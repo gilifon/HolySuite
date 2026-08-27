@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -39,6 +39,14 @@ namespace HolyLogger
                 CBX_HoverPopup.IsChecked = _main != null && _main.GetClusterHoverPopupEnabled();
                 CBX_AutoFillDxCall.IsChecked = s.ClusterAutoFillDxCall;
 
+                var sources = _main != null
+                    ? _main.GetEnabledClusterSpotSources()
+                    : new HashSet<string>(new[] { "telnet", "pota", "sota", "wwff" }, StringComparer.OrdinalIgnoreCase);
+                CBX_SourceTelnet.IsChecked = sources.Contains("telnet");
+                CBX_SourcePota.IsChecked   = sources.Contains("pota");
+                CBX_SourceSota.IsChecked   = sources.Contains("sota");
+                CBX_SourceWwff.IsChecked   = sources.Contains("wwff");
+
                 var sounds = BuildSoundList();
                 CB_NewCountrySound.ItemsSource = sounds;
                 CB_NewCountrySound.SelectedItem = PickSound(sounds, s.ClusterNewCountrySound);
@@ -72,6 +80,35 @@ namespace HolyLogger
             => sounds.Contains(saved, StringComparer.OrdinalIgnoreCase)
                 ? sounds.First(n => string.Equals(n, saved, StringComparison.OrdinalIgnoreCase))
                 : "Chime";
+
+        // The four Spot Source boxes share one handler. Every combination is legal EXCEPT none at
+        // all - an empty table teaches the operator nothing about why it is empty - so unticking the
+        // last remaining source is undone on the spot and the box stays ticked.
+        private void SpotSource_Changed(object sender, RoutedEventArgs e)
+        {
+            if (_loading || _main == null) return;
+
+            var box = sender as CheckBox;
+            if (box != null && box.IsChecked != true && CheckedSpotSources().Count == 0)
+            {
+                _loading = true;                 // re-ticking must not re-enter this handler
+                try { box.IsChecked = true; }
+                finally { _loading = false; }
+                return;
+            }
+
+            _main.SetEnabledClusterSpotSources(CheckedSpotSources());
+        }
+
+        private List<string> CheckedSpotSources()
+        {
+            var list = new List<string>();
+            if (CBX_SourceTelnet.IsChecked == true) list.Add("telnet");
+            if (CBX_SourcePota.IsChecked == true)   list.Add("pota");
+            if (CBX_SourceSota.IsChecked == true)   list.Add("sota");
+            if (CBX_SourceWwff.IsChecked == true)   list.Add("wwff");
+            return list;
+        }
 
         // One handler for every checkbox: push each toggle straight through to the live cluster.
         private void Setting_Changed(object sender, RoutedEventArgs e)

@@ -239,6 +239,9 @@
     <Setting Name="ClusterLotwOnly" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">False</Value>
     </Setting>
+    <Setting Name="ClusterSpotSources" Type="System.String" Scope="User">
+      <Value Profile="(Default)">telnet</Value>
+    </Setting>
     <Setting Name="ChannelsJson" Type="System.String" Scope="User">
       <Value Profile="(Default)" />
     </Setting>

@@ -73,7 +73,7 @@ namespace HolyLogger
         // Said in three pieces because the middle one is the link.
         internal static string KeyHelpBefore
         {
-            get { return "The check is done by " + Service.Label + ". It needs a key of your own. Get one at "; }
+            get { return "The check is done by " + Service.Label + ". It needs an API key of your own. Get one at "; }
         }
         internal static string KeyHelpLinkText { get { return Service.KeyPageText; } }
         internal static string KeyHelpAfter

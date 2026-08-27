@@ -9426,6 +9426,8 @@ namespace HolyLogger
             public string DXCallsign { get; set; }
             public string SpotterCallsign { get; set; }
             public string Comment { get; set; }
+            // "telnet" | "pota" | "sota" | "wwff" - see the Spot Source frame in Cluster Settings.
+            public string SpotSource { get; set; }
             public string Locator { get; set; }
             public double? DxLat { get; set; }
             public double? DxLon { get; set; }

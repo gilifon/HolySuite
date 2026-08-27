@@ -66,18 +66,21 @@
             <TextBlock Margin="6,8" FontSize="16" TextWrapping="Wrap"
                        Text="All application colors (form background, table headers, contest frames, …) are now edited in one place: View  ›  Color Scheme  ›  Customize Colors."/>
         </GroupBox>
-        <GroupBox Header="Graphics Box" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="370,0,0,0" Width="300" Height="220" FontSize="16">
+        <!-- No fixed Height: five radio buttons, a path box and a Browse button at 16pt come to
+             more than the 220 this was pinned at, and the button was sliced in half. Sized to its
+             own content, it cannot be outgrown by its contents again. -->
+        <GroupBox Header="Graphics Box" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="370,0,0,0" Width="300" FontSize="16">
             <StackPanel Margin="10">
                 <RadioButton x:Name="RB_MapDisplay_None" Content="Empty" GroupName="MapDisplay" FontSize="16" Margin="0,2" Checked="MapDisplayMode_Changed"/>
                 <RadioButton x:Name="RB_MapDisplay_Map" Content="Map" GroupName="MapDisplay" FontSize="16" Margin="0,2" Checked="MapDisplayMode_Changed"/>
                 <RadioButton x:Name="RB_MapDisplay_Compass" Content="Compass" GroupName="MapDisplay" FontSize="16" Margin="0,2" Checked="MapDisplayMode_Changed"/>
                 <RadioButton x:Name="RB_MapDisplay_QRZPhoto" Content="Photo from QRZ.com" GroupName="MapDisplay" FontSize="16" Margin="0,2" Checked="MapDisplayMode_Changed"/>
                 <RadioButton x:Name="RB_MapDisplay_CustomImage" Content="Custom image" GroupName="MapDisplay" FontSize="16" Margin="0,2" Checked="MapDisplayMode_Changed"/>
-                <TextBox x:Name="TB_CustomImagePath" Height="24" FontSize="16" Margin="0,5,0,0" IsReadOnly="True" VerticalContentAlignment="Center" BorderBrush="#AAAAAA" BorderThickness="1" HorizontalAlignment="Stretch"/>
-                <Button x:Name="Btn_BrowseImage" Content="Browse..." Width="80" Height="24" FontSize="16" Margin="0,5,0,0" HorizontalAlignment="Left" Click="Btn_BrowseImage_Click"/>
+                <TextBox x:Name="TB_CustomImagePath" Height="28" FontSize="16" Margin="0,5,0,0" IsReadOnly="True" VerticalContentAlignment="Center" BorderBrush="#AAAAAA" BorderThickness="1" HorizontalAlignment="Stretch"/>
+                <Button x:Name="Btn_BrowseImage" Content="Browse..." Width="90" Height="30" FontSize="16" Margin="0,5,0,0" HorizontalAlignment="Left" Click="Btn_BrowseImage_Click"/>
             </StackPanel>
         </GroupBox>
-        <GroupBox Header="Map" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="370,228,0,0" Width="300" Height="178" FontSize="16">
+        <GroupBox Header="Map" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="370,250,0,0" Width="300" Height="178" FontSize="16">
             <StackPanel Margin="10">
                 <!-- "Plot spots on map" moved to the Cluster window's gear (Cluster Settings), which is
                      now the single home for the cluster's display/behaviour settings. -->
@@ -89,7 +92,7 @@
         </GroupBox>
         <!-- Only whether the cluster RUNS and whether its window SHOWS live here. Everything about how
              the cluster looks/behaves is in the Cluster window's gear (Cluster Settings). -->
-        <GroupBox Header="Cluster" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="370,414,0,0" Width="330" Height="146" FontSize="16">
+        <GroupBox Header="Cluster" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="370,436,0,0" Width="330" Height="146" FontSize="16">
             <StackPanel Margin="10">
                 <CheckBox x:Name="CBX_ClusterActive" Content="Active" FontSize="16" Margin="0,2" Checked="ClusterActive_Changed" Unchecked="ClusterActive_Changed"/>
                 <CheckBox x:Name="CBX_ClusterVisible" Content="Visible" FontSize="16" Margin="0,2" Checked="ClusterVisible_Changed" Unchecked="ClusterVisible_Changed"/>

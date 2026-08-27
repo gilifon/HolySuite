@@ -272,11 +272,10 @@ namespace HolyLogger.OptionsUserControls
             // Trigger immediate graphics box refresh in main window
             GraphicsBoxModeChanged?.Invoke(this, EventArgs.Empty);
 
-            // Auto-open file browser when Custom image is selected for the first time
-            if (mode == 3 && string.IsNullOrWhiteSpace(Properties.Settings.Default.CustomMapImagePath))
-            {
-                Btn_BrowseImage_Click(sender, e);
-            }
+            // PICKING THE OPTION IS NOT ASKING FOR A FILE DIALOG. Choosing "Custom image" used to
+            // throw the file explorer open by itself, which is a window nobody asked for over a
+            // radio button nobody had finished thinking about. The Browse button is right underneath
+            // and it is the one that means "open the explorer".
         }
 
         private void Btn_BrowseImage_Click(object sender, RoutedEventArgs e)

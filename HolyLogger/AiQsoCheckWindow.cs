@@ -91,7 +91,10 @@ namespace HolyLogger
             // the Log Fixer has to be able to put the same thing in front of the operator when his
             // allowance runs out there. It stays on screen after a key is saved: the day the free
             // allowance is used up is the day he wants to switch without hunting for a setting.
-            _keyPanel = new AiServicePanel
+            // COMPACT, LIKE THE LOG FIXER'S DIALOG. This window asks a question about one QSO; it
+            // is not where an account is set up. With a key it shows the model and nothing else,
+            // and without one it says so and offers the page that fixes it.
+            _keyPanel = new AiServicePanel(showModel: true, compact: true)
             {
                 Say = text => { if (_status != null) _status.Text = text; },
                 KeySaved = Ask,
@@ -100,7 +103,7 @@ namespace HolyLogger
                     if (_status == null) return;
                     _status.Text = AiQsoCheck.HasKey
                         ? "Press Ask to check this QSO."
-                        : "Enter a key for this service to run the check.";
+                        : "No API key yet - set one in Options > AI Service.";
                 }
             };
             Grid.SetRow(_keyPanel, 1);
@@ -212,7 +215,7 @@ namespace HolyLogger
                 if (AiQsoCheck.HasKey) Ask();
                 else
                 {
-                    _status.Text = "Enter a key for this service to run the first check.";
+                    _status.Text = "No API key yet - set one in Options > AI Service.";
                     _keyPanel.FocusKey();
                 }
             };
@@ -251,17 +254,10 @@ namespace HolyLogger
             {
                 _keyPanel.Refresh();
 
-                // A KEY HE ALREADY HAS IS NOT A KEY HE HAS TO FETCH AGAIN. The keys are kept one per
-                // service, so changing the service in the list above is enough to arrive here with
-                // none - and "enter a key", said to a man who pasted one last week, sends him off to
-                // a signup page for a second account he does not need.
-                string elsewhere = AiServices.WithKeysExcept(AiServices.Current);
-                _status.Text = elsewhere.Length > 0
-                    ? "Enter a key for this service - or pick " + elsewhere
-                      + " in the list above, which already has one."
-                    : "Enter a key for this service to run the check.";
-
-                _keyPanel.FocusKey();
+                // ONE PLACE TO SET A KEY, AND THIS IS NOT IT. The line about picking another
+                // service that already has a key belonged to the days of two services; now there is
+                // one, and the key is set on one page.
+                _status.Text = "No API key yet - set one in Options > AI Service.";
                 return;
             }
 

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -73,12 +74,27 @@ namespace HolyLogger
             "correction, and what each of two databases answered for that callsign at that " +
             "moment.\n\n" +
 
-            "cty.dat knows callsign prefixes as they stand today. Club Log knows what a " +
-            "particular callsign WAS between two moments - a DXpedition, a special licence, a " +
-            "reissued call - and its records begin and end at a time of day, not at midnight. " +
-            "When the two disagree it is usually the contact's own date and time against Club " +
-            "Log's window that settles it.\n\n" +
+            "cty.dat knows callsign prefixes as they stand TODAY, and nothing about when they " +
+            "changed hands. Club Log knows what a particular callsign or prefix WAS between two " +
+            "moments - a DXpedition, a special licence, a reissued call - and its records begin " +
+            "and end at a time of day, not at midnight.\n\n" +
 
+            "A DATE BEATS A PREFIX RULE - WHILE IT LASTS. When you are given a Club Log record " +
+            "with dates and the contact falls INSIDE them, that record is the answer, and a " +
+            "prefix rule that holds today does not overrule it.\n\n" +
+
+            "WHEN THE CONTACT FALLS OUTSIDE THE RECORD, SET THAT RECORD ASIDE AND WORK THE " +
+            "COUNTRY OUT YOURSELF. Outside its dates the record says nothing at all about this " +
+            "contact. Decide what the callsign was by what YOU know of callsign allocation on " +
+            "that date - the country the prefix and the call area belong to, and what a " +
+            "suffix like /1 or /P means about where the operator was.\n\n" +
+
+            "DO NOT SIMPLY TAKE WHAT A DATABASE SAYS INSTEAD. Both of them carry leftovers of " +
+            "expired operations against ordinary callsigns: cty.dat still lists K4A as Puerto " +
+            "Rico because of a week in 2014, though a 1x1 callsign like K4A in any other year " +
+            "is an ordinary mainland United States special-event call. A database entry is " +
+            "evidence, not an answer - if you know it is the residue of an operation that had " +
+            "ended, say so and answer accordingly.\n\n" +
             "Answer with ONE LINE PER NUMBER, nothing before them and nothing after:\n" +
             "<number>: LOG - <reason in at most fifteen words>\n" +
             "<number>: SUGGESTED - <reason in at most fifteen words>\n" +
@@ -164,10 +180,14 @@ namespace HolyLogger
                 // he watches for a minute or two says which one he is watching.
                 string who = AiServices.Current.Model;
 
+                // Marked for bold. The window turns **...** into bold text; anywhere else the
+                // markers are simply part of a sentence nobody is reading with a magnifying glass.
+                string whoBold = "**" + who + "**";
+
                 if (say != null)
                     say(batches == 1
-                        ? count + " QSO" + (count == 1 ? " is" : "s are") + " verified by " + who
-                        : "Asking " + who + " - request " + (b + 1) + " of " + batches + "...");
+                        ? count + " QSO" + (count == 1 ? " is" : "s are") + " verified by " + whoBold
+                        : "Asking " + whoBold + " - request " + (b + 1) + " of " + batches + "...");
 
                 // EVERY ANSWER THE MOMENT IT IS WRITTEN, not the whole list at the end.
                 //
@@ -187,7 +207,7 @@ namespace HolyLogger
 
                     if (answered != null) answered(index, answer);
                     if (say != null)
-                        say(who + " has answered " + settled + " of " + questions.Count + "...");
+                        say(whoBold + " has answered " + settled + " of " + questions.Count + "...");
                 };
 
                 string input = Describe(questions, from, count);
@@ -258,9 +278,23 @@ namespace HolyLogger
             return sb.ToString();
         }
 
-        // WHAT EACH DATABASE ANSWERED, asked with the QSO's own date AND time, the way the rest of the
-        // program asks - four hours in a day decided Swains Island against American Samoa once, and
-        // asking at midnight would have got it wrong.
+        // EVERYTHING THE PROGRAM KNOWS ABOUT THIS CALLSIGN, NOT ITS CONCLUSIONS.
+        //
+        // This used to send two sentences - "cty.dat matched CQ8 which is Azores", "Club Log matched
+        // CQ which is Portugal" - and keep the rest to itself. The rest is the argument. HolyLogger
+        // holds, for every callsign, the longer prefix Club Log DOES have and the exact dates it
+        // applied between; it knew that CQ8 means Azores only from 2009 and never said so, while
+        // asking an AI about a 1991 QSO to work that out from memory.
+        //
+        // It could not, and it showed: across six runs of the same six QSOs, five rows came back
+        // identical every time and CQ8M moved four different ways - twice a guess one way, twice the
+        // other, twice an honest "I would need the 1991 licence". The one row we withheld the
+        // evidence for was the only unstable row in the set.
+        //
+        // So everything goes. Whether a record is against this EXACT callsign or merely its prefix,
+        // whether it is a historic record, the near-miss prefix with its from and to dates, and the
+        // entity numbers - all of it in plain lines the model can compare with the QSO's own date
+        // instead of remembering.
         private static IEnumerable<string> Databases(QSO q)
         {
             var lines = new List<string>();
@@ -282,8 +316,50 @@ namespace HolyLogger
 
             lines.Add("- cty.dat says: " + x.CtySays);
             lines.Add("- Club Log says: " + x.ClubSays);
+
+            // HOW MUCH OF THE CALLSIGN EACH ONE RECOGNISED. "Club Log matched CQ" and "cty.dat
+            // matched CQ8" are two different strengths of answer, and which of them matched more of
+            // the callsign is often the whole of the argument.
+            if (Text(x.CtyMatched).Length > 0)
+                lines.Add("- cty.dat matched the prefix: " + Text(x.CtyMatched)
+                          + (x.CtyCode > 0 ? "  (entity " + x.CtyCode + ")" : string.Empty));
+
+            if (Text(x.ClubMatched).Length > 0)
+                lines.Add("- Club Log matched: " + Text(x.ClubMatched)
+                          + (x.ClubCode > 0 ? "  (entity " + x.ClubCode + ")" : string.Empty));
+
+            // A RECORD AGAINST THIS VERY CALLSIGN beats one read off a prefix, and the model cannot
+            // tell the two apart unless it is told which it has.
+            if (x.ClubExactCall)
+                lines.Add("- Club Log holds a record for this EXACT callsign, not merely its prefix.");
+
+            if (x.ClubHistoric)
+                lines.Add("- Club Log's record for it is a historic one, tied to dates.");
+
+            // THE FACT THAT WAS BEING WITHHELD. Club Log holds a longer prefix that did NOT apply on
+            // this QSO's date - which is precisely why its answer came back shorter than cty.dat's.
+            // Without the dates the model is left to remember when a prefix changed hands; with them
+            // there is nothing to remember.
+            if (Text(x.ClubNearKey).Length > 0)
+            {
+                string from = x.ClubNearFrom == DateTime.MinValue
+                    ? "the beginning"
+                    : x.ClubNearFrom.ToString("dd-MM-yyyy", CultureInfo.InvariantCulture);
+
+                string to = x.ClubNearTo == DateTime.MaxValue || x.ClubNearTo == DateTime.MinValue
+                    ? "now"
+                    : x.ClubNearTo.ToString("dd-MM-yyyy", CultureInfo.InvariantCulture);
+
+                lines.Add("- Club Log ALSO holds " + Text(x.ClubNearKey) + " as "
+                          + Text(x.ClubNearName)
+                          + (x.ClubNearCode > 0 ? " (entity " + x.ClubNearCode + ")" : string.Empty)
+                          + ", but only from " + from + " to " + to
+                          + " - which does NOT cover this contact's date.");
+            }
+
             foreach (string note in x.ExtraNotes)
                 lines.Add("- Club Log note: " + note.Replace("**", string.Empty));
+
             return lines;
         }
 

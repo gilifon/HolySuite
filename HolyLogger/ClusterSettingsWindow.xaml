@@ -14,6 +14,7 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
         <GroupBox Grid.Row="0" Header="Display" FontSize="17" Padding="10,8">
@@ -38,7 +39,27 @@
             </StackPanel>
         </GroupBox>
 
-        <GroupBox Grid.Row="1" Header="Sound alerts" FontSize="17" Padding="10,8" Margin="0,14,0,0">
+        <GroupBox Grid.Row="1" Header="Spot source" FontSize="17" Padding="10,8" Margin="0,14,0,0">
+            <StackPanel>
+                <!-- HolyCluster merges four feeds into the one stream HolyLogger listens to. These
+                     tick which of them reach the table. At least one is always on: unticking the
+                     last one is refused in code and the box simply stays ticked. -->
+                <CheckBox x:Name="CBX_SourceTelnet" Content="DX cluster (telnet)" FontSize="16" Margin="0,4"
+                          ToolTip="Ordinary spots from the DX cluster telnet servers"
+                          Checked="SpotSource_Changed" Unchecked="SpotSource_Changed"/>
+                <CheckBox x:Name="CBX_SourcePota" Content="POTA - Parks On The Air" FontSize="16" Margin="0,4"
+                          ToolTip="Spots collected from pota.app"
+                          Checked="SpotSource_Changed" Unchecked="SpotSource_Changed"/>
+                <CheckBox x:Name="CBX_SourceSota" Content="SOTA - Summits On The Air" FontSize="16" Margin="0,4"
+                          ToolTip="Spots collected from the SOTA web site"
+                          Checked="SpotSource_Changed" Unchecked="SpotSource_Changed"/>
+                <CheckBox x:Name="CBX_SourceWwff" Content="WWFF - World Wide Flora &amp; Fauna" FontSize="16" Margin="0,4"
+                          ToolTip="Spots collected from spots.wwff.co"
+                          Checked="SpotSource_Changed" Unchecked="SpotSource_Changed"/>
+            </StackPanel>
+        </GroupBox>
+
+        <GroupBox Grid.Row="2" Header="Sound alerts" FontSize="17" Padding="10,8" Margin="0,14,0,0">
             <StackPanel>
                 <StackPanel Orientation="Horizontal" Margin="0,4">
                     <CheckBox x:Name="CBX_NewCountrySound" VerticalAlignment="Center" FontSize="16"
@@ -74,7 +95,7 @@
             </StackPanel>
         </GroupBox>
 
-        <Button Grid.Row="2" x:Name="BtnClose" Content="Close" HorizontalAlignment="Center"
+        <Button Grid.Row="3" x:Name="BtnClose" Content="Close" HorizontalAlignment="Center"
                 Padding="28,6" FontSize="16" Margin="0,14,0,0" Click="BtnClose_Click"/>
     </Grid>
 </Window>

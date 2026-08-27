@@ -161,7 +161,7 @@ namespace HolyLogger
             {
                 var heading = new TextBlock
                 {
-                    Text = "Which AI answers when you ask about a QSO",
+                    Text = "Setting up an AI service",
                     FontSize = 18,
                     FontWeight = FontWeights.Bold,
                     TextWrapping = TextWrapping.Wrap,
@@ -172,9 +172,20 @@ namespace HolyLogger
 
                 var note = new TextBlock
                 {
-                    Text = "Used by Ask AI to check this QSO, and by Check with AI in the Log "
-                         + "Fixer. The key is kept on this computer only, and each service keeps its "
-                         + "own - so moving between them never means fetching a key twice.",
+                    // HIS OWN WORDS, 2026-08-27. Written as an operator hears it: what the thing
+                    // is, who provides it, what it costs, and the one fear worth answering before
+                    // he types a card number - that nothing is kept and nothing is charged twice.
+                    Text = "You can set an AI service that will help you to check your QSOs. The "
+                         + "provider of the AI is OpenRouter and we will guide you how to open an "
+                         + "account with them." + Environment.NewLine
+                         + "You will be able to use GPT, Claude or Gemini."
+                         + Environment.NewLine + Environment.NewLine
+                         + "You will have to create a credit by paying with your credit card, which "
+                         + "will not be saved and will not be charged again if you use the whole "
+                         + "credit amount." + Environment.NewLine
+                         + "Asking the AI to verify 10 QSOs in one question will cost a few cents."
+                         + Environment.NewLine + Environment.NewLine
+                         + "An API key will be saved on this computer.",
                     FontSize = 16,
                     TextWrapping = TextWrapping.Wrap,
                     Opacity = 0.85,

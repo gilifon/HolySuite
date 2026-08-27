@@ -113,54 +113,19 @@ namespace HolyLogger
 
         internal static readonly AiService[] All =
         {
-            new AiService
-            {
-                Name = Gemini,
-                Label = "Google Gemini - free to start, paid if you want more",
-                ShortName = "Google Gemini",
-                Endpoint = "https://generativelanguage.googleapis.com/v1beta/interactions",
-                DefaultModel = "gemini-3.7-flash",
-                ChatShape = false,
-                Bearer = false,
-                KeyPageUrl = "https://aistudio.google.com/apikey",
-                KeyPageText = "aistudio.google.com/apikey",
-                // "NOTHING IS EVER CHARGED" WAS TOO STRONG. It is true of the free allowance and only
-                // of that: the same key can be put on billing later, and then it is charged like any
-                // other. A promise the program cannot keep is worse than the plain arrangement.
-                Price = "Free to start. The allowance is small - around twenty checks a day - and when "
-                      + "it runs out it starts again tomorrow. Nothing is charged unless you turn on "
-                      + "billing for the key yourself.",
-                Steps = new[]
-                {
-                    "Sign in with any Google account - a Gmail address is one.",
-                    "Open the key page below and press Create API key.",
-                    "Copy the key it shows you and paste it in the box.",
-                    "No credit card is asked for to start. One is needed only if you later turn "
-                    + "on billing to go past the free allowance."
-                },
-                // NO BALANCE TO SHOW, BUT A WAY TO THE ACCOUNT ALL THE SAME. Google reports no
-                // figure this program could count down, so there is no credit line for Gemini - but
-                // somebody who wants more than twenty questions a day still has to be told where to
-                // go, and "find it yourself" is not an instruction.
-                ModelsUrl = "https://generativelanguage.googleapis.com/v1beta/models",
-                ModelsUrlNeedsKey = true,
-                TopUpUrl = "https://aistudio.google.com/apikey",
-                TopUpText = "aistudio.google.com/apikey",
-                ReadKey = () => Properties.Settings.Default.AiApiKey,
-                WriteKey = v => Properties.Settings.Default.AiApiKey = v,
-                ModelChoices = new[]
-                {
-                    "gemini-3.7-flash|free allowance, fast, the one this program starts with",
-                    "gemini-3.7-pro|thinks harder, needs billing turned on",
-                },
-                ReadModel = () => Properties.Settings.Default.AiModelGemini,
-                WriteModel = v => Properties.Settings.Default.AiModelGemini = v
-            },
-
+            // GOOGLE GEMINI IS NO LONGER OFFERED, and its definition is kept out of this list
+            // rather than out of the file - the request shape it needs is still in AiQsoCheck, and
+            // an operator can still reach Gemini through OpenRouter as google/gemini-3.7-flash.
+            //
+            // Why: its free allowance is twenty checks a day, which runs out on the first real log,
+            // and on the same six QSOs it answered differently from the four paid models that all
+            // agreed with each other. A service offered inside this program is one this program is
+            // standing behind, and there is no promise here to give anybody an AI for nothing.
+            //
             new AiService
             {
                 Name = OpenRouter,
-                Label = "OpenRouter - free models, or paid for GPT, Claude and others",
+                Label = "OpenRouter - paid, reaches GPT, Claude and Gemini",
                 ShortName = "OpenRouter",
                 Endpoint = "https://openrouter.ai/api/v1/chat/completions",
                 // A NAMED MODEL, NOT "auto". The chooser was picked to survive model names being
@@ -172,10 +137,11 @@ namespace HolyLogger
                 // A name that is retired is still a line in the settings file, which is what
                 // AiModelOpenRouter is for - the operator can put a working one in without waiting
                 // for a new build. That was always the real answer to the worry.
-                // FREE, AND NAMED. A paid model here would have refused outright for anyone with no
-                // credit on the account, which is most people trying this - so the pinned model is
-                // one of the free ones. Checked against openrouter.ai/api/v1/models on 2026-08-25.
-                DefaultModel = "nvidia/nemotron-3-ultra-550b-a55b:free",
+                // THE DEFAULT IS A PAID ONE NOW. It was a free model, chosen so that a key with no
+                // credit still answered - but the free ones answered worse, and a wrong country is
+                // not a bargain. Anyone who does not want to pay has Google Gemini and its own free
+                // allowance; anyone here has already put credit on the account.
+                DefaultModel = "anthropic/claude-sonnet-5",
                 ChatShape = true,
                 Bearer = true,
                 KeyPageUrl = "https://openrouter.ai/keys",
@@ -186,22 +152,25 @@ namespace HolyLogger
                 // could not be: with an empty balance the service uses its FREE models, which have a
                 // daily cap instead of a price. A description that sends somebody to fetch a credit
                 // card he does not need is worse than no description.
-                Price = "Free to begin with: on an account with no credit it uses the free models, "
-                      + "which cost nothing and have a daily cap of their own. Add credit and it "
-                      + "reaches the paid models too - prepaid, so nothing can ever be charged "
-                      + "beyond what you put on, and a limit on the key caps it further.",
+                Price = "Paid, and prepaid: the credit goes on the account first and nothing can ever "
+                      + "be charged beyond it. A run over a few QSOs costs a few cents. Put a limit "
+                      + "on the API key as well and that limit is the most it can spend, whatever "
+                      + "happens here.",
+                // THE CREDIT COMES FIRST. This service is the only one offered now, and it answers
+                // nothing at all on an empty account - so "add credit" is step two, not an optional
+                // step five for people who want something better. The order here is the order an
+                // operator has to do it in, and nothing is listed before it is needed.
                 Steps = new[]
                 {
                     "Open openrouter.ai and make an account.",
-                    "Open the key page below and press Create Key.",
-                    "Copy the key and paste it in the box. That is enough to start - with no credit "
-                    + "on the account it uses the free models, and no card is asked for.",
-                    "Only if you want the paid models: add some credit, and give the key a credit "
-                    + "limit while you are there. That limit is the most it can ever spend, and this "
-                    + "window shows you what is left of it.",
-                    "Then name the model in Options - AI Service. anthropic/claude-opus-5 is one of "
-                    + "the strongest; anthropic/claude-sonnet-5 costs about half. A question about "
-                    + "six QSOs runs to a penny or two.",
+                    "Put credit on the account: Credits, then Add Credits. Five dollars is plenty - "
+                    + "a question about six QSOs costs a few cents.",
+                    "It is prepaid, so that sum is the ceiling. Leave Auto Top-Up alone and nothing "
+                    + "can ever be charged beyond what you put on.",
+                    "Open the API key page below and press + New Key.",
+                    "Give the API key a credit limit while you are there, if you want a smaller ceiling "
+                    + "still. This window shows you what is left of it.",
+                    "Copy the API key and paste it in the box, then choose a model below.",
                     "An existing ChatGPT or Claude SUBSCRIPTION cannot be used here - those are "
                     + "separate accounts and buy nothing outside their own websites."
                 },
@@ -212,14 +181,20 @@ namespace HolyLogger
                 TopUpText = "openrouter.ai/credits",
                 ReadKey = () => Properties.Settings.Default.AiApiKeyOpenRouter,
                 WriteKey = v => Properties.Settings.Default.AiApiKeyOpenRouter = v,
+                // NO FREE MODELS HERE, AND THE REASON IS MEASURED. Put the same six QSOs to all of
+                // them: the four paid models came back with the same verdict on every row and the
+                // same rule quoted for it, while the free ones disagreed on two rows each. Offering
+                // a model that answers worse, beside better ones, is offering somebody a way to be
+                // told the wrong country about his own log.
+                //
+                // Nobody is shut out - Google Gemini is still there with its own free allowance -
+                // and any name at all can still be typed into the box by hand.
                 ModelChoices = new[]
                 {
-                    "nvidia/nemotron-3-ultra-550b-a55b:free|free, no credit needed",
-                    "z-ai/glm-5.2:free|free, smaller and quicker",
-                    "anthropic/claude-opus-5|paid, Anthropic, the dearest of these",
-                    "anthropic/claude-sonnet-5|paid, Anthropic, cheaper than Opus",
-                    "openai/gpt-5.2|paid, OpenAI",
-                    "google/gemini-3.7-flash|paid, Google, no daily allowance to run out",
+                    "anthropic/claude-opus-5|Anthropic, the dearest of these",
+                    "anthropic/claude-sonnet-5|Anthropic, cheaper than Opus",
+                    "openai/gpt-5.2|OpenAI",
+                    "google/gemini-3.7-flash|Google, no daily allowance to run out",
                 },
                 ReadModel = () => Properties.Settings.Default.AiModelOpenRouter,
                 WriteModel = v => Properties.Settings.Default.AiModelOpenRouter = v
@@ -599,14 +574,14 @@ namespace HolyLogger
                     // THE CAP HE SET, AND WHAT IS LEFT OF IT. This is the case worth having: a
                     // number that cannot be exceeded, and how much of it is still his.
                     if (cap.HasValue && left.HasValue)
-                        return "Credit left on this key: " + Money(left.Value)
+                        return "Credit left on this API key: " + Money(left.Value)
                              + " of " + Money(cap.Value) + ".";
 
                     // No cap on the key. Saying only what has been spent would read as reassurance;
                     // what he needs to know is that nothing here stops at a number.
                     if (spent.HasValue)
-                        return "Spent through this key so far: " + Money(spent.Value)
-                             + ". No limit is set on the key, so it can spend whatever credit is on "
+                        return "Spent through this API key so far: " + Money(spent.Value)
+                             + ". No limit is set on the API key, so it can spend whatever credit is on "
                              + "the account.";
 
                     return string.Empty;

@@ -3198,6 +3198,11 @@ namespace HolyLogger
                     string bandText = spotToken["band"] != null ? spotToken["band"].ToString() : string.Empty;
                     string mode = (string)spotToken["mode"] ?? string.Empty;
                     string comment = (string)spotToken["comment"] ?? string.Empty;
+                    // Where the spot came from. HolyCluster tags only its three award-programme
+                    // collectors ("pota"/"sota"/"wwff"); an ordinary DX-cluster spot carries no
+                    // "type" at all, so no tag means telnet. Kept as one of the four lowercase
+                    // names the Spot Source settings frame stores.
+                    string spotSource = NormalizeClusterSpotSource((string)spotToken["type"]);
                     string dxLocator = ExtractClusterSpotLocator(spotToken, comment);
 
                     double? dxLat = null;
@@ -3270,6 +3275,7 @@ namespace HolyLogger
                         DXCallsign = dx,
                         SpotterCallsign = spotter,
                         Comment = comment,
+                        SpotSource = spotSource,
                         Locator = dxLocator,
                         DxLat = dxLat,
                         DxLon = dxLon,
@@ -4141,6 +4147,70 @@ namespace HolyLogger
             return enabled.Contains(normalized);
         }
 
+        // ---- Spot Source ------------------------------------------------------------------
+        // HolyCluster feeds four collectors into one stream: the DX-cluster telnet servers plus the
+        // POTA, SOTA and WWFF web sites. Only the last three are tagged in the feed (a "type" of
+        // "pota"/"sota"/"wwff"); an untagged spot came off telnet. The operator picks which of the
+        // four he wants to see, and at least one is always on - see ClusterSettingsWindow.
+
+        internal static readonly string[] ClusterSpotSourceOptions = { "telnet", "pota", "sota", "wwff" };
+
+        // Anything the feed sends that is not one of the three tags is treated as a telnet spot,
+        // so an unknown future tag still shows up rather than vanishing.
+        private static string NormalizeClusterSpotSource(string typeText)
+        {
+            string t = (typeText ?? string.Empty).Trim().ToLowerInvariant();
+            return (t == "pota" || t == "sota" || t == "wwff") ? t : "telnet";
+        }
+
+        private string _enabledSpotSourcesRaw;
+        private HashSet<string> _enabledSpotSourcesCache;
+
+        internal HashSet<string> GetEnabledClusterSpotSources()
+        {
+            string raw = Properties.Settings.Default.ClusterSpotSources ?? string.Empty;
+            if (_enabledSpotSourcesCache != null && string.Equals(raw, _enabledSpotSourcesRaw, StringComparison.Ordinal))
+                return _enabledSpotSourcesCache;
+
+            var set = new HashSet<string>(
+                raw.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries)
+                   .Select(v => v.Trim().ToLowerInvariant())
+                   .Where(v => ClusterSpotSourceOptions.Contains(v)),
+                StringComparer.OrdinalIgnoreCase);
+
+            // An empty or corrupt setting would hide every spot, so it falls back to all four.
+            if (set.Count == 0)
+                set = new HashSet<string>(ClusterSpotSourceOptions, StringComparer.OrdinalIgnoreCase);
+
+            _enabledSpotSourcesRaw = raw;
+            _enabledSpotSourcesCache = set;
+            return set;
+        }
+
+        // Called by the settings frame. An empty set is refused the same way as above: the last
+        // remaining source cannot be turned off.
+        internal void SetEnabledClusterSpotSources(IEnumerable<string> enabled)
+        {
+            var set = new HashSet<string>(
+                (enabled ?? Enumerable.Empty<string>()).Select(v => (v ?? string.Empty).Trim().ToLowerInvariant()),
+                StringComparer.OrdinalIgnoreCase);
+            if (set.Count == 0)
+                set = new HashSet<string>(ClusterSpotSourceOptions, StringComparer.OrdinalIgnoreCase);
+
+            Properties.Settings.Default.ClusterSpotSources =
+                string.Join(",", ClusterSpotSourceOptions.Where(o => set.Contains(o)));
+            Properties.Settings.Default.Save();
+
+            // The whole 1500-spot buffer is re-filtered, so the table reacts to the click at once
+            // instead of only from the next spot onwards.
+            RefreshClusterVisibleSpots();
+        }
+
+        private bool IsClusterSpotSourceEnabled(string spotSource)
+        {
+            return GetEnabledClusterSpotSources().Contains(NormalizeClusterSpotSource(spotSource));
+        }
+
         private void RefreshClusterVisibleSpots()
         {
             if (clusterVisibleSpots == null)
@@ -4150,6 +4220,7 @@ namespace HolyLogger
 
             bool lotwOnly = Properties.Settings.Default.ClusterLotwOnly;
             var ordered = clusterAllSpots.Where(s => IsClusterBandEnabled(s.BandText) && IsClusterModeEnabled(s.Mode))
+                                         .Where(s => IsClusterSpotSourceEnabled(s.SpotSource))
                                          .Where(s => !lotwOnly || s.IsLotwUser)
                                          .Where(s => s.UnixTime > 0 && s.UnixTime >= DateTimeOffset.UtcNow.ToUnixTimeSeconds() - (clusterLastMinutesFilterValue * 60L))
                                          .OrderByDescending(s => s.UnixTime);
@@ -4237,6 +4308,8 @@ namespace HolyLogger
                     if (s.UnixTime <= 0 || s.UnixTime < cutoff)
                         continue;
                     if (!IsClusterModeEnabled(s.Mode))
+                        continue;
+                    if (!IsClusterSpotSourceEnabled(s.SpotSource))
                         continue;
                     if (string.IsNullOrWhiteSpace(s.BandText))
                         continue;

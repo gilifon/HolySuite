@@ -2876,6 +2876,40 @@ namespace HolyLogger
             return value.ToString(CultureInfo.InvariantCulture).PadLeft(widest);
         }
 
+        // THE LINE THE OPERATOR WATCHES, WITH THE MODEL NAME IN BOLD.
+        //
+        // Which model is answering is the one word on that line worth finding at a glance - it is
+        // what he is choosing between, and what makes 5-1 into 4-2. A TextBlock shows one weight of
+        // text unless it is given Inlines, so **...** is turned into a bold run and everything else
+        // is left as it stands.
+        private void SaySummary(string text)
+        {
+            if (TB_KindsSummary == null) return;
+
+            TB_KindsSummary.Inlines.Clear();
+
+            string rest = text ?? string.Empty;
+            bool bold = false;
+
+            while (rest.Length > 0)
+            {
+                int mark = rest.IndexOf("**", StringComparison.Ordinal);
+                string piece = mark < 0 ? rest : rest.Substring(0, mark);
+
+                if (piece.Length > 0)
+                {
+                    var run = new Run(piece);
+                    if (bold) run.FontWeight = FontWeights.Bold;
+                    TB_KindsSummary.Inlines.Add(run);
+                }
+
+                if (mark < 0) break;
+
+                rest = rest.Substring(mark + 2);
+                bold = !bold;
+            }
+        }
+
         // THE VERDICTS AS THEY STAND, TAKEN HERE AND NOT IN THE WRITER. The report is written off the
         // UI thread - the country explanations are two database lookups apiece - and the rows it would
         // have to read them from are the window's own, changing as he ticks. Copied out first, what
@@ -2950,19 +2984,25 @@ namespace HolyLogger
                 return;
             }
 
-            // THE KEY BOX ITSELF, HERE, NOT DIRECTIONS TO WHERE IT LIVES.
+            // NO KEY: SAY SO, AND OFFER THE PLACE IT IS SET.
             //
-            // This used to say "right-click any QSO and choose 'Ask AI to check this QSO' - that
-            // window asks for the key once" : an errand across the program, through a window he did
-            // not want, to reach a box that fits perfectly well right here. He pressed a button; the
-            // one thing standing between him and the answer should be put in front of him.
-            //
-            // The chooser was made a window of its own for exactly this - so it can be opened
-            // wherever the need turns up - and it also says which service the missing key belongs
-            // to, since a key saved for another one is the usual reason to be standing here.
+            // This used to open a small chooser of its own. There is now one page that does the
+            // whole job - Options > AI Service, with the credit, the pictures, the key box and the
+            // model - and a second window that does half of it is a second place to keep right. So
+            // the message says what is missing and the button goes straight there, at the AI page,
+            // rather than dropping him at the top of Options to find it.
             if (!AiQsoCheck.HasKey)
             {
-                new AiServiceWindow(this).ShowDialog();
+                if (!HolyMessageBox.ShowConfirm(
+                        "No API key is set yet." + gap
+                        + "The AI needs a key of your own before it can check anything. Set it up in "
+                        + "Options > AI Service - it takes a couple of minutes and there are pictures "
+                        + "for every step.",
+                        "Check with AI", HolyMsgType.Info, this, 0, "Set it up now", "Cancel")) return;
+
+                var options = new OptionsWindow { Owner = this };
+                options.AiItem.IsSelected = true;
+                options.ShowDialog();
 
                 // He may have pasted a key, picked a service that already had one, or closed it and
                 // thought better of the whole thing. Only the first two mean carrying on, and asking
@@ -2984,7 +3024,7 @@ namespace HolyLogger
             // THE SERVICE IS PART OF THE QUESTION, so it is named here and can be changed here.
             // AiRunPrompt is this dialog with the chooser standing in it.
             string asking =
-                  rows.Count + " QSO" + (rows.Count == 1 ? "" : "s") + " will be checked by AI."
+                  "**" + rows.Count + " QSO" + (rows.Count == 1 ? "" : "s") + "** will be checked by AI."
                 + (already > 0
                     ? Environment.NewLine + already + (already == 1 ? " has" : " have")
                       + " been answered already and will not be asked again."
@@ -3082,6 +3122,10 @@ namespace HolyLogger
             // be a lie about who said it.
             string who = AiServices.Current.ShortName + " (" + AiServices.Current.Model + ")";
 
+            // Set when he picks another model after an allowance ran out, so the run restarts with
+            // it instead of leaving him at a dead end.
+            bool startAgain = false;
+
             bool settled = false;
             Action settle = () =>
             {
@@ -3100,7 +3144,7 @@ namespace HolyLogger
             {
                 Dictionary<int, AiCountryVote.Answer> answers =
                     await AiCountryVote.AskAsync(questions,
-                        text => Dispatcher.Invoke(new Action(() => TB_KindsSummary.Text = text)),
+                        text => Dispatcher.Invoke(new Action(() => SaySummary(text))),
                         _aiRunning.Token,
 
                         // EACH VERDICT PAINTED AS IT ARRIVES. The answers come back one line at a
@@ -3260,7 +3304,13 @@ namespace HolyLogger
                         ex.Message + gap + "Choose a different AI service now?",
                         "Check with AI", HolyMsgType.Warning, this))
                 {
-                    new AiServiceWindow(this).ShowDialog();
+                    // STRAIGHT BACK TO THE RUN DIALOG, WHICH IS ALREADY THE CHOOSER.
+                    //
+                    // Saying yes here used to open a window to pick a model in, and pressing its
+                    // button then opened the run dialog to press OK in - two windows and three
+                    // presses to answer one question. The run dialog holds the service, the model,
+                    // the credit and an OK: it is the only window this needed.
+                    startAgain = true;
                 }
                 else if (!spent)
                 {
@@ -3271,6 +3321,12 @@ namespace HolyLogger
             {
                 if (_aiRunning != null) { _aiRunning.Dispose(); _aiRunning = null; }
                 settle();
+
+                // Queued rather than called: this one is still inside its own finally, and starting
+                // the next before that has finished would meet its own half-cleared state.
+                if (startAgain && IsLoaded)
+                    Dispatcher.BeginInvoke(new Action(() => Btn_Ai_Click(this, null)),
+                                           System.Windows.Threading.DispatcherPriority.Background);
                 // The ticks may have moved under it: every row the AI gave to the log has just lost
                 // its own, so the count on the Fix button is no longer the one it was showing.
                 UpdateFixButton();

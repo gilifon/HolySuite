@@ -778,6 +778,12 @@
     <Resource Include="HolyLogger icon.ico" />
     <Resource Include="Images\HolyLogger icon.ico" />
     <Resource Include="Images\HolyLogger icon.png" />
+    <Resource Include="Images\openrouter_credits.png" />
+    <Resource Include="Images\openrouter_amount.png" />
+    <Resource Include="Images\openrouter_onetime.png" />
+    <Resource Include="Images\openrouter_newkey.png" />
+    <Resource Include="Images\openrouter_keylimit.png" />
+    <Resource Include="Images\openrouter_copykey.png" />
     <Resource Include="Images\upload_log.png" />
     <Resource Include="Images\qrz_mini_icon.png" />
     <Resource Include="Images\sign.png" />

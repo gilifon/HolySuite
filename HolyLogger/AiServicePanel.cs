@@ -3,6 +3,7 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
 
 namespace HolyLogger
 {
@@ -47,11 +48,22 @@ namespace HolyLogger
             if (_commitModel != null) _commitModel();
         }
 
-        internal AiServicePanel() : this(false) { }
+        // COMPACT: everything about SETTING IT UP is left out while there is already a key.
+        //
+        // The run dialog is not the place to be taught how to open an account. Once a key is saved,
+        // the only thing there worth a decision is which model answers - so the how-to button, the
+        // line saying a key exists, and the box to replace it all go, and what is left is one row.
+        // With no key it shows the lot, because then setting it up IS the decision.
+        private readonly bool _compact;
 
-        internal AiServicePanel(bool showModel)
+        internal AiServicePanel() : this(false, false) { }
+
+        internal AiServicePanel(bool showModel) : this(showModel, false) { }
+
+        internal AiServicePanel(bool showModel, bool compact)
         {
             _showModel = showModel;
+            _compact = compact;
             Margin = new Thickness(0, 0, 0, 10);
 
             // ── which service ───────────────────────────────────────────────────────────────────
@@ -73,7 +85,15 @@ namespace HolyLogger
             SelectCurrent();
             _providerBox.SelectionChanged += Provider_Changed;
             chooser.Children.Add(_providerBox);
-            Children.Add(chooser);
+
+            // A LIST OF ONE IS NOT A CHOICE, AND NEITHER IS A LABEL ABOVE IT.
+            //
+            // While OpenRouter is the only service, the dropdown asks him to pick something he has
+            // no say in - and the line that replaced it, "AI service: OpenRouter - paid, reaches
+            // GPT, Claude and Gemini", said what the paragraph above the panel already says. The
+            // box stays in the tree, wired as it always was, so the day a second service is added
+            // it is one line of code and not a rebuild of this panel.
+            if (AiServices.All.Length > 1) Children.Add(chooser);
 
             // ── and everything that belongs to it ───────────────────────────────────────────────
             _serviceHelp = new StackPanel();
@@ -82,7 +102,7 @@ namespace HolyLogger
             _keyRow = new DockPanel { LastChildFill = true };
             var save = new Button
             {
-                Content = "Save key",
+                Content = "Save API key",
                 FontSize = 16,
                 Padding = new Thickness(14, 4, 14, 4),
                 Margin = new Thickness(8, 0, 0, 0),
@@ -96,7 +116,11 @@ namespace HolyLogger
             _keyBox = new TextBox { FontSize = 16, Padding = new Thickness(4) };
             _keyBox.KeyDown += (s, e) => { if (e.Key == Key.Enter) Save_Click(s, null); };
             _keyRow.Children.Add(_keyBox);
-            Children.Add(_keyRow);
+
+            // NOT ADDED HERE. The panel used to end with this row, which put the key box below
+            // everything including the model list - so an operator following the steps went past
+            // "copy the key" and had to look under the model box to find where it goes. It is
+            // placed by Refresh instead, straight after the how-to, where the eye already is.
 
             Refresh();
         }
@@ -120,70 +144,53 @@ namespace HolyLogger
             AiService service = AiServices.Current;
             bool haveKey = service.Key.Length > 0;
 
-            // The key box goes away once there is a key, and so do the instructions for getting one.
-            // What stays is the chooser above them, which is the part still worth having.
-            _keyRow.Visibility = haveKey ? Visibility.Collapsed : Visibility.Visible;
+            // THREE THINGS, IN THE ORDER HE DOES THEM: how to set it up, where the key goes, which
+            // model answers.
+            //
+            // The page used to open with a wall - the service named, a line saying a key was saved,
+            // what had been spent, a link, then seven numbered steps, then the box. Every line of it
+            // was true and most of it was in the way. The words above this panel now say what the
+            // thing is and what it costs; the steps live behind one button, with pictures; and what
+            // is left is the two boxes he has to fill in.
+            //
+            // The key box shows whether or not there is a key, because a key gets replaced for
+            // ordinary reasons and hiding the only way to do it is hiding the fix.
+            _keyRow.Visibility = Visibility.Visible;
 
-            if (haveKey)
+            // COMPACT IS THE RUN DIALOG, AND IT SETS NOTHING UP.
+            //
+            // With a key it shows the model and nothing else. Without one it says what is missing
+            // and offers the page where that is fixed - but it does NOT carry a paste box of its
+            // own: a key is pasted in one place, Options > AI Service, and one place is one place to
+            // keep right. A second box on a dialog he opened to ask a question is a second thing to
+            // maintain and a second way to end up with a key saved somewhere he did not expect.
+            if (_compact)
             {
-                _serviceHelp.Children.Add(Line("A key for this service is saved on this computer.",
-                                               italic: false, dim: true));
-                ShowAllowance(service);
-                ShowTopUp(service);
+                if (!haveKey)
+                {
+                    ShowKeyState(false);
+                    ShowTopUp(service);
+                }
+
                 ShowModelBox(service);
                 return;
             }
 
-            foreach (string step in AiServices.Guidance(service))
-                _serviceHelp.Children.Add(Line(step, italic: false, dim: false));
-
-            // WHAT IT COSTS, said plainly and last, because for most operators the price is the whole
-            // decision and burying it inside step four would be a way of not saying it.
-            var price = Line(service.Price, italic: true, dim: true);
-            price.Margin = new Thickness(0, 6, 0, 4);
-            _serviceHelp.Children.Add(price);
-
-            var help = new TextBlock
-            {
-                FontSize = 16,
-                TextWrapping = TextWrapping.Wrap,
-                Foreground = ThemeManager.Brush("TextBrush"),
-                Margin = new Thickness(0, 0, 0, 6),
-            };
-            help.Inlines.Add(new System.Windows.Documents.Run("The key page: "));
-
-            string address = service.KeyPageUrl;
-            var link = new System.Windows.Documents.Hyperlink(
-                new System.Windows.Documents.Run(service.KeyPageText))
-            {
-                NavigateUri = new Uri(address),
-                ToolTip = address,
-            };
-            link.RequestNavigate += (s, e) =>
-            {
-                try { System.Diagnostics.Process.Start(address); }
-                catch (Exception swallowed)
-                {
-                    Log.Swallow(swallowed);
-                    if (Say != null) Say("Could not open the browser. The address is " + address);
-                }
-                e.Handled = true;
-            };
-            help.Inlines.Add(link);
-            help.Inlines.Add(new System.Windows.Documents.Run(
-                "  -  the key is kept on this computer only."));
-            _serviceHelp.Children.Add(help);
+            // AND THE FULL PAGE: the state of things first, then the offer to put it right, then the
+            // box. The button used to sit above the line saying there was no key, which is an answer
+            // printed above its question. A man reads what is wrong, then what to do about it.
+            ShowKeyState(haveKey);
+            ShowTopUp(service);
+            ShowKeyBox(haveKey);
+            ShowModelBox(service);
         }
 
-        // WHAT IS LEFT TO SPEND, PUT UNDER THE NAME OF THE SERVICE.
+        // WHAT IS LEFT TO SPEND, FETCHED AFTER THE PAGE IS ALREADY UP.
         //
-        // A paid service is a running total of somebody's money, and the operator should not have to
-        // go to a website to find out where it stands. So it is shown here, beside the key it belongs
-        // to - and shown for the free service not at all, which has nothing to spend.
-        //
-        // FETCHED AFTER THE PANEL IS ALREADY UP. It is a web call, and a web call on the way to
-        // drawing a window is a window that does not appear. The line is added empty and hidden, and
-        // it stays hidden unless an answer arrives: no answer means no claim about his money.
+        // A paid service is a running total of somebody's money, and he should not have to go to a
+        // website to see where it stands. It is a web call, though, and a web call on the way to
+        // drawing a window is a window that does not appear - so the line is added empty and hidden,
+        // and it stays hidden unless an answer arrives. No answer means no claim about his money.
         //
         // THE SERVICE IS HELD, NOT LOOKED UP AGAIN ON THE WAY BACK. He can work the dropdown while
         // the request is still in the air, and an answer about the service he just left, written
@@ -208,53 +215,69 @@ namespace HolyLogger
             line.Visibility = Visibility.Visible;
         }
 
-        // THE WAY TO THE ACCOUNT, ONCE THERE IS A KEY.
+        // THE WAY TO THE ACCOUNT, AND THE PICTURES THAT SHOW WHAT TO DO THERE.
         //
-        // Every link in this panel is part of the signup instructions, and the instructions go away
-        // the moment a key is saved - which is right, but it left a man who wanted to put credit on
-        // his account with nowhere to go. He had a key, so the program had stopped telling him where
-        // the service lives. The one link he still needs is this one.
+        // Everything that happens on somebody else's website is behind one button: adding credit,
+        // making the API key, setting a limit on it. Words alone about a page an operator has never
+        // seen are words he abandons halfway through.
         private void ShowTopUp(AiService service)
         {
             if (service == null || string.IsNullOrEmpty(service.TopUpUrl)) return;
 
-            var line = new TextBlock
+            var how = new Button
             {
+                Content = "Show me how to set this up",
                 FontSize = 16,
-                TextWrapping = TextWrapping.Wrap,
-                Foreground = ThemeManager.Brush("TextBrush"),
-                Margin = new Thickness(0, 6, 0, 0),
+                Padding = new Thickness(14, 4, 14, 4),
+                HorizontalAlignment = HorizontalAlignment.Left,
+                Margin = new Thickness(0, 0, 0, 4),
             };
-            // WORDED FOR THE SERVICE IT BELONGS TO. One of them keeps a balance this window can show
-            // and count down; the other counts days and reports no figure at all. "Add credit, or
-            // see what you have spent" over a service that has no such page would be a promise the
-            // page does not keep.
-            line.Inlines.Add(new System.Windows.Documents.Run(
-                string.IsNullOrEmpty(service.AllowanceUrl)
-                    ? "The free allowance is a daily one. To go past it, turn on billing for the "
-                      + "key's project: "
-                    : "Add credit, or see what you have spent: "));
+            how.Click += (s, e) => AiPayHelpWindow.Show(Window.GetWindow(this));
+            _serviceHelp.Children.Add(how);
 
-            string where = service.TopUpUrl;
-            var link = new System.Windows.Documents.Hyperlink(
-                new System.Windows.Documents.Run(service.TopUpText ?? where))
-            {
-                NavigateUri = new Uri(where),
-                ToolTip = where,
-            };
-            link.RequestNavigate += (s, e) =>
-            {
-                try { System.Diagnostics.Process.Start(where); }
-                catch (Exception swallowed)
-                {
-                    Log.Swallow(swallowed);
-                    if (Say != null) Say("Could not open the browser. The address is " + where);
-                }
-                e.Handled = true;
-            };
-            line.Inlines.Add(link);
+            // NO SPENT LINE. It was his own account rather than an instruction, which is why I
+            // kept it - and he cut it: this page is for setting the thing up, and what has been
+            // spent is on the account page the link goes to. Two places saying it is one too many.
+            // ShowAllowance is left in the file; nothing calls it while the line is not wanted.
+        }
+
+        // What the box is FOR when a key is already saved - otherwise an empty box under "a key is
+        // saved on this computer" reads as a fault rather than an offer.
+        // WHETHER THERE IS A KEY AT ALL, SAID BEFORE THE BOX.
+        //
+        // An empty box tells him nothing about the state of things: he cannot see whether a key is
+        // saved and he is about to replace it, or whether there is none and nothing will work until
+        // he pastes one. The second of those is the one that stops the feature dead, so it is said
+        // in red - the only red on this page, and it goes the moment a key is saved.
+        private void ShowKeyState(bool haveKey)
+        {
+            var line = Line(haveKey ? "An API key is already saved on this computer."
+                                    : "No API key is saved on this computer yet.",
+                            italic: false, dim: false);
+
+            line.FontWeight = FontWeights.Bold;
+            line.Foreground = new SolidColorBrush(haveKey
+                ? Color.FromRgb(0x1A, 0x4F, 0xA8)     // blue: settled
+                : Color.FromRgb(0xC6, 0x28, 0x28));   // red: nothing will work until this is done
+            line.Margin = new Thickness(0, 0, 0, 8);
 
             _serviceHelp.Children.Add(line);
+        }
+
+        private void ShowKeyBox(bool haveKey)
+        {
+            var line = Line(haveKey ? "Paste a new API key here to replace it:"
+                                    : "Paste the API key here:",
+                            italic: false, dim: false);
+            line.Margin = new Thickness(0, 10, 0, 2);
+            _serviceHelp.Children.Add(line);
+
+            // The row is re-parented on every Refresh, so it is taken off its old parent first -
+            // WPF refuses an element that already has one, and the whole panel would come up blank.
+            var was = _keyRow.Parent as Panel;
+            if (was != null) was.Children.Remove(_keyRow);
+
+            _serviceHelp.Children.Add(_keyRow);
         }
 
         // WHICH MODEL, WHEN THE OPERATOR WANTS TO SAY.
@@ -285,13 +308,9 @@ namespace HolyLogger
 
                 if (id.Length == 0) continue;
 
-                bool isDefault = service != null
-                    && string.Equals(id, service.DefaultModel, StringComparison.OrdinalIgnoreCase);
-
                 box.Items.Add(new ComboBoxItem
                 {
-                    Content = id + (what.Length > 0 ? "   -   " + what : string.Empty)
-                                 + (isDefault ? "   (used unless you change it)" : string.Empty),
+                    Content = id + (what.Length > 0 ? "   -   " + what : string.Empty),
                     Tag = id,
                     FontSize = 16,
                 });
@@ -329,7 +348,7 @@ namespace HolyLogger
         {
             if (!_showModel || service == null || service.WriteModel == null) return;
 
-            var label = Line("Which model answers:", italic: false, dim: false);
+            var label = Line("Which AI model to use?", italic: false, dim: false);
             label.Margin = new Thickness(0, 10, 0, 2);
             _serviceHelp.Children.Add(label);
 
@@ -433,12 +452,9 @@ namespace HolyLogger
 
             _serviceHelp.Children.Add(row);
 
-            var note = Line("Pick one and press Save model. Any other name from the service's own "
-                          + "website can be typed in as well; a name it does not know is refused "
-                          + "with a message saying so, and nothing is spent on it.",
-                            italic: true, dim: true);
-            note.Margin = new Thickness(0, 4, 0, 0);
-            _serviceHelp.Children.Add(note);
+            // NO NOTE UNDER THE BOX. It explained that a name can be typed by hand and that a
+            // wrong one is refused without costing anything - both true, and both answers to
+            // questions nobody had asked yet. The list is the instruction.
         }
 
         private TextBlock Line(string text, bool italic, bool dim)
@@ -488,7 +504,7 @@ namespace HolyLogger
             string key = (_keyBox.Text ?? string.Empty).Trim();
             if (key.Length == 0)
             {
-                if (Say != null) Say("Paste the key first.");
+                if (Say != null) Say("Paste the API key first.");
                 return;
             }
 
