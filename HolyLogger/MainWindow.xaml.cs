@@ -3417,17 +3417,46 @@ namespace HolyLogger
                 return "FE FE " + icomAddress + " E0 17 00 " + textHex + " FD";
             }
 
-            bool isYaesu = rigType.StartsWith("FT", StringComparison.OrdinalIgnoreCase)
-                        || rigType.StartsWith("FTDX", StringComparison.OrdinalIgnoreCase);
-            bool isElecraft = rigType.StartsWith("K3", StringComparison.OrdinalIgnoreCase);
-            bool isKenwood = rigType.StartsWith("TS", StringComparison.OrdinalIgnoreCase);
-
-            if (isYaesu || isElecraft || isKenwood)
-            {
-                return "KY " + safe + ";";
-            }
+            if (KeyedByKyCommand(rigType)) return "KY " + safe + ";";
 
             return null;
+        }
+
+        // ── THE RADIOS KEYED BY THE "KY" COMMAND ────────────────────────────────────────────────
+        //
+        // Everything that is not an Icom sends CW with the same text command - KY, then the text, then
+        // a semicolon - so the question is only which radios have it, and that is answered by the name
+        // OmniRig is running under.
+        //
+        // ELECRAFT WAS NEVER MATCHED AT ALL. The test was StartsWith("K3"), and OmniRig does not call
+        // them K3: its files are named "Elecraft K3", "Elecraft K4", "Elecraft KX2", "Elecraft KX3". So
+        // every Elecraft fell through to "not supported for this radio model" - and K4, KX2 and KX3
+        // would have been refused by that test even if the prefix had been right.
+        //
+        // The K2 is deliberately left out: it is the one Elecraft where KY is not something to assume.
+        //
+        // Yaesu and Kenwood stay a prefix test, and that is knowingly optimistic - an FT-857 or a
+        // TS-440 is old enough not to have KY, and will be sent it and quietly do nothing. Narrowing
+        // those two to a list of models is a job on its own, and a list that is wrong in the other
+        // direction would refuse radios that work.
+        private static bool KeyedByKyCommand(string rigType)
+        {
+            string name = (rigType ?? string.Empty).Trim();
+            if (name.Length == 0) return false;
+
+            if (name.StartsWith("FT", StringComparison.OrdinalIgnoreCase)) return true;    // Yaesu
+            if (name.StartsWith("TS", StringComparison.OrdinalIgnoreCase)) return true;    // Kenwood
+
+            // Elecraft, under either spelling: OmniRig's "Elecraft K3", or a bare model name from some
+            // other version of its rig list.
+            string model = name.StartsWith("Elecraft", StringComparison.OrdinalIgnoreCase)
+                         ? name.Substring("Elecraft".Length).Trim()
+                         : name;
+
+            foreach (string keyed in new[] { "K3", "K4", "KX2", "KX3" })
+                if (model.StartsWith(keyed, StringComparison.OrdinalIgnoreCase)) return true;
+
+            return false;
         }
 
         // How much one command may carry. Under every radio's real buffer on purpose: the pacing keeps
@@ -3663,15 +3692,11 @@ namespace HolyLogger
 
         private static string BuildCwSendCommand(string rigType, string text)
         {
-            // Yaesu: KY text; (max ~28 chars per command, space-pad to 28)
-            bool isYaesu = rigType.StartsWith("FT", StringComparison.OrdinalIgnoreCase)
-                        || rigType.StartsWith("FTDX", StringComparison.OrdinalIgnoreCase);
-            // Elecraft K3
-            bool isElecraft = rigType.StartsWith("K3", StringComparison.OrdinalIgnoreCase);
-            // Kenwood (if added later)
-            bool isKenwood = rigType.StartsWith("TS", StringComparison.OrdinalIgnoreCase);
-
-            if (isYaesu || isElecraft || isKenwood)
+            // KY text; - Yaesu, Kenwood and Elecraft alike, padded to 28 for the canned messages.
+            // The same one test as the keyer uses, so the two cannot come to disagree about which
+            // radios can be keyed. It used to be three prefix checks here and three more there, and
+            // the Elecraft one was wrong in both.
+            if (KeyedByKyCommand(rigType))
             {
                 string safe = new string(text.ToUpper().Where(c => c >= ' ' && c <= 'Z').ToArray());
                 if (safe.Length > 28) safe = safe.Substring(0, 28);
