@@ -3475,6 +3475,33 @@ namespace HolyLogger
             return false;
         }
 
+        // ── WHICH RADIOS CAN SEND CW FROM HERE, IN WORDS ────────────────────────────────────────
+        //
+        // The operator finds out today by pressing a key and being refused. This is the same knowledge
+        // written down, for the panel behind the keyer's gear button - and it answers the only question
+        // he actually has, which is whether HIS radio can do it.
+        internal string CwKeyingForThisRadio()
+        {
+            string rig = Rig == null ? null : Rig.RigType;
+            if (string.IsNullOrWhiteSpace(rig))
+                return "No radio is connected, so there is nothing to say yet.";
+
+            if (KeyedByKyCommand(rig))
+                return rig + " — yes. HolyLogger sends the text with the KY command.";
+
+            string address = GetIcomCivAddress(rig);
+            if (address != null)
+                return rig + " — yes. HolyLogger sends the text with CI-V command 17, at address "
+                     + address + ".";
+
+            if (rig.StartsWith("FT", StringComparison.OrdinalIgnoreCase))
+                return rig + " — no. No Yaesu can be sent typed CW over CAT. Use the radio's own "
+                     + "memory keyer.";
+
+            return rig + " — no. HolyLogger has no CW command for this model. Use the radio's own "
+                 + "memory keyer.";
+        }
+
         // THE MOST TEXT ONE COMMAND MAY CARRY, from the manuals rather than from a round number.
         // Kenwood and Elecraft both stop at 24; Icom's command 17 takes 30. Anything longer is not
         // refused by the radio - it is silently cut, which is worse.

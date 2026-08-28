@@ -1500,6 +1500,7 @@ namespace HolyLogger
             stack.Children.Add(secondsRow);
             stack.Children.Add(secondsHint);
             stack.Children.Add(BuildHelp());
+            stack.Children.Add(BuildRadioList());
             stack.Children.Add(buttons);
 
             var dialog = new Window
@@ -1514,7 +1515,18 @@ namespace HolyLogger
                 ShowInTaskbar = false,
                 WindowStartupLocation = WindowStartupLocation.CenterOwner,
                 Owner = this,
-                Content = stack
+
+                // GROWS TO ITS CONTENT, BUT NOT PAST THE SCREEN. The list of radios made this dialog
+                // half as tall again, and SizeToContent has nothing to stop it at the bottom of the
+                // monitor - what goes over the edge is the OK button. Capped, with the scroller taking
+                // over from there, exactly as the message boxes do it.
+                Content = new ScrollViewer
+                {
+                    Content = stack,
+                    VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                    HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                    MaxHeight = Math.Max(300, SystemParameters.WorkArea.Height - 120)
+                }
             };
             dialog.SetResourceReference(BackgroundProperty, "WindowBg");
 
@@ -1546,6 +1558,99 @@ namespace HolyLogger
 
             dialog.ShowDialog();
             _box.Focus();
+        }
+
+        // ── WHICH RADIOS CAN SEND CW FROM HERE ──────────────────────────────────────────────────
+        //
+        // Until now the only way to find out was to press a key and be refused - and on a Yaesu not
+        // even that: the command went out, the radio ignored it, and nothing was said at all.
+        //
+        // His own radio comes FIRST and in bold, because it is the only line he is really asking
+        // about. The rest is there for the day he is choosing a radio, or helping somebody else.
+        private UIElement BuildRadioList()
+        {
+            var box = new StackPanel { Margin = new Thickness(0, 14, 0, 0) };
+
+            var heading = new TextBlock
+            {
+                Text = "Which radios can send CW from here",
+                FontSize = 16,
+                FontWeight = FontWeights.Bold,
+                Margin = new Thickness(0, 0, 0, 6)
+            };
+            heading.SetResourceReference(TextBlock.ForegroundProperty, "TextBrush");
+            box.Children.Add(heading);
+
+            // Asked of the main window, which is the only place that knows what OmniRig is running.
+            string mine = null;
+            try
+            {
+                var main = Owner as MainWindow;
+                if (main != null) mine = main.CwKeyingForThisRadio();
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+            if (!string.IsNullOrEmpty(mine))
+            {
+                var yours = new TextBlock
+                {
+                    Text = "Your radio: " + mine,
+                    FontSize = 16,
+                    FontWeight = FontWeights.Bold,
+                    TextWrapping = TextWrapping.Wrap,
+                    Margin = new Thickness(0, 0, 0, 8)
+                };
+                yours.SetResourceReference(TextBlock.ForegroundProperty, "AccentBrush");
+                box.Children.Add(yours);
+            }
+
+            var makers = new[]
+            {
+                new[] { "Icom",     "Any Icom OmniRig supports. The text goes out as CI-V command 17, and "
+                                  + "HolyLogger reads the radio's address from OmniRig's own rig file." },
+                new[] { "Kenwood",  "TS-590S, TS-590SG, TS-480, TS-890S, TS-990S, TS-2000 and other models "
+                                  + "with the KY command. An older TS is sent it and quietly ignores it." },
+                new[] { "Elecraft", "K3, K3S, K4, KX2 and KX3." },
+                new[] { "Yaesu",    "None. Yaesu has no CAT command that sends typed CW - its KY plays back "
+                                  + "a message already stored in the radio. Use the radio's own memory keyer." }
+            };
+
+            var grid = new Grid();
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(12) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+            for (int i = 0; i < makers.Length; i++)
+            {
+                grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+
+                var maker = new TextBlock
+                {
+                    Text = makers[i][0],
+                    FontSize = 16,
+                    FontWeight = FontWeights.Bold,
+                    Margin = new Thickness(0, 3, 0, 3)
+                };
+                maker.SetResourceReference(TextBlock.ForegroundProperty, "TextBrush");
+                Grid.SetRow(maker, i);
+                Grid.SetColumn(maker, 0);
+                grid.Children.Add(maker);
+
+                var what = new TextBlock
+                {
+                    Text = makers[i][1],
+                    FontSize = 16,
+                    TextWrapping = TextWrapping.Wrap,
+                    Margin = new Thickness(0, 3, 0, 3)
+                };
+                what.SetResourceReference(TextBlock.ForegroundProperty, "TextBrush");
+                Grid.SetRow(what, i);
+                Grid.SetColumn(what, 2);
+                grid.Children.Add(what);
+            }
+
+            box.Children.Add(grid);
+            return box;
         }
 
         // WHAT THE KEYS DO, in the one place the operator already opens to change how this window
