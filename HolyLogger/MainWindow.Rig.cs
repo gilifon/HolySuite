@@ -105,7 +105,6 @@ namespace HolyLogger
             {
                 HolyMessageBox.ShowWarning(
                     "This QSO has no frequency to tune to.\n\n"
-                    + "Nothing was sent to the radio.\n\n"
                     + "Double-click the QSO and type the frequency in MHz — 14.200 — then try again.",
                     "Set Radio to Frequency", this);
                 return;

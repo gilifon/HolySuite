@@ -921,8 +921,12 @@ namespace HolyLogger
             catch (Exception ex)
             {
                 Log.Swallow(ex);
-                HolyMessageBox.ShowWarning("The country databases could not be asked about " + call + ".",
-                                           "Why this country?", this);
+                HolyMessageBox.ShowWarning(
+                    "The country databases could not be asked about " + call + ".\n\n"
+                    + ex.Message + "\n\n"
+                    + "HolyLogger fetches cty.dat and the Club Log file itself. Close it, make sure "
+                    + "you are online, and open it again.",
+                    "Why this country?", this);
                 return;
             }
 
@@ -3609,7 +3613,10 @@ namespace HolyLogger
             var dal = DataAccess.GetInstance();
             if (dal == null)
             {
-                HolyMessageBox.ShowWarning("The log database is not open.", "Log Fixer", this);
+                HolyMessageBox.ShowWarning(
+                    "The log database is not open.\n\n"
+                    + "Close HolyLogger and open it again.",
+                    "Log Fixer", this);
                 return;
             }
 
@@ -4008,8 +4015,10 @@ namespace HolyLogger
             catch (Exception ex)
             {
                 Log.Swallow(ex);
-                HolyMessageBox.ShowWarning("This QSO could not be opened for editing:\n\n" + ex.Message,
-                                           "Log Fixer", this);
+                HolyMessageBox.ShowWarning(
+                    "This QSO could not be opened for editing:\n\n" + ex.Message + "\n\n"
+                    + HolyMessageBox.WhatToDo(ex.Message, null),
+                    "Log Fixer", this);
             }
         }
 
@@ -4190,8 +4199,10 @@ namespace HolyLogger
             catch (Exception ex)
             {
                 Log.Swallow(ex);
-                HolyMessageBox.ShowWarning("This QSO could not be opened:\n\n" + ex.Message,
-                                           "Log Fixer", this);
+                HolyMessageBox.ShowWarning(
+                    "This QSO could not be opened:\n\n" + ex.Message + "\n\n"
+                    + HolyMessageBox.WhatToDo(ex.Message, null),
+                    "Log Fixer", this);
             }
         }
 

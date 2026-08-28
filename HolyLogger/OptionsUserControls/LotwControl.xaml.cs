@@ -274,7 +274,7 @@ namespace HolyLogger.OptionsUserControls
         {
             if (Dal == null)
             {
-                ShowError("Database not available.");
+                ShowError("The log database is not open. Close HolyLogger and open it again.");
                 return;
             }
 
@@ -319,7 +319,7 @@ namespace HolyLogger.OptionsUserControls
         {
             if (Dal == null)
             {
-                ShowError("Database not available.");
+                ShowError("The log database is not open. Close HolyLogger and open it again.");
                 return;
             }
             if (DP_FromDate.SelectedDate == null)

@@ -3329,8 +3329,11 @@ namespace HolyLogger
 
             if (BuildCwChunkCommand(rigType, "E") == null)
             {
-                if (!silent) HolyMessageBox.ShowWarning("CW keying by CAT is not supported for this radio model ("
-                                                       + rigType + ").", "CW Keyer", this);
+                if (!silent) HolyMessageBox.ShowWarning(
+                    "CW keying by CAT is not supported for this radio model (" + rigType + ").\n\n"
+                    + "Nothing was sent, and nothing you can set will change it — HolyLogger has no CW "
+                    + "command for this model. Use the radio's own memory keyer.",
+                    "CW Keyer", this);
                 return;
             }
 
@@ -3524,7 +3527,11 @@ namespace HolyLogger
 
             if (command == null)
             {
-                HolyMessageBox.ShowWarning("CW text keying via CAT is not supported for this radio model (" + rigType + ").", "CW Text", this);
+                HolyMessageBox.ShowWarning(
+                    "CW text keying via CAT is not supported for this radio model (" + rigType + ").\n\n"
+                    + "Nothing was sent, and nothing you can set will change it — HolyLogger has no CW "
+                    + "command for this model. Use the radio's own memory keyer.",
+                    "CW Text", this);
                 return;
             }
 
@@ -5125,7 +5132,6 @@ namespace HolyLogger
                     HolyMessageBox.ShowError(
                         "That QSO could not be opened for editing.\n\n"
                         + ex.Message + "\n\n"
-                        + "The QSO itself is unchanged.\n"
                         + HolyMessageBox.WhatToDo(ex.Message, null),
                         "Edit QSO", this);
                 }
@@ -6547,7 +6553,10 @@ namespace HolyLogger
             LogUploadWindow w = (LogUploadWindow)sender;
             if (Qsos.Count == 0)
             {
-                HolyMessageBox.ShowWarning("Cannot upload an empty log.", "Log Upload", this);
+                HolyMessageBox.ShowWarning(
+                    "There is nothing in this log to upload.\n\n"
+                    + "Log some QSOs into it first, or switch to another log in File → Log Manager.",
+                    "Log Upload", this);
                 w.Close();
                 return;
             }
@@ -7580,7 +7589,6 @@ namespace HolyLogger
                         $"The profile \"{name}\" could not be saved.\n\n"
                         + (string.IsNullOrWhiteSpace(ProfileManager.LastError)
                                ? string.Empty : ProfileManager.LastError + "\n\n")
-                        + "Your current setup is untouched — nothing here changed it.\n"
                         + "Profiles are files in the Profiles folder. If this keeps happening, check "
                         + "that folder is not read-only and that the drive it is on has room.",
                         "Profile Manager", this);
@@ -8419,7 +8427,6 @@ namespace HolyLogger
                 HolyMessageBox.ShowError(
                     "Could not open the Log Workshop for those QSOs.\n\n"
                     + ex.Message + "\n\n"
-                    + "Nothing was changed.\n"
                     + HolyMessageBox.WhatToDo(ex.Message, null),
                     "Log Workshop", this);
             }
@@ -10348,7 +10355,6 @@ namespace HolyLogger
                 HolyMessageBox.ShowError(
                     "Could not open Compact the Database.\n\n"
                     + ex.Message + "\n\n"
-                    + "Nothing was changed.\n"
                     + HolyMessageBox.WhatToDo(ex.Message, null),
                     "Compact the Database", this);
             }

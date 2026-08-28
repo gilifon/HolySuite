@@ -243,7 +243,11 @@ namespace HolyLogger
             myMutex = new Mutex(true, SingleInstanceMutexName, out aIsNewInstance);
             if (!aIsNewInstance)
             {
-                HolyMessageBox.ShowWarning("Holyland logger is already open.", "HolyLogger");
+                HolyMessageBox.ShowWarning(
+                "HolyLogger is already open.\n\n"
+                + "Only one copy can run at a time — two would write to the same log at "
+                + "once. Look for it on the taskbar.",
+                "HolyLogger");
                 App.Current.Shutdown();
                 return;
             }

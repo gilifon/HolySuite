@@ -109,7 +109,11 @@ namespace HolyLogger.OptionsUserControls
                         + "It is the Logbook key, not your XML subscription key.",
                         "QRZ Logbook", Window.GetWindow(this));
                     else if (reason.Contains("subscription"))
-                        HolyMessageBox.ShowError("An active QRZ XML Logbook Data Subscription is required to use automated API logging.", "QRZ Logbook", Window.GetWindow(this));
+                        HolyMessageBox.ShowError(
+                            "An active QRZ XML Logbook Data Subscription is required to use automated API logging.\n\n"
+                            + "It is bought at qrz.com under Subscriptions. Without it QRZ refuses "
+                            + "the request whatever the password or the key.",
+                            "QRZ Logbook", Window.GetWindow(this));
                     else
                         HolyMessageBox.ShowError(
                         "QRZ rejected the API key"

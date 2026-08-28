@@ -2493,7 +2493,11 @@ namespace HolyLogger
             var list = shown == null ? new System.Collections.Generic.List<QSO>() : shown.ToList();
             if (list.Count == 0)
             {
-                HolyMessageBox.ShowWarning("There are no QSOs on screen to check.", "Log Fixer", this);
+                HolyMessageBox.ShowWarning(
+                    "There are no QSOs on screen to check.\n\n"
+                    + "The Log Fixer checks what the table is showing. Press Clear to bring the "
+                    + "whole log back, then press Log Fixer again.",
+                    "Log Fixer", this);
                 return;
             }
 
@@ -2510,7 +2514,10 @@ namespace HolyLogger
             }
             catch (Exception ex)
             {
-                HolyMessageBox.ShowError("Could not check these QSOs.\n\n" + ex.Message, "Log Fixer", this);
+                HolyMessageBox.ShowError(
+                    "Could not check these QSOs.\n\n" + ex.Message + "\n\n"
+                    + HolyMessageBox.WhatToDo(ex.Message, "press Log Fixer"),
+                    "Log Fixer", this);
             }
         }
 

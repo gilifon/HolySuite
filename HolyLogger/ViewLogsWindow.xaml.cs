@@ -208,7 +208,6 @@ namespace HolyLogger
             {
                 HolyMessageBox.ShowError(
                     "Could not check this log.\n\n" + ex.Message + "\n\n"
-                    + "Nothing was changed.\n"
                     + HolyMessageBox.WhatToDo(ex.Message, "press Log Fixer"),
                     "Log Fixer", this);
             }
@@ -236,7 +235,6 @@ namespace HolyLogger
             {
                 HolyMessageBox.ShowError(
                     "Could not open the search for this log.\n\n" + ex.Message + "\n\n"
-                    + "Nothing was changed.\n"
                     + HolyMessageBox.WhatToDo(ex.Message, "press Search In Log"),
                     "Search Log", this);
             }

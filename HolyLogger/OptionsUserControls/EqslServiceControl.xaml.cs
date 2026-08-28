@@ -290,7 +290,11 @@ namespace HolyLogger.OptionsUserControls
             }
             catch (Exception ex)
             {
-                HolyMessageBox.ShowError("Connection failed: " + ex.Message, "eQSL Test", Window.GetWindow(this));
+                HolyMessageBox.ShowError(
+                    "Could not reach eQSL.\n\n" + ex.Message + "\n\n"
+                    + "Check your internet connection and try again.\n"
+                    + "If other websites work, eQSL itself may be down — wait a few minutes.",
+                    "eQSL Test", Window.GetWindow(this));
             }
             finally
             {

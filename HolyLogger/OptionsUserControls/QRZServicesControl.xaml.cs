@@ -173,7 +173,11 @@ namespace HolyLogger.OptionsUserControls
                     if (reason.Contains("auth") || reason.Contains("invalid") || reason.Contains("key"))
                         HolyMessageBox.ShowError("Authentication failed. Invalid API Key.", "QRZ Logbook", win);
                     else if (reason.Contains("subscription"))
-                        HolyMessageBox.ShowError("An active QRZ XML Logbook Data Subscription is required.", "QRZ Logbook", win);
+                        HolyMessageBox.ShowError(
+                            "An active QRZ XML Logbook Data Subscription is required.\n\n"
+                            + "It is bought at qrz.com under Subscriptions. Without it QRZ refuses "
+                            + "the request whatever the password or the key.",
+                            "QRZ Logbook", win);
                     else
                         HolyMessageBox.ShowError("QRZ rejected the API key" +
                             (string.IsNullOrWhiteSpace(r.Reason) ? "." : ":\n" + r.Reason), "QRZ Logbook", win);
@@ -182,7 +186,12 @@ namespace HolyLogger.OptionsUserControls
             catch (Exception ex)
             {
                 SetValid(false);
-                HolyMessageBox.ShowError("Test failed:\n" + ex.Message, "QRZ Logbook", Window.GetWindow(this));
+                HolyMessageBox.ShowError(
+                    "The test failed.\n\n" + ex.Message + "\n\n"
+                    + "Nothing was saved.\n\n"
+                    + "Paste the key again — a space or a line break copied along with it is the "
+                    + "usual cause. If that is not it, check you can reach qrz.com in your browser.",
+                    "QRZ Logbook", Window.GetWindow(this));
             }
             finally { TestBtn.IsEnabled = true; }
         }

@@ -74,7 +74,10 @@ namespace HolyLogger
             }
             catch (Exception e)
             {
-                HolyMessageBox.ShowError("Failed to connect to DB: " + e.Message, "HolyLogger");
+                HolyMessageBox.ShowError(
+                    "The log database could not be opened.\n\n" + e.Message + "\n\n"
+                    + "Close HolyLogger and open it again.",
+                    "HolyLogger");
                 throw;
             }
 

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -845,7 +845,10 @@ namespace HolyLogger
             catch (Exception ex)
             {
                 Log.Warn("The support message could not be packed: " + ex.GetType().Name + ": " + ex.Message);
-                HolyMessageBox.ShowWarning("The message could not be saved:\n\n" + ex.Message,
+                HolyMessageBox.ShowWarning(
+                    "The message could not be saved.\n\n" + ex.Message + "\n\n"
+                    + "Your text is still on screen — copy it somewhere safe before you close "
+                    + "this window.",
                     "Not sent", this);
             }
             finally

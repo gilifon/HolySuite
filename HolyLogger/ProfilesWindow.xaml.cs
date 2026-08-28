@@ -95,7 +95,7 @@ namespace HolyLogger
             else
             {
                 ProfileFailed("The profile could not be saved.",
-                              "Your current setup is untouched - nothing here changed it.");
+                              string.Empty);
             }
         }
 
@@ -174,7 +174,7 @@ namespace HolyLogger
 
             if (ProfileManager.ImportFrom(dlg.FileName, name)) Refresh();
             else ProfileFailed("That file could not be imported.",
-                    "Your profiles are as they were. A profile file is one HolyLogger exported.");
+                    "A profile file is one HolyLogger exported.");
         }
 
         private void BTN_Export_Click(object sender, RoutedEventArgs e)
@@ -196,7 +196,7 @@ namespace HolyLogger
                     "Profile Manager", this);
             else
                 ProfileFailed("The profile could not be exported.",
-                    "No file was written. The profile itself is unchanged.");
+                    "No file was written.");
         }
 
         // ── WHY IT DID NOT WORK ─────────────────────────────────────────────────────────────────
@@ -206,8 +206,10 @@ namespace HolyLogger
         // to do. ProfileManager now keeps the reason for its last refusal, so the sentence can be
         // followed by the thing that actually explains it.
         //
-        // `stillTrue` is the state the operator is left in, in his own terms: the profile is unchanged,
-        // the old one is still there. It is the half he needs before he decides anything.
+        // `stillTrue` is the state he is left in - "it is still there under its old name" - and it is
+        // EMPTY wherever that state was never in doubt. A failed save cannot have changed the setup it
+        // was copying; saying so describes instead of helping, and pushes the line that does help
+        // further down the box.
         private void ProfileFailed(string what, string stillTrue)
         {
             string why = ProfileManager.LastError;
@@ -215,7 +217,7 @@ namespace HolyLogger
             HolyMessageBox.ShowError(
                 what + "\n\n"
                 + (string.IsNullOrWhiteSpace(why) ? "" : why + "\n\n")
-                + stillTrue + "\n"
+                + (string.IsNullOrWhiteSpace(stillTrue) ? string.Empty : stillTrue + "\n")
                 + "Profiles are files in the Profiles folder. If this keeps happening, check that "
                 + "folder is not read-only and that the drive it is on has room.",
                 "Profiles", this);
