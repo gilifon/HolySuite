@@ -1840,7 +1840,9 @@ namespace HolyLogger
                 new[] { "Icom",     "IC-705, IC-7300, IC-7300MK2, IC-7610, IC-9700" },
                 new[] { "Kenwood",  "TS-480, TS-590S, TS-590SG, TS-890S, TS-990S" },
                 new[] { "Elecraft", "K3, K3S, K4, KX2, KX3" },
-                new[] { "Yaesu",    "None. Yaesu has no command that keys typed text." }
+                new[] { "Yaesu",    "FT-991, FT-991A, FT-891, FTDX10, FTDX101, FT-710 — in two steps: "
+                                  + "HolyLogger writes the text into CW memory 5 and plays that "
+                                  + "memory, so keep nothing you want to save in memory 5." }
             };
 
             var grid = new Grid();

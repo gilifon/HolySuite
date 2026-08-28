@@ -3327,7 +3327,7 @@ namespace HolyLogger
 
             string rigType = NormalizeRigType(Rig != null ? Rig.RigType : null);
 
-            if (BuildCwChunkCommand(rigType, "E") == null)
+            if (!CanKeyCw(rigType))
             {
                 if (!silent) HolyMessageBox.ShowWarning(
                     "CW keying by CAT is not supported for this radio model (" + rigType + ").\n\n"
@@ -3341,6 +3341,15 @@ namespace HolyLogger
             cwKeyboard = new CwKeyboardWindow(
                 chunk =>
                 {
+                    // A Yaesu takes two: the text into a memory, then the memory played.
+                    string[] pair = BuildYaesuCwCommands(rigType, chunk);
+                    if (pair != null)
+                    {
+                        foreach (string one in pair)
+                            if (!TrySendOmniRigCustomCommand(one)) return false;
+                        return true;
+                    }
+
                     string command = BuildCwChunkCommand(rigType, chunk);
                     return command != null && TrySendOmniRigCustomCommand(command);
                 },
@@ -3502,11 +3511,93 @@ namespace HolyLogger
             if (address != null)
                 return "Yes. HolyLogger sends the text with CI-V command 17, at address " + address + ".";
 
+            if (IsYaesuKeyer(rig))
+                return "Yes, in two steps. Yaesu has no command that keys typed text, so HolyLogger "
+                     + "writes it into CW memory " + YaesuCwMemory + " and tells the radio to play "
+                     + "that memory. Keep nothing you want to save in memory " + YaesuCwMemory + ".";
+
             if (rig.StartsWith("FT", StringComparison.OrdinalIgnoreCase))
-                return "No. Yaesu has no command that keys typed text - its KY plays back a message "
-                     + "already stored in the radio. Use the radio's own memory keyer.";
+                return "No. Yaesu has no command that keys typed text, and this model is not one of "
+                     + "the ones HolyLogger can do it on in two steps. Use the radio's own memory keyer.";
 
             return "No. HolyLogger has no CW command for this model. Use the radio's own memory keyer.";
+        }
+
+        // CAN THIS RADIO BE KEYED AT ALL, by any of the three ways? The gates in front of the keyer
+        // and the canned messages ask this and nothing else - which command does the work is the
+        // business of whoever builds it.
+        private static bool CanKeyCw(string rigType)
+        {
+            return KeyedByKyCommand(rigType)
+                || GetIcomCivAddress(rigType) != null
+                || IsYaesuKeyer(rigType);
+        }
+
+        // ── YAESU: WRITE IT INTO A MEMORY, THEN PLAY THAT MEMORY ────────────────────────────────
+        //
+        // Yaesu has no command that keys typed text. What it has is a pair, and between them they do
+        // the same job in two steps - from their own CAT manuals for the FT-991, FT-991A, FT-891,
+        // FTDX10, FTDX101 and FT-710:
+        //
+        //   KM  KEYER MEMORY   P1 1-5: memory channel, P2: up to 50 characters
+        //   KY  CW KEYING      plays one of those memories back
+        //
+        // So the text is written into a memory and the radio is told to play it.
+        //
+        // MEMORY 5, ALWAYS, AND SAID OUT LOUD. Writing into a memory overwrites whatever the operator
+        // had stored there, and there is no way to send typed CW on these radios without doing it. One
+        // fixed memory that the program names - in the keyer, and on the Help page - is honest: he
+        // knows to keep nothing in 5. Reading his text first and putting it back afterwards was the
+        // alternative and is worse: three more commands on every send, and a failure half way through
+        // leaves his memory holding ours anyway.
+        private const int YaesuCwMemory = 5;
+
+        // TWO DIALECTS OF THE SAME COMMAND, both read out of Yaesu's own manuals.
+        //
+        //   FT-991, FT-991A, FT-891, FTDX10    KY P1 ;      P1 1-5 plays keyer memory 1-5
+        //   FTDX101, FT-710                    KY P1 P2 ;   P1 0 = CW TEXT memory, P2 1-5 plays it
+        //
+        // The newer pair split the memories in two - the TEXT memories, which are the ones KM writes,
+        // and the MESSAGE memories recorded from the paddle. P1 = 0 asks for the text side, which is
+        // where our writing went.
+        private static readonly string[] YaesuTwoPartKy = { "FTDX101", "FT-710", "FTDX-101" };
+
+        private static bool IsYaesuKeyer(string rigType)
+        {
+            string name = (rigType ?? string.Empty).Trim();
+            if (name.Length == 0) return false;
+
+            foreach (string known in new[] { "FT-991", "FT991", "FT-891", "FT891",
+                                             "FTDX10", "FTDX-10", "FTdx10",
+                                             "FTDX101", "FTDX-101", "FT-710", "FT710" })
+                if (name.StartsWith(known, StringComparison.OrdinalIgnoreCase)) return true;
+
+            return false;
+        }
+
+        private static bool YaesuNeedsTwoPartKy(string rigType)
+        {
+            string name = (rigType ?? string.Empty).Trim();
+            foreach (string two in YaesuTwoPartKy)
+                if (name.StartsWith(two, StringComparison.OrdinalIgnoreCase)) return true;
+            return false;
+        }
+
+        // The two commands, in the order they must go. Null when this radio is not one of them.
+        private static string[] BuildYaesuCwCommands(string rigType, string text)
+        {
+            if (!IsYaesuKeyer(rigType)) return null;
+
+            string safe = new string((text ?? string.Empty).ToUpper().Where(c => c >= ' ' && c <= 'Z').ToArray());
+            if (safe.Length == 0) return null;
+            if (safe.Length > YaesuMemoryLimit) safe = safe.Substring(0, YaesuMemoryLimit);
+
+            string write = "KM" + YaesuCwMemory + safe + ";";
+            string play  = YaesuNeedsTwoPartKy(rigType)
+                         ? "KY0" + YaesuCwMemory + ";"
+                         : "KY" + YaesuCwMemory + ";";
+
+            return new[] { write, play };
         }
 
         // THE MOST TEXT ONE COMMAND MAY CARRY, from the manuals rather than from a round number.
@@ -3514,6 +3605,7 @@ namespace HolyLogger
         // refused by the radio - it is silently cut, which is worse.
         private const int KyTextLimit = 24;
         private const int IcomCwTextLimit = 30;
+        private const int YaesuMemoryLimit = 50;   // KM: "Message Characters (up to 50 characters)"
 
         // How much one command may carry. Under every radio's real buffer on purpose: the pacing keeps
         // the radio busy anyway, and a short chunk is a short wait between typing and hearing it.
@@ -3606,6 +3698,32 @@ namespace HolyLogger
                     + "Only letters, digits and  . , ? / @ = + -  go out over the air.\n\n"
                     + "Right-click the button to change its text.",
                     "CW Text", this);
+                return;
+            }
+
+            // A Yaesu takes two commands - the text into memory 5, then that memory played - so it is
+            // handled before the single-command path rather than inside it.
+            string[] yaesu = BuildYaesuCwCommands(rigType, cwText);
+            if (yaesu != null)
+            {
+                foreach (string one in yaesu)
+                {
+                    if (TrySendOmniRigCustomCommand(one)) continue;
+
+                    HolyMessageBox.ShowWarning(
+                        "Failed to send the CW text to " + rigType + ".\n\n"
+                        + "Nothing was sent.\n\n"
+                        + "When CAT is working, the radio's name shows in green at the right of the "
+                        + "status bar. Anything else there means it is not.",
+                        "CW Text", this);
+                    return;
+                }
+
+                pendingVoiceMessageNumber = messageNumber;
+                activeVoiceMessageNumber = null;
+                pendingVoiceMessageDeadlineUtc = DateTime.UtcNow.AddSeconds(30);
+
+                ShowCwSendMonitor(cwText);
                 return;
             }
 
