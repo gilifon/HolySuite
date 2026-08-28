@@ -35,6 +35,35 @@ namespace HolyLogger
             // "I already said not now" about the kHz frequency repair. That answer is about the LOG,
             // so switching profile must neither re-ask nor silently inherit someone else's refusal.
             "FreqRepairDeclinedCount",
+
+            // ── WHAT THE PROGRAM WRITES ABOUT ITSELF, WHICH NOBODY CHOSE ────────────────────────
+            //
+            // All of these move on their own, and every one of them was making the program say "you
+            // changed settings since the profile was saved" to a man who had changed nothing.
+            //
+            // THE RADIO'S FREQUENCY IS THE WORST OF THEM. It is written every time the VFO moves, so
+            // anyone with CAT connected had a "changed" profile within seconds of switching on, and was
+            // asked on every close for ever after.
+            "Frequency",
+
+            // The serial number the contest is up to - it counts itself, one per QSO.
+            "ContestNextSerial",
+
+            // What eQSL, QRZ and Club Log sent back when their confirmations were last downloaded.
+            // Downloaded data, not settings. The LoTW ones were already excluded above; these three
+            // were simply missed, and a confirmation check made the profile look changed.
+            "EqslConfirmedEntities", "EqslConfirmedQsoCount", "EqslConfirmedDeletedCodes",
+            "QrzConfirmedEntities", "QrzConfirmedQsoCount", "QrzConfirmedDeletedCodes",
+            "ClublogConfirmedEntities", "ClublogConfirmedQsoCount", "ClublogConfirmedDeletedCodes",
+
+            // Where he was last: the cluster's minutes filter, the eQSL row he last had selected, the
+            // activity program he last used. Each written as he works, none of them a choice about how
+            // the program behaves.
+            "ClusterLastMinutesFilter", "EqslLastSelectedCallsign", "LastActivityProgram",
+
+            // NOT EXCLUDED, deliberately: SignBoardWindowIsOpen, MatrixWindowIsOpen, TimerWindowIsOpen
+            // and HasClosedClusterWindow. Those say which windows were open, and a profile is expected
+            // to bring back the set of windows it was saved with.
         };
 
         // Window geometry: everything that describes WHERE the windows are, as opposed to how the
@@ -50,6 +79,9 @@ namespace HolyLogger
         {
             if (string.IsNullOrEmpty(name)) return false;
             if (string.Equals(name, "WindowBoundsJson", StringComparison.OrdinalIgnoreCase)) return true;
+            // Where the QSO editor sits, written when it closes. A window position like any other; it
+            // is only spelled differently - one setting holding "left,top" instead of two.
+            if (string.Equals(name, "QsoEditWindowPos", StringComparison.OrdinalIgnoreCase)) return true;
             if (IsColumnLayoutSetting(name)) return true;
             return name.EndsWith("WindowLeft", StringComparison.OrdinalIgnoreCase)
                 || name.EndsWith("WindowTop", StringComparison.OrdinalIgnoreCase)
@@ -79,11 +111,16 @@ namespace HolyLogger
         {
             if (string.IsNullOrEmpty(name)) return false;
 
+            // The log grid's own columns are named ColWidthCallsign, Callsign_index and so on - a width
+            // and a position per column - and the cluster's are ClusterColWidthDX and the rest. Matched
+            // by shape rather than listed, so a column added later is out of profiles from the day it
+            // appears rather than from the day somebody remembers to add it here.
             return name.EndsWith("ColumnLayout", StringComparison.OrdinalIgnoreCase)
                 || name.EndsWith("ColumnOrder", StringComparison.OrdinalIgnoreCase)
                 || name.EndsWith("ColumnWidth", StringComparison.OrdinalIgnoreCase)
                 || name.EndsWith("ColumnDisplayIndex", StringComparison.OrdinalIgnoreCase)
-                || name.StartsWith("ColWidth", StringComparison.OrdinalIgnoreCase);
+                || name.EndsWith("_index", StringComparison.Ordinal)
+                || name.IndexOf("ColWidth", StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
         // ── WHY THE LAST ONE FAILED ─────────────────────────────────────────────────────────────
