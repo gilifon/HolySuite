@@ -1,6 +1,26 @@
 ﻿== 8.9.2 ==
 
 New
+- Radio Control Panel: a window of band buttons, each holding an SSB and a CW frequency, with
+  SSB and CW buttons and a box to type a frequency into. Switched on in Options > User
+  Interface.
+- Tune with the mouse wheel: over the LED, over the panel's frequency box, or over the Live
+  Scale spot list. A notch is worth what the pointer is over - kHz on the left of the point,
+  Hz on the right - and the first notch tidies an odd frequency up to the whole kHz. It will
+  not walk you outside the band.
+- Tools > Open OmniRig opens OmniRig's own settings window, where the radio and its COM port
+  are chosen. Until now that window could only be reached from OmniRig's tray icon.
+- CW on a Yaesu: the keyer now works on the FT-891, FT-991, FT-991A, FTDX10, FTDX101D,
+  FTDX101MP and FT-710. Yaesu has no command that keys typed text, so HolyLogger writes your
+  text into CW memory 5 and plays it - keep nothing you want to save in memory 5.
+- CW on any Icom: the radio's address is read from OmniRig's own file instead of a list of
+  three, so every Icom OmniRig supports can be keyed - the IC-9700, IC-705 and IC-7100 among
+  them.
+- Help > Which radios can send CW: which radios HolyLogger can key, and whether yours is one.
+  Every model on it was read out of its own maker's command manual.
+- Messages tell you what to do: an error now says where things stand and the one thing worth
+  trying, instead of only what went wrong. Where nothing can honestly be advised it says so
+  rather than telling you to try again.
 - Country box: the country on the main form is now a list. Type and it offers the countries
   whose name BEGINS with what you typed - digits find the entity number, so 33 finds 336.
   Picking one sets the name, the flag, the number, the continent and the zones together.
@@ -48,6 +68,16 @@ New
 - Sun and propagation: the figures now come from IARC.
 
 Fixed
+- CW keying refused radios it could key: an IC-7300-DATA is an IC-7300, and every Elecraft was
+  turned away because of the name OmniRig gives it. K3, K3S, K4, KX2 and KX3 all key now.
+- CW text was sent four characters too long for a Kenwood or an Elecraft, and the overflow was
+  cut without a word.
+- The CW keyer accepted pasted text a keyer cannot send - Hebrew, curly quotes - and then
+  dropped every character of it on the way to the radio. It is cleaned as it is pasted now.
+- A failed Add no longer empties the form. It used to tell you the QSO was not saved and wipe
+  what you had typed in the same breath.
+- Message windows grow to fit what they have to say, and a long one can no longer push its own
+  OK button off the bottom of the screen.
 - The log table now shows a correction the moment the Log Fixer writes it. A country put right
   appeared in the Log Workshop and stayed wrong in the main window behind it.
 - Ticking the Fix box in the table header was a coffee break on a big log. It is immediate.
