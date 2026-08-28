@@ -68,6 +68,13 @@ New
 - Sun and propagation: the figures now come from IARC.
 
 Fixed
+- "You changed settings since the profile was saved" was asked on every close, of operators who
+  had changed nothing. The profile was watching things the program writes by itself - the
+  radio's frequency above all, which moves every time you turn the VFO - and they are out of
+  profiles now. They are still remembered from one session to the next; they simply no longer
+  count as something you chose.
+- A port typed in Options was forgotten if you closed the window with the X while the caret was
+  still in the box. It is kept now, along with anything else typed on that page.
 - CW keying refused radios it could key: an IC-7300-DATA is an IC-7300, and every Elecraft was
   turned away because of the name OmniRig gives it. K3, K3S, K4, KX2 and KX3 all key now.
 - CW text was sent four characters too long for a Kenwood or an Elecraft, and the overflow was
