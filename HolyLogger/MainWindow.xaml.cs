@@ -3424,27 +3424,43 @@ namespace HolyLogger
 
         // ── THE RADIOS KEYED BY THE "KY" COMMAND ────────────────────────────────────────────────
         //
-        // Everything that is not an Icom sends CW with the same text command - KY, then the text, then
-        // a semicolon - so the question is only which radios have it, and that is answered by the name
-        // OmniRig is running under.
+        // KY carries the text itself on a Kenwood and on an Elecraft, and their manuals agree on the
+        // shape of it - the letters KY, one space, the text, a semicolon:
         //
-        // ELECRAFT WAS NEVER MATCHED AT ALL. The test was StartsWith("K3"), and OmniRig does not call
-        // them K3: its files are named "Elecraft K3", "Elecraft K4", "Elecraft KX2", "Elecraft KX3". So
-        // every Elecraft fell through to "not supported for this radio model" - and K4, KX2 and KX3
-        // would have been refused by that test even if the prefix had been right.
+        //   Kenwood TS-590S/SG PC Control Command Reference
+        //     "KY - Converts the entered characters into morse code while keying."
+        //     KY + P1 (always a space) + up to 24 characters.
         //
-        // The K2 is deliberately left out: it is the one Elecraft where KY is not something to assume.
+        //   Elecraft K3S/K3/KX3/KX2 Programmer's Reference, Rev. G5
+        //     "SET format: KY*[text]; where * is normally a BLANK and [text] is 0 to 24 characters."
         //
-        // Yaesu and Kenwood stay a prefix test, and that is knowingly optimistic - an FT-857 or a
-        // TS-440 is old enough not to have KY, and will be sent it and quietly do nothing. Narrowing
-        // those two to a list of models is a job on its own, and a list that is wrong in the other
-        // direction would refuse radios that work.
+        // YAESU IS NOT ON THIS LIST, AND NEVER SHOULD HAVE BEEN. Yaesu spells a different command with
+        // the same two letters. From their own CAT manuals - FT-991, FT-991A, FT-891, and FTDX101 with
+        // a second parameter:
+        //
+        //     KY  CW KEYING
+        //     Set  K Y P1 ;    P1  1..5: Keyer Memory Playback   6..A: Message Keyer Playback
+        //
+        // It plays back a message ALREADY STORED IN THE RADIO, and takes one digit. It has no way to
+        // accept typed text at all. So this program was sending "KY HELLO ;" to a radio waiting for a
+        // single digit, and no Yaesu has ever keyed a word of it - the operator saw a keyer that
+        // appeared to work and a radio that stayed silent, with nothing said.
+        //
+        // Refusing them is the honest answer: the message now tells a Yaesu owner to use the radio's
+        // own memory keyer, which is the only thing that CAN send CW on his radio.
+        //
+        // ELECRAFT, meanwhile, was never matched: the test was StartsWith("K3") and OmniRig names them
+        // "Elecraft K3", "Elecraft K4", "Elecraft KX2", "Elecraft KX3". Every Elecraft was turned away,
+        // a K3 among them - the radio whose manual is quoted above.
+        //
+        // The K2 is left out deliberately: its KY is an extended-response variant and not something to
+        // assume. Kenwood stays a prefix test, knowingly optimistic - a TS-440 is old enough not to
+        // have KY, will be sent it, and will quietly ignore it.
         private static bool KeyedByKyCommand(string rigType)
         {
             string name = (rigType ?? string.Empty).Trim();
             if (name.Length == 0) return false;
 
-            if (name.StartsWith("FT", StringComparison.OrdinalIgnoreCase)) return true;    // Yaesu
             if (name.StartsWith("TS", StringComparison.OrdinalIgnoreCase)) return true;    // Kenwood
 
             // Elecraft, under either spelling: OmniRig's "Elecraft K3", or a bare model name from some
@@ -3458,6 +3474,12 @@ namespace HolyLogger
 
             return false;
         }
+
+        // THE MOST TEXT ONE COMMAND MAY CARRY, from the manuals rather than from a round number.
+        // Kenwood and Elecraft both stop at 24; Icom's command 17 takes 30. Anything longer is not
+        // refused by the radio - it is silently cut, which is worse.
+        private const int KyTextLimit = 24;
+        private const int IcomCwTextLimit = 30;
 
         // How much one command may carry. Under every radio's real buffer on purpose: the pacing keeps
         // the radio busy anyway, and a short chunk is a short wait between typing and hearing it.
@@ -3692,15 +3714,19 @@ namespace HolyLogger
 
         private static string BuildCwSendCommand(string rigType, string text)
         {
-            // KY text; - Yaesu, Kenwood and Elecraft alike, padded to 28 for the canned messages.
-            // The same one test as the keyer uses, so the two cannot come to disagree about which
-            // radios can be keyed. It used to be three prefix checks here and three more there, and
-            // the Elecraft one was wrong in both.
+            // The same one test the keyer uses, so the two cannot come to disagree about which radios
+            // can be keyed. It used to be three prefix checks here and three more there, and the
+            // Elecraft one was wrong in both.
             if (KeyedByKyCommand(rigType))
             {
                 string safe = new string(text.ToUpper().Where(c => c >= ' ' && c <= 'Z').ToArray());
-                if (safe.Length > 28) safe = safe.Substring(0, 28);
-                safe = safe.PadRight(28);
+
+                // 24, WHICH IS WHAT THE MANUALS SAY. It was padded to 28 - four characters past what
+                // either radio accepts, on a command whose overflow is not refused but silently cut.
+                // The padding itself is kept: a canned message is one command, and Kenwood keys the
+                // trailing spaces as the gap after the text rather than running the next one into it.
+                if (safe.Length > KyTextLimit) safe = safe.Substring(0, KyTextLimit);
+                safe = safe.PadRight(KyTextLimit);
                 return "KY " + safe + ";";
             }
 
@@ -3711,6 +3737,11 @@ namespace HolyLogger
                 // Keep only printable ASCII (space–Z range is safe for CW keyer)
                 string safe = new string(text.ToUpper().Where(c => c >= ' ' && c <= 'Z').ToArray());
                 if (string.IsNullOrEmpty(safe)) return null;
+
+                // "To send CW messages of up to 30 characters" - Icom's own CI-V reference. Not padded:
+                // command 17 sends what it is given, and spaces on the end would be keyed as silence.
+                if (safe.Length > IcomCwTextLimit) safe = safe.Substring(0, IcomCwTextLimit);
+
                 string textHex = string.Join(" ", safe.Select(c => ((byte)c).ToString("X2")));
                 return "FE FE " + icomAddress + " E0 17 00 " + textHex + " FD";
             }
