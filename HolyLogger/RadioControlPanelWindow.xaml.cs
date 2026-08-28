@@ -289,7 +289,7 @@ namespace HolyLogger
             button.IsChecked = ReferenceEquals(band, _currentBand);
 
             if (band == null) return;
-            _main.TuneFromRadioPanel(band.FrequencyFor(_mode), _mode);
+            _main.TuneRadioToKhz(band.FrequencyFor(_mode), _mode);
         }
 
         private void ModeButton_Click(object sender, RoutedEventArgs e)
@@ -306,7 +306,7 @@ namespace HolyLogger
             double khz = _currentBand != null ? _currentBand.FrequencyFor(mode) : _rigKhz;
             if (khz <= 0) return;
 
-            _main.TuneFromRadioPanel(khz, mode);
+            _main.TuneRadioToKhz(khz, mode);
         }
 
         // ---- only a frequency can be typed into the box ------------------------------------
@@ -358,61 +358,49 @@ namespace HolyLogger
 
         // ---- the wheel tunes ---------------------------------------------------------------
         //
-        // A notch of the wheel over the box moves the radio one kHz, up or down.
-        //
-        // THE FIRST NOTCH TIDIES THE FREQUENCY UP. From 14250.630 a notch up goes to 14251 and a notch
-        // down to 14250 - the nearest whole kHz IN THE DIRECTION THE WHEEL WAS TURNED - and every notch
-        // after that is a plain 1 kHz from there. A wheel that carried the odd 630 Hz along with it
-        // would never land on a round number at all.
-        //
-        // Spinning it does not wait for the radio: each notch is added to where the last notch was
-        // sent, not to the frequency read back, so a fast spin moves as far as it was spun instead of
-        // fighting the readback of a tune still on its way.
-        private double _wheelTargetKhz;
-        private DateTime _wheelAtUtc;
+        // A notch of the wheel over the box moves the radio one kHz, up or down. What that means for
+        // an odd frequency, and for a fast spin, is decided in FrequencyWheel - the LED on the main
+        // window turns the wheel through the same class, so the two behave identically.
+        private readonly FrequencyWheel _wheel = new FrequencyWheel();
 
         private void TB_Frequency_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
         {
             e.Handled = true;
 
-            if (!_rigOnline || _rigKhz <= 0) return;
+            if (!_rigOnline) return;
 
-            int steps = e.Delta / 120;
-            if (steps == 0) return;
-
-            bool spinning = _wheelTargetKhz > 0 && (DateTime.UtcNow - _wheelAtUtc).TotalSeconds < 1.5;
-
-            double target;
-            if (spinning)
-            {
-                // Already on a whole kHz from the notch before: plain steps from there.
-                target = _wheelTargetKhz + steps;
-            }
-            else if (Math.Abs(_rigKhz - Math.Round(_rigKhz)) < 0.0005)
-            {
-                // The radio is already on a whole kHz - nothing to tidy.
-                target = Math.Round(_rigKhz) + steps;
-            }
-            else if (steps > 0)
-            {
-                // Up: to the whole kHz above, and the rest of the notches from there.
-                target = Math.Ceiling(_rigKhz) + (steps - 1);
-            }
-            else
-            {
-                target = Math.Floor(_rigKhz) + (steps + 1);
-            }
-
-            if (target <= 0) return;
-
-            _wheelTargetKhz = target;
-            _wheelAtUtc = DateTime.UtcNow;
+            double? target = _wheel.Next(_rigKhz, e.Delta, StepUnderPointer(e.GetPosition(TB_Frequency).X));
+            if (target == null) return;
 
             // The box follows the radio again, and no mode is named: turning the dial is not a
             // request to change from data to SSB.
             _boxShowsRadio = true;
-            TB_Frequency.Text = target.ToString("0.000", CultureInfo.InvariantCulture);
-            _main.TuneFromRadioPanel(target, null);
+            TB_Frequency.Text = target.Value.ToString("0.000", CultureInfo.InvariantCulture);
+
+            // QueueWheelTune, not TuneRadioToKhz: the wheel's path writes the frequency and nothing
+            // else - no mode, no readback poll - and sends at most one command per 50 ms however fast
+            // the wheel is spun.
+            _main.QueueWheelTune(target.Value);
+        }
+
+        /// <summary>
+        /// 1 kHz with the pointer over the kHz digits, 0.1 kHz once it is past the decimal point -
+        /// the box is read the way the radio's own dial is: the digit you are pointing at is the one
+        /// that moves.
+        /// </summary>
+        private double StepUnderPointer(double x)
+        {
+            try
+            {
+                int dot = (TB_Frequency.Text ?? string.Empty).IndexOf('.');
+                if (dot < 0) return 1.0;
+
+                Rect dotRect = TB_Frequency.GetRectFromCharacterIndex(dot);
+                return x > dotRect.Right ? 0.1 : 1.0;
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+            return 1.0;
         }
 
         private void TB_Frequency_KeyDown(object sender, KeyEventArgs e)
@@ -437,7 +425,7 @@ namespace HolyLogger
             // Handed back to the radio: from here the box follows the reading again, which is also
             // how the operator sees that the radio actually went where it was sent.
             _boxShowsRadio = true;
-            _main.TuneFromRadioPanel(khz, _mode);
+            _main.TuneRadioToKhz(khz, _mode);
         }
 
         /// <summary>

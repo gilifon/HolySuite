@@ -302,6 +302,7 @@
       <DependentUpon>RadioControlPanelControl.xaml</DependentUpon>
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="FrequencyWheel.cs" />
     <Compile Include="RadioPanelPresets.cs" />
     <Compile Include="RadioControlPanelWindow.xaml.cs">
       <DependentUpon>RadioControlPanelWindow.xaml</DependentUpon>

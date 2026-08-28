@@ -486,6 +486,7 @@ namespace HolyLogger
         }
         private void SelectRig()
         {
+            ForgetWriteableParams();   // another rig, another set of writeable parameters
             UpdateRigLabel();
             if (OmniRigEngine == null) { UpdateFreqLed(); return; }
             if (Properties.Settings.Default.SelectedOmniRig1)
@@ -543,6 +544,7 @@ namespace HolyLogger
         //OmniRig StatusChange events
         private void OmniRigEngine_StatusChange(int RigNumber)
         {
+            ForgetWriteableParams();   // a rig that just came online may answer differently
             QueueShowRigParams();
         }
 
@@ -709,6 +711,75 @@ namespace HolyLogger
             catch (Exception swallowed) { Log.Swallow(swallowed); }
         }
 
+        // The LED on the main window tunes on the wheel exactly as the panel's box does - same class,
+        // same first-notch rule - so there is one behaviour to learn and one place it is written.
+        private readonly FrequencyWheel _ledWheel = new FrequencyWheel();
+
+        private void FreqLed_PreviewMouseWheel(object sender, System.Windows.Input.MouseWheelEventArgs e)
+        {
+            e.Handled = true;
+
+            // Only when the LED is a live reading. With CAT off, no rig, or manual mode, the number on
+            // screen is one the operator typed and there is no radio behind it to move.
+            if (!Properties.Settings.Default.EnableOmniRigCAT || Properties.Settings.Default.isManualMode) return;
+            if (OmniRigEngine == null || Rig == null || Rig.Status != OmniRig.RigStatusX.ST_ONLINE) return;
+
+            // Not while the inline editor is open over the LED: the wheel there belongs to the text.
+            if (TB_FreqLedEdit != null && TB_FreqLedEdit.Visibility == Visibility.Visible) return;
+
+            double khz;
+            try { khz = (double)Rig.GetRxFrequency() / 1000.0; }
+            catch (Exception swallowed) { Log.Swallow(swallowed); return; }
+
+            double? target = _ledWheel.Next(khz, e.Delta, LedStepUnderPointer(e.GetPosition(FreqLedLive).X));
+            if (target == null) return;
+
+            QueueWheelTune(target.Value);
+        }
+
+        /// <summary>
+        /// Which digits the pointer is over on the LED: 1 kHz to the left of the decimal point, 0.1 kHz
+        /// to the right of it - the display is read the way the radio's own dial is, the digit you are
+        /// pointing at being the one that moves.
+        ///
+        /// The LED is right-aligned inside a fixed width, so where the point sits on screen depends on
+        /// how many digits the frequency has. The text is measured as it is actually drawn - same font,
+        /// same size, same screen - rather than guessed at from character counts, which a seven-segment
+        /// font with its narrow dot would get wrong.
+        /// </summary>
+        private double LedStepUnderPointer(double x)
+        {
+            try
+            {
+                if (FreqLedLive == null) return 1.0;
+
+                string text = FreqLedLive.Text ?? string.Empty;
+                int dot = text.IndexOf('.');
+                if (dot < 0) return 1.0;
+
+                double dpi = VisualTreeHelper.GetDpi(FreqLedLive).PixelsPerDip;
+                var typeface = new Typeface(FreqLedLive.FontFamily, FreqLedLive.FontStyle,
+                                            FreqLedLive.FontWeight, FreqLedLive.FontStretch);
+
+                double whole = Measure(text, typeface, dpi);
+                double uptoDot = Measure(text.Substring(0, dot + 1), typeface, dpi);
+
+                // Right-aligned: the text ends at the right edge, so it begins that far back from it.
+                double textStart = FreqLedLive.ActualWidth - whole;
+                return x > textStart + uptoDot ? 0.1 : 1.0;
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+            return 1.0;
+        }
+
+        private double Measure(string text, Typeface typeface, double pixelsPerDip)
+        {
+            return new FormattedText(text, CultureInfo.InvariantCulture, FlowDirection.LeftToRight,
+                                     typeface, FreqLedLive.FontSize, System.Windows.Media.Brushes.Black,
+                                     pixelsPerDip).WidthIncludingTrailingWhitespace;
+        }
+
         private void RadioPanel_Closed(object sender, EventArgs e)
         {
             radioPanel = null;
@@ -776,10 +847,113 @@ namespace HolyLogger
             catch (Exception swallowed) { Log.Swallow(swallowed); }
         }
 
+        // ---- the wheel's own way to the radio ------------------------------------------------
+        //
+        // WHY THE WHEEL DOES NOT GO THROUGH TuneRadioToKhz. That path is written for a jump to a spot:
+        // it reads the rig's mode, WRITES the mode, writes the frequency, and then polls GetRxFrequency
+        // up to eight times over a second to make sure the radio arrived. Perfectly right for one press
+        // of a band button - and ruinous ten times a second, which is what a spun wheel asks for. A ten
+        // notch spin cost ten mode writes, ten frequency writes and up to eighty readback polls, and the
+        // radio ended up chasing a queue of commands long after the wheel had stopped.
+        //
+        // This path carries one thing to the radio: the newest frequency. No mode is written (the wheel
+        // never changes the mode), nothing is polled back (OmniRig reports the new frequency on its own
+        // ParamsChange, which is what draws the LED anyway), and while the wheel is being spun at most
+        // one command goes out every 50 ms - always the LATEST target, never a backlog of stale ones.
+
+        private DispatcherTimer _wheelSendTimer;
+        private double _wheelPendingKhz;
+        private DateTime _wheelSentAtUtc;
+
+        // Rig.WriteableParams over COM, asked once per rig rather than once per notch. Cleared whenever
+        // the rig or its status changes, which is the only time the answer can differ.
+        private int _writeableParamsCache = -1;
+
+        internal void ForgetWriteableParams()
+        {
+            _writeableParamsCache = -1;
+        }
+
         /// <summary>
-        /// The one way the panel moves the radio: a frequency in kHz, and the mode it should be in.
+        /// A wheel notch's worth of tuning: kept until the next send slot, so a fast spin costs one
+        /// command per 50 ms instead of one per notch.
         /// </summary>
-        internal async void TuneFromRadioPanel(double khz, string mode)
+        internal void QueueWheelTune(double khz)
+        {
+            if (khz <= 0) return;
+
+            _wheelPendingKhz = khz;
+
+            double sinceLast = (DateTime.UtcNow - _wheelSentAtUtc).TotalMilliseconds;
+            if (sinceLast >= 50)
+            {
+                SendWheelTune();
+                return;
+            }
+
+            if (_wheelSendTimer == null)
+            {
+                _wheelSendTimer = new DispatcherTimer(DispatcherPriority.Send)
+                {
+                    Interval = TimeSpan.FromMilliseconds(50)
+                };
+                _wheelSendTimer.Tick += (s, e) =>
+                {
+                    _wheelSendTimer.Stop();
+                    SendWheelTune();
+                };
+            }
+
+            if (!_wheelSendTimer.IsEnabled) _wheelSendTimer.Start();
+        }
+
+        private void SendWheelTune()
+        {
+            double khz = _wheelPendingKhz;
+            _wheelPendingKhz = 0;
+            if (khz <= 0) return;
+
+            if (!Properties.Settings.Default.EnableOmniRigCAT || Rig == null
+                || Rig.Status != OmniRig.RigStatusX.ST_ONLINE)
+            {
+                return;
+            }
+
+            _wheelSentAtUtc = DateTime.UtcNow;
+            int frequencyHz = (int)Math.Round(khz * 1000.0);
+
+            try
+            {
+                if (_writeableParamsCache < 0) _writeableParamsCache = (int)Rig.WriteableParams;
+
+                if ((_writeableParamsCache & PM_FREQ) != 0) Rig.Freq = frequencyHz;
+                else if ((_writeableParamsCache & PM_FREQA) != 0) Rig.FreqA = frequencyHz;
+                else return;
+            }
+            catch (Exception swallowed)
+            {
+                Log.Swallow(swallowed);
+                _writeableParamsCache = -1;   // ask again next time; the rig may have gone
+                return;
+            }
+
+            // The LED moves NOW, not when the radio gets round to answering. OmniRig polls the rig on
+            // its own interval - half a second on many .ini files - and a display that only caught up
+            // then made the wheel feel broken. ShowRigParams overwrites this with the radio's own word
+            // as soon as it arrives, so nothing here can survive being wrong.
+            try
+            {
+                TB_Frequency.Text = (frequencyHz / 1000000.0).ToString("###0.000000", CultureInfo.InvariantCulture);
+                UpdateFreqLed();
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        /// <summary>
+        /// The one way the panel and the LED move the radio: a frequency in kHz, and the mode it
+        /// should be in - or null for "leave the mode alone", which is what the wheel asks for.
+        /// </summary>
+        internal async void TuneRadioToKhz(double khz, string mode)
         {
             if (khz <= 0) return;
 
