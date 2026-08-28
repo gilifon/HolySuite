@@ -3332,9 +3332,8 @@ namespace HolyLogger
                 if (!silent) HolyMessageBox.ShowWarning(
                     "CW keying by CAT is not supported for this radio model (" + rigType + ").\n\n"
                     + "Nothing was sent.\n\n"
-                    + "If OmniRig lists your radio under more than one name, pick the plain one — "
-                    + "IC-7300 rather than IC-7300-DATA — and try again.\n\n"
-                    + "Otherwise use the radio's own memory keyer.",
+                    + (string.IsNullOrEmpty(RigFileTrouble) ? string.Empty : RigFileTrouble + "\n\n")
+                    + "Use the radio's own memory keyer instead.",
                     "CW Keyer", this);
                 return;
             }
@@ -3532,9 +3531,8 @@ namespace HolyLogger
                 HolyMessageBox.ShowWarning(
                     "CW text keying via CAT is not supported for this radio model (" + rigType + ").\n\n"
                     + "Nothing was sent.\n\n"
-                    + "If OmniRig lists your radio under more than one name, pick the plain one — "
-                    + "IC-7300 rather than IC-7300-DATA — and try again.\n\n"
-                    + "Otherwise use the radio's own memory keyer.",
+                    + (string.IsNullOrEmpty(RigFileTrouble) ? string.Empty : RigFileTrouble + "\n\n")
+                    + "Use the radio's own memory keyer instead.",
                     "CW Text", this);
                 return;
             }
@@ -3709,6 +3707,119 @@ namespace HolyLogger
             return null;
         }
 
+        // ── THE RADIO'S CI-V ADDRESS, ASKED OF OMNIRIG'S OWN FILES ──────────────────────────────
+        //
+        // An Icom is addressed by a number inside every command sent to it, and OmniRig's custom-command
+        // interface takes raw bytes - so whoever builds the command has to know that number. OmniRig
+        // does not offer it through the COM interface, which is why this program kept a little table of
+        // its own: three radios, three numbers, and every other Icom refused.
+        //
+        // But OmniRig HAS the number, written into the rig file it is running: every Icom command in
+        // there begins FE FE <address> E0. Reading it from that file means HolyLogger keys whatever
+        // Icom OmniRig supports, at whatever address that file uses, instead of the three it was told
+        // about - and cannot disagree with OmniRig about the address, because it is the same number
+        // from the same place.
+        //
+        // The folder is found the way Windows finds OmniRig itself: the COM server's registered path.
+        // Guessing "C:\Program Files (x86)\Afreet" would be wrong on a machine that installed it
+        // somewhere else.
+        private static readonly Dictionary<string, string> CivAddressFromRigFile =
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        // WHY THE RIG FILE COULD NOT BE READ, for the message that has to tell him. Empty when it was
+        // read, or when the built-in table answered and nobody needs to hear about it.
+        private static string _rigFileTrouble;
+
+        internal static string RigFileTrouble { get { return _rigFileTrouble; } }
+
+        private static string OmniRigRigsFolder()
+        {
+            try
+            {
+                foreach (string root in new[] { @"CLSID\{0839E8C6-ED30-4950-8087-966F970F0CAE}\LocalServer32",
+                                                @"WOW6432Node\CLSID\{0839E8C6-ED30-4950-8087-966F970F0CAE}\LocalServer32" })
+                {
+                    using (var key = Microsoft.Win32.Registry.ClassesRoot.OpenSubKey(root))
+                    {
+                        if (key == null) continue;
+                        string exe = (key.GetValue(null) as string ?? string.Empty).Trim().Trim('"');
+                        if (exe.Length == 0) continue;
+
+                        string folder = System.IO.Path.GetDirectoryName(exe);
+                        if (string.IsNullOrEmpty(folder)) continue;
+
+                        string rigs = System.IO.Path.Combine(folder, "Rigs");
+                        if (System.IO.Directory.Exists(rigs)) return rigs;
+                    }
+                }
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+            return null;
+        }
+
+        // The address out of one rig file: the first Icom command in it, whose first four bytes are
+        // FE FE <address> E0. The file is full of them and they all carry the same address.
+        private static string CivAddressInRigFile(string rigType)
+        {
+            string rigs = OmniRigRigsFolder();
+            if (rigs == null)
+            {
+                _rigFileTrouble = "HolyLogger could not find OmniRig's Rigs folder, so it could not read "
+                                + "the radio's CI-V address from OmniRig's own file.";
+                return null;
+            }
+
+            string file = System.IO.Path.Combine(rigs, rigType + ".ini");
+            if (!System.IO.File.Exists(file))
+            {
+                _rigFileTrouble = "OmniRig has no file for " + rigType + " in" + Environment.NewLine + rigs;
+                return null;
+            }
+
+            try
+            {
+                foreach (string line in System.IO.File.ReadAllLines(file))
+                {
+                    string trimmed = line.TrimStart();
+                    if (trimmed.StartsWith(";", StringComparison.Ordinal)) continue;   // a comment
+
+                    int at = trimmed.IndexOf("FEFE", StringComparison.OrdinalIgnoreCase);
+                    if (at < 0 || trimmed.Length < at + 8) continue;
+
+                    string address = trimmed.Substring(at + 4, 2);
+                    string echo = trimmed.Substring(at + 6, 2);
+
+                    // FE FE <radio> E0 - E0 is the computer's own address, and it is what says this is
+                    // an Icom frame rather than four hex characters that happen to spell FEFE.
+                    if (!string.Equals(echo, "E0", StringComparison.OrdinalIgnoreCase)) continue;
+                    if (!IsHexPair(address)) continue;
+
+                    _rigFileTrouble = null;
+                    return address.ToUpperInvariant();
+                }
+
+                // NOT REPORTED. A rig file with no Icom command in it is a rig that is not an
+                // Icom - a Yaesu, a Kenwood, an Elecraft - and those are keyed by a different
+                // command entirely, further down. Saying "no CI-V address" to the owner of an
+                // FT-991A names a thing his radio was never going to have.
+                _rigFileTrouble = null;
+            }
+            catch (Exception ex)
+            {
+                Log.Swallow(ex);
+                _rigFileTrouble = "OmniRig's file for " + rigType + " could not be read: " + ex.Message;
+            }
+            return null;
+        }
+
+        private static bool IsHexPair(string two)
+        {
+            if (two == null || two.Length != 2) return false;
+            foreach (char c in two)
+                if (!((c >= '0' && c <= '9') || (c >= 'A' && c <= 'F') || (c >= 'a' && c <= 'f'))) return false;
+            return true;
+        }
+
         private static readonly Dictionary<string, string> IcomCivAddresses = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
             { "IC-7300",    "94" },
@@ -3732,20 +3843,48 @@ namespace HolyLogger
         private static string GetIcomCivAddress(string rigType)
         {
             string name = (rigType ?? string.Empty).Trim();
+            if (name.Length == 0) return null;
 
-            string key = IcomCivAddresses.Keys.FirstOrDefault(k => string.Equals(k, name, StringComparison.OrdinalIgnoreCase));
-            if (key != null) return IcomCivAddresses[key];
+            // ASKED OF OMNIRIG FIRST, and remembered: it is a small file, but this is called for every
+            // chunk of every message and reading it off the disk each time would be reading it hundreds
+            // of times to get the same two characters.
+            string address;
+            if (CivAddressFromRigFile.TryGetValue(name, out address)) return address;
 
-            foreach (string suffix in OmniRigVariantSuffixes)
+            address = CivAddressInRigFile(name);
+            if (address != null)
             {
-                if (!name.EndsWith(suffix, StringComparison.OrdinalIgnoreCase)) continue;
-
-                string bare = name.Substring(0, name.Length - suffix.Length).Trim();
-                key = IcomCivAddresses.Keys.FirstOrDefault(k => string.Equals(k, bare, StringComparison.OrdinalIgnoreCase));
-                if (key != null) return IcomCivAddresses[key];
+                CivAddressFromRigFile[name] = address;
+                return address;
             }
 
-            return null;
+            // THE OLD TABLE, KEPT AS A FALLBACK. OmniRig may be installed somewhere this cannot find,
+            // or not installed at all on a machine driving the radio some other way. Three radios is
+            // better than none, and for those three the numbers are the same ones OmniRig's own files
+            // carry - which is how they were checked.
+            string key = IcomCivAddresses.Keys.FirstOrDefault(k => string.Equals(k, name, StringComparison.OrdinalIgnoreCase));
+            if (key == null)
+            {
+                // One radio, several OmniRig entries: IC-7300 and IC-7300-DATA are the same transceiver
+                // and differ only in which modes DIG maps to. Letter-for-letter matching refused CW on
+                // the second name, about a radio sitting on this very list.
+                foreach (string suffix in OmniRigVariantSuffixes)
+                {
+                    if (!name.EndsWith(suffix, StringComparison.OrdinalIgnoreCase)) continue;
+
+                    string bare = name.Substring(0, name.Length - suffix.Length).Trim();
+                    key = IcomCivAddresses.Keys.FirstOrDefault(k => string.Equals(k, bare, StringComparison.OrdinalIgnoreCase));
+                    if (key != null) break;
+                }
+            }
+
+            if (key == null) return null;
+
+            // The table answered, so whatever went wrong reading the file does not matter and must not
+            // be reported: CW is about to work.
+            _rigFileTrouble = null;
+            CivAddressFromRigFile[name] = IcomCivAddresses[key];
+            return IcomCivAddresses[key];
         }
 
         private void UpdateMessageButtonLabels()
