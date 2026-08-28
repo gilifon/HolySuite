@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Windows;
@@ -94,6 +95,13 @@ namespace HolyLogger
         // a pause between chunks - which is why a Yaesu is given the whole 50 characters its memory
         // holds, rather than the 12 an Icom's buffer likes, so the pause comes four times less often.
         private readonly bool _waitForTxIdle;
+
+        // Tells the radio to key at this speed, and says what speeds it will accept. Null when the
+        // radio cannot be told - then the readout is not built at all.
+        private readonly Action<int> _setSpeed;
+        private readonly SpeedRange _speedRange;
+
+        public delegate void SpeedRange(out int low, out int high);
 
         // Turns * and ! into callsigns. The stored text keeps the macro; only what goes on air is
         // expanded, so a button reads the same next year when the callsign in the form is different.
@@ -246,9 +254,12 @@ namespace HolyLogger
                                 Func<string, string> expandMacros, Func<string, string> macroProblem,
                                 Action<double> learnWpm, Func<string, string, string> editText,
                                 Func<int, string> getSharedText, Action<int, string> setSharedText,
-                                bool waitForTxIdle = false)
+                                bool waitForTxIdle = false,
+                                Action<int> setSpeed = null, SpeedRange speedRange = null)
         {
             _waitForTxIdle = waitForTxIdle;
+            _setSpeed = setSpeed;
+            _speedRange = speedRange;
             _sendChunk = sendChunk;
             _stopSending = stopSending;
             _currentWpm = currentWpm;
@@ -1399,6 +1410,7 @@ namespace HolyLogger
 
             var right = new StackPanel { Orientation = Orientation.Horizontal };
             DockPanel.SetDock(right, Dock.Right);
+            right.Children.Add(BuildSpeedReadout());
             right.Children.Add(gearBtn);
             right.Children.Add(closeBtn);
 
@@ -1595,6 +1607,121 @@ namespace HolyLogger
             line.SetResourceReference(TextBlock.ForegroundProperty, "MutedTextBrush");
 
             return line;
+        }
+
+        // ── WPM ##, AND THE WHEEL OVER IT ───────────────────────────────────────────────────────
+        //
+        // The keyer used to TIME the keying and work the speed out from it - an estimate of a number
+        // the radio knows exactly, and one the operator could not change without reaching past the
+        // program to the radio's own menu. Every maker has a command for it, so it is set from here.
+        //
+        // IN THE TITLE BAR, because a speed is changed in the middle of a QSO. Behind the gear it
+        // would be three clicks and a dialog, which is not a thing anybody does while sending.
+        //
+        // TURNED, NOT TYPED. A notch of the wheel over the number is one word a minute, which is how
+        // an operator thinks about it - a little faster, a little slower - and it needs no Enter and
+        // no undoing of a half-typed number.
+        //
+        // 5 TO 30, which is the range asked for: the speeds a man actually works at. The radios go
+        // wider - a Kenwood to 60 - and the wheel deliberately does not, because a notch that can
+        // reach 60 is a notch that can run away from him.
+        private const int WheelWpmLow = 5;
+        private const int WheelWpmHigh = 30;
+
+        private TextBlock _wpmText;
+        private int _wpm;
+
+        private UIElement BuildSpeedReadout()
+        {
+            var holder = new Border
+            {
+                Margin = new Thickness(0, 0, 10, 0),
+                Padding = new Thickness(6, 0, 6, 0),
+                Background = Brushes.Transparent,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+
+            // Nothing to show on a radio this program cannot tell.
+            if (_setSpeed == null || _speedRange == null) return holder;
+
+            int low, high;
+            Limits(out low, out high);
+            if (high == 0) return holder;
+
+            _wpm = Math.Max(low, Math.Min(high, 20));
+
+            _wpmText = new TextBlock
+            {
+                FontSize = 16,
+                FontWeight = FontWeights.Bold,
+                Foreground = Brushes.Black,
+                VerticalAlignment = VerticalAlignment.Center,
+                Cursor = System.Windows.Input.Cursors.SizeNS,
+                ToolTip = "The radio's keyer speed. Roll the wheel over it: "
+                        + low + " to " + high + " words a minute."
+            };
+            RefreshSpeedText();
+
+            holder.Child = _wpmText;
+            System.Windows.Shell.WindowChrome.SetIsHitTestVisibleInChrome(holder, true);
+
+            holder.MouseWheel += (s2, e2) =>
+            {
+                Nudge(e2.Delta > 0 ? 1 : -1);
+                e2.Handled = true;
+            };
+
+            return holder;
+        }
+
+        // His 5 to 50, held inside what the radio itself accepts - an Elecraft starts at 8 and an
+        // Icom stops at 48, and asking either for a speed its manual does not offer is asking for
+        // whatever it decides to do about it.
+        private void Limits(out int low, out int high)
+        {
+            int radioLow, radioHigh;
+            _speedRange(out radioLow, out radioHigh);
+
+            if (radioHigh == 0) { low = 0; high = 0; return; }
+
+            low = Math.Max(WheelWpmLow, radioLow);
+            high = Math.Min(WheelWpmHigh, radioHigh);
+        }
+
+        private void Nudge(int by)
+        {
+            int low, high;
+            Limits(out low, out high);
+            if (high == 0) return;
+
+            int wanted = _wpm + by;
+            if (wanted < low) wanted = low;
+            if (wanted > high) wanted = high;
+            if (wanted == _wpm) return;
+
+            _wpm = wanted;
+            RefreshSpeedText();
+
+            try { _setSpeed(_wpm); }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        private void RefreshSpeedText()
+        {
+            if (_wpmText != null) _wpmText.Text = "WPM " + _wpm.ToString(CultureInfo.InvariantCulture);
+        }
+
+        // The speed the radio is really at, shown without being sent back to it.
+        internal void ShowSpeed(int wpm)
+        {
+            if (_wpmText == null || wpm <= 0 || wpm == _wpm) return;
+
+            int low, high;
+            Limits(out low, out high);
+            if (wpm < low || wpm > high) return;
+
+            _wpm = wpm;
+            RefreshSpeedText();
         }
 
         // WHAT THE KEYS DO, in the one place the operator already opens to change how this window

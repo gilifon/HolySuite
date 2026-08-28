@@ -3388,7 +3388,16 @@ namespace HolyLogger
                 },
                 // A Yaesu has no character buffer: the keyer must let each memory finish playing
                 // before it writes the next one over the top of it.
-                IsYaesuKeyer(rigType))
+                IsYaesuKeyer(rigType),
+
+                // The WPM readout in its title bar: what to send when the wheel is turned, and what
+                // speeds this radio will accept.
+                wpm =>
+                {
+                    string command = BuildCwSpeedCommand(rigType, wpm);
+                    if (command != null) TrySendOmniRigCustomCommand(command);
+                },
+                (out int low, out int high) => CwSpeedRange(rigType, out low, out high))
             {
                 Owner = this,
                 Icon = Icon
@@ -3534,6 +3543,73 @@ namespace HolyLogger
             return KeyedByKyCommand(rigType)
                 || GetIcomCivAddress(rigType) != null
                 || IsYaesuKeyer(rigType);
+        }
+
+        // ── SETTING THE RADIO'S KEYER SPEED ─────────────────────────────────────────────────────
+        //
+        // HolyLogger has never asked the radio how fast it is keying - it TIMED the keying and worked
+        // the speed out from that, which is an estimate of a number the radio knows exactly. Every
+        // maker has a command for it, quoted here from their own documents:
+        //
+        //   Kenwood TS-590S/SG PC Control Command Reference
+        //     "KS  Sets and reads the Keying speed."   K S P1 P1 P1 ;   P1 004 ~ 060
+        //
+        //   Yaesu CAT References (FT-991, FT-891, FTDX10, FTDX101, FT-710)
+        //     "KS  KEY SPEED"                          K S P1 P1 P1 ;   P1 004 - 060 (WPM)
+        //
+        //   Elecraft K3S/K3/KX3/KX2 Programmer's Reference rev. G5
+        //     "KS (Keyer Speed; GET/SET)  SET/RSP format: KSnnn; where nnn is 008-050 (8-50 WPM)."
+        //
+        //   Icom CI-V Reference Guides (IC-705, IC-7610, IC-9700) and the IC-7300 Full Manual
+        //     command 14, sub-command 0C: "Send/read keying speed (0000=6 WPM ~ 0255=48 WPM)"
+        //
+        // THE LIMITS ARE THE MAKERS' OWN, not one number for everybody. Asking an Elecraft for 60 WPM
+        // or an Icom for 4 is asking for something its manual does not offer, and what a radio does
+        // with a value outside its range is its own business - better to send the nearest it accepts.
+        private const int WpmKenwoodLow = 4,  WpmKenwoodHigh = 60;
+        private const int WpmYaesuLow   = 4,  WpmYaesuHigh   = 60;
+        private const int WpmElecraftLow = 8, WpmElecraftHigh = 50;
+        private const int WpmIcomLow    = 6,  WpmIcomHigh    = 48;
+
+        // What this radio will accept, so the keyer can hold its own box to the same range.
+        internal static void CwSpeedRange(string rigType, out int low, out int high)
+        {
+            string name = (rigType ?? string.Empty).Trim();
+
+            if (IsYaesuKeyer(name))            { low = WpmYaesuLow;    high = WpmYaesuHigh;    return; }
+            if (GetIcomCivAddress(name) != null) { low = WpmIcomLow;   high = WpmIcomHigh;     return; }
+            if (name.StartsWith("TS", StringComparison.OrdinalIgnoreCase))
+                                               { low = WpmKenwoodLow;  high = WpmKenwoodHigh;  return; }
+            if (KeyedByKyCommand(name))        { low = WpmElecraftLow; high = WpmElecraftHigh; return; }
+
+            low = 0; high = 0;   // not a radio this program can key
+        }
+
+        private static string BuildCwSpeedCommand(string rigType, int wpm)
+        {
+            int low, high;
+            CwSpeedRange(rigType, out low, out high);
+            if (high == 0) return null;
+
+            if (wpm < low) wpm = low;
+            if (wpm > high) wpm = high;
+
+            // Icom: a level like any other, command 14 sub-command 0C, and the value is BCD in two
+            // bytes over the range the manual gives - 0 is 6 WPM and 255 is 48.
+            string icom = GetIcomCivAddress(rigType);
+            if (icom != null)
+            {
+                int level = (int)Math.Round((wpm - WpmIcomLow) * 255.0 / (WpmIcomHigh - WpmIcomLow));
+                if (level < 0) level = 0;
+                if (level > 255) level = 255;
+
+                // 0..255 written as four BCD digits: 0255 becomes the bytes 02 55.
+                string digits = level.ToString("0000", CultureInfo.InvariantCulture);
+                return "FE FE " + icom + " E0 14 0C " + digits.Substring(0, 2) + " " + digits.Substring(2, 2) + " FD";
+            }
+
+            // Kenwood, Yaesu and Elecraft all spell it the same way: KS and three digits.
+            return "KS" + wpm.ToString("000", CultureInfo.InvariantCulture) + ";";
         }
 
         // ── YAESU: WRITE IT INTO A MEMORY, THEN PLAY THAT MEMORY ────────────────────────────────
