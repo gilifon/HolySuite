@@ -77,24 +77,31 @@
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
-            <TextBox x:Name="TB_Frequency" Grid.Column="1" Width="126" Height="34" FontSize="18" FontWeight="Bold" MaxLength="9"
-                     VerticalContentAlignment="Center" HorizontalContentAlignment="Center"
-                     Background="{DynamicResource EditFieldBg}" Foreground="{DynamicResource TextBrush}"
-                     BorderBrush="{DynamicResource InputBorder}" BorderThickness="1"
-                     KeyDown="TB_Frequency_KeyDown" PreviewTextInput="TB_Frequency_PreviewTextInput"
-                     PreviewMouseWheel="TB_Frequency_PreviewMouseWheel"
-                     LostFocus="TB_Frequency_LostFocus"/>
+            <!-- THE ARROWS SIT INSIDE THE BOX, at its right-hand edge. A wheel over a text box is not
+                 something anybody expects, and the hint has to be ON the thing it is about - beside
+                 the box it read as decoration next to "kHz". IsHitTestVisible="False" so the arrows
+                 are scenery: every click and every notch of the wheel goes straight through them to
+                 the box underneath. Padding on the box keeps a long frequency from running under them. -->
+            <Grid Grid.Column="1">
+                <TextBox x:Name="TB_Frequency" Width="126" Height="34" FontSize="18" FontWeight="Bold" MaxLength="9"
+                         VerticalContentAlignment="Center" HorizontalContentAlignment="Center"
+                         Padding="0,0,14,0"
+                         Background="{DynamicResource EditFieldBg}" Foreground="{DynamicResource TextBrush}"
+                         BorderBrush="{DynamicResource InputBorder}" BorderThickness="1"
+                         KeyDown="TB_Frequency_KeyDown" PreviewTextInput="TB_Frequency_PreviewTextInput"
+                         PreviewMouseWheel="TB_Frequency_PreviewMouseWheel"
+                         LostFocus="TB_Frequency_LostFocus"/>
+                <TextBlock Text="&#x21C5;" FontSize="15" FontWeight="Bold"
+                           HorizontalAlignment="Right" VerticalAlignment="Center"
+                           Margin="0,0,6,0" IsHitTestVisible="False"
+                           Foreground="{DynamicResource MutedTextBrush}"/>
+            </Grid>
             <!-- kHz, and under it the sign that the box can be rolled. A wheel over a text box is not
                  something anybody expects, so it has to be shown rather than discovered: the two
                  arrows say it in the one place the wheel works. -->
-            <StackPanel Grid.Column="2" HorizontalAlignment="Left" VerticalAlignment="Center"
-                        Margin="4,0,0,0">
-                <TextBlock Text="kHz" FontSize="14" FontWeight="Bold"
-                           Foreground="{DynamicResource TextBrush}"/>
-                <TextBlock Text="&#x21C5;" FontSize="15" FontWeight="Bold" Margin="0,-2,0,0"
-                           ToolTip="Roll the mouse wheel over the box to tune"
-                           Foreground="{DynamicResource MutedTextBrush}"/>
-            </StackPanel>
+            <TextBlock Grid.Column="2" Text="kHz" FontSize="14" FontWeight="Bold"
+                       HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="2,0,0,0"
+                       Foreground="{DynamicResource TextBrush}"/>
         </Grid>
 
         <!-- Twelve buttons, four rows of three: ten bands, plus SSB and CW either side of the
