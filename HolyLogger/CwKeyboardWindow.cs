@@ -1662,7 +1662,24 @@ namespace HolyLogger
             };
             RefreshSpeedText();
 
-            holder.Child = _wpmText;
+            // THE ARROWS ARE THE WHOLE POINT OF SHOWING IT AS A NUMBER. A wheel over a piece of text
+            // is not something anybody expects, so it is said rather than left to be discovered - and
+            // said beside the number, which is the only place the wheel does anything.
+            var hint = new TextBlock
+            {
+                Text = "⇅",
+                FontSize = 15,
+                FontWeight = FontWeights.Bold,
+                Foreground = Brushes.DimGray,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(4, 0, 0, 0)
+            };
+
+            var line = new StackPanel { Orientation = Orientation.Horizontal };
+            line.Children.Add(_wpmText);
+            line.Children.Add(hint);
+
+            holder.Child = line;
             System.Windows.Shell.WindowChrome.SetIsHitTestVisibleInChrome(holder, true);
 
             holder.MouseWheel += (s2, e2) =>

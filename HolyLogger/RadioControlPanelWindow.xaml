@@ -84,9 +84,17 @@
                      KeyDown="TB_Frequency_KeyDown" PreviewTextInput="TB_Frequency_PreviewTextInput"
                      PreviewMouseWheel="TB_Frequency_PreviewMouseWheel"
                      LostFocus="TB_Frequency_LostFocus"/>
-            <TextBlock Grid.Column="2" Text="kHz" FontSize="14" FontWeight="Bold"
-                       HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="2,0,0,0"
-                       Foreground="{DynamicResource TextBrush}"/>
+            <!-- kHz, and under it the sign that the box can be rolled. A wheel over a text box is not
+                 something anybody expects, so it has to be shown rather than discovered: the two
+                 arrows say it in the one place the wheel works. -->
+            <StackPanel Grid.Column="2" HorizontalAlignment="Left" VerticalAlignment="Center"
+                        Margin="4,0,0,0">
+                <TextBlock Text="kHz" FontSize="14" FontWeight="Bold"
+                           Foreground="{DynamicResource TextBrush}"/>
+                <TextBlock Text="&#x21C5;" FontSize="15" FontWeight="Bold" Margin="0,-2,0,0"
+                           ToolTip="Roll the mouse wheel over the box to tune"
+                           Foreground="{DynamicResource MutedTextBrush}"/>
+            </StackPanel>
         </Grid>
 
         <!-- Twelve buttons, four rows of three: ten bands, plus SSB and CW either side of the
