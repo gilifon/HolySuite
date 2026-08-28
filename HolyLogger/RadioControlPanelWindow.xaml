@@ -3,17 +3,23 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:primitives="clr-namespace:System.Windows.Controls.Primitives;assembly=PresentationFramework"
         Title="Radio Control Panel"
-        Height="304" Width="240" MinHeight="294" MinWidth="230"
-        ResizeMode="CanResize" ShowInTaskbar="False"
+        Width="240" SizeToContent="Height"
+        ResizeMode="NoResize" ShowInTaskbar="False"
         Icon="Images/crown.png"
         Background="{DynamicResource WindowBg}"
         Foreground="{DynamicResource TextBrush}">
 
     <Window.Resources>
+        <!-- The colour of a lit button. It is a resource, not a fixed colour in the trigger, because
+             the panel repaints it when the mode changes: blue while the radio is on SSB, red while
+             it is on CW. Every lit button reads this one brush, so the band button always wears the
+             colour of the mode it would send the radio to. -->
+        <SolidColorBrush x:Key="PanelLitBrush" Color="#FF1565C0"/>
+
         <!-- The panel's own button look. The application's ordinary button style says nothing about a
              PRESSED state, and this panel's whole job is to show, at a glance, which band and which
-             mode the radio is on: the lit button carries a green face, white bold text and a gold
-             edge, none of which any other button in the program wears. -->
+             mode the radio is on: the lit button carries the mode's colour, white bold text and a
+             gold edge, none of which any other button in the program wears. -->
         <Style x:Key="PanelToggleStyle" TargetType="{x:Type primitives:ToggleButton}">
             <Setter Property="FontSize" Value="18"/>
             <Setter Property="FontWeight" Value="Bold"/>
@@ -36,7 +42,7 @@
                                 <Setter TargetName="Face" Property="Background" Value="{DynamicResource ButtonHoverBg}"/>
                             </Trigger>
                             <Trigger Property="IsChecked" Value="True">
-                                <Setter TargetName="Face" Property="Background" Value="#FF00A650"/>
+                                <Setter TargetName="Face" Property="Background" Value="{DynamicResource PanelLitBrush}"/>
                                 <Setter TargetName="Face" Property="BorderBrush" Value="#FFFFC400"/>
                                 <Setter TargetName="Face" Property="BorderThickness" Value="3"/>
                                 <Setter Property="Foreground" Value="White"/>
@@ -53,13 +59,16 @@
 
     <Grid Margin="8">
         <Grid.RowDefinitions>
+            <!-- Every row takes exactly the height it needs and the window is sized to their sum, so
+                 the air under the lamp is the same 8px margin as the air above the frequency box.
+                 Nothing stretches: a stretching row put the window's spare height between the buttons
+                 and the lamp, which read as a gap for no reason. -->
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <!-- Type a frequency, press Enter, the radio goes there. Seven digits is the most any
-             frequency the panel deals with needs, and the box is that wide and no wider. -->
+        <!-- Type a frequency, press Enter, the radio goes there. -->
         <Grid Grid.Row="0">
             <!-- Three columns, the outer two equal: the box itself sits dead centre of the panel, and
                  "kHz" stands beside it in the right-hand column without pulling the box off centre. -->
@@ -82,16 +91,21 @@
         <!-- Twelve buttons, four rows of three: ten bands, plus SSB and CW either side of the
              bottom row. They are built in code from the frequencies on the Options page, so
              editing a frequency there changes what a button does without touching this file. -->
-        <!-- Top, not stretched: with the rows sharing out the leftover height, the buttons were
-             pushed apart by whatever the window had spare. Anchored to the top they keep their own
-             4px gap whatever the window height, and the spare room falls to the bottom, where the
-             "no radio" line appears. -->
         <UniformGrid x:Name="ButtonGrid" Grid.Row="1" Rows="4" Columns="3" VerticalAlignment="Top" Margin="0,4,0,0"/>
 
-        <!-- Underneath, and only when there is something wrong to say: no radio, or something typed
-             that is not a frequency. Collapsed the rest of the time, so it costs no height. -->
-        <TextBlock x:Name="TB_Status" Grid.Row="2" Text="" FontSize="16" TextWrapping="Wrap"
-                   Visibility="Collapsed" Margin="0,4,0,0" Foreground="{DynamicResource MutedTextBrush}"/>
-
+        <!-- Built the way the radio itself does it: the words TX/RX, and one rectangular lamp under
+             them - green while the radio is listening, red while it is transmitting. Dark when there
+             is no radio, and then the label reads NO RADIO instead, which is the panel's one place
+             for saying so now that the window is a fixed size. Nothing here polls: the lamp is
+             written from the same OmniRig event as everything else in the panel. -->
+        <StackPanel Grid.Row="2" HorizontalAlignment="Center" Margin="0,8,0,0">
+            <TextBlock x:Name="TxRxLabel" Text="TX/RX" FontSize="14" FontWeight="Bold"
+                       HorizontalAlignment="Center" Foreground="{DynamicResource TextBrush}"/>
+            <!-- No Width of its own: stretched inside a stack that is only as wide as the words
+                 above it, the lamp comes out exactly the length of the label. -->
+            <Border x:Name="TxRxLamp" Height="14" CornerRadius="2" Margin="0,3,0,0"
+                    BorderThickness="1" BorderBrush="{DynamicResource ThemeBorderBrush}"
+                    Background="{DynamicResource ButtonBg}"/>
+        </StackPanel>
     </Grid>
 </Window>

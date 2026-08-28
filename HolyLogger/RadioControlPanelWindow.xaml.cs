@@ -36,9 +36,27 @@ namespace HolyLogger
         // and until Enter is pressed, or the box is left, the radio no longer writes into it.
         private bool _boxShowsRadio = true;
 
+        // Blue for SSB, red for CW. One brush, read by every lit button, so the band button and the
+        // mode button always agree about which mode the panel is on.
+        private static readonly System.Windows.Media.Brush SsbLit =
+            new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x15, 0x65, 0xC0));
+        private static readonly System.Windows.Media.Brush CwLit =
+            new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0xD3, 0x2F, 0x2F));
+
+        // Lamp colours. Red is the same red as a lit CW button, green is the panel's own.
+        private static readonly System.Windows.Media.Brush TxLit =
+            new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0xD3, 0x2F, 0x2F));
+        private static readonly System.Windows.Media.Brush RxLit =
+            new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x00, 0xA6, 0x50));
+
         private RadioBandPreset _currentBand;
         private bool _rigOnline;
         private double _rigKhz;
+
+        // True transmitting, false receiving, null when the radio does not say. Some rigs' OmniRig
+        // .ini files do not read the PTT line at all, and a green RX lamp invented for those would be
+        // a reading the program does not have - so both lamps stay dark instead.
+        private bool? _transmitting;
 
         public RadioControlPanelWindow(MainWindow main)
         {
@@ -200,14 +218,24 @@ namespace HolyLogger
         /// </summary>
         public void ShowRigState(bool rigOnline, double khz, string mode)
         {
+            ShowRigState(rigOnline, khz, mode, _transmitting);
+        }
+
+        public void ShowRigState(bool rigOnline, double khz, string mode, bool? transmitting)
+        {
             _rigOnline = rigOnline;
             _rigKhz = khz;
+            _transmitting = transmitting;
+            ShowTxRx(rigOnline ? transmitting : null);
 
             if (string.Equals(mode, "SSB", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(mode, "CW", StringComparison.OrdinalIgnoreCase))
             {
                 _mode = mode.ToUpperInvariant();
             }
+
+            Resources["PanelLitBrush"] =
+                string.Equals(_mode, "CW", StringComparison.OrdinalIgnoreCase) ? CwLit : SsbLit;
 
             _currentBand = rigOnline && khz > 0
                 ? _bands.FirstOrDefault(b => b.Contains(khz))
@@ -226,15 +254,7 @@ namespace HolyLogger
             if (_cwButton != null) _cwButton.IsEnabled = rigOnline;
             TB_Frequency.IsEnabled = rigOnline;
 
-            if (!rigOnline)
-            {
-                Say("Radio not connected.");
-                return;
-            }
-
-            // Nothing to say while the radio is answering: the box shows the frequency and the lit
-            // buttons show the band and the mode. A line repeating all three is a line in the way.
-            Say(null);
+            if (!rigOnline) return;
 
             // The box shows where the radio is, until it is typed in - to the same three decimals
             // as the LED on the main window, so the two never disagree about where the radio is.
@@ -243,20 +263,18 @@ namespace HolyLogger
         }
 
         /// <summary>
-        /// The one line of words in the panel. It is there only when something is wrong - no radio,
-        /// or something typed that is not a frequency - and takes no room at all otherwise.
+        /// The one lamp under the TX/RX label: green while the radio listens, red while it transmits,
+        /// dark when there is no radio or the radio does not report which it is doing.
         /// </summary>
-        private void Say(string message)
+        private void ShowTxRx(bool? transmitting)
         {
-            if (string.IsNullOrEmpty(message))
-            {
-                TB_Status.Text = string.Empty;
-                TB_Status.Visibility = Visibility.Collapsed;
-                return;
-            }
+            if (transmitting == true) TxRxLamp.Background = TxLit;
+            else if (transmitting == false) TxRxLamp.Background = RxLit;
+            else TxRxLamp.Background = (System.Windows.Media.Brush)FindResource("ButtonBg");
 
-            TB_Status.Text = message;
-            TB_Status.Visibility = Visibility.Visible;
+            // With the window a fixed size there is no room for a line of explanation, so the label
+            // itself carries it: a dark lamp over "NO RADIO" says why nothing in the panel answers.
+            TxRxLabel.Text = _rigOnline ? "TX/RX" : "NO RADIO";
         }
 
         // ---- the operator presses something ------------------------------------------------
@@ -351,11 +369,11 @@ namespace HolyLogger
             e.Handled = true;
 
             string typed = (TB_Frequency.Text ?? string.Empty).Trim();
+            // Nothing but digits and one point can be in the box, so the only things left that do
+            // not parse are an empty box or a bare point. Neither is a frequency; neither is worth a
+            // message either.
             if (!double.TryParse(typed, NumberStyles.Float, CultureInfo.InvariantCulture, out double khz) || khz <= 0)
-            {
-                Say("Type kHz only, for example 14250.");
                 return;
-            }
 
             // Handed back to the radio: from here the box follows the reading again, which is also
             // how the operator sees that the radio actually went where it was sent.

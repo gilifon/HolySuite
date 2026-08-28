@@ -744,6 +744,7 @@ namespace HolyLogger
 
             double khz = 0;
             string mode = null;
+            bool? transmitting = null;
 
             if (online)
             {
@@ -753,6 +754,16 @@ namespace HolyLogger
                     // what is logged, not to which band the radio is actually sitting on.
                     khz = (double)Rig.GetRxFrequency() / 1000.0;
                     mode = GetNormalizedRigMode();
+
+                    // NO POLLING OF OUR OWN. OmniRig polls the radio on its own timer and raises
+                    // ParamsChange when anything moves; this is that event, and Rig.Tx is the state it
+                    // has already read. The CW keyer reads the same property in the same way.
+                    //
+                    // A rig whose OmniRig .ini does not read the PTT line answers PM_UNKNOWN, and the
+                    // panel then lights neither lamp rather than guess at "receiving".
+                    var txState = Rig.Tx;
+                    if (txState == (OmniRig.RigParamX)PM_TX) transmitting = true;
+                    else if (txState == (OmniRig.RigParamX)PM_RX) transmitting = false;
                 }
                 catch (Exception swallowed)
                 {
@@ -761,7 +772,7 @@ namespace HolyLogger
                 }
             }
 
-            try { radioPanel.ShowRigState(online, khz, mode); }
+            try { radioPanel.ShowRigState(online, khz, mode, transmitting); }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
         }
 
