@@ -980,6 +980,11 @@ namespace HolyLogger
                 Opacity = 1
             };
             clusterSpotsGrid = spotsGrid;
+
+            // The wheel over the spots tunes the radio - but only in Live Scale, where the list is a
+            // frequency scale that re-centres on the VFO by itself, so nothing is taken away. In the
+            // ordinary list the wheel is how the operator reads through the spots, and it stays that.
+            spotsGrid.PreviewMouseWheel += ClusterSpots_PreviewMouseWheel;
             // Themed via resource references so they live-update on Light/Dark toggle.
             spotsGrid.SetResourceReference(Control.BackgroundProperty, "GridRowBg");
             spotsGrid.SetResourceReference(Control.ForegroundProperty, "TextBrush");
@@ -2123,6 +2128,35 @@ namespace HolyLogger
         // list's average spacing, letting the whole list slide away off-screen. Full-viewport spacer
         // margins on the ROWS panel (never the grid itself — the column headers must not move) give the
         // scroll range needed for all of that.
+        // Turning the wheel over the Live Scale list moves the radio exactly as turning it over the LED
+        // does, in whole kHz - the same class decides what a notch is worth, so the first notch tidies
+        // an odd frequency up to the whole kHz in the direction of the turn. The list follows, because
+        // it follows the VFO.
+        private readonly FrequencyWheel _clusterWheel = new FrequencyWheel();
+
+        private void ClusterSpots_PreviewMouseWheel(object sender, System.Windows.Input.MouseWheelEventArgs e)
+        {
+            // Not in the ordinary list, and not while a band-hover preview has turned the table back
+            // into one: there the wheel scrolls, as it always has.
+            if (!clusterLiveScaleOn || _clusterBandHoverActive) return;
+
+            e.Handled = true;   // the list must not scroll away from the VFO under the operator
+
+            if (!Properties.Settings.Default.EnableOmniRigCAT || Properties.Settings.Default.isManualMode) return;
+            if (OmniRigEngine == null || Rig == null || Rig.Status != OmniRig.RigStatusX.ST_ONLINE) return;
+
+            double khz;
+            try { khz = (double)Rig.GetRxFrequency() / 1000.0; }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); return; }
+
+            // Always the whole-kHz step: there are no digits under the pointer here to read a finer
+            // one from, and a spot list is read in kHz.
+            double? target = _clusterWheel.Next(khz, e.Delta, 1.0);
+            if (target == null) return;
+
+            QueueWheelTune(target.Value);
+        }
+
         private void ScrollClusterLiveScale()
         {
             // Paused while a band-hover preview owns the table (it shows that band as a normal list, not
