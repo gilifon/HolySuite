@@ -3385,7 +3385,10 @@ namespace HolyLogger
                 {
                     SetCwMessageText(number, text);
                     UpdateMessageButtonLabel(GetMessageButton(number), number, isCw: true);
-                })
+                },
+                // A Yaesu has no character buffer: the keyer must let each memory finish playing
+                // before it writes the next one over the top of it.
+                IsYaesuKeyer(rigType))
             {
                 Owner = this,
                 Icon = Icon
@@ -3611,7 +3614,14 @@ namespace HolyLogger
         // the radio busy anyway, and a short chunk is a short wait between typing and hearing it.
         private static int CwChunkSizeFor(string rigType)
         {
-            return 12;
+            // A YAESU GETS THE WHOLE MEMORY. Its text goes into a 50-character memory that is then
+            // played, and nothing may be handed over until that playback has finished - so every chunk
+            // costs a pause. Filling the memory makes the pause come once every 50 characters instead
+            // of once every 12: about twenty seconds apart at 30 WPM rather than five.
+            //
+            // Twelve is right for the others, whose buffers take the next characters while they are
+            // still keying the last ones. A big chunk there would only delay Escape.
+            return IsYaesuKeyer(rigType) ? YaesuMemoryLimit : 12;
         }
 
         private void CwKeyboardMenuItem_Click(object sender, RoutedEventArgs e)

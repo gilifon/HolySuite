@@ -83,6 +83,18 @@ namespace HolyLogger
         // How much a single CAT command may carry. The radio's own buffer, not a guess.
         private readonly int _maxChunk;
 
+        // ONE CHUNK AT A TIME, FOR A RADIO THAT HAS NO BUFFER.
+        //
+        // An Icom or a Kenwood takes the next characters into a buffer while it is still keying the
+        // last ones, so the keyer hands them over EARLY and the keying never runs dry. A Yaesu has no
+        // buffer to hand them to: the text is written into a memory and that memory is played, and
+        // writing the next lot while the last is still playing writes over what is being sent.
+        //
+        // So for those radios the keyer holds back until the radio has stopped transmitting. It costs
+        // a pause between chunks - which is why a Yaesu is given the whole 50 characters its memory
+        // holds, rather than the 12 an Icom's buffer likes, so the pause comes four times less often.
+        private readonly bool _waitForTxIdle;
+
         // Turns * and ! into callsigns. The stored text keeps the macro; only what goes on air is
         // expanded, so a button reads the same next year when the callsign in the form is different.
         private readonly Func<string, string> _expandMacros;
@@ -233,8 +245,10 @@ namespace HolyLogger
                                 Func<bool> wpmMeasured, int maxChunk, Func<bool> isTransmitting,
                                 Func<string, string> expandMacros, Func<string, string> macroProblem,
                                 Action<double> learnWpm, Func<string, string, string> editText,
-                                Func<int, string> getSharedText, Action<int, string> setSharedText)
+                                Func<int, string> getSharedText, Action<int, string> setSharedText,
+                                bool waitForTxIdle = false)
         {
+            _waitForTxIdle = waitForTxIdle;
             _sendChunk = sendChunk;
             _stopSending = stopSending;
             _currentWpm = currentWpm;
@@ -490,6 +504,9 @@ namespace HolyLogger
 
             // The radio still has enough to be going on with.
             if (DateTime.UtcNow + Lead < _radioBusyUntil) return;
+
+            // A radio with no buffer gets nothing until it has stopped sending the last lot.
+            if (_waitForTxIdle && _isTransmitting != null && _isTransmitting()) return;
 
             int waiting = text.Length - _handedUpTo;
             int take = Math.Min(_maxChunk, waiting);
@@ -1840,7 +1857,7 @@ namespace HolyLogger
                 new[] { "Icom",     "IC-705, IC-7300, IC-7300MK2, IC-7610, IC-9700" },
                 new[] { "Kenwood",  "TS-480, TS-590S, TS-590SG, TS-890S, TS-990S" },
                 new[] { "Elecraft", "K3, K3S, K4, KX2, KX3" },
-                new[] { "Yaesu",    "FT-991, FT-991A, FT-891, FTDX10, FTDX101, FT-710 — in two steps: "
+                new[] { "Yaesu",    "FT-891, FT-991, FT-991A, FTDX10, FTDX101D, FTDX101MP, FT-710 — in two steps: "
                                   + "HolyLogger writes the text into CW memory 5 and plays that "
                                   + "memory, so keep nothing you want to save in memory 5." }
             };
