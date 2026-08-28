@@ -405,7 +405,12 @@ namespace HolyLogger
                 }
                 catch
                 {
-                    HolyMessageBox.ShowWarning("Failed to open UDP port.", "UDP Client", this);
+                    HolyMessageBox.ShowWarning(
+                        "Failed to open UDP port " + Properties.Settings.Default.UDPPort + ".\n\n"
+                        + "Another program is probably already using it.\n\n"
+                        + "The listener has been switched off. Pick a different port in "
+                        + "Options → General, or close the other program.",
+                    "UDP Client", this);
                     Properties.Settings.Default.EnableUDPClient = false;
                 }
             }
@@ -419,7 +424,12 @@ namespace HolyLogger
                 }
                 catch
                 {
-                    HolyMessageBox.ShowWarning("Failed to open N1MM+ UDP port.", "N1MM+ UDP Client", this);
+                    HolyMessageBox.ShowWarning(
+                        "Failed to open N1MM+ UDP port " + Properties.Settings.Default.N1MMUDPPort + ".\n\n"
+                        + "Another program is probably already using it.\n\n"
+                        + "The listener has been switched off. Pick a different port in "
+                        + "Options → General, or close the other program.",
+                    "N1MM+ UDP Client", this);
                     Properties.Settings.Default.EnableN1MMUDPClient = false;
                 }
             }
@@ -2418,7 +2428,11 @@ namespace HolyLogger
             }
             catch (Exception ex)
             {
-                HolyMessageBox.ShowError("Failed to set up your log: " + ex.Message, "Log setup");
+                HolyMessageBox.ShowError(
+                    "Your log could not be set up.\n\n" + ex.Message + "\n\n"
+                    + "No log was created, and nothing in your database was changed.\n"
+                    + HolyMessageBox.WhatToDo(ex.Message, null),
+                    "Log setup");
                 return false;
             }
         }
@@ -3284,13 +3298,23 @@ namespace HolyLogger
 
             if (!Properties.Settings.Default.EnableOmniRigCAT || OmniRigEngine == null || Rig == null)
             {
-                if (!silent) HolyMessageBox.ShowWarning("OmniRig CAT is not available.", "CW Keyer", this);
+                if (!silent) HolyMessageBox.ShowWarning(
+                    "OmniRig CAT is not available.\n\n"
+                    + "Nothing was sent.\n\n"
+                    + "Tick Enable Omni-Rig CAT in Options → General, and check the radio is "
+                    + "powered and its cable connected.",
+                    "CW Keyer", this);
                 return;
             }
 
             if (Rig.Status != OmniRig.RigStatusX.ST_ONLINE)
             {
-                if (!silent) HolyMessageBox.ShowWarning("The radio is offline.", "CW Keyer", this);
+                if (!silent) HolyMessageBox.ShowWarning(
+                    "The radio is offline.\n\n"
+                    + "Nothing was sent.\n\n"
+                    + "When CAT is working, the radio's name shows in green at the right of the "
+                    + "status bar. Anything else there means it is not.",
+                    "CW Keyer", this);
                 return;
             }
 
@@ -3420,13 +3444,23 @@ namespace HolyLogger
 
             if (!Properties.Settings.Default.EnableOmniRigCAT || OmniRigEngine == null || Rig == null)
             {
-                HolyMessageBox.ShowWarning("OmniRig CAT is not available.", "CW Text", this);
+                HolyMessageBox.ShowWarning(
+                    "OmniRig CAT is not available.\n\n"
+                    + "Nothing was sent.\n\n"
+                    + "Tick Enable Omni-Rig CAT in Options → General, and check the radio is "
+                    + "powered and its cable connected.",
+                    "CW Text", this);
                 return;
             }
 
             if (Rig.Status != OmniRig.RigStatusX.ST_ONLINE)
             {
-                HolyMessageBox.ShowWarning("The radio is offline.", "CW Text", this);
+                HolyMessageBox.ShowWarning(
+                    "The radio is offline.\n\n"
+                    + "Nothing was sent.\n\n"
+                    + "When CAT is working, the radio's name shows in green at the right of the "
+                    + "status bar. Anything else there means it is not.",
+                    "CW Text", this);
                 return;
             }
 
@@ -3440,7 +3474,11 @@ namespace HolyLogger
 
                 if (!string.IsNullOrWhiteSpace(stopCommand) && !TrySendOmniRigCustomCommand(stopCommand))
                 {
-                    HolyMessageBox.ShowWarning("Failed to send the CW stop CAT command to " + rigType + ".", "CW Text", this);
+                    HolyMessageBox.ShowWarning(
+                    "Failed to stop the CW message on " + rigType + ".\n\n"
+                    + "The radio may still be transmitting.\n\n"
+                    + "Stop it at the radio itself - press its own key, or change mode.",
+                    "CW Text", this);
                     return;
                 }
 
@@ -3474,7 +3512,11 @@ namespace HolyLogger
 
             if (string.IsNullOrWhiteSpace(cwText))
             {
-                HolyMessageBox.ShowWarning("CW text " + messageNumber + " has nothing to send.", "CW Text", this);
+                HolyMessageBox.ShowWarning(
+                    "CW text " + messageNumber + " has nothing a keyer can send.\n\n"
+                    + "Only letters, digits and  . , ? / @ = + -  go out over the air.\n\n"
+                    + "Right-click the button to change its text.",
+                    "CW Text", this);
                 return;
             }
 
@@ -3488,7 +3530,12 @@ namespace HolyLogger
 
             if (!TrySendOmniRigCustomCommand(command))
             {
-                HolyMessageBox.ShowWarning("Failed to send CW text CAT command to " + rigType + ".", "CW Text", this);
+                HolyMessageBox.ShowWarning(
+                    "Failed to send the CW text to " + rigType + ".\n\n"
+                    + "Nothing was sent.\n\n"
+                    + "When CAT is working, the radio's name shows in green at the right of the "
+                    + "status bar. Anything else there means it is not.",
+                    "CW Text", this);
                 return;
             }
 
@@ -4224,7 +4271,12 @@ namespace HolyLogger
             catch (Exception ex)
             {
                 Log.Warn("Exporting the selection failed: " + ex.GetType().Name + ": " + ex.Message);
-                HolyMessageBox.ShowError("Export failed: " + ex.Message, "Export ADIF", this);
+                HolyMessageBox.ShowError(
+                    "Export failed.\n\n" + ex.Message + "\n\n"
+                    + "Nothing was written — your log is untouched.\n"
+                    + "If the file is already open in another program, close it and export again.\n"
+                    + "If it is on a memory stick or a network drive, check the drive is still there.",
+                    "Export ADIF", this);
             }
         }
 
@@ -4905,7 +4957,11 @@ namespace HolyLogger
             if (!RequireActiveLog("upload")) return;
             if (!ClublogService.HasApiKey)
             {
-                HolyMessageBox.ShowError("This copy of HolyLogger has no Club Log application key.", "Club Log", this);
+                HolyMessageBox.ShowError(
+                    "This copy of HolyLogger has no Club Log application key.\n\n"
+                    + "Nothing you can set will fix this — the key is missing from the program "
+                    + "itself, not from your account. Please report it with Help → Support.",
+                    "Club Log", this);
                 return;
             }
             var s = Properties.Settings.Default;
@@ -5396,7 +5452,10 @@ namespace HolyLogger
                 }
                 catch (Exception ex)
                 {
-                    HolyMessageBox.ShowError(ex.Message, "Spot Failed", dialog);
+                    HolyMessageBox.ShowError(
+                        "The spot was not sent.\n\n" + ex.Message + "\n\n"
+                        + "The cluster may be busy or down. Nothing in your log changed.",
+                        "Spot Failed", dialog);
                 }
                 finally
                 {
@@ -5628,7 +5687,11 @@ namespace HolyLogger
             {
                 if (!string.IsNullOrWhiteSpace(profile.StopCommand) && !TrySendOmniRigCustomCommand(profile.StopCommand))
                 {
-                    HolyMessageBox.ShowWarning("Failed to send the stop CAT command to " + rigType + ".", "Voice Message", this);
+                    HolyMessageBox.ShowWarning(
+                    "Failed to stop the voice message on " + rigType + ".\n\n"
+                    + "The radio may still be transmitting.\n\n"
+                    + "Stop it at the radio itself - press its own key, or change mode.",
+                    "Voice Message", this);
                     return;
                 }
 
@@ -5644,13 +5707,22 @@ namespace HolyLogger
 
             if (string.IsNullOrWhiteSpace(command))
             {
-                HolyMessageBox.ShowWarning("No voice-message CAT command is defined for this button.", "Voice Message", this);
+                HolyMessageBox.ShowWarning(
+                    "No voice message is set for this button on this radio.\n\n"
+                    + "HolyLogger knows the commands for some radio models and not for others, and "
+                    + "this is not one it knows. Send it from the radio's own memory buttons instead.",
+                    "Voice Message", this);
                 return;
             }
 
             if (!TrySendOmniRigCustomCommand(command))
             {
-                HolyMessageBox.ShowWarning("Failed to send the CAT command to " + rigType + ".", "Voice Message", this);
+                HolyMessageBox.ShowWarning(
+                    "Failed to send the voice message to " + rigType + ".\n\n"
+                    + "Nothing was sent.\n\n"
+                    + "When CAT is working, the radio's name shows in green at the right of the "
+                    + "status bar. Anything else there means it is not.",
+                    "Voice Message", this);
                 return;
             }
 
@@ -7504,7 +7576,14 @@ namespace HolyLogger
                     "Unsaved profile changes", HolyMsgType.Warning, this);
 
                 if (save && !ProfileManager.Save(name))
-                    HolyMessageBox.ShowError($"Could not save the profile \"{name}\".", "Profile Manager", this);
+                    HolyMessageBox.ShowError(
+                        $"The profile \"{name}\" could not be saved.\n\n"
+                        + (string.IsNullOrWhiteSpace(ProfileManager.LastError)
+                               ? string.Empty : ProfileManager.LastError + "\n\n")
+                        + "Your current setup is untouched — nothing here changed it.\n"
+                        + "Profiles are files in the Profiles folder. If this keeps happening, check "
+                        + "that folder is not read-only and that the drive it is on has room.",
+                        "Profile Manager", this);
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
             return true;
@@ -8337,8 +8416,12 @@ namespace HolyLogger
             }
             catch (System.Exception ex)
             {
-                HolyMessageBox.ShowError("Could not open the Log Workshop for those QSOs.\n\n" + ex.Message,
-                                         "Log Workshop", this);
+                HolyMessageBox.ShowError(
+                    "Could not open the Log Workshop for those QSOs.\n\n"
+                    + ex.Message + "\n\n"
+                    + "Nothing was changed.\n"
+                    + HolyMessageBox.WhatToDo(ex.Message, null),
+                    "Log Workshop", this);
             }
         }
 
@@ -8849,7 +8932,12 @@ namespace HolyLogger
                 }
                 catch
                 {
-                    HolyMessageBox.ShowWarning("Failed to open UDP port.", "UDP Client", this);
+                    HolyMessageBox.ShowWarning(
+                        "Failed to open UDP port " + Properties.Settings.Default.UDPPort + ".\n\n"
+                        + "Another program is probably already using it.\n\n"
+                        + "The listener has been switched off. Pick a different port in "
+                        + "Options → General, or close the other program.",
+                    "UDP Client", this);
                     Properties.Settings.Default.EnableUDPClient = false;
                 }
             }
@@ -8873,7 +8961,12 @@ namespace HolyLogger
                 }
                 catch
                 {
-                    HolyMessageBox.ShowWarning("Failed to open N1MM+ UDP port.", "N1MM+ UDP Client", this);
+                    HolyMessageBox.ShowWarning(
+                        "Failed to open N1MM+ UDP port " + Properties.Settings.Default.N1MMUDPPort + ".\n\n"
+                        + "Another program is probably already using it.\n\n"
+                        + "The listener has been switched off. Pick a different port in "
+                        + "Options → General, or close the other program.",
+                    "N1MM+ UDP Client", this);
                     Properties.Settings.Default.EnableN1MMUDPClient = false;
                 }
             }
@@ -10252,8 +10345,12 @@ namespace HolyLogger
             catch (Exception ex)
             {
                 Log.Warn("Compact database window failed: " + ex.GetType().Name + ": " + ex.Message);
-                HolyMessageBox.ShowError("Could not open the compact window: " + ex.Message,
-                                         "Compact the Database", this);
+                HolyMessageBox.ShowError(
+                    "Could not open Compact the Database.\n\n"
+                    + ex.Message + "\n\n"
+                    + "Nothing was changed.\n"
+                    + HolyMessageBox.WhatToDo(ex.Message, null),
+                    "Compact the Database", this);
             }
         }
 
@@ -10584,7 +10681,12 @@ namespace HolyLogger
                 }
                 catch (Exception)
                 {
-                    HolyMessageBox.ShowWarning("Auto checking for update failed. Please try again manually later.", "HolyLogger Update", this);
+                    HolyMessageBox.ShowWarning(
+                        "HolyLogger could not check whether there is a new version.\n\n"
+                        + "Nothing was installed — your HolyLogger is untouched.\n\n"
+                        + "Help → Check for updates asks again, and Help → Visit HolyLogger site "
+                        + "has the new version to download yourself.",
+                        "HolyLogger Update", this);
                 }
             }
         }
@@ -10601,7 +10703,12 @@ namespace HolyLogger
             }
             else
             {
-                HolyMessageBox.ShowError("Failed to download, please check your connection.", "Download Failed", this);
+                HolyMessageBox.ShowError(
+                    "The new version could not be downloaded.\n\n"
+                    + "Nothing was installed — your HolyLogger is untouched.\n\n"
+                    + "Check your internet connection, or download it yourself from "
+                    + "Help → Visit HolyLogger site.",
+                    "Download Failed", this);
             }
         }
 
