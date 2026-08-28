@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Windows;
 
 namespace HolyLogger
@@ -68,7 +68,8 @@ namespace HolyLogger
 
             if (!ProfileManager.Apply(name))
             {
-                HolyMessageBox.ShowError($"Could not apply the profile \"{name}\".", "Profiles", this);
+                ProfileFailed($"The profile \"{name}\" could not be loaded.",
+                              "Nothing was changed - HolyLogger is still set up as it was.");
                 return;
             }
             ProfileManager.RestartApplication();
@@ -93,7 +94,8 @@ namespace HolyLogger
             }
             else
             {
-                HolyMessageBox.ShowError("Could not save the profile.", "Profiles", this);
+                ProfileFailed("The profile could not be saved.",
+                              "Your current setup is untouched - nothing here changed it.");
             }
         }
 
@@ -107,7 +109,8 @@ namespace HolyLogger
                 return;
 
             if (ProfileManager.Save(name)) { Refresh(); ShowSavedMessage(name); }
-            else HolyMessageBox.ShowError("Could not update the profile.", "Profiles", this);
+            else ProfileFailed("The profile could not be updated.",
+                    "It still holds what it held before.");
         }
 
         // Confirm the write and say exactly WHERE it went, so the file can be found, backed up or shared.
@@ -128,11 +131,14 @@ namespace HolyLogger
 
             if (ProfileManager.Exists(newName))
             {
-                HolyMessageBox.ShowWarning($"A profile named \"{newName}\" already exists.", "Profiles", this);
+                HolyMessageBox.ShowWarning($"A profile named \"{newName}\" already exists.\n\n"
+                    + "Pick another name, or delete that one first.",
+                    "Profiles", this);
                 return;
             }
             if (ProfileManager.Rename(oldName, newName)) Refresh();
-            else HolyMessageBox.ShowError("Could not rename the profile.", "Profiles", this);
+            else ProfileFailed("The profile could not be renamed.",
+                    "It is still there under its old name.");
         }
 
         private void BTN_Delete_Click(object sender, RoutedEventArgs e)
@@ -144,7 +150,8 @@ namespace HolyLogger
                 return;
 
             if (ProfileManager.Delete(name)) Refresh();
-            else HolyMessageBox.ShowError("Could not delete the profile.", "Profiles", this);
+            else ProfileFailed("The profile could not be deleted.",
+                    "It is still in the list.");
         }
 
         private void BTN_Import_Click(object sender, RoutedEventArgs e)
@@ -166,7 +173,8 @@ namespace HolyLogger
                 return;
 
             if (ProfileManager.ImportFrom(dlg.FileName, name)) Refresh();
-            else HolyMessageBox.ShowError("Could not import that file.", "Profiles", this);
+            else ProfileFailed("That file could not be imported.",
+                    "Your profiles are as they were. A profile file is one HolyLogger exported.");
         }
 
         private void BTN_Export_Click(object sender, RoutedEventArgs e)
@@ -187,7 +195,30 @@ namespace HolyLogger
                     $"The profile \"{name}\" was exported successfully.\n\n{dlg.FileName}",
                     "Profile Manager", this);
             else
-                HolyMessageBox.ShowError("Could not export the profile.", "Profiles", this);
+                ProfileFailed("The profile could not be exported.",
+                    "No file was written. The profile itself is unchanged.");
+        }
+
+        // ── WHY IT DID NOT WORK ─────────────────────────────────────────────────────────────────
+        //
+        // Every one of these used to be a single flat sentence - "Could not save the profile." - which
+        // is the fault stated and nothing else: not what went wrong, not what is still true, not what
+        // to do. ProfileManager now keeps the reason for its last refusal, so the sentence can be
+        // followed by the thing that actually explains it.
+        //
+        // `stillTrue` is the state the operator is left in, in his own terms: the profile is unchanged,
+        // the old one is still there. It is the half he needs before he decides anything.
+        private void ProfileFailed(string what, string stillTrue)
+        {
+            string why = ProfileManager.LastError;
+
+            HolyMessageBox.ShowError(
+                what + "\n\n"
+                + (string.IsNullOrWhiteSpace(why) ? "" : why + "\n\n")
+                + stillTrue + "\n"
+                + "Profiles are files in the Profiles folder. If this keeps happening, check that "
+                + "folder is not read-only and that the drive it is on has room.",
+                "Profiles", this);
         }
 
         // Small inline name prompt. Returns null when cancelled or the name isn't usable as a file name.
@@ -200,7 +231,8 @@ namespace HolyLogger
             if (!ProfileManager.IsValidName(name))
             {
                 HolyMessageBox.ShowWarning(
-                    "Please enter a name without these characters:  \\ / : * ? \" < > |",
+                    "Please enter a name without these characters:  \\ / : * ? \" < > |\n\n"
+                    + "A profile is saved as a file, and Windows does not allow those in a file name.",
                     "Profiles", this);
                 return null;
             }
@@ -222,7 +254,8 @@ namespace HolyLogger
 
             if (!ProfileManager.RestoreFactoryDefaults())
             {
-                HolyMessageBox.ShowError("Could not restore the factory defaults.", "Profile Manager", this);
+                ProfileFailed("The factory defaults could not be restored.",
+                              "Your settings are exactly as they were - nothing was cleared.");
                 return;
             }
             ProfileManager.RestartApplication();

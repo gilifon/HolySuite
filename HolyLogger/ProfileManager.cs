@@ -56,6 +56,35 @@ namespace HolyLogger
                 || name.EndsWith("WindowHeight", StringComparison.OrdinalIgnoreCase);
         }
 
+        // ── WHY THE LAST ONE FAILED ─────────────────────────────────────────────────────────────
+        //
+        // Everything below answers true or false, and every failure used to end in the same place: the
+        // reason written to the log file and thrown away here. So the Profiles window could only ever
+        // say "Could not save the profile." - a sentence that tells a man his profile is not saved and
+        // nothing whatever about what to do, when the answer was usually one line long and right there
+        // in the exception ("access to the path is denied", "the device is not ready").
+        //
+        // Kept as the reason for the LAST call, read straight after it, which is how every caller here
+        // uses it. It is not thread-safe and does not need to be: these are all button presses on one
+        // window, one at a time.
+        public static string LastError { get; private set; }
+
+        // Records the reason and answers false, so a catch is one line and can never forget to do both.
+        private static bool Failed(Exception ex)
+        {
+            Log.Swallow(ex);
+            LastError = ex == null ? null : ex.Message;
+            return false;
+        }
+
+        // For the refusals that are not exceptions - a name with a slash in it, a profile that is not
+        // there any more. Same idea: say why, answer false.
+        private static bool Failed(string why)
+        {
+            LastError = why;
+            return false;
+        }
+
         public static string ProfilesFolder
         {
             get
@@ -113,14 +142,15 @@ namespace HolyLogger
         // Writes the CURRENT configuration to a profile file, overwriting it if it exists.
         public static bool Save(string name)
         {
-            if (!IsValidName(name)) return false;
+            LastError = null;
+            if (!IsValidName(name)) return Failed("\"" + name + "\" is not a name a file can have.");
             try
             {
                 File.WriteAllText(PathFor(name),
                     JsonConvert.SerializeObject(CaptureCurrent(), Formatting.Indented));
                 return true;
             }
-            catch (Exception swallowed) { Log.Swallow(swallowed); return false; }
+            catch (Exception ex) { return Failed(ex); }
         }
 
         // Loads the active profile at startup, so the program always begins from what that profile
@@ -172,14 +202,15 @@ namespace HolyLogger
                 }
                 return false;
             }
-            catch (Exception swallowed) { Log.Swallow(swallowed); return false; }
+            catch (Exception ex) { return Failed(ex); }
         }
 
         // Loads a profile into Properties.Settings and saves. The caller restarts the app so everything
         // (window layout, colours, which windows open) is rebuilt from the new values.
         public static bool Apply(string name)
         {
-            if (!Exists(name)) return false;
+            LastError = null;
+            if (!Exists(name)) return Failed("The profile file is not in the Profiles folder any more.");
             try
             {
                 var values = JsonConvert.DeserializeObject<Dictionary<string, string>>(
@@ -205,7 +236,7 @@ namespace HolyLogger
                 s.Save();
                 return true;
             }
-            catch (Exception swallowed) { Log.Swallow(swallowed); return false; }
+            catch (Exception ex) { return Failed(ex); }
         }
 
         // Puts every setting back to the default declared in Settings.Designer.cs - the escape hatch when
@@ -216,6 +247,7 @@ namespace HolyLogger
         // resetting the LoTW caches would only force a slow re-download for no benefit.
         public static bool RestoreFactoryDefaults()
         {
+            LastError = null;
             try
             {
                 var s = Properties.Settings.Default;
@@ -237,12 +269,13 @@ namespace HolyLogger
                 s.Save();
                 return true;
             }
-            catch (Exception swallowed) { Log.Swallow(swallowed); return false; }
+            catch (Exception ex) { return Failed(ex); }
         }
 
         public static bool Delete(string name)
         {
-            if (!Exists(name)) return false;
+            LastError = null;
+            if (!Exists(name)) return Failed("The profile file is not in the Profiles folder any more.");
             try
             {
                 File.Delete(PathFor(name));
@@ -253,11 +286,12 @@ namespace HolyLogger
                 }
                 return true;
             }
-            catch (Exception swallowed) { Log.Swallow(swallowed); return false; }
+            catch (Exception ex) { return Failed(ex); }
         }
 
         public static bool Rename(string oldName, string newName)
         {
+            LastError = null;
             if (!Exists(oldName) || !IsValidName(newName) || Exists(newName)) return false;
             try
             {
@@ -269,21 +303,23 @@ namespace HolyLogger
                 }
                 return true;
             }
-            catch (Exception swallowed) { Log.Swallow(swallowed); return false; }
+            catch (Exception ex) { return Failed(ex); }
         }
 
         public static bool ImportFrom(string sourceFile, string newName)
         {
+            LastError = null;
             if (!IsValidName(newName) || !File.Exists(sourceFile)) return false;
             try { File.Copy(sourceFile, PathFor(newName), true); return true; }
-            catch (Exception swallowed) { Log.Swallow(swallowed); return false; }
+            catch (Exception ex) { return Failed(ex); }
         }
 
         public static bool ExportTo(string name, string targetFile)
         {
-            if (!Exists(name)) return false;
+            LastError = null;
+            if (!Exists(name)) return Failed("The profile file is not in the Profiles folder any more.");
             try { File.Copy(PathFor(name), targetFile, true); return true; }
-            catch (Exception swallowed) { Log.Swallow(swallowed); return false; }
+            catch (Exception ex) { return Failed(ex); }
         }
 
         // Relaunch so every window is rebuilt from the newly applied settings.
