@@ -1798,15 +1798,29 @@ namespace HolyLogger
                 box.Children.Add(yours);
             }
 
+            // ── THE MODELS, EACH ONE READ OUT OF ITS MAKER'S OWN DOCUMENT ────────────────────────
+            //
+            // Not from memory and not from what a forum says. Every model here was checked against the
+            // manufacturer's published command reference:
+            //
+            //   Icom      CI-V Reference Guides (IC-705, IC-7610, IC-9700, IC-7300MK2) and the IC-7300
+            //             Full Manual: command 17, "Send CW messages", up to 30 characters.
+            //   Kenwood   PC Control Command References (TS-480, TS-590S/SG, TS-890S, TS-990S):
+            //             "KY - Converts the entered characters into morse code while keying."
+            //   Elecraft  Programmer's References (K3S/K3/KX3/KX2 rev. G5, K4 rev. D5):
+            //             "KY*[text];" - 24 characters on the K3 family, 60 on the K4.
+            //   Yaesu     CAT References (FT-991, FT-991A, FT-891, FTDX101): KY plays back a memory
+            //             and takes a digit. There is no command that keys typed text.
+            //
+            // A SHORT LIST ON PURPOSE. It is the popular radios, not every model ever made: a list that
+            // tries to be complete from memory is a list with mistakes in it, and a mistake here tells
+            // a man his radio cannot do something it can.
             var makers = new[]
             {
-                new[] { "Icom",     "Any Icom OmniRig supports. The text goes out as CI-V command 17, and "
-                                  + "HolyLogger reads the radio's address from OmniRig's own rig file." },
-                new[] { "Kenwood",  "TS-590S, TS-590SG, TS-480, TS-890S, TS-990S, TS-2000 and other models "
-                                  + "with the KY command. An older TS is sent it and quietly ignores it." },
-                new[] { "Elecraft", "K3, K3S, K4, KX2 and KX3." },
-                new[] { "Yaesu",    "None. Yaesu has no CAT command that sends typed CW - its KY plays back "
-                                  + "a message already stored in the radio. Use the radio's own memory keyer." }
+                new[] { "Icom",     "IC-705, IC-7300, IC-7300MK2, IC-7610, IC-9700" },
+                new[] { "Kenwood",  "TS-480, TS-590S, TS-590SG, TS-890S, TS-990S" },
+                new[] { "Elecraft", "K3, K3S, K4, KX2, KX3" },
+                new[] { "Yaesu",    "None. Yaesu has no command that keys typed text." }
             };
 
             var grid = new Grid();
@@ -1847,8 +1861,9 @@ namespace HolyLogger
 
             var note = new TextBlock
             {
-                Text = "Whether a particular model has the command depends on its age: it is the newer "
-                     + "radios of each maker that carry it.",
+                Text = "Every model above was checked in its own maker's command manual. The list is the "
+                     + "popular radios rather than every model ever made - if yours is missing, ask for "
+                     + "it with Help \u2192 Support and it can be checked and added.",
                 FontSize = 16,
                 TextWrapping = TextWrapping.Wrap,
                 Margin = new Thickness(0, 14, 0, 0)
