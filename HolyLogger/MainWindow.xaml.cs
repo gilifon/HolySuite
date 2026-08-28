@@ -5105,7 +5105,11 @@ namespace HolyLogger
             }
             catch (Exception ex)
             {
-                HolyMessageBox.ShowError("Could not open the AI check: " + ex.Message, "AI check", this);
+                HolyMessageBox.ShowError(
+                    "Could not open the AI check.\n\n"
+                    + ex.Message + "\n\n"
+                    + HolyMessageBox.WhatToDo(ex.Message, null),
+                    "AI check", this);
             }
         }
 
@@ -6334,7 +6338,13 @@ namespace HolyLogger
             catch (Exception ex)
             {
                 HideBusyOverlay();
-                HolyMessageBox.ShowError("Failed to save the backup:\n" + ex.Message + "\n\nReplace cancelled — your log was not changed.", "Backup Failed", this);
+                HolyMessageBox.ShowError(
+                    "The safety copy of your log could not be written, so the replace was "
+                    + "cancelled.\n\n" + ex.Message + "\n\n"
+                    + "Your log still holds every QSO it had. Nothing is replaced until a copy "
+                    + "of it exists.\n\n"
+                    + "Check the drive the database is on has room, then import again.",
+                    "Backup Failed", this);
                 return false;
             }
             finally { HideBusyOverlay(); }
@@ -8734,7 +8744,10 @@ namespace HolyLogger
             }
             catch (System.Exception ex)
             {
-                HolyMessageBox.ShowError("Could not open the browser: " + ex.Message, "Open Link", this);
+                HolyMessageBox.ShowError(
+                    "Could not open the browser.\n\n" + ex.Message + "\n\n"
+                    + "Open the address in your own browser instead.",
+                    "Open Link", this);
             }
         }
 
@@ -10370,7 +10383,11 @@ namespace HolyLogger
             catch (Exception ex)
             {
                 Log.Swallow(ex);
-                HolyMessageBox.ShowError("Could not open Backups & Restore:\n" + ex.Message, "Backups & Restore", this);
+                HolyMessageBox.ShowError(
+                    "Could not open Backups & Restore.\n\n"
+                    + ex.Message + "\n\n"
+                    + HolyMessageBox.WhatToDo(ex.Message, null),
+                    "Backups & Restore", this);
             }
         }
 

@@ -413,7 +413,11 @@ namespace HolyLogger
             }
             catch (Exception ex)
             {
-                HolyMessageBox.ShowError("Could not open the AI check: " + ex.Message, "AI check", this);
+                HolyMessageBox.ShowError(
+                    "Could not open the AI check.\n\n"
+                    + ex.Message + "\n\n"
+                    + HolyMessageBox.WhatToDo(ex.Message, null),
+                    "AI check", this);
             }
         }
 
