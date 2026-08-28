@@ -136,7 +136,12 @@ namespace HolyLogger
                 System.IO.File.WriteAllText(save.FileName, adif);
                 HolyMessageBox.ShowSuccess("File created successfully!", "Export ADIF", owner);
             }
-            catch (Exception ex) { HolyMessageBox.ShowError("Export failed: " + ex.Message, "Export ADIF", owner); }
+            catch (Exception ex) { HolyMessageBox.ShowError(
+                "Export failed.\n\n" + ex.Message + "\n\n"
+                + "Nothing was written — your log is untouched.\n"
+                + "If the file is already open in another program, close it and export again.\n"
+                + "If it is on a memory stick or a network drive, check the drive is still there.",
+                "Export ADIF", owner); }
         }
 
         public void ExportQsosToCsv(System.Collections.ObjectModel.ObservableCollection<QSO> qsos, Window owner)
@@ -149,7 +154,12 @@ namespace HolyLogger
                 System.IO.File.WriteAllText(save.FileName, csv);
                 HolyMessageBox.ShowSuccess("File created successfully!", "Export CSV", owner);
             }
-            catch (Exception ex) { HolyMessageBox.ShowError("Export failed: " + ex.Message, "Export CSV", owner); }
+            catch (Exception ex) { HolyMessageBox.ShowError(
+                "Export failed.\n\n" + ex.Message + "\n\n"
+                + "Nothing was written — your log is untouched.\n"
+                + "If the file is already open in another program, close it and export again.\n"
+                + "If it is on a memory stick or a network drive, check the drive is still there.",
+                "Export CSV", owner); }
         }
 
         // Reusable Cabrillo export of one log's QSOs. The CONTEST: header MUST name the contest that
@@ -205,7 +215,12 @@ namespace HolyLogger
                 System.IO.File.WriteAllText(save.FileName, cabrillo);
                 HolyMessageBox.ShowSuccess("File created successfully!", "Export Cabrillo", owner);
             }
-            catch (Exception ex) { HolyMessageBox.ShowError("Export failed: " + ex.Message, "Export Cabrillo", owner); }
+            catch (Exception ex) { HolyMessageBox.ShowError(
+                "Export failed.\n\n" + ex.Message + "\n\n"
+                + "Nothing was written — your log is untouched.\n"
+                + "If the file is already open in another program, close it and export again.\n"
+                + "If it is on a memory stick or a network drive, check the drive is still there.",
+                "Export Cabrillo", owner); }
         }
 
         // ---- QRZ.com Logbook real-time upload --------------------------------------------------------
@@ -1124,6 +1139,17 @@ namespace HolyLogger
                 sb.AppendLine("    " + ex.Message);
                 if (ex.InnerException != null)
                     sb.AppendLine("    " + ex.InnerException.Message);
+
+                // Out of memory has its own list above. Every OTHER fault used to go straight
+                // from what went wrong to who should be told about it, leaving the operator
+                // holding a half-imported log and nothing to do about it.
+                sb.AppendLine();
+                sb.AppendLine("WHAT TO TRY, best first");
+                sb.AppendLine("    1. Your log is unchanged unless the lines above say QSOs went in.");
+                sb.AppendLine("    2. Close HolyLogger and open it again, then import before anything");
+                sb.AppendLine("       else.");
+                sb.AppendLine("    3. If it stops at the same place every time, the file is the problem -");
+                sb.AppendLine("       open it in Notepad and look at the record the report names.");
             }
 
             sb.AppendLine();
@@ -1310,7 +1336,9 @@ namespace HolyLogger
                     if (!File.Exists(filename))
                     {
                         this.Dispatcher.Invoke(() =>
-                            HolyMessageBox.ShowError($"File not found:\n{filename}", "Import Error", this));
+                            HolyMessageBox.ShowError($"File not found:\n{filename}\n\n"
+                                + "It has been moved, renamed or deleted since you picked it. Choose it again.",
+                                "Import Error", this));
                         continue;
                     }
 
@@ -1325,7 +1353,9 @@ namespace HolyLogger
                     if (string.IsNullOrWhiteSpace(RawAdif))
                     {
                         this.Dispatcher.Invoke(() =>
-                            HolyMessageBox.ShowWarning($"File is empty:\n{filename}", "Import Error", this));
+                            HolyMessageBox.ShowWarning($"File is empty:\n{filename}\n\n"
+                                + "There is nothing in it to import. Export it again from the program that made it.",
+                                "Import Error", this));
                         continue;
                     }
 
