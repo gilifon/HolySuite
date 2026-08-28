@@ -1773,29 +1773,49 @@ namespace HolyLogger
             // Asked of the main window, the only place that knows what OmniRig is running. Reached
             // through the owner where there is one, and by looking for it where there is not - this
             // window opens both from Help and from the keyer, which is itself owned by the main window.
-            string mine = null;
+            string rigName = null, mine = null;
             try
             {
                 MainWindow main = Owner as MainWindow;
                 if (main == null && Owner != null) main = Owner.Owner as MainWindow;
                 if (main == null && Application.Current != null)
                     main = Application.Current.Windows.OfType<MainWindow>().FirstOrDefault();
-                if (main != null) mine = main.CwKeyingForThisRadio();
+                if (main != null)
+                {
+                    rigName = main.ConnectedRigName();
+                    mine = main.CwKeyingForThisRadio();
+                }
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
 
-            if (!string.IsNullOrEmpty(mine))
+            // TWO LINES, NOT ONE. The radio's name and the answer about it were run together, and the
+            // name - the thing he is looking for - was buried in the middle of a sentence. The name
+            // stands on its own line and the answer sits under it.
+            if (!string.IsNullOrEmpty(rigName))
             {
                 var yours = new TextBlock
                 {
-                    Text = "Your radio: " + mine,
+                    Text = "Your radio: " + rigName,
                     FontSize = 16,
                     FontWeight = FontWeights.Bold,
                     TextWrapping = TextWrapping.Wrap,
-                    Margin = new Thickness(0, 0, 0, 14)
+                    Margin = new Thickness(0, 0, 0, 2)
                 };
                 yours.SetResourceReference(TextBlock.ForegroundProperty, "AccentBrush");
                 box.Children.Add(yours);
+            }
+
+            if (!string.IsNullOrEmpty(mine))
+            {
+                var answer = new TextBlock
+                {
+                    Text = mine,
+                    FontSize = 16,
+                    TextWrapping = TextWrapping.Wrap,
+                    Margin = new Thickness(0, 0, 0, 14)
+                };
+                answer.SetResourceReference(TextBlock.ForegroundProperty, "TextBrush");
+                box.Children.Add(answer);
             }
 
             // ── THE MODELS, EACH ONE READ OUT OF ITS MAKER'S OWN DOCUMENT ────────────────────────

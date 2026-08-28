@@ -3480,26 +3480,33 @@ namespace HolyLogger
         // The operator finds out today by pressing a key and being refused. This is the same knowledge
         // written down, for the panel behind the keyer's gear button - and it answers the only question
         // he actually has, which is whether HIS radio can do it.
+        // The name OmniRig is running under, for the line that says "Your radio: ...". Empty when
+        // there is no radio, which the page reads as "nothing to say yet".
+        internal string ConnectedRigName()
+        {
+            return Rig == null ? string.Empty : (Rig.RigType ?? string.Empty).Trim();
+        }
+
+        // The ANSWER on its own, without the radio's name in front of it: the page puts the name on a
+        // line of its own and this underneath, so the eye finds the radio first and then reads why.
         internal string CwKeyingForThisRadio()
         {
-            string rig = Rig == null ? null : Rig.RigType;
-            if (string.IsNullOrWhiteSpace(rig))
+            string rig = ConnectedRigName();
+            if (rig.Length == 0)
                 return "No radio is connected, so there is nothing to say yet.";
 
             if (KeyedByKyCommand(rig))
-                return rig + " — yes. HolyLogger sends the text with the KY command.";
+                return "Yes. HolyLogger sends the text with the KY command.";
 
             string address = GetIcomCivAddress(rig);
             if (address != null)
-                return rig + " — yes. HolyLogger sends the text with CI-V command 17, at address "
-                     + address + ".";
+                return "Yes. HolyLogger sends the text with CI-V command 17, at address " + address + ".";
 
             if (rig.StartsWith("FT", StringComparison.OrdinalIgnoreCase))
-                return rig + " — no. No Yaesu can be sent typed CW over CAT. Use the radio's own "
-                     + "memory keyer.";
+                return "No. Yaesu has no command that keys typed text - its KY plays back a message "
+                     + "already stored in the radio. Use the radio's own memory keyer.";
 
-            return rig + " — no. HolyLogger has no CW command for this model. Use the radio's own "
-                 + "memory keyer.";
+            return "No. HolyLogger has no CW command for this model. Use the radio's own memory keyer.";
         }
 
         // THE MOST TEXT ONE COMMAND MAY CARRY, from the manuals rather than from a round number.
