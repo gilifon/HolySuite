@@ -10788,6 +10788,21 @@ namespace HolyLogger
             }
         }
 
+        // Help > Which radios can send CW. A reference page, so it opens from Help rather than from
+        // the keyer's settings - the keyer only links to it.
+        private void CwRadiosMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            try { CwRadiosWindow.Show(this); }
+            catch (Exception ex)
+            {
+                Log.Swallow(ex);
+                HolyMessageBox.ShowError(
+                    "That page could not be opened.\n\n" + ex.Message + "\n\n"
+                    + HolyMessageBox.WhatToDo(ex.Message, null),
+                    "Which radios can send CW", this);
+            }
+        }
+
         private async void WhatsNewMenuItem_Click(object sender, RoutedEventArgs e)
         {
             string file = await ReleaseNotes.FetchAsync();
