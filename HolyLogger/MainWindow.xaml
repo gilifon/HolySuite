@@ -1212,6 +1212,7 @@
                              Background="White" Foreground="Black" CaretBrush="Black" BorderThickness="0"
                              TextAlignment="Right" MaxLength="11"
                              VerticalContentAlignment="Center"
+                             PreviewMouseWheel="FreqNoCat_PreviewMouseWheel"
                              KeyDown="TB_FreqNoCat_KeyDown" LostFocus="TB_FreqNoCat_LostFocus"
                              GotFocus="TB_FreqNoCat_GotFocus" TextChanged="TB_FreqNoCat_TextChanged"/>
                 </Border>

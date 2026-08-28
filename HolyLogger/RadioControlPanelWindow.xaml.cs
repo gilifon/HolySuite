@@ -365,12 +365,18 @@ namespace HolyLogger
 
         private void TB_Frequency_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
         {
-            e.Handled = true;
+            if (!_rigOnline) return;   // nothing to tune: leave the wheel to whatever else wants it
 
-            if (!_rigOnline) return;
+            // Inside the band and no further: the edges of whatever band the radio is in now.
+            var band = RadioPanelPresets.BandFor(_rigKhz);
+            double lowKhz = band != null ? band.LowKhz : 0;
+            double highKhz = band != null ? band.HighKhz : 0;
 
-            double? target = _wheel.Next(_rigKhz, e.Delta, StepUnderPointer(e.GetPosition(TB_Frequency).X));
+            double? target = _wheel.Next(_rigKhz, e.Delta,
+                                         StepUnderPointer(e.GetPosition(TB_Frequency).X), lowKhz, highKhz);
             if (target == null) return;
+
+            e.Handled = true;   // the radio is being tuned: the wheel belongs to us for this notch
 
             // The box follows the radio again, and no mode is named: turning the dial is not a
             // request to change from data to SSB.

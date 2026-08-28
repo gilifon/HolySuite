@@ -58,6 +58,21 @@ namespace HolyLogger
             new object[] { "50",  "6m",   50000,  54000,  50150,  50090 },
         };
 
+        // The band EDGES never change and are not the operator's to edit - only the two frequencies
+        // inside each band are - so they are worked out once and answered from here, rather than
+        // re-reading and re-parsing the settings string for every notch of the mouse wheel.
+        private static readonly List<RadioBandPreset> Edges = Defaults();
+
+        /// <summary>
+        /// The band a frequency falls in, or null if it is in none of them (out-of-band receive, a
+        /// transverter, 60m - anywhere the panel has no edges to speak for).
+        /// </summary>
+        public static RadioBandPreset BandFor(double khz)
+        {
+            if (khz <= 0) return null;
+            return Edges.FirstOrDefault(b => b.Contains(khz));
+        }
+
         public static List<RadioBandPreset> Defaults()
         {
             return Factory.Select(row => new RadioBandPreset

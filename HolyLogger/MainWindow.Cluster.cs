@@ -2140,9 +2140,12 @@ namespace HolyLogger
             // into one: there the wheel scrolls, as it always has.
             if (!clusterLiveScaleOn || _clusterBandHoverActive) return;
 
-            e.Handled = true;   // the list must not scroll away from the VFO under the operator
-
-            if (!Properties.Settings.Default.EnableOmniRigCAT || Properties.Settings.Default.isManualMode) return;
+            // NOT HANDLED UNTIL THERE IS SOMETHING TO DO. Handling it up here swallowed the wheel in
+            // Manual mode and with CAT off, where there is no radio to tune - and Live Scale's own
+            // ClusterLiveScale_BlockWheel is still on this grid to keep the list from scrolling away
+            // from the VFO, so nothing is needed from us for that.
+            // Manual mode says where the LOG gets its frequency, not whether the radio can be tuned.
+            if (!Properties.Settings.Default.EnableOmniRigCAT) return;
             if (OmniRigEngine == null || Rig == null || Rig.Status != OmniRig.RigStatusX.ST_ONLINE) return;
 
             double khz;
@@ -2151,9 +2154,15 @@ namespace HolyLogger
 
             // Always the whole-kHz step: there are no digits under the pointer here to read a finer
             // one from, and a spot list is read in kHz.
-            double? target = _clusterWheel.Next(khz, e.Delta, 1.0);
+            // Inside the band and no further: the edges of whatever band the radio is in now.
+            var band = RadioPanelPresets.BandFor(khz);
+            double lowKhz = band != null ? band.LowKhz : 0;
+            double highKhz = band != null ? band.HighKhz : 0;
+
+            double? target = _clusterWheel.Next(khz, e.Delta, 1.0, lowKhz, highKhz);
             if (target == null) return;
 
+            e.Handled = true;   // the radio is being tuned: the wheel belongs to us for this notch
             QueueWheelTune(target.Value);
         }
 

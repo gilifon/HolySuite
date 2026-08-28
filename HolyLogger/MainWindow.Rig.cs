@@ -748,11 +748,15 @@ namespace HolyLogger
 
         private void FreqLed_PreviewMouseWheel(object sender, System.Windows.Input.MouseWheelEventArgs e)
         {
-            e.Handled = true;
-
-            // Only when the LED is a live reading. With CAT off, no rig, or manual mode, the number on
-            // screen is one the operator typed and there is no radio behind it to move.
-            if (!Properties.Settings.Default.EnableOmniRigCAT || Properties.Settings.Default.isManualMode) return;
+            // NOT HANDLED UNTIL THERE IS SOMETHING TO DO. Marking the event handled first meant that in
+            // Manual mode, or with CAT off, the wheel was swallowed here and never reached whatever it
+            // would otherwise have scrolled - the wheel simply stopped working on the window.
+            //
+            // MANUAL MODE IS NOT A REASON TO REFUSE. It says the LOG takes its frequency from the
+            // operator rather than from the radio - it does not say the radio is unreachable, and the
+            // Radio Control Panel has always tuned in manual mode. Refusing here made the wheel work in
+            // one window and not the other, for no reason the operator could see.
+            if (!Properties.Settings.Default.EnableOmniRigCAT) return;
             if (OmniRigEngine == null || Rig == null || Rig.Status != OmniRig.RigStatusX.ST_ONLINE) return;
 
             // Not while the inline editor is open over the LED: the wheel there belongs to the text.
@@ -762,10 +766,64 @@ namespace HolyLogger
             try { khz = (double)Rig.GetRxFrequency() / 1000.0; }
             catch (Exception swallowed) { Log.Swallow(swallowed); return; }
 
-            double? target = _ledWheel.Next(khz, e.Delta, LedStepUnderPointer(e.GetPosition(FreqLedLive).X));
+            // Inside the band and no further: the edges of whatever band the radio is in now.
+            var band = RadioPanelPresets.BandFor(khz);
+            double lowKhz = band != null ? band.LowKhz : 0;
+            double highKhz = band != null ? band.HighKhz : 0;
+
+            double? target = _ledWheel.Next(khz, e.Delta,
+                                            LedStepUnderPointer(e.GetPosition(FreqLedLive).X), lowKhz, highKhz);
             if (target == null) return;
 
+            e.Handled = true;   // the radio is being tuned: the wheel belongs to us for this notch
             QueueWheelTune(target.Value);
+        }
+
+        // In manual mode (and whenever CAT is off) the LED is hidden and this white box stands in its
+        // place. The wheel has to work on what is on the screen, so it works here too: it moves the
+        // number the operator is going to log, and - if a radio is connected at all - moves the radio
+        // with it. Its base is what the BOX says, not what the radio says: in manual mode the box is
+        // the one the operator is working with, and the two need not agree.
+        private readonly FrequencyWheel _noCatWheel = new FrequencyWheel();
+
+        private void FreqNoCat_PreviewMouseWheel(object sender, System.Windows.Input.MouseWheelEventArgs e)
+        {
+            if (TB_FreqNoCat == null) return;
+
+            string typed = (TB_FreqNoCat.Text ?? string.Empty).Trim();
+            if (!double.TryParse(typed, NumberStyles.Float, CultureInfo.InvariantCulture, out double khz) || khz <= 0)
+                return;   // an empty or half-typed box has no frequency to step from
+
+            var band = RadioPanelPresets.BandFor(khz);
+            double lowKhz = band != null ? band.LowKhz : 0;
+            double highKhz = band != null ? band.HighKhz : 0;
+
+            int dot = typed.IndexOf('.');
+            double step = 1.0;
+            if (dot >= 0)
+            {
+                try
+                {
+                    Rect dotRect = TB_FreqNoCat.GetRectFromCharacterIndex(dot);
+                    if (e.GetPosition(TB_FreqNoCat).X > dotRect.Right) step = 0.1;
+                }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
+            }
+
+            double? target = _noCatWheel.Next(khz, e.Delta, step, lowKhz, highKhz);
+            if (target == null) return;
+
+            e.Handled = true;
+
+            TB_FreqNoCat.Text = target.Value.ToString("0.000", CultureInfo.InvariantCulture);
+            CommitFreqNoCat();   // the logged frequency and the Band box follow the number
+
+            // And the radio, when there is one listening.
+            if (Properties.Settings.Default.EnableOmniRigCAT && OmniRigEngine != null && Rig != null
+                && Rig.Status == OmniRig.RigStatusX.ST_ONLINE)
+            {
+                QueueWheelTune(target.Value);
+            }
         }
 
         /// <summary>

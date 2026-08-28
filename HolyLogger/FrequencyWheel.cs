@@ -16,6 +16,9 @@ namespace HolyLogger
     /// never land on a round number at all. A radio already on a whole kHz has nothing to tidy, so its
     /// first notch is a plain step.
     ///
+    /// IT ALSO STAYS INSIDE THE BAND, when the caller says what the band is: the notch that would
+    /// cross an edge lands on the edge, and further notches in that direction do nothing.
+    ///
     /// AND IT DOES NOT WAIT FOR THE RADIO. While the wheel is being spun each notch is added to where
     /// the last notch was sent, not to the frequency read back, so a fast spin moves as far as it was
     /// spun instead of fighting a tune still on its way. A second and a half of stillness ends the
@@ -36,7 +39,8 @@ namespace HolyLogger
         /// kHz digits, 0.1 kHz over the Hz digits - and the tidying is to a multiple of THAT step, so
         /// the small step lands on 14250.700 exactly as the big one lands on 14251.
         /// </summary>
-        public double? Next(double rigKhz, int wheelDelta, double stepKhz)
+        public double? Next(double rigKhz, int wheelDelta, double stepKhz,
+                            double minKhz = 0, double maxKhz = 0)
         {
             if (rigKhz <= 0 || stepKhz <= 0) return null;
 
@@ -74,6 +78,16 @@ namespace HolyLogger
             // Kept clean of floating-point dust: the frequency is only ever whole Hz anyway.
             target = Math.Round(target, 3);
             if (target <= 0) return null;
+
+            // THE WHEEL DOES NOT LEAVE THE BAND. Given edges, it stops on them: spinning on past the
+            // top of 20m walked the radio into 14.4 MHz, which is not a place to transmit and not a
+            // place the operator meant to go. Clamped HERE, before the target is remembered, so the
+            // next notch carries on from the edge rather than from somewhere outside it.
+            if (maxKhz > 0 && target > maxKhz) target = maxKhz;
+            if (minKhz > 0 && target < minKhz) target = minKhz;
+
+            // Already sitting on that edge: nothing to send.
+            if (Math.Abs(target - _targetKhz) < 0.0005 && spinning) return null;
 
             _targetKhz = target;
             _stepKhz = stepKhz;
