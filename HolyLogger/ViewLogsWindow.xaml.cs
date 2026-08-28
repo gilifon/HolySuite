@@ -206,7 +206,11 @@ namespace HolyLogger
             }
             catch (Exception ex)
             {
-                HolyMessageBox.ShowError("Could not check this log.\n\n" + ex.Message, "Log Fixer", this);
+                HolyMessageBox.ShowError(
+                    "Could not check this log.\n\n" + ex.Message + "\n\n"
+                    + "Nothing was changed.\n"
+                    + HolyMessageBox.WhatToDo(ex.Message, "press Log Fixer"),
+                    "Log Fixer", this);
             }
         }
 
@@ -230,8 +234,11 @@ namespace HolyLogger
             }
             catch (Exception ex)
             {
-                HolyMessageBox.ShowError("Could not open the search for this log.\n\n" + ex.Message,
-                                         "Search Log", this);
+                HolyMessageBox.ShowError(
+                    "Could not open the search for this log.\n\n" + ex.Message + "\n\n"
+                    + "Nothing was changed.\n"
+                    + HolyMessageBox.WhatToDo(ex.Message, "press Search In Log"),
+                    "Search Log", this);
             }
         }
 

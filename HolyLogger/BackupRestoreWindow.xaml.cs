@@ -444,7 +444,10 @@ namespace HolyLogger
             if (result == null || !result.Ok)
             {
                 HolyMessageBox.ShowError(
-                    "The restore could not be completed, and your log was not changed:\n" + (result?.Error ?? "unknown error"),
+                    "The restore could not be completed, and your log was not changed:\n"
+                    + (result?.Error ?? "unknown error") + "\n\n"
+                    + "Close every other HolyLogger window and try the restore again.\n"
+                    + "If the backup itself is at fault, pick an earlier one from the list.",
                     "Restore from backup", this);
                 return;
             }
@@ -536,7 +539,11 @@ namespace HolyLogger
                 catch (Exception ex)
                 {
                     Log.Swallow(ex);
-                    HolyMessageBox.ShowError("That folder can't be written to, so it wasn't set:\n" + path, "Extra backup folder", owner);
+                    HolyMessageBox.ShowError(
+                        "That folder can't be written to, so it wasn't set:\n" + path + "\n\n"
+                        + "Pick a folder on a drive that is always connected, and one you own — "
+                        + "a folder inside Documents always works.",
+                        "Extra backup folder", owner);
                     return false;
                 }
 
