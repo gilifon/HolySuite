@@ -103,7 +103,11 @@ namespace HolyLogger
             string freqText = (qso.Freq ?? string.Empty).Trim();
             if (!double.TryParse(freqText, NumberStyles.Float, CultureInfo.InvariantCulture, out double freqValue) || freqValue <= 0)
             {
-                HolyMessageBox.ShowWarning("This QSO has no valid frequency.", "Set Radio to Frequency", this);
+                HolyMessageBox.ShowWarning(
+                    "This QSO has no frequency to tune to.\n\n"
+                    + "Nothing was sent to the radio.\n\n"
+                    + "Double-click the QSO and type the frequency in MHz — 14.200 — then try again.",
+                    "Set Radio to Frequency", this);
                 return;
             }
 
@@ -588,6 +592,10 @@ namespace HolyLogger
         {
             ShowRigStatus();
 
+            // Before any of the early returns below: the panel must follow the radio even in manual
+            // mode or while a QSO is being edited, when the logger's own fields deliberately do not.
+            UpdateRadioPanel();
+
             bool rigOnline = OmniRigEngine != null && Rig != null
                              && Rig.Status == OmniRig.RigStatusX.ST_ONLINE
                              && Properties.Settings.Default.EnableOmniRigCAT;
@@ -646,6 +654,126 @@ namespace HolyLogger
                 System.Windows.Forms.MessageBox.Show("Error: " + e.Message);
             }
 
+        }
+
+        // ---- Radio Control Panel ------------------------------------------------------------
+        //
+        // A small window of its own: a frequency box, ten band buttons and SSB/CW. It holds no state
+        // about the radio - it asks the radio to move, and what it SHOWS is written by
+        // UpdateRadioPanel from what the radio reports, so a band or mode changed on the radio's own
+        // knobs lights up here exactly as a button press does.
+
+        private RadioControlPanelWindow radioPanel;
+
+        /// <summary>Opens or closes the panel to match the "Show Control Panel" setting.</summary>
+        internal void ApplyRadioControlPanelVisibility()
+        {
+            if (Properties.Settings.Default.ShowRadioControlPanel)
+            {
+                if (radioPanel == null)
+                {
+                    radioPanel = new RadioControlPanelWindow(this);
+                    try { radioPanel.Owner = this; } catch (Exception swallowed) { Log.Swallow(swallowed); }
+                    radioPanel.Closed += RadioPanel_Closed;
+                    radioPanel.Show();
+                }
+                else
+                {
+                    try { radioPanel.Activate(); } catch (Exception swallowed) { Log.Swallow(swallowed); }
+                }
+
+                UpdateRadioPanel();
+                return;
+            }
+
+            var panel = radioPanel;
+            radioPanel = null;
+            if (panel == null) return;
+
+            panel.Closed -= RadioPanel_Closed;   // we are closing it because it was switched off
+            try { panel.Close(); } catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        private void RadioPanel_Closed(object sender, EventArgs e)
+        {
+            radioPanel = null;
+            // Closing the window IS switching the panel off. Without this it would come back on the
+            // next start, and a window that reappears after being closed is a window nobody trusts.
+            Properties.Settings.Default.ShowRadioControlPanel = false;
+        }
+
+        /// <summary>Rebuild the panel's buttons after the frequencies were edited in Options.</summary>
+        internal void ReloadRadioPanelPresets()
+        {
+            try { radioPanel?.ReloadPresets(); }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        /// <summary>
+        /// Tells the panel what the radio is doing. Called from ShowRigParams, which runs on every
+        /// OmniRig params/status event, so the panel follows the radio without a timer of its own.
+        /// </summary>
+        internal void UpdateRadioPanel()
+        {
+            if (radioPanel == null) return;
+
+            if (!Dispatcher.CheckAccess())
+            {
+                Dispatcher.BeginInvoke(new Action(UpdateRadioPanel));
+                return;
+            }
+
+            bool online = Properties.Settings.Default.EnableOmniRigCAT
+                          && OmniRigEngine != null && Rig != null
+                          && Rig.Status == OmniRig.RigStatusX.ST_ONLINE;
+
+            int khz = 0;
+            string mode = null;
+
+            if (online)
+            {
+                try
+                {
+                    // The radio's real frequency, with no satellite shift applied: the shift belongs to
+                    // what is logged, not to which band the radio is actually sitting on.
+                    khz = (int)Math.Round((double)Rig.GetRxFrequency() / 1000.0);
+                    mode = GetNormalizedRigMode();
+                }
+                catch (Exception swallowed)
+                {
+                    Log.Swallow(swallowed);
+                    online = false;
+                }
+            }
+
+            try { radioPanel.ShowRigState(online, khz, mode); }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        /// <summary>
+        /// The one way the panel moves the radio: a frequency in kHz, and the mode it should be in.
+        /// </summary>
+        internal async void TuneFromRadioPanel(double khz, string mode)
+        {
+            if (khz <= 0) return;
+
+            if (!Properties.Settings.Default.EnableOmniRigCAT || Rig == null
+                || Rig.Status != OmniRig.RigStatusX.ST_ONLINE)
+            {
+                UpdateRadioPanel();   // the panel says so itself; no dialog to dismiss
+                return;
+            }
+
+            int frequencyHz = (int)Math.Round(khz * 1000.0);
+            string wanted = string.IsNullOrWhiteSpace(mode)
+                ? (GetNormalizedRigMode() ?? "SSB")
+                : mode.Trim().ToUpperInvariant();
+
+            // Same mapping the cluster and the log use, so SSB below 10 MHz is LSB and above it USB.
+            int? rigMode = MapClusterModeToRigMode(wanted, frequencyHz / 1000000.0);
+            await TryTuneRigFrequencyAsync(frequencyHz, (OmniRig.RigParamX)(rigMode ?? PM_SSB_U));
+
+            UpdateRadioPanel();
         }
     }
 }

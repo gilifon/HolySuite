@@ -295,6 +295,29 @@ namespace HolyLogger
             _box.PreviewKeyDown += Box_PreviewKeyDown;
             _box.PreviewTextInput += Box_PreviewTextInput;
 
+            // AND THE SAME RULE FOR PASTE. PreviewTextInput fires for typing and for nothing else, so
+            // Ctrl+V put straight into the box whatever the clipboard held - and what a keyer cannot
+            // send is dropped later, silently, on the way to the radio. Cleaned rather than refused:
+            // what can be keyed goes in, the rest is left out.
+            DataObject.AddPastingHandler(_box, (s2, e2) =>
+            {
+                try
+                {
+                    string pasted = e2.DataObject.GetDataPresent(DataFormats.UnicodeText)
+                                  ? e2.DataObject.GetData(DataFormats.UnicodeText) as string
+                                  : null;
+                    if (pasted == null) { e2.CancelCommand(); return; }
+
+                    string clean = new string(pasted.Where(IsSendable).ToArray());
+                    if (clean.Length == pasted.Length) return;
+
+                    var wrapped = new DataObject();
+                    wrapped.SetData(DataFormats.UnicodeText, clean);
+                    e2.DataObject = wrapped;
+                }
+                catch (Exception swallowed) { Log.Swallow(swallowed); e2.CancelCommand(); }
+            });
+
             // A TextBox paints all its text in one colour, so it paints none of it: what the operator
             // sees comes from this TextBlock sitting exactly under the box, in two runs - blue for the
             // characters the radio has already keyed, ordinary for the rest. The box keeps the caret,
@@ -1208,8 +1231,17 @@ namespace HolyLogger
 
             if (text.Length == 0)
             {
-                HolyMessageBox.ShowWarning("Nothing to send: the callsign this text asks for is empty.",
-                                           "CW Keyer", this);
+                // NOT ABOUT A CALLSIGN. It used to say the callsign was empty, and by this point
+                // that has already been ruled out - a missing callsign, serial or exchange is
+                // caught above, by name. What is left is a button whose text holds nothing a keyer
+                // can send. Typing and pasting are both filtered now, so this is a last resort for
+                // a text saved by an older build.
+                HolyMessageBox.ShowWarning(
+                    "Nothing to send.\n\n"
+                    + "Button " + (index + 1) + " holds nothing a CW keyer can send. Only letters, "
+                    + "digits and  . , ? / @ = + -  go out over the air.\n\n"
+                    + "Right-click the button to change its text.",
+                    "CW Keyer", this);
                 return;
             }
 

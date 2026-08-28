@@ -1457,6 +1457,12 @@ namespace HolyLogger
                 catch (Exception swallowed) { Log.Swallow(swallowed); }
             }
 
+            // The Radio Control Panel comes back if it was left switched on. Done here for the same
+            // reason as the channels window: it takes this window as its owner, and WPF will not
+            // accept an owner that has not been shown yet.
+            try { ApplyRadioControlPanelVisibility(); }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+
             // Re-assert the log name in the title bar once the window is fully loaded. The constructor
             // already sets it, but if that early call hit a transient DB hiccup the title would be left
             // bare; doing it again here (dal + ActiveLogId are settled by now) makes it reliable.
@@ -2978,6 +2984,9 @@ namespace HolyLogger
                 MaxLength = 120
             };
 
+            // The one list of what may be typed OR pasted here, so the two can never drift.
+            const string validChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 .,?/@=+-*!#${}";
+
             // Add validation for CW-valid characters only
             tb.PreviewTextInput += (s, e) =>
             {
@@ -2987,12 +2996,41 @@ namespace HolyLogger
                 // The keyable characters, plus the two macro marks. * and ! are never keyed - they
                 // are replaced by a callsign before anything reaches the radio - but they have to be
                 // typeable here or the messages that use them could not be written.
-                string validChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 .,?/@=+-*!#${}";
                 if (!validChars.Contains(e.Text.ToUpperInvariant()))
                 {
                     e.Handled = true;  // Block invalid character
                 }
             };
+
+            // AND THE SAME RULE FOR PASTE, which the handler above never sees: PreviewTextInput fires
+            // for typing and for nothing else, so Ctrl+V walked straight past it. A message pasted from
+            // a web page or a mail - Hebrew, curly quotes, a bullet - was stored happily and then had
+            // every character of it dropped on the way to the radio, leaving the keyer to say "nothing
+            // to send" about a button with text plainly written on it.
+            //
+            // The paste is not refused, it is CLEANED: what can be keyed goes in and the rest is left
+            // out, which is what the operator meant by pasting it.
+            DataObject.AddPastingHandler(tb, (s2, e2) =>
+            {
+                try
+                {
+                    string pasted = e2.DataObject.GetDataPresent(DataFormats.UnicodeText)
+                                  ? e2.DataObject.GetData(DataFormats.UnicodeText) as string
+                                  : null;
+                    if (pasted == null) { e2.CancelCommand(); return; }
+
+                    var clean = new StringBuilder(pasted.Length);
+                    foreach (char c in pasted.ToUpperInvariant())
+                        if (validChars.IndexOf(c) >= 0) clean.Append(c);
+
+                    if (clean.Length == pasted.Length) return;   // nothing to strip
+
+                    var wrapped = new DataObject();
+                    wrapped.SetData(DataFormats.UnicodeText, clean.ToString());
+                    e2.DataObject = wrapped;
+                }
+                catch (Exception swallowed) { Log.Swallow(swallowed); e2.CancelCommand(); }
+            });
 
             Grid.SetRow(tb, 0);
             Grid.SetColumnSpan(tb, 3);
@@ -8718,6 +8756,8 @@ namespace HolyLogger
 
             // Subscribe to graphics box mode changes for immediate refresh
             options.UserInterfaceControlInstance.GraphicsBoxModeChanged += UserInterfaceControl_GraphicsBoxModeChanged;
+            // "Show Control Panel" acts at once, not when Options is closed.
+            options.UserInterfaceControlInstance.ShowRadioControlPanelChanged += (s2, e2) => ApplyRadioControlPanelVisibility();
             // Refresh the QRZ icon as soon as the user tests the connection in QRZ Service options.
             options.QRZServicesControlInstance.ConnectionTested += QRZServiceControl_ConnectionTested;
             // Give the LoTW control access to the database so it can reset the upload queue.
@@ -8778,6 +8818,11 @@ namespace HolyLogger
             if (optionWindow.SatelliteControlInstance.HasChanged)
             {
                 ShowRigParams();
+            }
+            if (optionWindow.RadioControlPanelControlInstance.HasChanged)
+            {
+                // A band frequency was edited: the open panel rebuilds its buttons around the new one.
+                ReloadRadioPanelPresets();
             }
             if (Properties.Settings.Default.EnableUDPClient)
             {
