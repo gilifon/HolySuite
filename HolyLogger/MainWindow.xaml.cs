@@ -3331,8 +3331,10 @@ namespace HolyLogger
             {
                 if (!silent) HolyMessageBox.ShowWarning(
                     "CW keying by CAT is not supported for this radio model (" + rigType + ").\n\n"
-                    + "Nothing was sent, and nothing you can set will change it — HolyLogger has no CW "
-                    + "command for this model. Use the radio's own memory keyer.",
+                    + "Nothing was sent.\n\n"
+                    + "If OmniRig lists your radio under more than one name, pick the plain one — "
+                    + "IC-7300 rather than IC-7300-DATA — and try again.\n\n"
+                    + "Otherwise use the radio's own memory keyer.",
                     "CW Keyer", this);
                 return;
             }
@@ -3529,8 +3531,10 @@ namespace HolyLogger
             {
                 HolyMessageBox.ShowWarning(
                     "CW text keying via CAT is not supported for this radio model (" + rigType + ").\n\n"
-                    + "Nothing was sent, and nothing you can set will change it — HolyLogger has no CW "
-                    + "command for this model. Use the radio's own memory keyer.",
+                    + "Nothing was sent.\n\n"
+                    + "If OmniRig lists your radio under more than one name, pick the plain one — "
+                    + "IC-7300 rather than IC-7300-DATA — and try again.\n\n"
+                    + "Otherwise use the radio's own memory keyer.",
                     "CW Text", this);
                 return;
             }
@@ -3712,10 +3716,36 @@ namespace HolyLogger
             { "IC-7610",    "98" },
         };
 
+        // OMNIRIG NAMES ONE RADIO SEVERAL TIMES, and the extra names are the same radio.
+        //
+        // Its rig list carries an entry per WAY OF USING a radio, not per radio: IC-7300 and
+        // IC-7300-DATA are one transceiver, and which of them an operator picked says only which mode
+        // he wants the data ports set for. This table is looked up by name, so the man running as
+        // IC-7300-DATA was told "CW keying by CAT is not supported for this radio model" about a radio
+        // that supports it perfectly well and is listed here.
+        //
+        // So the suffix is taken off before the lookup. Only the ones OmniRig actually adds - it is a
+        // list, not a rule, because a suffix invented here would silently match a radio this program
+        // has never been tested against and send it bytes meant for something else.
+        private static readonly string[] OmniRigVariantSuffixes = { "-DATA", "-D", " DATA" };
+
         private static string GetIcomCivAddress(string rigType)
         {
-            string key = IcomCivAddresses.Keys.FirstOrDefault(k => string.Equals(k, rigType, StringComparison.OrdinalIgnoreCase));
-            return key != null ? IcomCivAddresses[key] : null;
+            string name = (rigType ?? string.Empty).Trim();
+
+            string key = IcomCivAddresses.Keys.FirstOrDefault(k => string.Equals(k, name, StringComparison.OrdinalIgnoreCase));
+            if (key != null) return IcomCivAddresses[key];
+
+            foreach (string suffix in OmniRigVariantSuffixes)
+            {
+                if (!name.EndsWith(suffix, StringComparison.OrdinalIgnoreCase)) continue;
+
+                string bare = name.Substring(0, name.Length - suffix.Length).Trim();
+                key = IcomCivAddresses.Keys.FirstOrDefault(k => string.Equals(k, bare, StringComparison.OrdinalIgnoreCase));
+                if (key != null) return IcomCivAddresses[key];
+            }
+
+            return null;
         }
 
         private void UpdateMessageButtonLabels()
