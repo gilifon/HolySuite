@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Windows;
 using System.Windows.Controls;
 
@@ -99,7 +99,11 @@ namespace HolyLogger.OptionsUserControls
             if (ok)
                 HolyMessageBox.ShowSuccess("Connected to QRZ.com successfully!", "QRZ Connection", Window.GetWindow(this));
             else
-                HolyMessageBox.ShowError("Connection failed. Check your username and password.", "QRZ Connection", Window.GetWindow(this));
+                HolyMessageBox.ShowError(
+                    "Connection failed. Check your user name and password.\n\n"
+                    + "An XML Subscription is also required for callsign lookups.\n"
+                    + "Without one QRZ refuses the login even when the password is right.",
+                    "QRZ Connection", Window.GetWindow(this));
             ConnectionTested?.Invoke(ok, sessionKey);
         }
 
@@ -121,7 +125,10 @@ namespace HolyLogger.OptionsUserControls
             try { System.Diagnostics.Process.Start(QrzLogbookService.ApiDocsUrl); }
             catch (Exception ex)
             {
-                HolyMessageBox.ShowError("Could not open the browser:\n" + ex.Message, "QRZ Logbook", Window.GetWindow(this));
+                HolyMessageBox.ShowError(
+                    "Could not open the browser.\n\n" + ex.Message + "\n\n"
+                    + "Open qrz.com in your own browser and sign in there.",
+                    "QRZ Logbook", Window.GetWindow(this));
             }
         }
 
@@ -145,7 +152,11 @@ namespace HolyLogger.OptionsUserControls
                 if (r.NetworkError)
                 {
                     SetValid(false);
-                    HolyMessageBox.ShowError("Could not reach QRZ.com.\nPlease check your internet connection and try again.", "QRZ Logbook", win);
+                    HolyMessageBox.ShowError(
+                        "Could not reach QRZ.com.\n\n"
+                        + "Check your internet connection and try again.\n"
+                        + "If other websites work, QRZ itself may be down — wait a few minutes.",
+                        "QRZ Logbook", win);
                     return;
                 }
                 if (r.Ok)

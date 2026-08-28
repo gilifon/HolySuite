@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -307,7 +307,9 @@ namespace HolyLogger.OptionsUserControls
             }
             if (!File.Exists(path))
             {
-                ShowError($"File not found:\n{path}");
+                ShowError($"File not found:\n{path}\n\n"
+                          + "Press Browse and pick tqsl.exe — normally in "
+                          + @"C:\Program Files (x86)\TrustedQSL.");
                 return;
             }
             ShowOk($"TQSL found: {path}");

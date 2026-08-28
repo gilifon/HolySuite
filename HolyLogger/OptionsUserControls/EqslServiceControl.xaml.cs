@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Windows;
@@ -54,7 +54,11 @@ namespace HolyLogger.OptionsUserControls
             }
             catch (Exception ex)
             {
-                HolyMessageBox.ShowError("Failed to load eQSL accounts: " + ex.Message, "eQSL Accounts", Window.GetWindow(this));
+                HolyMessageBox.ShowError(
+                    "Your eQSL accounts could not be read.\n\n" + ex.Message + "\n\n"
+                    + "They are safe in the database — nothing was changed.\n"
+                    + "If the list stays empty, use Help → Support and paste the line above.",
+                    "eQSL Accounts", Window.GetWindow(this));
             }
         }
 
@@ -213,7 +217,11 @@ namespace HolyLogger.OptionsUserControls
             }
             catch (Exception ex)
             {
-                HolyMessageBox.ShowError("Failed to remove eQSL account: " + ex.Message, "eQSL Accounts", Window.GetWindow(this));
+                HolyMessageBox.ShowError(
+                    "That eQSL account could not be removed.\n\n" + ex.Message + "\n\n"
+                    + "It is still there.\n"
+                    + "If it will not go, use Help → Support and paste the line above.",
+                    "eQSL Accounts", Window.GetWindow(this));
             }
         }
 
@@ -267,9 +275,16 @@ namespace HolyLogger.OptionsUserControls
                 string resp = await _testHttp.GetStringAsync(url);
 
                 if (string.IsNullOrWhiteSpace(resp))
-                    HolyMessageBox.ShowError("Could not verify the connection to eQSL. Please try again.", "eQSL Test", Window.GetWindow(this));
+                    HolyMessageBox.ShowError(
+                        "eQSL did not answer as expected.\n\n"
+                        + "It may be down for maintenance, or your internet may be off.",
+                        "eQSL Test", Window.GetWindow(this));
                 else if (resp.IndexOf("No such", StringComparison.OrdinalIgnoreCase) >= 0)
-                    HolyMessageBox.ShowError("eQSL rejected the user name / password.", "eQSL Test", Window.GetWindow(this));
+                    HolyMessageBox.ShowError(
+                        "eQSL rejected the user name / password.\n\n"
+                        + "Check them at eqsl.cc. The user name is usually your callsign, and the "
+                        + "password is your eQSL password, not your e-mail password.",
+                        "eQSL Test", Window.GetWindow(this));
                 else
                     HolyMessageBox.ShowSuccess("Connected to eQSL successfully!", "eQSL Test", Window.GetWindow(this));
             }

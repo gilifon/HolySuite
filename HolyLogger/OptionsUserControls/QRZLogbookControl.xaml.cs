@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Windows;
 using System.Windows.Controls;
 
@@ -57,7 +57,10 @@ namespace HolyLogger.OptionsUserControls
             }
             catch (Exception ex)
             {
-                HolyMessageBox.ShowError("Could not open the browser: " + ex.Message, "QRZ Logbook", Window.GetWindow(this));
+                HolyMessageBox.ShowError(
+                    "Could not open the browser.\n\n" + ex.Message + "\n\n"
+                    + "Open qrz.com in your own browser and sign in there.",
+                    "QRZ Logbook", Window.GetWindow(this));
             }
         }
 
@@ -81,7 +84,11 @@ namespace HolyLogger.OptionsUserControls
                 if (r.NetworkError)
                 {
                     SetValid(false);
-                    HolyMessageBox.ShowError("Could not reach QRZ.com. Please check your internet connection and try again.", "QRZ Logbook", Window.GetWindow(this));
+                    HolyMessageBox.ShowError(
+                        "Could not reach QRZ.com.\n\n"
+                        + "Check your internet connection and try again.\n"
+                        + "If other websites work, QRZ itself may be down — wait a few minutes.",
+                        "QRZ Logbook", Window.GetWindow(this));
                     return;
                 }
 
@@ -96,18 +103,33 @@ namespace HolyLogger.OptionsUserControls
                     SetValid(false);
                     string reason = (r.Reason ?? string.Empty).ToLowerInvariant();
                     if (reason.Contains("auth") || reason.Contains("invalid") || reason.Contains("key"))
-                        HolyMessageBox.ShowError("Authentication failed. Invalid API Key.", "QRZ Logbook", Window.GetWindow(this));
+                        HolyMessageBox.ShowError(
+                        "Authentication failed. Invalid API Key.\n\n"
+                        + "Copy the key again from qrz.com → My Logbook → Settings.\n"
+                        + "It is the Logbook key, not your XML subscription key.",
+                        "QRZ Logbook", Window.GetWindow(this));
                     else if (reason.Contains("subscription"))
                         HolyMessageBox.ShowError("An active QRZ XML Logbook Data Subscription is required to use automated API logging.", "QRZ Logbook", Window.GetWindow(this));
                     else
-                        HolyMessageBox.ShowError("QRZ rejected the API key" +
-                            (string.IsNullOrWhiteSpace(r.Reason) ? "." : (": " + r.Reason)), "QRZ Logbook", Window.GetWindow(this));
+                        HolyMessageBox.ShowError(
+                        "QRZ rejected the API key"
+                        + (string.IsNullOrWhiteSpace(r.Reason) ? "." : (": " + r.Reason))
+                        + "\n\n"
+                        + "Copy the key again from qrz.com → My Logbook → Settings.\n"
+                        + "It is the Logbook key, not your XML subscription key.",
+                        "QRZ Logbook", Window.GetWindow(this));
                 }
             }
             catch (Exception ex)
             {
                 SetValid(false);
-                HolyMessageBox.ShowError("Test failed: " + ex.Message, "QRZ Logbook", Window.GetWindow(this));
+                HolyMessageBox.ShowError(
+                    "The test failed.\n\n" + ex.Message + "\n\n"
+                    + "Nothing was saved.\n\n"
+                    + "Paste the key again — a space or a line break copied along with it is "
+                    + "the usual cause. If that is not it, check you can reach qrz.com in your "
+                    + "browser.",
+                    "QRZ Logbook", Window.GetWindow(this));
             }
             finally
             {

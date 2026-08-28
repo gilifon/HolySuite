@@ -57,7 +57,11 @@ namespace HolyLogger.OptionsUserControls
             if (ok)
                 HolyMessageBox.ShowSuccess("Connected to QRZ.com successfully!", "QRZ Connection", Window.GetWindow(this));
             else
-                HolyMessageBox.ShowError("Connection failed. Check your username and password.", "QRZ Connection", Window.GetWindow(this));
+                HolyMessageBox.ShowError(
+                    "Connection failed. Check your user name and password.\n\n"
+                    + "An XML Subscription is also required for callsign lookups.\n"
+                    + "Without one QRZ refuses the login even when the password is right.",
+                    "QRZ Connection", Window.GetWindow(this));
             // Let the main window update the QRZ icon to match the test result immediately.
             ConnectionTested?.Invoke(ok, x);
         }

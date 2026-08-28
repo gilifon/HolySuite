@@ -1,4 +1,4 @@
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Controls;
 
 namespace HolyLogger.OptionsUserControls
@@ -174,7 +174,11 @@ namespace HolyLogger.OptionsUserControls
 
                 if (r.NetworkError)
                 {
-                    HolyMessageBox.ShowError("Could not reach Club Log. Check your internet connection and try again.", "Club Log", owner);
+                    HolyMessageBox.ShowError(
+                        "Could not reach Club Log.\n\n"
+                        + "Check your internet connection and try again.\n"
+                        + "If other websites work, Club Log itself may be down — wait a few minutes.",
+                        "Club Log", owner);
                 }
                 else if (apiKeyRejected)
                 {
@@ -203,7 +207,12 @@ namespace HolyLogger.OptionsUserControls
                 }
                 else
                 {
-                    HolyMessageBox.ShowError("Club Log did not accept the request (HTTP " + r.StatusCode + ").\n" + (r.Message ?? string.Empty), "Club Log", owner);
+                    HolyMessageBox.ShowError(
+                        "Club Log did not accept the request (HTTP " + r.StatusCode + ").\n"
+                        + (r.Message ?? string.Empty) + "\n\n"
+                        + "400 or 403 is usually the e-mail or the password.\n"
+                        + "500 is Club Log's own end — wait and try later.",
+                        "Club Log", owner);
                 }
             }
             finally
