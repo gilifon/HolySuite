@@ -352,6 +352,37 @@ namespace HolyLogger
             UpdateVoiceMessageAvailabilityState();
         }
 
+        /// <summary>
+        /// Tools > Open OmniRig: shows OmniRig's OWN settings window, where the radio and its COM port
+        /// are chosen. OmniRig raises its status and params events when the operator changes something
+        /// there, and HolyLogger already listens to those, so the new radio takes effect straight away
+        /// with nothing to restart.
+        /// </summary>
+        private void OpenOmniRigMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            // The window belongs to the OmniRig engine, so there has to be one. If CAT has never been
+            // started in this run, start it now - opening its settings is a reason to.
+            if (OmniRigEngine == null) StartOmniRig();
+
+            // StartOmniRig says why itself (wrong version, not installed) and says it once.
+            if (OmniRigEngine == null) return;
+
+            try
+            {
+                OmniRigEngine.DialogVisible = true;
+            }
+            catch (Exception ex)
+            {
+                Log.Warn("OmniRig settings window could not be opened: " + ex.GetType().Name + ": " + ex.Message);
+                HolyMessageBox.ShowWarning(
+                    "OmniRig would not open its settings window." + Environment.NewLine + Environment.NewLine
+                    + "Reason: " + ex.Message + Environment.NewLine + Environment.NewLine
+                    + "Its own window can still be opened from the OmniRig icon in the Windows "
+                    + "notification area, next to the clock.",
+                    "Radio control (OmniRig)", this);
+            }
+        }
+
         private void OmnirigMenuItem_Click(object sender, RoutedEventArgs e)
         {
             string url = "http://www.dxatlas.com/OmniRig/";

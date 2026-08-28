@@ -778,6 +778,13 @@
                         </MenuItem.Icon>
                     </MenuItem>
                     <Separator />
+                    <MenuItem x:Name="OpenOmniRigMenuItem" Header="Open OmniRig" Click="OpenOmniRigMenuItem_Click"
+                              ToolTip="Open OmniRig's own settings window, to pick the radio and its COM port">
+                        <MenuItem.Icon>
+                            <Image Source="Images/OmniRigIcon.gif" Stretch="UniformToFill" Width="16" Height="16"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    <Separator />
                     <MenuItem x:Name="OptionsMenuItem" Header="Options (F2)" ToolTip="Customize your Holylogger" Click="OptionsMenuItemMenuItem_Click">
                         <MenuItem.Icon>
                             <Image Source="Images/properties.png" Stretch="UniformToFill" Width="16" Height="16"/>
