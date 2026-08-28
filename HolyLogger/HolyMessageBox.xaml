@@ -28,11 +28,22 @@
             <Path x:Name="IconPath" Stretch="Uniform"/>
         </Viewbox>
 
-        <!-- Message text -->
-        <TextBlock Grid.Row="0" Grid.Column="1"
-                   x:Name="MessageText"
-                   FontSize="18" TextWrapping="Wrap"
-                   VerticalAlignment="Center"/>
+        <!-- MESSAGE TEXT, IN A SCROLLER THAT ALMOST NEVER SHOWS ITSELF.
+             The window grows to fit its text (SizeToContent="Height"), which is right until the text
+             is taller than the screen: then the window grows past the bottom of the monitor and takes
+             its own OK button with it. The height is capped in code to what the screen can hold, and
+             this is what saves the message when that cap bites - a scrollbar appears, the buttons stay
+             where they are, and every word is still reachable. Horizontal scrolling is off on purpose:
+             TextWrapping="Wrap" breaks even a single word too long for the line, so nothing can run
+             off the right-hand edge. -->
+        <ScrollViewer Grid.Row="0" Grid.Column="1"
+                      x:Name="MessageScroller"
+                      VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled">
+            <TextBlock x:Name="MessageText"
+                       FontSize="18" TextWrapping="Wrap"
+                       VerticalAlignment="Center"/>
+        </ScrollViewer>
 
         <!-- OK button (info/success/warning/error mode). Right by default, as every dialog in the
              program has always had it; ShowWithLinks centres it for the one kind of message that ends

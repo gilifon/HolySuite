@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
@@ -394,7 +394,13 @@ namespace HolyLogger
             }
             catch (Exception ex)
             {
-                HolyMessageBox.ShowError("Could not save the QSO: " + ex.Message, "Edit QSO", this);
+                HolyMessageBox.ShowError(
+                    "This QSO was NOT saved.\n\n"
+                    + ex.Message + "\n\n"
+                    + "Your changes are still on screen — Save tries again, Cancel leaves the QSO "
+                    + "exactly as it was.\n"
+                    + HolyMessageBox.WhatToDo(ex.Message, "press Save"),
+                    "Edit QSO", this);
             }
         }
 

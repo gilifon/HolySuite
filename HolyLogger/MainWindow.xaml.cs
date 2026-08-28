@@ -793,7 +793,12 @@ namespace HolyLogger
                 }
                 catch (Exception ex)
                 {
-                    HolyMessageBox.ShowError("Failed to save QSO: " + ex.Message, "Save Error", this);
+                    HolyMessageBox.ShowError(
+                        "A contact sent by another program was NOT saved.\n\n"
+                        + ex.Message + "\n\n"
+                        + "That program still has it in its own log — you can add it here by hand.\n"
+                        + HolyMessageBox.WhatToDo(ex.Message, null),
+                        "Save Error", this);
                 }
             });
             Client.BeginReceive(new AsyncCallback(StartUDPClient), null);
@@ -862,7 +867,12 @@ namespace HolyLogger
                 }
                 catch (Exception ex)
                 {
-                    HolyMessageBox.ShowError("Failed to save QSO: " + ex.Message, "Save Error", this);
+                    HolyMessageBox.ShowError(
+                        "A contact sent by another program was NOT saved.\n\n"
+                        + ex.Message + "\n\n"
+                        + "That program still has it in its own log — you can add it here by hand.\n"
+                        + HolyMessageBox.WhatToDo(ex.Message, null),
+                        "Save Error", this);
                 }
             });
             N1MMClient.BeginReceive(new AsyncCallback(StartN1MMUDPClient), null);
@@ -1921,7 +1931,8 @@ namespace HolyLogger
             // suspenders; startup / log-switch already prompt).
             if (!EnsureActiveLogHasIdentity())
             {
-                HolyMessageBox.ShowWarning("Set this log's identity (station callsign + operator) before logging QSOs into it.",
+                HolyMessageBox.ShowWarning("Set this log's identity (station callsign + operator) before logging QSOs into it.\n\n"
+                    + "File → Log Manager, pick this log and press Set Identity.",
                     "Log identity required", this);
                 return;
             }
@@ -1929,6 +1940,14 @@ namespace HolyLogger
             // an award program matching on it will never find "EU-5". Answering "log it anyway" keeps
             // what was typed - the operator's data is never silently dropped.
             if (!ConfirmActivityBeforeSave()) return;
+
+            // SET WHEN THE CONTACT DID NOT REACH THE DATABASE, so the form is left exactly as he typed
+            // it instead of being emptied at the end of this method. Telling a man his QSO was not saved
+            // and wiping the form in the same breath leaves him with a message and nothing to act on -
+            // he has to remember a callsign, a time, a band and a mode and type them all again. With the
+            // form still standing, the advice in that message is one word long: press Add again.
+            bool notSaved = false;
+
             if (state == State.New)
             {
                 QSO qso = new QSO();
@@ -2038,7 +2057,13 @@ namespace HolyLogger
                 }
                 catch (Exception ex)
                 {
-                    HolyMessageBox.ShowError("Failed to save QSO: " + ex.Message, "Save Error", this);
+                    HolyMessageBox.ShowError(
+                        "This QSO is NOT in your log.\n\n"
+                        + ex.Message + "\n\n"
+                        + "It is still in the form, so nothing you typed is lost.\n"
+                        + HolyMessageBox.WhatToDo(ex.Message, "press Add"),
+                        "Save Error", this);
+                    notSaved = true;
                 }
             }
             else if (state == State.Edit)
@@ -2114,6 +2139,15 @@ namespace HolyLogger
 
                 LoadPreEditUserData();
             }
+            // THE FORM IS ONLY EMPTIED WHEN THE CONTACT REACHED THE DATABASE.
+            //
+            // It used to be emptied either way, so a failed save told the operator his QSO was not in
+            // the log and wiped it off the screen in the same breath - callsign, time, band and mode
+            // all to be remembered and typed again. Leaving the form standing costs nothing when the
+            // save worked, and is the whole difference between a message he can act on and one he can
+            // only read.
+            if (notSaved) return;
+
             ShowNewDXCC();
             ClearBtn_Click(null, null);
             UpdateNumOfQSOs();
@@ -4247,7 +4281,12 @@ namespace HolyLogger
             catch (Exception ex) { Log.Swallow(ex); }
 
             if (failure != null)
-                HolyMessageBox.ShowError("Could not delete them all: " + failure, "Delete QSOs", this);
+                HolyMessageBox.ShowError(
+                    "Some QSOs could not be deleted.\n\n"
+                    + failure + "\n\n"
+                    + "They are still in your log — the table above is right.\n"
+                    + HolyMessageBox.WhatToDo(failure, null),
+                    "Delete QSOs", this);
 
             if (deleted.Count > 0)
                 PushUndo(new UndoStep
@@ -4415,7 +4454,13 @@ namespace HolyLogger
             catch (Exception ex)
             {
                 Log.Warn("Undoing an edit failed: " + ex.Message);
-                HolyMessageBox.ShowError("The edit could not be undone.\n\n" + ex.Message, "Undo", this);
+                HolyMessageBox.ShowError(
+                    "The edit could not be undone.\n\n"
+                    + ex.Message + "\n\n"
+                    + "The QSO still carries your edit. Double-click it in the log and put the old "
+                    + "value back by hand.\n"
+                    + HolyMessageBox.WhatToDo(ex.Message, null),
+                    "Undo", this);
             }
         }
 
@@ -4975,7 +5020,12 @@ namespace HolyLogger
                 }
                 catch (Exception ex)
                 {
-                    HolyMessageBox.ShowError("Error: " + ex.Message, "Edit QSO", this);
+                    HolyMessageBox.ShowError(
+                        "That QSO could not be opened for editing.\n\n"
+                        + ex.Message + "\n\n"
+                        + "The QSO itself is unchanged.\n"
+                        + HolyMessageBox.WhatToDo(ex.Message, null),
+                        "Edit QSO", this);
                 }
                 UpdateMatrix();
             }

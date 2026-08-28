@@ -87,8 +87,18 @@ namespace HolyLogger
                 try { Owner = owner; }
                 catch (InvalidOperationException swallowed) { Log.Swallow(swallowed); }
             }
-            if (width > 0) Width = width;
+            if (width > 0) { Width = width; _widthWasChosen = true; }
             ApplyType(type);
+            ChooseWidth();
+
+            // EVERY WORD MUST BE READABLE, whatever the message turns out to say.
+            //
+            // These boxes are 460 wide and as tall as their text needs, which suited the one-line
+            // messages they used to carry. They now carry the error itself and two or three lines of
+            // advice under it, and a long one - a database error quoting a full path, say - made a
+            // narrow ribbon of a window taller than the screen, with its own OK button below the
+            // bottom edge. Sized here, once, when everything that is going into it is in.
+            Loaded += (s, e) => CapHeight();
 
             // Remember where the user last placed any of these popups: restore that spot if it still
             // lands on a visible monitor, otherwise fall back to the XAML default (centered on owner).
@@ -343,6 +353,133 @@ namespace HolyLogger
 
             dlg.ShowDialog();
             return dlg.Confirmed;
+        }
+
+        // True when the caller named a width itself. Its number is a deliberate choice about one
+        // particular message and is never overruled by the general rule below.
+        private bool _widthWasChosen;
+
+        // ── A WINDOW BIG ENOUGH FOR WHAT IT HAS TO SAY ──────────────────────────────────────────
+        //
+        // TWO SIZES, DECIDED IN THIS ORDER.
+        //
+        // The WIDTH first, because the height depends on it: 460 is a comfortable measure for a
+        // sentence or two and a poor one for fifteen lines, where the same text in a wider box is
+        // shorter, squarer and quicker to read. Long messages are given more room before anything is
+        // measured. A width the caller asked for is left exactly as asked.
+        //
+        // Then the HEIGHT, which is the one that can actually hide something. SizeToContent grows the
+        // window until the text fits, with nothing stopping it at the edge of the monitor - and what
+        // goes over that edge is the bottom of the window, which is where the OK button lives. So the
+        // height is capped at what the screen can show, and the scroller in the XAML takes over from
+        // there. The cap is only ever reached by a message far longer than any of ours.
+        //
+        // MEASURED, NOT GUESSED FROM THE CHARACTER COUNT. The text can carry line breaks, bold runs
+        // and a list of file paths; WPF is asked what it actually needs.
+        // The window's own furniture, in pixels, so the sums below are about the TEXT and not about
+        // guessing: 24 of margin each side, the 56-wide icon column, and - for the height - the 20 of
+        // top and bottom margin, the 16 spacer row and the 38 of button under it, plus the title bar.
+        private const double SideFurniture = 24 + 24 + 56;
+        private const double TallFurniture = 20 + 16 + 38 + 20 + 40;
+
+        private void ChooseWidth()
+        {
+            try
+            {
+                if (MessageText == null) return;
+
+                // ── WIDTH ────────────────────────────────────────────────────────────────────────
+                //
+                // 460 STAYS THE ANSWER UNTIL IT IS THE WRONG ONE. Every dialog in the program is that
+                // width and has been for years; widening them all because the wording changed would be
+                // a change nobody asked for. So the message is laid out at 460 first, and only a
+                // message that comes out TALL is given more room - one that would otherwise be a narrow
+                // ribbon of a window, which is both harder to read and the thing that runs off the
+                // bottom of the screen.
+                //
+                // The text is measured on its own rather than by asking the TextBlock: inside a
+                // scroller it has already been told how wide it may be, and it answers with that.
+                if (_widthWasChosen) return;
+
+                string plain = MessageText.Text ?? string.Empty;
+                if (plain.Length == 0) return;
+
+                double room = Math.Max(460, SystemParameters.WorkArea.Width - 160);
+                foreach (double candidate in new[] { 460.0, 620.0, 760.0, 880.0 })
+                {
+                    if (candidate > room) break;
+                    if (HeightAt(plain, candidate) <= 340 || candidate >= 880) { Width = candidate; break; }
+                }
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        // How tall this message would be if the window were `windowWidth` across. Bold throughout, so a
+        // message with bold in it is never measured short.
+        private double HeightAt(string text, double windowWidth)
+        {
+            var drawn = new System.Windows.Media.FormattedText(
+                text,
+                System.Globalization.CultureInfo.CurrentUICulture,
+                FlowDirection.LeftToRight,
+                new System.Windows.Media.Typeface(MessageText.FontFamily, MessageText.FontStyle,
+                                                  FontWeights.Bold, MessageText.FontStretch),
+                MessageText.FontSize,
+                System.Windows.Media.Brushes.Black);
+            drawn.MaxTextWidth = Math.Max(50, windowWidth - SideFurniture);
+            return drawn.Height;
+        }
+
+        // Run when the window is up, because it needs the scroller that is in it. The width is
+        // decided before that, in the constructor - it is a measurement of text and needs no window
+        // at all, and doing it there was the fix for a real fault: at Loaded the assignment simply
+        // did not take, and every message came out 460 wide however long its longest line was.
+        private void CapHeight()
+        {
+            try
+            {
+                if (MessageScroller == null) return;
+
+                // ── HEIGHT ───────────────────────────────────────────────────────────────────────
+                //
+                // THE CAP GOES ON THE SCROLLER, NOT ON THE WINDOW. A MaxHeight on the window only
+                // CLIPS: the message row is sized to its content, so the scroller was handed all the
+                // room it asked for, never scrolled, and the window then cut off whatever hung below
+                // the limit - starting with its own OK button. Measured on a sixty-line message: the
+                // text wanted 4,333 pixels, the viewport was given all 4,333, and the window was
+                // chopped at 960. Capping the SCROLLER makes it scroll, and the window - which sizes
+                // itself to its content - then comes out exactly as tall as the screen allows.
+                double room = SystemParameters.WorkArea.Height - TallFurniture;
+                if (room > 200) MessageScroller.MaxHeight = room;
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        // ── WHAT TO DO ABOUT IT ─────────────────────────────────────────────────────────────────
+        //
+        // A message that says only what went wrong leaves the operator holding a fault and no next
+        // move. These messages now end with one, and it is CHOSEN rather than offered to everybody.
+        //
+        // "Try again" is the honest answer to exactly one kind of failure: the log database being held
+        // for a moment by something else - an upload writing a status, a backup reading the file.
+        // SQLite says so in the error itself, in those words. Every other cause - a full disk, a file
+        // the program may not write, a database that is damaged - is untouched by pressing the same
+        // button a second time, and telling a man to press it wastes his time and leaves him no wiser.
+        //
+        // `pressAgain` is the button in HIS words - "press Add", "press Save" - so the sentence names
+        // the thing in front of him rather than describing an action in general.
+        internal static string WhatToDo(string error, string pressAgain)
+        {
+            string said = (error ?? string.Empty).ToLowerInvariant();
+            string again = string.IsNullOrWhiteSpace(pressAgain) ? null : pressAgain.Trim();
+
+            if (said.Contains("lock") || said.Contains("busy"))
+                return "The log database is busy" + (again == null ? " — wait a moment and try once more."
+                                                                   : " — wait a moment and " + again + " again.");
+
+            return "Close HolyLogger and open it again"
+                 + (again == null ? "." : ", then " + again + ".")
+                 + " If it keeps happening, use Help → Support and paste the line above.";
         }
 
         public static void ShowSuccess(string message, string title = "HolyLogger", Window owner = null, double width = 0)

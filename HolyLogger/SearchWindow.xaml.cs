@@ -1,4 +1,4 @@
-using HolyParser;
+﻿using HolyParser;
 using DXCCManager;
 using System;
 using System.Collections.Generic;
@@ -709,7 +709,12 @@ namespace HolyLogger
                 UpdateUndoButton();
                 TB_Status.Text = $"Deleted {deleted.Count:N0} QSOs.  Press Undo to restore them.";
             }
-            catch (Exception ex) { HolyMessageBox.ShowError("Could not delete the QSOs: " + ex.Message, "Delete QSOs", this); }
+            catch (Exception ex) { HolyMessageBox.ShowError(
+                "The QSOs could not be deleted.\n\n"
+                + ex.Message + "\n\n"
+                + "They are still in your log.\n"
+                + HolyMessageBox.WhatToDo(ex.Message, null),
+                "Delete QSOs", this); }
             finally { _hlKeep = false; ClearHighlight(); }
         }
 
@@ -803,7 +808,12 @@ namespace HolyLogger
                 UpdateUndoButton();
                 TB_Status.Text = $"Deleted {qso.DXCall}.  Press Undo to restore it.";
             }
-            catch (Exception ex) { HolyMessageBox.ShowError("Could not delete the QSO: " + ex.Message, "Delete QSO", this); }
+            catch (Exception ex) { HolyMessageBox.ShowError(
+                "The QSO could not be deleted.\n\n"
+                + ex.Message + "\n\n"
+                + "It is still in your log.\n"
+                + HolyMessageBox.WhatToDo(ex.Message, null),
+                "Delete QSO", this); }
             finally { _hlKeep = false; ClearHighlight(); }
         }
 
