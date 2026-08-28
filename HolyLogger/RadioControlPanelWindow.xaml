@@ -82,6 +82,7 @@
                      Background="{DynamicResource EditFieldBg}" Foreground="{DynamicResource TextBrush}"
                      BorderBrush="{DynamicResource InputBorder}" BorderThickness="1"
                      KeyDown="TB_Frequency_KeyDown" PreviewTextInput="TB_Frequency_PreviewTextInput"
+                     PreviewMouseWheel="TB_Frequency_PreviewMouseWheel"
                      LostFocus="TB_Frequency_LostFocus"/>
             <TextBlock Grid.Column="2" Text="kHz" FontSize="14" FontWeight="Bold"
                        HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="2,0,0,0"

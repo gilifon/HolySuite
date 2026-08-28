@@ -356,6 +356,65 @@ namespace HolyLogger
             return System.Text.RegularExpressions.Regex.IsMatch(after, @"^[0-9]*\.?[0-9]*$");
         }
 
+        // ---- the wheel tunes ---------------------------------------------------------------
+        //
+        // A notch of the wheel over the box moves the radio one kHz, up or down.
+        //
+        // THE FIRST NOTCH TIDIES THE FREQUENCY UP. From 14250.630 a notch up goes to 14251 and a notch
+        // down to 14250 - the nearest whole kHz IN THE DIRECTION THE WHEEL WAS TURNED - and every notch
+        // after that is a plain 1 kHz from there. A wheel that carried the odd 630 Hz along with it
+        // would never land on a round number at all.
+        //
+        // Spinning it does not wait for the radio: each notch is added to where the last notch was
+        // sent, not to the frequency read back, so a fast spin moves as far as it was spun instead of
+        // fighting the readback of a tune still on its way.
+        private double _wheelTargetKhz;
+        private DateTime _wheelAtUtc;
+
+        private void TB_Frequency_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
+        {
+            e.Handled = true;
+
+            if (!_rigOnline || _rigKhz <= 0) return;
+
+            int steps = e.Delta / 120;
+            if (steps == 0) return;
+
+            bool spinning = _wheelTargetKhz > 0 && (DateTime.UtcNow - _wheelAtUtc).TotalSeconds < 1.5;
+
+            double target;
+            if (spinning)
+            {
+                // Already on a whole kHz from the notch before: plain steps from there.
+                target = _wheelTargetKhz + steps;
+            }
+            else if (Math.Abs(_rigKhz - Math.Round(_rigKhz)) < 0.0005)
+            {
+                // The radio is already on a whole kHz - nothing to tidy.
+                target = Math.Round(_rigKhz) + steps;
+            }
+            else if (steps > 0)
+            {
+                // Up: to the whole kHz above, and the rest of the notches from there.
+                target = Math.Ceiling(_rigKhz) + (steps - 1);
+            }
+            else
+            {
+                target = Math.Floor(_rigKhz) + (steps + 1);
+            }
+
+            if (target <= 0) return;
+
+            _wheelTargetKhz = target;
+            _wheelAtUtc = DateTime.UtcNow;
+
+            // The box follows the radio again, and no mode is named: turning the dial is not a
+            // request to change from data to SSB.
+            _boxShowsRadio = true;
+            TB_Frequency.Text = target.ToString("0.000", CultureInfo.InvariantCulture);
+            _main.TuneFromRadioPanel(target, null);
+        }
+
         private void TB_Frequency_KeyDown(object sender, KeyEventArgs e)
         {
             if ((e.Key == Key.Back || e.Key == Key.Delete) && _boxShowsRadio)
