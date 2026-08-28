@@ -100,6 +100,17 @@
                            TextWrapping="Wrap" Margin="0,8,0,0" Foreground="{DynamicResource MutedTextBrush}"/>
             </StackPanel>
         </GroupBox>
+        <!-- Below the Cluster box (which ends at y=582), in the right-hand column. -->
+        <GroupBox Header="Radio Control Panel" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="370,590,0,0" Width="330" FontSize="16">
+            <StackPanel Margin="10,6,10,8">
+                <CheckBox x:Name="CBX_ShowRadioControlPanel" Content="Show Control Panel" FontSize="16" Margin="0,2"
+                          IsChecked="{Binding Default.ShowRadioControlPanel, Source={StaticResource Settings}, Mode=TwoWay}"
+                          Checked="ShowRadioControlPanel_Changed" Unchecked="ShowRadioControlPanel_Changed"/>
+                <TextBlock Text="A small window with a frequency box and buttons for the bands, SSB and CW. Its frequencies are set on the Radio Control Panel page."
+                           FontSize="16" TextWrapping="Wrap" Margin="0,6,0,0"
+                           Foreground="{DynamicResource MutedTextBrush}"/>
+            </StackPanel>
+        </GroupBox>
         <!--<CheckBox x:Name="CBX_QRZAutoOpen" Content="Auto open QRZ.com page" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.QRZ_auto_open, Source={StaticResource Settings}, Mode=TwoWay}" FontSize="16" Margin="0,156,0,0"/>-->
     </Grid>
 </UserControl>

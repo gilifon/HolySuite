@@ -298,6 +298,15 @@
     <Compile Include="OptionsUserControls\LotwControl.xaml.cs">
       <DependentUpon>LotwControl.xaml</DependentUpon>
     </Compile>
+    <Compile Include="OptionsUserControls\RadioControlPanelControl.xaml.cs">
+      <DependentUpon>RadioControlPanelControl.xaml</DependentUpon>
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="RadioPanelPresets.cs" />
+    <Compile Include="RadioControlPanelWindow.xaml.cs">
+      <DependentUpon>RadioControlPanelWindow.xaml</DependentUpon>
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="OptionsUserControls\UserInterfaceControl.xaml.cs">
       <DependentUpon>UserInterfaceControl.xaml</DependentUpon>
     </Compile>
@@ -577,6 +586,14 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="OptionsUserControls\LotwControl.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="OptionsUserControls\RadioControlPanelControl.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="RadioControlPanelWindow.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

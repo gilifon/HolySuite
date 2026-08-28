@@ -1457,11 +1457,19 @@ namespace HolyLogger
                 catch (Exception swallowed) { Log.Swallow(swallowed); }
             }
 
-            // The Radio Control Panel comes back if it was left switched on. Done here for the same
-            // reason as the channels window: it takes this window as its owner, and WPF will not
-            // accept an owner that has not been shown yet.
-            try { ApplyRadioControlPanelVisibility(); }
-            catch (Exception swallowed) { Log.Swallow(swallowed); }
+            // The Radio Control Panel comes back if it was left switched on - but NOT before the log
+            // itself is on the screen. Opened from Loaded it stood alone on the desktop for the length
+            // of the start, with no main window behind it. ContentRendered is the moment the main
+            // window has actually been drawn (it is what the splash screen waits for as well), so the
+            // panel arrives with the program rather than ahead of it.
+            EventHandler showRadioPanel = null;
+            showRadioPanel = (sender2, args3) =>
+            {
+                ContentRendered -= showRadioPanel;
+                try { ApplyRadioControlPanelVisibility(); }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
+            };
+            ContentRendered += showRadioPanel;
 
             // Re-assert the log name in the title bar once the window is fully loaded. The constructor
             // already sets it, but if that early call hit a transient DB hiccup the title would be left
@@ -7682,6 +7690,11 @@ namespace HolyLogger
         // owned by the dead window.
         private void DoShutdownCleanup()
         {
+            // First of all: stop the Radio Control Panel's own close handler from firing as the
+            // program tears its windows down, or the exit itself unticks "Show Control Panel".
+            try { DetachRadioPanelForShutdown(); }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+
             // Windows still OPEN at shutdown never run their own Closing save - the program tears them
             // down instead - so a window left open lost the position it had been moved to. Persist them
             // here, BEFORE the flush below, so their placement lands in the same write.

@@ -694,6 +694,22 @@ namespace HolyLogger
             try { panel.Close(); } catch (Exception swallowed) { Log.Swallow(swallowed); }
         }
 
+        /// <summary>
+        /// Called as the program shuts down, BEFORE the main window closes.
+        ///
+        /// WHY IT EXISTS: the panel is owned by the main window, so Windows closes it as part of the
+        /// shutdown - and that ran RadioPanel_Closed, which reads a close as "the operator switched
+        /// the panel off" and wrote the setting to false. The tick in Options was therefore cleared
+        /// by every exit, and the panel never came back. Letting go of the handler first means only
+        /// a close the operator actually performs switches it off.
+        /// </summary>
+        internal void DetachRadioPanelForShutdown()
+        {
+            if (radioPanel == null) return;
+            try { radioPanel.Closed -= RadioPanel_Closed; }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
         private void RadioPanel_Closed(object sender, EventArgs e)
         {
             radioPanel = null;
@@ -727,7 +743,7 @@ namespace HolyLogger
                           && OmniRigEngine != null && Rig != null
                           && Rig.Status == OmniRig.RigStatusX.ST_ONLINE;
 
-            int khz = 0;
+            double khz = 0;
             string mode = null;
 
             if (online)
@@ -736,7 +752,7 @@ namespace HolyLogger
                 {
                     // The radio's real frequency, with no satellite shift applied: the shift belongs to
                     // what is logged, not to which band the radio is actually sitting on.
-                    khz = (int)Math.Round((double)Rig.GetRxFrequency() / 1000.0);
+                    khz = (double)Rig.GetRxFrequency() / 1000.0;
                     mode = GetNormalizedRigMode();
                 }
                 catch (Exception swallowed)

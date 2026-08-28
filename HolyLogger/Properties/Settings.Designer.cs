@@ -3097,5 +3097,53 @@ namespace HolyLogger.Properties {
                 this["AiModelOpenRouter"] = value;
             }
         }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool ShowRadioControlPanel {
+            get {
+                return ((bool)(this["ShowRadioControlPanel"]));
+            }
+            set {
+                this["ShowRadioControlPanel"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string RadioPanelBands {
+            get {
+                return ((string)(this["RadioPanelBands"]));
+            }
+            set {
+                this["RadioPanelBands"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("-1")]
+        public double RadioPanelWindowLeft {
+            get {
+                return ((double)(this["RadioPanelWindowLeft"]));
+            }
+            set {
+                this["RadioPanelWindowLeft"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("-1")]
+        public double RadioPanelWindowTop {
+            get {
+                return ((double)(this["RadioPanelWindowTop"]));
+            }
+            set {
+                this["RadioPanelWindowTop"] = value;
+            }
+        }
     }
 }

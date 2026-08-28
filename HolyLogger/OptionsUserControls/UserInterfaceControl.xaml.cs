@@ -28,6 +28,10 @@ namespace HolyLogger.OptionsUserControls
         // Event to notify main window of graphics box mode changes
         public event EventHandler GraphicsBoxModeChanged;
 
+        /// <summary>Raised when "Show Control Panel" is ticked or unticked, so the panel appears or
+        /// goes away at once rather than when the Options window is closed.</summary>
+        public event EventHandler ShowRadioControlPanelChanged;
+
         public UserInterfaceControl()
         {
             InitializeComponent();
@@ -38,6 +42,13 @@ namespace HolyLogger.OptionsUserControls
             LoadMapDisplayModeSettings();
             LoadClusterMapSettings();
             LoadClusterSettings();
+        }
+
+        private void ShowRadioControlPanel_Changed(object sender, RoutedEventArgs e)
+        {
+            HasChanged = true;
+            // The two-way binding has already written the setting; the main window reads it from there.
+            ShowRadioControlPanelChanged?.Invoke(this, EventArgs.Empty);
         }
 
         private void HasChanged_Click(object sender, RoutedEventArgs e)

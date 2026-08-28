@@ -66,6 +66,8 @@ namespace HolyLogger
         {
             // Make sure any eQSL account edit still in progress (typed but not yet committed) is saved.
             if (EqslServiceControlInstance != null) EqslServiceControlInstance.SaveAll();
+            // Same for a band frequency typed on the Radio Control Panel page and not tabbed away from.
+            if (RadioControlPanelControlInstance != null) RadioControlPanelControlInstance.SaveAll();
             base.OnClosing(e);
         }
 
@@ -207,6 +209,12 @@ namespace HolyLogger
             AiHostInstance.Visibility = Visibility.Visible;
         }
 
+        private void RadioPanelItem_Selected(object sender, RoutedEventArgs e)
+        {
+            HideAllControls();
+            RadioControlPanelControlInstance.Visibility = Visibility.Visible;
+        }
+
         private void HideAllControls()
         {
             AiHostInstance.Visibility = Visibility.Hidden;
@@ -219,6 +227,7 @@ namespace HolyLogger
             ImportControlInstance.Visibility = Visibility.Hidden;
             SatelliteControlInstance.Visibility = Visibility.Hidden;
             PersonalInfoControlInstance.Visibility = Visibility.Hidden;
+            RadioControlPanelControlInstance.Visibility = Visibility.Hidden;
         }
 
         /// <summary>

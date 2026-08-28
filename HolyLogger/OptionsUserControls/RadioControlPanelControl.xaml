@@ -1,0 +1,23 @@
+<UserControl x:Class="HolyLogger.OptionsUserControls.RadioControlPanelControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:local="clr-namespace:HolyLogger.OptionsUserControls"
+             mc:Ignorable="d"
+             d:DesignHeight="620" d:DesignWidth="700">
+
+    <StackPanel HorizontalAlignment="Left" Width="680">
+        <TextBlock Text="Radio Control Panel" FontSize="18" FontWeight="Bold" Margin="0,0,0,6"/>
+        <TextBlock FontSize="16" TextWrapping="Wrap" Margin="0,0,0,10"
+                   Text="Each band button on the panel holds two frequencies. Pressing the button moves the radio to the SSB one when the panel is on SSB, and to the CW one when it is on CW. Frequencies are in kHz."/>
+
+        <!-- The ten rows are built in code from the band list, so a band cannot be listed here and
+             missing from the panel, or the other way round. -->
+        <Grid x:Name="BandGrid"/>
+
+        <Button x:Name="Btn_RestoreDefaults" Content="Restore standard frequencies" FontSize="16"
+                Height="32" Width="280" HorizontalAlignment="Left" Margin="0,14,0,0"
+                Click="Btn_RestoreDefaults_Click"/>
+    </StackPanel>
+</UserControl>

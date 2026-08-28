@@ -35,6 +35,7 @@
                 </TreeViewItem>
                 <TreeViewItem x:Name="ImportItem" Header="Import Settings" Selected="ImportItem_Selected"/>
                 <TreeViewItem x:Name="SatelliteItem" Header="Satellite Mode" Selected="SatelliteItem_Selected"/>
+                <TreeViewItem x:Name="RadioPanelItem" Header="Radio Control Panel" Selected="RadioPanelItem_Selected"/>
                 <TreeViewItem x:Name="AiItem" Selected="AiItem_Selected">
                     <TreeViewItem.Header><TextBlock><Run FontWeight="Bold" Text="AI"/><Run Text=" Service"/></TextBlock></TreeViewItem.Header>
                 </TreeViewItem>
@@ -55,6 +56,7 @@
                 <OptionsUserControls:GeneralSettingsControl x:Name="GeneralSettingsControlControlInstance" HorizontalAlignment="Left" Margin="10,10,0,0" VerticalAlignment="Top" Visibility="Hidden"/>
                 <OptionsUserControls:ImportControl x:Name="ImportControlInstance" HorizontalAlignment="Left" Margin="10,10,0,0" VerticalAlignment="Top" Visibility="Hidden"/>
                 <OptionsUserControls:SatelliteControl x:Name="SatelliteControlInstance" HorizontalAlignment="Left" Margin="10,10,0,0" VerticalAlignment="Top" Visibility="Hidden"/>
+                <OptionsUserControls:RadioControlPanelControl x:Name="RadioControlPanelControlInstance" HorizontalAlignment="Left" Margin="10,10,0,0" VerticalAlignment="Top" Visibility="Hidden"/>
                 <OptionsUserControls:PersonalInfoControl x:Name="PersonalInfoControlInstance" HorizontalAlignment="Left" Margin="10,10,0,0" VerticalAlignment="Top" Visibility="Hidden"/>
                 <!-- NO USERCONTROL OF ITS OWN. The chooser, the signup steps, the price and the key
                      box already exist as AiServicePanel, built in code so the check window and the

@@ -769,5 +769,17 @@
     </Setting>
     <Setting Name="AiModelOpenRouter" Type="System.String" Scope="User">
       <Value Profile="(Default)" />
+    </Setting>
+    <Setting Name="ShowRadioControlPanel" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">True</Value>
+    </Setting>
+    <Setting Name="RadioPanelBands" Type="System.String" Scope="User">
+      <Value Profile="(Default)" />
+    </Setting>
+    <Setting Name="RadioPanelWindowLeft" Type="System.Double" Scope="User">
+      <Value Profile="(Default)">-1</Value>
+    </Setting>
+    <Setting Name="RadioPanelWindowTop" Type="System.Double" Scope="User">
+      <Value Profile="(Default)">-1</Value>
     </Setting>  </Settings>
 </SettingsFile>
