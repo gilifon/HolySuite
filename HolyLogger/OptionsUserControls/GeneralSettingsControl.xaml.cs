@@ -185,6 +185,43 @@ namespace HolyLogger.OptionsUserControls
             MainWindow.PlayClusterAlertSound("Beep", DeviceSettingFrom(CB_SoundDevice));
         }
 
+        // ── WHAT WAS TYPED BUT NOT TABBED AWAY FROM ─────────────────────────────────────────────
+        //
+        // A box on this page writes its value into the setting when it LOSES FOCUS - that is what a
+        // WPF text binding does unless it is told otherwise. Close the window with the X while the
+        // caret is still in the box and the value goes nowhere: it was on the screen, it was never in
+        // the settings, and next time the old one is back.
+        //
+        // An operator reported exactly that about the UDP port, and he was right. Two other pages had
+        // already been given this - the eQSL accounts and the Radio Control Panel's frequencies - and
+        // this one, which holds three port numbers, had been missed.
+        //
+        // Every box on the page rather than the three by name: a box added later would otherwise have
+        // the same fault and nobody would think to come back here.
+        public void SaveAll()
+        {
+            try
+            {
+                foreach (TextBox box in FindTextBoxes(this))
+                {
+                    BindingExpression bound = box.GetBindingExpression(TextBox.TextProperty);
+                    if (bound != null && bound.IsDirty) { bound.UpdateSource(); HasChanged = true; }
+                }
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        private static IEnumerable<TextBox> FindTextBoxes(DependencyObject root)
+        {
+            int n = VisualTreeHelper.GetChildrenCount(root);
+            for (int i = 0; i < n; i++)
+            {
+                DependencyObject child = VisualTreeHelper.GetChild(root, i);
+                if (child is TextBox box) yield return box;
+                foreach (TextBox deeper in FindTextBoxes(child)) yield return deeper;
+            }
+        }
+
         private void HasChanged_Click(object sender, RoutedEventArgs e)
         {
             HasChanged = true;

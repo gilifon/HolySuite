@@ -68,6 +68,10 @@ namespace HolyLogger
             if (EqslServiceControlInstance != null) EqslServiceControlInstance.SaveAll();
             // Same for a band frequency typed on the Radio Control Panel page and not tabbed away from.
             if (RadioControlPanelControlInstance != null) RadioControlPanelControlInstance.SaveAll();
+            // And the General page, which holds three port numbers. An operator changed his UDP port,
+            // closed this window with the X while the caret was still in the box, and the port was back
+            // to what it had been - the box had never lost focus, so the value never left it.
+            if (GeneralSettingsControlControlInstance != null) GeneralSettingsControlControlInstance.SaveAll();
             base.OnClosing(e);
         }
 
