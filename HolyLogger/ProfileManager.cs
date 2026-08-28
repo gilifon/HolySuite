@@ -50,10 +50,40 @@ namespace HolyLogger
         {
             if (string.IsNullOrEmpty(name)) return false;
             if (string.Equals(name, "WindowBoundsJson", StringComparison.OrdinalIgnoreCase)) return true;
+            if (IsColumnLayoutSetting(name)) return true;
             return name.EndsWith("WindowLeft", StringComparison.OrdinalIgnoreCase)
                 || name.EndsWith("WindowTop", StringComparison.OrdinalIgnoreCase)
                 || name.EndsWith("WindowWidth", StringComparison.OrdinalIgnoreCase)
                 || name.EndsWith("WindowHeight", StringComparison.OrdinalIgnoreCase);
+        }
+
+        // ── AND WHERE THE COLUMNS SIT, WHICH IS THE SAME KIND OF THING ──────────────────────────
+        //
+        // "You changed settings since the profile was saved" - asked on EVERY close, of a man who had
+        // changed nothing. This is why.
+        //
+        // The log grid's column layout is written at every close, and it holds each column's WIDTH. The
+        // columns are Auto-sized, so a width is whatever the DATA measured to: log a QSO with a longer
+        // callsign or a longer country name and the column comes out a few pixels wider. That number
+        // went into the profile, so once the real grid differed from the saved one by a pixel it
+        // differed on every close afterwards, for ever, and he was asked every time.
+        //
+        // A column width is not a setting anybody chose. It is layout the program maintains - the same
+        // class of thing as where a window sits, which was taken out of profiles for the same reason and
+        // lives in user.config instead. So these go with it.
+        //
+        // Matched by name rather than listed one by one: a grid added later will bring its own layout
+        // setting, and it should be out of profiles from the day it appears rather than from the day
+        // somebody remembers to add it here.
+        private static bool IsColumnLayoutSetting(string name)
+        {
+            if (string.IsNullOrEmpty(name)) return false;
+
+            return name.EndsWith("ColumnLayout", StringComparison.OrdinalIgnoreCase)
+                || name.EndsWith("ColumnOrder", StringComparison.OrdinalIgnoreCase)
+                || name.EndsWith("ColumnWidth", StringComparison.OrdinalIgnoreCase)
+                || name.EndsWith("ColumnDisplayIndex", StringComparison.OrdinalIgnoreCase)
+                || name.StartsWith("ColWidth", StringComparison.OrdinalIgnoreCase);
         }
 
         // ── WHY THE LAST ONE FAILED ─────────────────────────────────────────────────────────────
