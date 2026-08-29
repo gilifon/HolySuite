@@ -181,16 +181,19 @@ namespace HolyLogger
                     // HIS OWN WORDS, 2026-08-27. Written as an operator hears it: what the thing
                     // is, who provides it, what it costs, and the one fear worth answering before
                     // he types a card number - that nothing is kept and nothing is charged twice.
-                    Text = "You can set an AI service that will help you to check your QSOs. The "
-                         + "provider of the AI is OpenRouter and we will guide you how to open an "
-                         + "account with them." + Environment.NewLine
-                         + "You will be able to use GPT, Claude or Gemini."
+                    // TWO SERVICES AGAIN, so the paragraph names both and says which is which - a
+                    // page that talks only about paying, above a box offering a free one, sends
+                    // somebody for a credit card he does not need.
+                    Text = "You can set an AI service that will help you to check your QSOs. There "
+                         + "are two, and you choose below." + Environment.NewLine + Environment.NewLine
+                         + "Google Gemini is free and asks for no credit card. Its allowance is small "
+                         + "— around twenty checks a day — and it starts again the next day."
                          + Environment.NewLine + Environment.NewLine
-                         + "You will have to create a credit by paying with your credit card, which "
-                         + "will not be saved and will not be charged again if you use the whole "
-                         + "credit amount." + Environment.NewLine
-                         + "Asking the AI to verify 10 QSOs in one question will cost a few cents."
-                         + Environment.NewLine + Environment.NewLine
+                         + "OpenRouter is paid and reaches GPT, Claude and Gemini, and it answers "
+                         + "better. You create a credit by paying with your credit card, which will "
+                         + "not be saved and will not be charged again if you use the whole credit "
+                         + "amount. Asking the AI to verify 10 QSOs in one question will cost a few "
+                         + "cents." + Environment.NewLine + Environment.NewLine
                          + "An API key will be saved on this computer.",
                     FontSize = 16,
                     TextWrapping = TextWrapping.Wrap,

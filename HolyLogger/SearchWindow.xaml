@@ -295,9 +295,11 @@
                   <Border Background="#F5DE5E" CornerRadius="4" Padding="6,5" Margin="10,0,0,0">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                       <TextBlock Text="Fixed:" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"
-                                 ToolTip="Whether the Log Fixer has corrected this QSO"/>
-                      <ComboBox x:Name="CB_Review" Width="90" FontSize="16" VerticalAlignment="Center"
-                                ToolTip="Whether the Log Fixer has corrected this QSO"
+                                 ToolTip="What the Log Fixer has settled about this QSO"/>
+                      <!-- Wide enough for "Already checked but not fixed" at 16pt; the old 90 was cut
+                           for a two-letter answer that no longer exists. -->
+                      <ComboBox x:Name="CB_Review" Width="265" FontSize="16" VerticalAlignment="Center"
+                                ToolTip="What the Log Fixer has settled about this QSO"
                                 SelectionChanged="Filter_Changed"/>
                     </StackPanel>
                   </Border>

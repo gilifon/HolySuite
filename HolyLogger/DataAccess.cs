@@ -3808,11 +3808,25 @@ Environment.NewLine +
             lock (_dbLock)
             {
                 if (con == null || con.State != System.Data.ConnectionState.Open) return;
-                using (var cmd = new SQLiteCommand(
-                    "UPDATE qso SET review_state = @s WHERE Id IN (" + string.Join(",", ids) + ")", con))
+
+                // IN BATCHES, AND IN ONE TRANSACTION. "Everything the scan found nothing wrong with" is
+                // 28,400 contacts on this log, and one statement carrying 28,400 numbers is a quarter of
+                // a megabyte of SQL for SQLite to parse before it writes a byte. Nine hundred at a time
+                // parses in no time; the transaction round the lot keeps it to one commit, which is the
+                // part that actually costs.
+                using (var work = con.BeginTransaction())
                 {
-                    cmd.Parameters.Add(new SQLiteParameter("@s", state));
-                    cmd.ExecuteNonQuery();
+                    for (int at = 0; at < ids.Count; at += 900)
+                    {
+                        string batch = string.Join(",", ids.Skip(at).Take(900));
+                        using (var cmd = new SQLiteCommand(
+                            "UPDATE qso SET review_state = @s WHERE Id IN (" + batch + ")", con, work))
+                        {
+                            cmd.Parameters.Add(new SQLiteParameter("@s", state));
+                            cmd.ExecuteNonQuery();
+                        }
+                    }
+                    work.Commit();
                 }
             }
         }
@@ -5495,14 +5509,45 @@ Environment.NewLine +
             AddClublogConfirmationColumns();
             AddPaperConfirmationColumn();
             AddClublogColumn();
-            // WHAT THE LOG FIXER HAS ALREADY BEEN TOLD ABOUT THIS CONTACT: 0 never reviewed, 1 reviewed
-            // and corrected, 2 reviewed and deliberately left alone. Every existing QSO starts at 0,
-            // which is right - nothing in an old database has been through the Fixer's question yet.
+            // WHAT THE LOG FIXER HAS ALREADY BEEN TOLD ABOUT THIS CONTACT:
+            //   0  never checked - it has not been through a run that was answered
+            //   1  checked and corrected
+            //   2  a problem was shown, and he approved the log's own value on his own judgement
+            //   3  checked and nothing was wrong with it
+            //   4  the same approval as 2, given after an AI had read the contact and backed the log
+            // 3 is what makes "never checked" mean "new since the last time I pressed Fix". Without it
+            // a clean contact stayed at 0 for ever, and the never-checked count never fell below the
+            // size of the log. Every existing QSO starts at 0, which is right - nothing in an old
+            // database has been through the Fixer's question yet.
             AddColToTable("qso", "review_state", "INTEGER NOT NULL DEFAULT 0");
             AddColToTable("qso", "log_id", "INTEGER NULL");  // each QSO belongs to a named Log
             EnsureLogsTable();
             EnsureLogStateTable();
             EnsureDbStateTable();
+
+            // ── THE 2s THAT NEVER MEANT ANYTHING ────────────────────────────────────────────────
+            //
+            // review_state 2 is "he looked at this contact and left it as it was". An early build wrote
+            // it on the way OUT of the Fixer, from a question nobody had asked for, and marked 4,522
+            // contacts that way in one evening. That question was removed and the scan was taught to
+            // read only 1, so those 2s have sat in the file meaning nothing ever since.
+            //
+            // Now 2 is written deliberately - the rows he was looking at and did not tick when he
+            // pressed Fix - and the chooser counts them. The old ones would be counted as decisions he
+            // never made, so they are cleared once, to 0, which is what they always were. Once, not on
+            // every start: after this, every 2 in the file is his.
+            try
+            {
+                if (GetDbState("review_state_2_cleared") != "1")
+                {
+                    using (var clearOldTwos = new SQLiteCommand(
+                        "UPDATE qso SET review_state = 0 WHERE review_state = 2", con))
+                        clearOldTwos.ExecuteNonQuery();
+                    SetDbState("review_state_2_cleared", "1");
+                }
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+
             // Real-time copy-to-log feature: a log may copy its new QSOs into another log.
             AddColToTable("logs", "copy_target_log_id", "INTEGER NULL");   // where this log's new QSOs are copied (NULL = off)
             AddColToTable("logs", "log_callsign", "nvarchar(50) NULL");    // this log's station-callsign identity

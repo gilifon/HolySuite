@@ -675,6 +675,15 @@
                     </MenuItem>
                 </MenuItem>
                 <MenuItem Header="Tools" FontSize="16" SubmenuOpened="ToolsMenu_SubmenuOpened">
+                    <!-- FIRST IN THE MENU. Picking the radio and its COM port is what an operator does
+                         before anything else works, and it was sitting two thirds of the way down. -->
+                    <MenuItem x:Name="OpenOmniRigMenuItem" Header="Open OmniRig" Click="OpenOmniRigMenuItem_Click"
+                              ToolTip="Open OmniRig's own settings window, to pick the radio and its COM port">
+                        <MenuItem.Icon>
+                            <Image Source="Images/OmniRigIcon.gif" Stretch="UniformToFill" Width="16" Height="16"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    <Separator />
                     <!--<MenuItem x:Name="MyStationMenuItem" Header="My Station" ToolTip="Set your station info">
                                 <MenuItem.Icon>
                                     <Image Source="Images/station.png" Stretch="UniformToFill" Width="16" Height="16"/>
@@ -793,13 +802,6 @@
                                 <Path Stretch="Uniform" Fill="#1565C0"
                                       Data="M5 9.2h3V19H5V9.2zM10.6 5h2.8v14h-2.8V5zm5.6 8H19v6h-2.8v-6z"/>
                             </Viewbox>
-                        </MenuItem.Icon>
-                    </MenuItem>
-                    <Separator />
-                    <MenuItem x:Name="OpenOmniRigMenuItem" Header="Open OmniRig" Click="OpenOmniRigMenuItem_Click"
-                              ToolTip="Open OmniRig's own settings window, to pick the radio and its COM port">
-                        <MenuItem.Icon>
-                            <Image Source="Images/OmniRigIcon.gif" Stretch="UniformToFill" Width="16" Height="16"/>
                         </MenuItem.Icon>
                     </MenuItem>
                     <Separator />

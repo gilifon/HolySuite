@@ -2175,13 +2175,20 @@ namespace HolyLogger
             if (clublog != null) { bool w = clublog == LotwConfirmed; results = results.Where(q => (q.ClublogQslRcvd == 1) == w); }
             if (paper != null)   { bool w = paper == LotwConfirmed;   results = results.Where(q => (q.PaperQslRcvd == 1) == w); }
 
-            // Whether the Log Fixer has actually written to this contact. Yes is the log as the Fixer
-            // left it; No is everything it has not corrected - the ones never checked and the ones the
-            // operator looked at and decided were right already.
+            // WHAT THE LOG FIXER HAS SETTLED ABOUT THIS CONTACT, decided in the Fixer's own class so
+            // this box and the window that opens when Log Fixer is pressed can never come to mean
+            // different things. Approved is split here into the two it is made of - his own judgement
+            // and an AI backing him - because looking back over a decision is when that matters.
+            // A contact the Fixer checked and found clean matches none of them: it is not new, it was
+            // not corrected, and it was never a question he had to answer.
             if (review != null)
             {
-                bool wantFixed = review == FixedYes;
-                results = results.Where(q => (q.ReviewState == 1) == wantFixed);
+                FixerScope want = review == FixedNever       ? FixerScope.NeverChecked
+                                : review == FixedYes         ? FixerScope.Fixed
+                                : review == ApprovedEither   ? FixerScope.Approved
+                                : review == ApprovedWithAi   ? FixerScope.ApprovedByAi
+                                                             : FixerScope.ApprovedByUser;
+                results = results.Where(q => LogFixerScopeWindow.Matches(q, want));
             }
 
             // Comments are free text, so this is a "contains" match - the useful thing is finding the
@@ -2330,19 +2337,35 @@ namespace HolyLogger
             foreach (var cb in new[] { CB_Lotw, CB_Qrz, CB_Eqsl, CB_Clublog, CB_Paper })
                 SetItems(cb, new List<string> { AnyItem, LotwConfirmed, LotwNotConfirmed });
 
-            // Fixed choices too, and only two of them: has the Log Fixer written to this QSO or not.
-            // The database keeps three states - never reviewed, corrected, reviewed and left alone -
-            // but the question this box answers is the plain one, so "No" is everything that was not
-            // corrected, whether it was ever looked at or not.
-            SetItems(CB_Review, new List<string> { AnyItem, FixedYes, FixedNo });
+            // The same answers, worded the same way, as the window that opens when Log Fixer is
+            // pressed - with approved split into who approved it, which is a question only worth
+            // asking when looking back.
+            SetItems(CB_Review, new List<string> { AnyItem, FixedNever, FixedYes, ApprovedEither,
+                                                   ApprovedByMe, ApprovedWithAi });
         }
 
         private const string LotwConfirmed = "Confirmed";
         private const string LotwNotConfirmed = "Not confirmed";
 
-        // Was this QSO put right by the Log Fixer? Yes is review_state 1; No is everything else.
-        private const string FixedYes = "Yes";
-        private const string FixedNo = "No";
+        // What the Log Fixer has settled about this QSO: never checked (review_state 0), checked and
+        // fixed (1), approved on his own judgement (2), approved with an AI backing him (4). Checked
+        // and clean (3) is none of these - it was never a question he had to answer.
+        // The words themselves come from the Fixer's own chooser, so the lists cannot drift apart.
+        private const string FixedNever = LogFixerScopeWindow.NeverLabel;
+        private const string FixedYes = LogFixerScopeWindow.FixedLabel;
+        private const string ApprovedEither = LogFixerScopeWindow.ApprovedLabel;
+        private const string ApprovedByMe = LogFixerScopeWindow.ApprovedByUserLabel;
+        private const string ApprovedWithAi = LogFixerScopeWindow.ApprovedByAiLabel;
+
+        // Picks an item by its text, for the Log Fixer's chooser: its two "already checked" buttons
+        // answer themselves by setting this box rather than by opening a window.
+        private static void SetFilter(ComboBox box, string item)
+        {
+            if (box == null) return;
+            foreach (object o in box.Items)
+                if (string.Equals(o as string, item, StringComparison.Ordinal))
+                { box.SelectedItem = o; return; }
+        }
 
         // Dropdown / date-picker changes only refresh the Clear button. The search still runs on
         // Search, Enter or Esc, so picking a band does not fire a search through a half-typed callsign.
@@ -2505,6 +2528,37 @@ namespace HolyLogger
                 return;
             }
 
+            // ASKED FIRST, NOT HANDED THE LOT. Twenty-eight thousand contacts is a long scan and a long
+            // table, and after the first run most of it is ground he has already been over. The chooser
+            // puts a count against each answer before he commits to one; Cancel there opens nothing.
+            FixerScope? scope = LogFixerScopeWindow.Ask(list, this);
+            if (scope == null) return;
+
+            // ── LOOKING BACK IS NOT SCANNING ────────────────────────────────────────────────────
+            //
+            // "Already checked and fixed" ran the scan over 4,371 contacts that had just been put
+            // right, found nothing wrong with a single one of them - because there is nothing wrong
+            // with them - and showed an empty table. It never could show anything else.
+            //
+            // What he wants from those two buttons is the LIST: which contacts did I settle. The Fixer
+            // opens on them as a plain table - no scan, nothing to tick - because that is the window he
+            // pressed the button in. The Workshop's own Fixed filter is there for the same question
+            // asked from the Workshop; this one belongs to the Fixer.
+            if (scope == FixerScope.Fixed || scope == FixerScope.Approved)
+            {
+                List<QSO> settled = LogFixerScopeWindow.Pick(list, scope.Value);
+                if (settled.Count == 0) return;
+                string what = scope == FixerScope.Fixed ? "the Log Fixer has corrected"
+                                                        : "you have approved as they are";
+                LogVerifierWindow.AsList(settled, "Log Fixer",
+                    settled.Count.ToString("N0") + " QSO" + (settled.Count == 1 ? "" : "s") + " "
+                    + what).Show();
+                return;
+            }
+
+            list = LogFixerScopeWindow.Pick(list, scope.Value);
+            if (list.Count == 0) return;
+
             try
             {
                 // Named with the count, because this is usually NOT the whole log and the window must
@@ -2512,7 +2566,15 @@ namespace HolyLogger
                 string what = TB_TitleLog != null && !string.IsNullOrWhiteSpace(TB_TitleLog.Text)
                     ? TB_TitleLog.Text.Trim()
                     : "this log";
-                var verifier = new LogVerifierWindow(list, $"{what}  ({list.Count:N0} QSOs)") { Owner = this };
+                // ALL MEANS "CHECK EVERYTHING", NOT "SHOW ME EVERYTHING AGAIN". A contact he has fixed
+                // or approved is settled, and listing it again as a problem under All is the window
+                // arguing with a decision he made this morning. Settled rows are dropped there, and on
+                // Never checked there are none to drop.
+                //
+                // The two "already checked" buttons are the exception, and the only reason they exist:
+                // there, looking again at what was settled IS the job, so nothing is hidden.
+                bool showSettled = scope == FixerScope.Fixed || scope == FixerScope.Approved;
+                var verifier = new LogVerifierWindow(list, $"{what}  ({list.Count:N0} QSOs)", !showSettled) { Owner = this };
                 verifier.ShowDialog();
                 ResultsGrid.Items.Refresh();   // corrections are written into the very objects shown here
             }

@@ -1,4 +1,30 @@
-﻿== 8.9.2 ==
+﻿== 8.9.3 ==
+
+New
+- Log Fixer asks first: All, Never checked, Already checked and fixed, Already
+  checked and approved - each with its own count.
+- One kind at a time: pick a kind and the table shows only that kind.
+- Two boxes on a row: Fix takes the correction, Do not change keeps the QSO as it is.
+- A QSO you leave with Do not change is approved and never raised again. It is kept
+  as approved by you, or approved with the AI.
+- The AI ticks the boxes for you: Fix where it wants a correction, Do not change
+  where it agrees with your log.
+- Check with AI now also asks about the QSOs where cty.dat and Club Log agree
+  against your log.
+- Google Gemini is back: a free AI service, no credit card, in Options > AI Service.
+- Ctrl+Z puts the tick boxes back.
+- Already checked and fixed, or approved, opens a plain list of those QSOs.
+- Tools > Open OmniRig is now the first item in the menu.
+
+Fixed
+- Check with AI asked about QSOs that were not on the screen.
+- QSOs you had just settled came straight back on the next check.
+
+Faster
+- Pressing Fix no longer looks frozen: the database copy and the log reload happen
+  behind the spinner, and the marking is written in batches.
+
+== 8.9.2 ==
 
 New
 - Radio Control Panel: a window of band buttons, each holding an SSB and a CW frequency, with

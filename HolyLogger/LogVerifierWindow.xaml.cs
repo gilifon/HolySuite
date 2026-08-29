@@ -634,7 +634,33 @@ namespace HolyLogger
                 {
                     if (apply == value) return;
                     apply = value && Fixable;
+                    if (apply) Keep = false;      // the two boxes are the two answers; one at a time
                     if (PropertyChanged != null) PropertyChanged(this, new PropertyChangedEventArgs("Apply"));
+                    if (ApplyChanged != null) ApplyChanged();
+                }
+            }
+
+            // ── THE OTHER ANSWER, AND IT HAD NO BOX ─────────────────────────────────────────────
+            //
+            // "Leave it as it is" was said by NOT ticking, which is not saying anything: a row he had
+            // read and agreed with looked exactly like a row he had not reached yet, and the button
+            // that acted on the difference - "User approved 136" - could only be understood by
+            // somebody who already knew the rule. Two boxes, two answers, and a row with neither
+            // ticked is what it looks like: not answered.
+            //
+            // Every row can take this one, including the ones nothing can be written to. "Club Log
+            // says this operation did not count" is not fixable and is still something he can read
+            // and be done with.
+            private bool keep;
+            public bool Keep
+            {
+                get { return keep; }
+                set
+                {
+                    if (keep == value) return;
+                    keep = value;
+                    if (keep) Apply = false;
+                    if (PropertyChanged != null) PropertyChanged(this, new PropertyChangedEventArgs("Keep"));
                     if (ApplyChanged != null) ApplyChanged();
                 }
             }
@@ -664,6 +690,23 @@ namespace HolyLogger
 
         private readonly List<QSO> _qsos;
         private readonly string _logName;
+
+        // WHETHER THIS WINDOW STILL HAS TO DECIDE WHAT TO LEAVE OUT.
+        //
+        // When the Fixer opens itself - after an import - it is handed the whole log and drops the
+        // contacts it has already put right. When it is opened from the Log Workshop the operator has
+        // just been asked that question by name, and the list he chose is the list he gets: asking
+        // for the ones already fixed and being shown none of them is the window arguing with him.
+        //
+        // NOT READONLY, because it is only true of the FIRST scan. He asked to see the ones already
+        // approved, was shown them, and answered them - and the re-check that follows put all five
+        // straight back on the screen, as problems, one second after he had settled them. What he
+        // chose in the chooser is what to OPEN on; once he has pressed the green button, a row he has
+        // just answered is a row that is done.
+        private bool _hideAlreadySettled = true;
+
+        // The contacts this run found something to say about. Everything else it scanned is clean.
+        private HashSet<QSO> _withFindings = new HashSet<QSO>();
 
         private readonly ObservableCollection<Finding> _findings = new ObservableCollection<Finding>();
         private readonly ObservableCollection<ProblemKind> _kinds = new ObservableCollection<ProblemKind>();
@@ -719,10 +762,23 @@ namespace HolyLogger
             return (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '/';
         }
 
-        public LogVerifierWindow(IEnumerable<QSO> qsos, string logName = null)
+        // Opened to LIST contacts rather than to check them - what the two "already checked" buttons
+        // in the chooser ask for. The headline is the window's whole message.
+        public static LogVerifierWindow AsList(IEnumerable<QSO> qsos, string title, string headline)
+        {
+            var win = new LogVerifierWindow(qsos, null);
+            win._listHeadline = headline;
+            win.Title = title;
+            return win;
+        }
+
+        private string _listHeadline;
+
+        public LogVerifierWindow(IEnumerable<QSO> qsos, string logName = null, bool hideAlreadySettled = true)
         {
             InitializeComponent();
             _qsos = (qsos ?? Enumerable.Empty<QSO>()).Where(q => q != null).ToList();
+            _hideAlreadySettled = hideAlreadySettled;
             _logName = string.IsNullOrWhiteSpace(logName) ? "" : logName.Trim();
             Title = string.IsNullOrEmpty(_logName) ? "Log Fixer" : "Log Fixer — " + _logName;
 
@@ -1041,6 +1097,9 @@ namespace HolyLogger
             // look for, the differences were handed to it. Everything after the scan is the same code.
             if (_prepared != null) { ShowPrepared(); return; }
 
+            // Nor does one opened to LIST what has already been settled.
+            if (_listHeadline != null) { ShowList(_listHeadline); return; }
+
             TB_Header.Text = "Checking " + _qsos.Count.ToString("N0") + " QSOs…";
             TB_Summary.Text = "working…";
             await RunCheck();
@@ -1096,6 +1155,10 @@ namespace HolyLogger
         {
             _findings.Clear();
 
+            // The rows are about to be built again from nothing, and an undo pointing at the old ones
+            // would put ticks back on objects no longer on screen.
+            _tickUndo.Clear();
+
             List<QSO> snapshot = _qsos;
             // The country lookup parses two databases and every QSO is resolved twice, so the whole scan
             // runs off the UI thread - a 40,000-QSO log would otherwise freeze the window.
@@ -1107,15 +1170,26 @@ namespace HolyLogger
             // each other, so a log with a corrected QSO taken out of the scan would stop seeing the pair
             // it belongs to - and report the survivor as fine. Everything is scanned; what has already
             // been dealt with is simply not shown.
-            // ONLY 1 - CORRECTED - HIDES A ROW. Not "anything other than 0": a build that asked on the
-            // way out whether to stop showing the untouched rows wrote 2 into thousands of contacts, and
-            // that question is gone. Reading 2 as silence would let a mark nothing can set any more go
-            // on hiding a log for good.
+            // ANYTHING BUT 0 HIDES A ROW, because every other state is an answer he gave with the Fix
+            // button under his hand: 1 he corrected, 2 he approved as it stood, 4 he approved with an
+            // AI backing him, 3 the scan found nothing wrong with. None of that used to be true of 2 -
+            // an old build wrote it from a question on the way out of the window - so the 2s from that
+            // build are cleared out of the file once, and every one read here is his own decision.
+            //
+            // And nothing is hidden at all when the operator has just been asked which contacts he
+            // wants; the Log Workshop hands over exactly the list he chose.
+            //
+            // WHICH CONTACTS HAD SOMETHING TO SAY ABOUT THEM, kept before the hiding: the ones that
+            // raised nothing are the clean ones, and pressing Fix marks them as checked so that "never
+            // checked" comes to mean "logged since the last time I answered this window".
+            _withFindings = new HashSet<QSO>(found.Where(f => f.Qso != null).Select(f => f.Qso));
+
             var kept = new List<Finding>(found.Count);
             var hidden = new HashSet<QSO>();
             foreach (Finding f in found)
             {
-                if (f.Qso != null && f.Qso.ReviewState == 1) { hidden.Add(f.Qso); continue; }
+                    if (_hideAlreadySettled && f.Qso != null && f.Qso.ReviewState != 0)
+                { hidden.Add(f.Qso); continue; }
                 kept.Add(f);
             }
             int settled = hidden.Count;
@@ -2135,6 +2209,53 @@ namespace HolyLogger
 
         // One row per QSO, with its cells filled from the QSO as it stands and from whatever its
         // findings propose. Cells nobody complained about carry the value and no colour.
+        // ── THE WINDOW AS A LIST, WITH NOTHING TO DECIDE ────────────────────────────────────────
+        //
+        // "Already checked and fixed" is a question about the past: which contacts did I settle? Run
+        // through the scan it answered with an empty table - of course it did, there is nothing wrong
+        // with a contact that has been put right - so the button could only ever look broken.
+        //
+        // Here the QSOs are simply listed, as the log now holds them. No scan, no proposals, no tick
+        // boxes and no green button: there is nothing on this screen to answer.
+        public void ShowList(string headline)
+        {
+            _listOnly = true;
+            _findings.Clear();
+            _rows.Clear();
+            _rowByQso.Clear();
+            _kinds.Clear();
+
+            var columns = new List<string> { "Country", "Country Code", "Continent", "DX Locator", "Comment" };
+
+            foreach (QSO q in _qsos)
+            {
+                if (q == null) continue;
+                var row = new FixRow { Qso = q };
+                CellFor(row, "Date").Current = FormatDate(q.Date);
+                CellFor(row, "Time").Current = FormatTime(q.Time);
+                CellFor(row, "Callsign").Current = Text(q.DXCall);
+                foreach (string key in columns) CellFor(row, key).Current = CurrentOf(q, key);
+                _rows.Add(row);
+                _rowByQso[q] = row;
+            }
+
+            BuildColumns(columns);
+            FindingsGrid.ItemsSource = _rows;
+
+            TB_Header.Text = headline;
+            TB_Summary.Text = "Double-click a row to open the QSO.";
+            TB_KindsSummary.Text = "";
+            if (TB_Intro != null) TB_Intro.Inlines.Clear();
+            if (Btn_Fix != null) { Btn_Fix.Visibility = Visibility.Collapsed; }
+            if (Btn_Ai != null) Btn_Ai.Visibility = Visibility.Collapsed;
+            if (Btn_ShowAll != null) Btn_ShowAll.Visibility = Visibility.Collapsed;
+            ShowAnswerColumns(false);
+        }
+
+        // True while the window is a list of settled contacts rather than a check. Nothing writes,
+        // nothing rescans, and the scan is never started at all.
+        private bool _listOnly;
+
         private List<string> BuildRows(List<Finding> found)
         {
             _rows.Clear();
@@ -2158,6 +2279,7 @@ namespace HolyLogger
                     SyncSelectionFromApply(thisRow);
                     UpdateFixButton();
                     UpdateFixAllBox();
+                    UpdateKeepAllBox();
                     UpdateKindBoxes();
                 };
 
@@ -2371,6 +2493,59 @@ namespace HolyLogger
             tick.Header = headerPanel;
 
             FindingsGrid.Columns.Add(tick);
+
+            // ── AND THE COLUMN THAT SAYS "I HAVE READ THIS AND IT STAYS" ────────────────────────
+            //
+            // Beside Fix, because the two are one decision taken once, looking at one row: correct it,
+            // or approve it as it stands. Its own header box does the whole pile at once, which is what
+            // a man does with ninety-six continent rows he has just satisfied himself about.
+            // 170, not 120: the header is a tick box AND the words "Do not change", and at 120 the
+            // header read "Do not chang".
+            var keep = new DataGridTemplateColumn { Width = 170, CanUserSort = false };
+
+            var keepBox = new FrameworkElementFactory(typeof(CheckBox));
+            keepBox.SetValue(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Center);
+            keepBox.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
+            keepBox.SetBinding(System.Windows.Controls.Primitives.ToggleButton.IsCheckedProperty,
+                new System.Windows.Data.Binding("Keep")
+                {
+                    Mode = System.Windows.Data.BindingMode.TwoWay,
+                    UpdateSourceTrigger = System.Windows.Data.UpdateSourceTrigger.PropertyChanged
+                });
+            keepBox.AddHandler(UIElement.PreviewMouseLeftButtonDownEvent,
+                               new System.Windows.Input.MouseButtonEventHandler(Chk_Keep_PreviewMouseDown));
+            keep.CellTemplate = new DataTemplate { VisualTree = keepBox };
+
+            var keepAll = new CheckBox
+            {
+                IsThreeState = true,
+                VerticalAlignment = VerticalAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                ToolTip = "Approve every row on show as it is, or clear them all"
+            };
+            keepAll.Click += Chk_KeepAll_Click;
+            _keepAllBox = keepAll;
+
+            var keepHeader = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center };
+            keepHeader.Children.Add(keepAll);
+            keepHeader.Children.Add(new TextBlock
+            {
+                Text = "Do not change",
+                FontWeight = FontWeights.Bold,
+                Margin = new Thickness(5, 0, 0, 0),
+                VerticalAlignment = VerticalAlignment.Center
+            });
+            keep.Header = keepHeader;
+
+            FindingsGrid.Columns.Add(keep);
+
+            // NEITHER BOX EXISTS UNTIL THERE IS A KIND TO ANSWER. With every kind listed the table is a
+            // summary of the work and nothing on this window will write - so two columns of boxes that
+            // do nothing when pressed are two invitations the window then refuses. They appear with the
+            // kind he chooses, which is also the moment they start meaning something.
+            _fixColumn = tick;
+            _keepColumn = keep;
+            ShowAnswerColumns(_filterKind != null);
 
             // WHY THIS ANSWER. A country proposal is the one finding the operator cannot check for
             // himself: two databases were asked, one of them won, and the table shows only the winner.
@@ -2653,6 +2828,8 @@ namespace HolyLogger
             if (kind.Checked && !string.Equals(_filterKind, kind.Name, StringComparison.Ordinal))
                 ApplyKindFilter(kind.Name);
 
+            PushTickUndo(_rows.Where(r => r.Has(kind.Name)));
+
             _syncingKind = true;
             try
             {
@@ -2668,6 +2845,7 @@ namespace HolyLogger
 
             UpdateFixButton();
             UpdateFixAllBox();
+            UpdateKeepAllBox();
             UpdateKindBoxes();
             ShowFirstTickedRow();
         }
@@ -2715,7 +2893,11 @@ namespace HolyLogger
             var row = box == null ? null : box.DataContext as FixRow;
             if (row == null) return;
 
-            if (row.Fixable) row.Apply = !row.Apply;
+            if (row.Fixable)
+            {
+                PushTickUndo(new[] { row });
+                row.Apply = !row.Apply;
+            }
             e.Handled = true;      // a row that cannot be fixed swallows the click rather than jumping
         }
 
@@ -2740,8 +2922,76 @@ namespace HolyLogger
             finally { _syncingApply = false; }
         }
 
+        // Same as the Fix box beside it, except that no row is barred from it: approving a row the
+        // program cannot write to is still a decision, and the commonest one on a report-only kind.
+        private void Chk_Keep_PreviewMouseDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            var box = sender as CheckBox;
+            var row = box == null ? null : box.DataContext as FixRow;
+            if (row == null) return;
+
+            PushTickUndo(new[] { row });
+            row.Keep = !row.Keep;
+            e.Handled = true;
+        }
+
+        // Nothing approved -> approve every row on show; anything approved -> clear the lot. Only the
+        // rows currently listed, so a kind filter's hidden rows are never swept in.
+        private void Chk_KeepAll_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var rows = FindingsGrid.Items.OfType<FixRow>().ToList();
+                bool keepAll = !rows.Any(r => r.Keep);
+                PushTickUndo(rows);
+
+                _syncingKind = true;                       // one update at the end, not one per row
+                try
+                {
+                    foreach (FixRow r in rows) r.Keep = keepAll;
+                }
+                finally { _syncingKind = false; }
+            }
+            catch (Exception ex) { Log.Swallow(ex); }
+
+            UpdateFixButton();
+            UpdateFixAllBox();
+            UpdateKeepAllBox();
+            UpdateKindBoxes();
+        }
+
+        private void UpdateKeepAllBox()
+        {
+            if (_keepAllBox == null || _syncingKind) return;
+            try
+            {
+                int rows = 0, kept = 0;
+                foreach (FixRow r in FindingsGrid.Items.OfType<FixRow>())
+                {
+                    rows++;
+                    if (r.Keep) kept++;
+                }
+                _keepAllBox.IsChecked = kept == 0 ? (bool?)false
+                                      : kept == rows ? (bool?)true
+                                      : null;
+            }
+            catch (Exception ex) { Log.Swallow(ex); }
+        }
+
         // The header's box, built in BuildColumns because the columns are remade on every scan.
         private CheckBox _fixAllBox;
+        private CheckBox _keepAllBox;
+
+        // The two answer columns, hidden until a kind is on show. Remade with the columns on every scan.
+        private DataGridColumn _fixColumn;
+        private DataGridColumn _keepColumn;
+
+        private void ShowAnswerColumns(bool show)
+        {
+            var how = show ? Visibility.Visible : Visibility.Collapsed;
+            if (_fixColumn != null) _fixColumn.Visibility = how;
+            if (_keepColumn != null) _keepColumn.Visibility = how;
+        }
 
         // Nothing ticked -> tick every row on show that CAN be fixed; anything ticked -> clear the lot.
         // Only the rows currently listed, never the ones a kind filter is hiding.
@@ -2751,6 +3001,7 @@ namespace HolyLogger
             {
                 var rows = FindingsGrid.Items.OfType<FixRow>().ToList();
                 bool tickAll = !rows.Any(r => r.Apply);
+                PushTickUndo(rows);
 
                 _syncingKind = true;                       // one update at the end, not one per row
                 try
@@ -2765,6 +3016,7 @@ namespace HolyLogger
 
             UpdateFixButton();
             UpdateFixAllBox();
+            UpdateKeepAllBox();
             UpdateKindBoxes();
             ShowFirstTickedRow();
         }
@@ -2890,8 +3142,11 @@ namespace HolyLogger
         // country, a spelling. Sending those to an AI would replace an answer with an opinion, and
         // spend the day's allowance doing it - 4,370 spellings would be 437 requests.
         //
-        // What is left is the pile where cty.dat and Club Log disagree, and there the program itself
-        // says the operator must decide. Those are the rows this button asks about, and no others.
+        // What is left is the COUNTRY, in both its kinds: the pile where cty.dat and Club Log disagree,
+        // and the pile where they agree with each other and against the log. The second was kept back
+        // at first - two files agreeing looked like certainty - but they agree because they are built
+        // from the same prefix tables, and an AI knows things no prefix table holds. Those two kinds
+        // are what this button asks about, and no others.
         private CancellationTokenSource _aiRunning;
 
         // WHICH AI OR AIS ANSWERED WHAT IS IN THIS REPORT. Usually one, and named. It can be two -
@@ -2992,14 +3247,37 @@ namespace HolyLogger
             // paragraph break is easier to see as a name than as a pair of characters inside a string.
             string gap = Environment.NewLine + Environment.NewLine;
 
-            var ofThisKind = _rows.Where(r => r.Has(CountryNeedsDecision)).ToList();
+            // ── BOTH COUNTRY KINDS, NOT ONLY THE ARGUMENT ───────────────────────────────────────
+            //
+            // It used to ask only where cty.dat and Club Log disagree, on the reasoning that where the
+            // two files agree the program knows exactly. They agree because they are built from the
+            // same prefix tables, which is not the same as being right: an AI knows things neither
+            // file holds - what a special callsign was issued for, where an expedition actually
+            // operated from - and can disagree with both of them together, correctly.
+            //
+            // So both country kinds go to it. Everything else in the list - a locator that is not a
+            // locator, a continent that does not match its own country - is arithmetic, and there is
+            // nothing there for an opinion to add.
+            // ── AND ONE KIND AT A TIME, LIKE EVERYTHING ELSE IN THIS WINDOW ─────────────────────
+            //
+            // The green button acts on the kind he is looking at. This one read the whole table, so a
+            // screen showing six contacts sent twenty-six to the AI - twenty of them a kind he had not
+            // opened, at his expense, on an allowance of twenty a day. What is on the screen is what
+            // the window is about.
+            var onShow = RowsOnShow();
+            var ofThisKind = onShow.Where(r => r.Has(CountryNeedsDecision) || r.Has(CountryBothAgree))
+                                   .ToList();
             if (ofThisKind.Count == 0)
             {
-                HolyMessageBox.Show(
-                    "There is nothing here for the AI to settle." + gap
-                    + "It is only asked about the QSOs where cty.dat and Club Log disagree - the "
-                    + "kind marked '" + CountryNeedsDecision + "'. Everything else in this list the "
-                    + "program knows exactly, and a second opinion could only make it worse.",
+                HolyMessageBox.Show(_filterKind == null
+                    ? "Choose a kind first." + gap
+                      + "The AI is asked about the QSOs on screen, and with every kind listed together "
+                      + "there is no one question to put to it. Click '" + CountryNeedsDecision
+                      + "' or '" + CountryBothAgree + "' above, then press Check with AI."
+                    : "There is nothing here for the AI to settle." + gap
+                      + "It is asked about the QSOs whose COUNTRY is in question - the two kinds marked "
+                      + "'" + CountryNeedsDecision + "' and '" + CountryBothAgree + "'. This kind is "
+                      + "not a matter of opinion: a locator either is a locator or it is not.",
                     "Check with AI", HolyMsgType.Info, this);
                 return;
             }
@@ -3235,6 +3513,38 @@ namespace HolyLogger
 
                 int silent = rows.Count - backedLog - backedUs - neither - unsure;
 
+                // ── THE AI'S ANSWERS, ALREADY TICKED ────────────────────────────────────────────
+                //
+                // Asking an AI and then being handed a table of empty boxes is being asked the same
+                // question twice. Its answer IS a recommendation for these two columns - correct this
+                // one, keep that one - so the boxes arrive holding it, and the work left is only the
+                // rows he disagrees with.
+                //
+                // Only the two clear verdicts. "It could be a different country again" and "I have no
+                // answer for you" are not recommendations, and a box ticked on either would be putting
+                // an opinion in the AI's mouth; those rows stay empty, for him.
+                //
+                // On the undo stack as one press, so Ctrl+Z takes the whole set back if he would
+                // rather start from nothing.
+                PushTickUndo(rows);
+                _syncingKind = true;
+                try
+                {
+                    for (int i = 0; i < rows.Count; i++)
+                    {
+                        AiCountryVote.Answer a;
+                        if (!answers.TryGetValue(i, out a) || a == null) continue;
+                        if (a.Backs == AiCountryVote.Backs.Log) rows[i].Keep = true;
+                        else if (a.Backs == AiCountryVote.Backs.Suggested) rows[i].Apply = true;
+                    }
+                }
+                finally { _syncingKind = false; }
+
+                UpdateFixButton();
+                UpdateFixAllBox();
+                UpdateKeepAllBox();
+                UpdateKindBoxes();
+
                 // THE WHOLE ARGUMENT, WRITTEN DOWN.
                 //
                 // The report was made when the scan finished, before the AI had been asked anything -
@@ -3283,6 +3593,17 @@ namespace HolyLogger
                       "Green is the one the AI thinks is correct." + Environment.NewLine
                     + "Grey is the one it does not recommend." + Environment.NewLine
                     + "Your log has not been changed yet.";
+
+                // AND WHAT TO DO ABOUT IT. The verdict was on screen and the next move was not: a man
+                // who has just been told the AI wants six contacts changed has no way of knowing from
+                // this message that HE has to tick them, one by one, before anything happens. Said only
+                // when there is something to tick - on a run where the AI backed the log every time,
+                // pointing at a Fix column he does not need is an instruction to ignore.
+                if (backedLog > 0 || backedUs > 0)
+                    message += Environment.NewLine + Environment.NewLine
+                             + "The boxes are already ticked to match: **Fix** where the AI suggests a "
+                             + "correction, **Do not change** where it agrees with your log. Change any "
+                             + "you disagree with, then press the green button.";
 
                 // AND WHO SAID IT. He ran the same six QSOs past two services and got two different
                 // answers, and this window - the one he actually reads - was the only place that did
@@ -3396,20 +3717,175 @@ namespace HolyLogger
                 Btn_ShowAll.Visibility = kindName == null ? Visibility.Collapsed : Visibility.Visible;
 
             TB_KindsSummary.Text = kindName == null
-                ? "Click a kind to show only its QSOs. Checking a kind selects them all; you can then "
-                  + "uncheck any single one before pressing Fix."
+                ? "One kind at a time: click a kind above to work through its QSOs."
                 : "Showing only: " + kindName + ".  Click it again, or Show all kinds, to see the rest.";
+
+            // The two answer columns belong to a kind, and so does the green button's offer.
+            ShowAnswerColumns(kindName != null);
+
+            // The header boxes describe the rows on show, and the rows on show have just changed.
+            UpdateFixButton();
+            UpdateFixAllBox();
+            UpdateKeepAllBox();
         }
 
+        // ── THE PRESS THAT WRITES NOTHING AND STILL SETTLES SOMETHING ───────────────────────────────
+        //
+        // He read the rows and agreed with the log about every one of them. No contact changes, so no
+        // safety copy is taken and no report is filed - the whole of it is the note that these were
+        // looked at and approved, and the re-check afterwards, which takes them off the screen.
+        private async Task ApproveOnly()
+        {
+            List<FixRow> approving = RowsToApprove();
+            if (approving.Count == 0)
+            {
+                // TWO DIFFERENT REASONS FOR AN EMPTY PRESS, and they need two different answers. One
+                // kind at a time is the rule, so with every kind listed there is nothing this button
+                // could act on and the way out is to choose a kind - not to hunt for a box to tick.
+                HolyMessageBox.Show(_filterKind == null
+                    ? "Nothing was written, because no kind of problem is chosen.\n\n"
+                      + "The Log Fixer works through one kind at a time. Click a kind above — Wrong "
+                      + "continent, DX Locator is wrong — and the table shows only those QSOs."
+                    : "Nothing was written, because nothing is ticked.\n\n"
+                      + "Tick Fix on the rows to correct, or Do not change on the ones to keep as "
+                      + "they are.",
+                    "Log Fixer", HolyMsgType.Info, this);
+                return;
+            }
+
+            var dal = DataAccess.GetInstance();
+            if (dal == null)
+            {
+                HolyMessageBox.ShowWarning(
+                    "The log database is not open.\n\nClose HolyLogger and open it again.",
+                    "Log Fixer", this);
+                return;
+            }
+
+            int byAi = approving.Count(r => r.AiBacksLog);
+            string one = approving.Count == 1 ? "QSO" : "QSOs";
+            if (!HolyMessageBox.ShowConfirm(
+                    "Nothing will be changed in your log.\n\n"
+                    + approving.Count.ToString("N0") + " " + one + " ticked in Do not change will be marked "
+                    + (byAi == 0            ? "APPROVED BY YOU"
+                     : byAi == approving.Count ? "APPROVED, WITH THE AI BACKING YOU"
+                     : "APPROVED — " + byAi.ToString("N0") + " of them with the AI backing you")
+                    + ", which means the Log Fixer stops raising "
+                    + (approving.Count == 1 ? "it" : "them") + ".\n\nApprove "
+                    + (approving.Count == 1 ? "it" : "them") + " now?",
+                    "Log Fixer", HolyMsgType.Info, this))
+                return;
+
+            try
+            {
+                foreach (var whoApproved in approving.GroupBy(r => r.AiBacksLog))
+                {
+                    int state = whoApproved.Key ? 4 : 2;
+                    List<QSO> qsos = whoApproved.Select(r => r.Qso).Distinct().ToList();
+                    if (qsos.Count == 0) continue;
+                    dal.SetReviewState(qsos.Select(q => q.id), state);
+                    foreach (QSO q in qsos) q.ReviewState = state;
+                }
+                MarkCleanAsChecked(dal, null);
+            }
+            catch (Exception ex)
+            {
+                Log.Swallow(ex);
+                HolyMessageBox.ShowError("These QSOs could not be marked.\n\n" + ex.Message,
+                                         "Log Fixer", this);
+                return;
+            }
+
+            HolyMessageBox.ShowSuccess(
+                approving.Count.ToString("N0") + " " + one + " approved. Nothing in your log was changed.",
+                "Log Fixer", this);
+
+            // What he has just answered is answered. See _hideAlreadySettled.
+            _hideAlreadySettled = true;
+            await RunCheck();
+        }
+
+        // THE CONTACTS THIS RUN HAD NOTHING TO SAY ABOUT. Written wherever a run is answered, so that
+        // "never checked" keeps meaning "logged since the last time I answered this window" whether the
+        // answer was a correction, an approval, or both.
+        private void MarkCleanAsChecked(DataAccess dal, HashSet<QSO> removed)
+        {
+            List<QSO> clean = _qsos.Where(q => q != null && q.id > 0 && q.ReviewState == 0
+                                               && !_withFindings.Contains(q)
+                                               && (removed == null || !removed.Contains(q)))
+                                   .ToList();
+            if (clean.Count == 0) return;
+            dal.SetReviewState(clean.Select(q => q.id), 3);
+            foreach (QSO q in clean) q.ReviewState = 3;
+        }
+
+        // THE ROWS THIS PRESS WOULD APPROVE: on screen, could have been ticked, and not ticked. Read
+        // from the grid's own view, so a kind filter's hidden rows are not swept into a decision he was
+        // never shown. Nothing already settled is counted - it is not his to answer twice.
+        // WHAT HE TICKED IN THE "DO NOT CHANGE" COLUMN, and nothing else.
+        //
+        // This used to be worked out - the rows on screen he had NOT ticked for fixing - and every
+        // attempt at drawing the line was wrong in a different way: with all kinds listed it offered to
+        // approve 136 contacts he had never scrolled to, and narrowed to one kind it still counted rows
+        // he had merely walked past. A tick in a box he pressed himself needs no rule and no reading of
+        // his mind, so the whole of that guesswork is one property now.
+        //
+        // ONE KIND AT A TIME. Read from the grid's view, and only while a kind is being shown: a wrong
+        // continent and a locator that is not a locator are two different jobs, judged differently, and
+        // a window that writes all of them on one press invites a press that was meant for one of them.
+        // With every kind listed the table is a summary of the work, not the work.
+        private List<FixRow> RowsToApprove()
+        {
+            return RowsOnShow().Where(CanApprove).ToList();
+        }
+
+        // The rows the green button acts on: the ones listed, which is one kind's worth. Empty while
+        // all kinds are on show, which is what makes the button inert there.
+        private List<FixRow> RowsOnShow()
+        {
+            if (FindingsGrid == null || _filterKind == null) return new List<FixRow>();
+            return FindingsGrid.Items.OfType<FixRow>().ToList();
+        }
+
+        private static bool CanApprove(FixRow r)
+        {
+            return r != null && r.Keep && r.Qso != null && r.Qso.ReviewState == 0;
+        }
+
+        // THE BUTTON SAYS BOTH HALVES OF WHAT IT DOES. It wrote corrections and, in the same press,
+        // marked the rows he had read and left as approved - and said only the first, so the second
+        // happened to four contacts without ever being on screen. "Fix 2, approve 4" is the press.
+        //
+        // AND IT IS ALIVE WITH NOTHING TICKED, which it never used to be. A man who reads six rows and
+        // agrees with the log about all six has made a decision, and refusing to record it unless he
+        // first ticks something he does not want ticked is the program arguing with him.
         private void UpdateFixButton()
         {
             if (Btn_Fix == null) return;
             if (_syncingKind) return;          // one update at the end of the sweep, not one per row
-            int n = _rows.Count(r => r.Apply);
-            Btn_Fix.IsEnabled = n > 0;
-            Btn_Fix.Content = n == 0
-                ? "Fix selected"
-                : "Fix " + n.ToString("N0") + " selected";
+            int n = RowsOnShow().Count(r => r.Apply);
+            List<FixRow> toApprove = RowsToApprove();
+            int approving = toApprove.Count;
+            int byAi = toApprove.Count(r => r.AiBacksLog);
+
+            // WHO IS DOING THE APPROVING, ON THE BUTTON ITSELF. An approval an AI has backed is a
+            // different piece of evidence from one given on his own judgement - it is stored as one -
+            // so the button that writes it says which it is about to write.
+            string approve = byAi == 0         ? "approve " + approving.ToString("N0")
+                           : byAi == approving ? "AI approve " + approving.ToString("N0")
+                           : "approve " + approving.ToString("N0") + " (" + byAi.ToString("N0")
+                             + " with AI)";
+
+            Btn_Fix.IsEnabled = n > 0 || approving > 0;
+
+            // NO KIND, NO WORDS. "Fix selected" over a button that cannot act on anything is a promise
+            // the window will not keep; blank, it is plainly waiting for him to choose a kind.
+            Btn_Fix.Content =
+                  _filterKind == null     ? ""
+                : n > 0 && approving > 0 ? "Fix " + n.ToString("N0") + ", " + approve
+                : n > 0                  ? "Fix " + n.ToString("N0") + " selected"
+                : approving > 0          ? approve
+                                         : "Fix selected";
         }
 
         // The turning ring. Kept as a field so it can be stopped again - an animation left running on a
@@ -3559,6 +4035,14 @@ namespace HolyLogger
 
         private async void Btn_Fix_Click(object sender, RoutedEventArgs e)
         {
+            // WHAT HE WAS ACTUALLY LOOKING AT WHEN HE PRESSED IT, read now, before anything is written
+            // or awaited. A kind filter hides rows, and a row he never saw is not a row he decided
+            // about - that is the mistake the old on-close question made, 4,522 contacts at a time.
+            // ONE KIND'S WORTH, and empty unless a kind is being shown - the same rows the button
+            // counted when it wrote its own label, so what he was promised is what gets written.
+            var onScreen = RowsOnShow();
+            var approvable = RowsToApprove();
+
             // THE ROWS DECIDE, NOT THE FINDINGS. A row can be worth writing for either of two reasons:
             // the program proposed something, or the operator typed something. Gating on findings alone
             // threw away every hand-typed answer - a checked row whose only finding was report-only
@@ -3567,12 +4051,14 @@ namespace HolyLogger
             // AND WHEN THERE IS NOTHING TO WRITE, SAY SO. Both of these used to return in silence, so
             // pressing Fix with nothing ticked - or with rows ticked that carry no answer yet - looked
             // exactly like a Fix that had run and reported nothing.
-            List<FixRow> rows = _rows.Where(r => r.Apply && r.Fixable && r.Qso != null).ToList();
+            List<FixRow> rows = onScreen.Where(r => r.Apply && r.Fixable && r.Qso != null).ToList();
             if (rows.Count == 0)
             {
-                HolyMessageBox.Show("Nothing was written, because nothing is ticked.\n\n"
-                    + "Tick a kind of problem to take all of its QSOs, or tick single rows in the table.",
-                    "Log Fixer", HolyMsgType.Info, this);
+                // NOTHING TICKED IS STILL AN ANSWER when there are rows on screen: he read them and the
+                // log was right about all of them. Nothing is written to a single contact, so there is
+                // no safety copy to take and no report to file - only the note that these have been
+                // settled, which is what stops them being raised at him again next month.
+                await ApproveOnly();
                 return;
             }
 
@@ -3646,6 +4132,29 @@ namespace HolyLogger
                         + " where the copies carry different comments — nothing in "
                         + (pending.Count == 1 ? "it is" : "those is") + " removed until you have chosen";
 
+            // AND THE OTHER HALF OF THE SAME PRESS: the rows ticked in Do not change. That is an answer
+            // too - the log was right - and it is written down as one, so the Fixer stops asking about
+            // them. Worth knowing BEFORE the press, not discovered afterwards. Counted the same way the
+            // write counts them, so the number he is shown is the number that will be marked.
+            List<FixRow> approvingRows = approvable.Where(r => !held.Contains(r)).ToList();
+            int approving = approvingRows.Count;
+            int byAi = approvingRows.Count(r => r.AiBacksLog);
+            if (approving > 0)
+            {
+                what += ".\n\n" + approving.ToString("N0") + " QSO"
+                        + (approving == 1 ? "" : "s") + " ticked in Do not change "
+                        + (approving == 1 ? "stays" : "stay") + " exactly as "
+                        + (approving == 1 ? "it is" : "they are") + " and "
+                        + (approving == 1 ? "is" : "are") + " marked ";
+                // Who approved it is written into the log, so it is named here too - and only the part
+                // that is true. Saying "with the AI's backing" over a run he never asked an AI about
+                // would be the message describing somebody else's evening.
+                what += byAi == 0        ? "APPROVED BY YOU"
+                      : byAi == approving ? "APPROVED, WITH THE AI BACKING YOU"
+                      : "APPROVED — " + byAi.ToString("N0") + " of them with the AI backing you";
+                what += ", so the Log Fixer stops raising " + (approving == 1 ? "it" : "them");
+            }
+
             if (!HolyMessageBox.ShowConfirm(
                     what
                     // Backups & Restore DOES list these now - they go into the Backups folder with the
@@ -3660,11 +4169,24 @@ namespace HolyLogger
                     "Log Fixer", HolyMsgType.Warning, this))
                 return;
 
-            string backup = SaveBackup(dal);
-            if (backup == null &&
-                !HolyMessageBox.ShowConfirm("The safety copy of the log could not be written.\n\nFix them "
-                    + "anyway?", "Log Fixer", HolyMsgType.Warning, this))
-                return;
+            // ── THE SILENCE BETWEEN THE PRESS AND THE SPINNER ────────────────────────────────────
+            //
+            // The safety copy is the whole database - tens of megabytes - copied on the UI thread with
+            // nothing on screen to say so, and it happened BEFORE the overlay appeared. Ten QSOs or one,
+            // the wait was the same, and the window looked dead for the whole of it. Now the overlay is
+            // up first and the copy runs off the thread, so the ring turns while the file is written.
+            ShowFixOverlay(0, "Copying your database…", "");
+            var backupClock = System.Diagnostics.Stopwatch.StartNew();
+            string backup = await Task.Run(() => SaveBackup(dal));
+            Log.Warn("Log Fixer: the safety copy took " + backupClock.ElapsedMilliseconds + " ms");
+
+            if (backup == null)
+            {
+                HideFixOverlay();
+                if (!HolyMessageBox.ShowConfirm("The safety copy of the log could not be written.\n\nFix "
+                        + "them anyway?", "Log Fixer", HolyMsgType.Warning, this))
+                    return;
+            }
 
             Btn_Fix.IsEnabled = false;
 
@@ -3754,7 +4276,9 @@ namespace HolyLogger
                 return;
             }
 
-            // Down before the message box, so the operator is not reading "fixing" behind "fixed".
+            // Down before the duplicate-comment question, which is a window he has to answer - but NOT
+            // down for good: the marks and the log reload still to come are the slowest part of the
+            // whole press, and they used to happen with the spinner already gone.
             HideFixOverlay();
 
             // ── STEP TWO: the groups whose comments disagree ─────────────────────────────────────
@@ -3796,12 +4320,32 @@ namespace HolyLogger
             //
             // These are settled: he was shown the problem, he ticked it, and the correction is in the
             // log. The scan should never put them to him again - and if a later country file disagrees
-            // with the value he has just chosen, that is a fresh argument he can ask for with "Include
-            // the ones I left", not one to be reopened behind his back on the next run.
+            // with the value he has just chosen, that is a fresh argument he can ask for by choosing
+            // "Already checked and fixed" when the window opens, not one to be reopened behind his back.
             //
             // The contacts that were REMOVED are left out: there is no row left to mark. So are the ones
             // held back for the comment question - a group he chose to skip there was not written at
             // all, and calling that "corrected" would bury a duplicate pair he has not decided about.
+            //
+            // ── AND THE TWO OTHER ANSWERS THE SAME PRESS GAVE ────────────────────────────────────
+            //
+            // Pressing Fix answers the whole table, not only the ticked lines. A row he read and did not
+            // tick is "leave this one" - state 2 - and a contact the scan found nothing to say about is
+            // "nothing wrong here" - state 3. Without 3 a clean contact stayed unchecked for ever and
+            // the never-checked count could never fall below the size of the log, which is the one
+            // number he wants to watch: what have I logged since the last time I did this.
+            //
+            // 2 is written only for rows that were ON SCREEN and could have been ticked. A row hidden by
+            // a kind filter, a report-only row with nothing to tick, a row held for the comment question
+            // - none of those is a decision, and calling them one is how the old build silenced 4,522
+            // contacts. And nothing here ever overwrites a state that is already set: the run he is
+            // answering is about the rows in front of him, not about what he settled last month.
+            // Up again for the marks and the reload. Everything from here to the message is the log
+            // itself being brought up to date, and on a 28,000-QSO log it is the longest part of the
+            // press - which is exactly why it must not happen behind a window that looks finished.
+            ShowFixOverlay(0, "Updating the log…", "");
+            var marksClock = System.Diagnostics.Stopwatch.StartNew();
+
             try
             {
                 var goneNow = new HashSet<QSO>(gone);
@@ -3813,8 +4357,36 @@ namespace HolyLogger
                     dal.SetReviewState(settledRows.Select(q => q.id), 1);
                     foreach (QSO q in settledRows) q.ReviewState = 1;
                 }
+
+                var putRight = new HashSet<QSO>(settledRows);
+                List<FixRow> approvedRows = approvable
+                    .Where(r => !putRight.Contains(r.Qso) && !goneNow.Contains(r.Qso)
+                                && !held.Contains(r))
+                    .ToList();
+
+                // WHO APPROVED IT, kept apart. An approval an AI read the contact and gave - the log is
+                // right - is not the same piece of evidence as one he gave on his own judgement, and
+                // the day a country file changes its mind about a prefix, the two are worth telling
+                // apart. 4 is the AI-backed one, 2 is his own.
+                //
+                // THE AI HAVING BEEN ASKED IS NOT THE SAME AS THE AI AGREEING. Asked covers the rows
+                // where it said the log is WRONG, and calling those AI-approved because he left them
+                // unticked would put words in its mouth: leaving that row is him overruling it, which
+                // is his own approval and nobody else's.
+                foreach (var whoApproved in approvedRows.GroupBy(r => r.AiBacksLog))
+                {
+                    int state = whoApproved.Key ? 4 : 2;
+                    List<QSO> qsos = whoApproved.Select(r => r.Qso).Distinct().ToList();
+                    if (qsos.Count == 0) continue;
+                    dal.SetReviewState(qsos.Select(q => q.id), state);
+                    foreach (QSO q in qsos) q.ReviewState = state;
+                }
+
+                MarkCleanAsChecked(dal, goneNow);
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+            Log.Warn("Log Fixer: writing what was settled took " + marksClock.ElapsedMilliseconds + " ms");
 
             // THE PATH IS CLICKABLE, so "where is my safety copy" is answered by pressing it rather
             // than by copying a line of text into Explorer. Clicking selects the file in its folder,
@@ -3843,6 +4415,7 @@ namespace HolyLogger
             // collection, so one call covers both windows.
             if (written > 0)
             {
+                var reloadClock = System.Diagnostics.Stopwatch.StartNew();
                 try
                 {
                     var main = Application.Current == null ? null
@@ -3850,7 +4423,11 @@ namespace HolyLogger
                     if (main != null) main.ReloadActiveLogQsos();
                 }
                 catch (Exception swallowed) { Log.Swallow(swallowed); }
+                Log.Warn("Log Fixer: reloading the log took " + reloadClock.ElapsedMilliseconds + " ms");
             }
+
+            // Only now, with the log itself up to date, is the job actually finished.
+            HideFixOverlay();
 
             int removed = gone.Count;
             int corrected = written - removed;
@@ -3860,6 +4437,15 @@ namespace HolyLogger
                 + (removed > 0 && corrected > 0 ? "\n" : "")
                 + (corrected > 0 ? corrected.ToString("N0") + " QSO" + (corrected == 1 ? "" : "s")
                                    + " fixed." : "")
+                // The other half of the press, said plainly afterwards as well as before it: these were
+                // not changed, they were settled, and that is why they will not appear again.
+                + (approving > 0 ? (removed > 0 || corrected > 0 ? "\n" : "")
+                                   + approving.ToString("N0") + " QSO" + (approving == 1 ? "" : "s")
+                                   + " approved unchanged"
+                                   + (byAi == 0 ? " by you"
+                                    : byAi == approving ? ", with the AI backing you"
+                                    : ", " + byAi.ToString("N0") + " of them with the AI backing you")
+                                   + "." : "")
                 // It used to say "Close and reopen the log window to see the new values", which was true
                 // and is not any more: the log table is reloaded above.
                 + (backup == null ? "" :
@@ -3882,7 +4468,10 @@ namespace HolyLogger
                 HolyMessageBox.ShowSuccess(report, "Log Fixer", this);
             }
 
-            // Re-check, so what is left on screen is what is still wrong.
+            // Re-check, so what is left on screen is what is still wrong - and what he has just
+            // settled is no longer wrong, whatever he asked the chooser to open on. See
+            // _hideAlreadySettled.
+            _hideAlreadySettled = true;
             await RunCheck();
         }
 
@@ -4030,6 +4619,21 @@ namespace HolyLogger
         // marked handled so it never reaches anything else. Escape now has exactly one meaning here.
         private void Window_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
         {
+            // CTRL+Z PUTS THE TICKS BACK.
+            //
+            // Ticking Do not change clears the Fix beside it - they are two answers to one question -
+            // and a hand that slips has just thrown away a decision with nothing to say what it was.
+            // He pressed Ctrl+Z, because that is what anybody presses, and the window did nothing.
+            // Now it does: every tick, every clear, and every whole-column sweep goes on a stack first.
+            if (e.Key == System.Windows.Input.Key.Z
+                && (System.Windows.Input.Keyboard.Modifiers & System.Windows.Input.ModifierKeys.Control)
+                   == System.Windows.Input.ModifierKeys.Control)
+            {
+                UndoTicks();
+                e.Handled = true;
+                return;
+            }
+
             if (e.Key != System.Windows.Input.Key.Escape) return;
             if (FindingsGrid != null)
             {
@@ -4037,6 +4641,98 @@ namespace HolyLogger
                 FindingsGrid.UnselectAllCells();
             }
             e.Handled = true;
+        }
+
+        // A WORD THAT TAKES ITSELF BACK OFF THE SCREEN.
+        //
+        // The line above the table belongs to the kinds - "Showing only: Wrong continent" - and is
+        // rewritten only when the filter changes. A message written over it therefore STAYS, so
+        // "Nothing to undo." sat there through every tick that followed and went on saying something
+        // that had stopped being true. It gets three seconds, then the line goes back to its own words.
+        private System.Windows.Threading.DispatcherTimer _summaryFlash;
+
+        private void FlashSummary(string text)
+        {
+            if (TB_KindsSummary == null) return;
+            TB_KindsSummary.Text = text;
+
+            if (_summaryFlash == null)
+            {
+                _summaryFlash = new System.Windows.Threading.DispatcherTimer
+                {
+                    Interval = TimeSpan.FromSeconds(3)
+                };
+                _summaryFlash.Tick += (s, e) =>
+                {
+                    _summaryFlash.Stop();
+                    if (TB_KindsSummary == null) return;
+                    TB_KindsSummary.Text = _filterKind == null
+                        ? "One kind at a time: click a kind above to work through its QSOs."
+                        : "Showing only: " + _filterKind + ".  Click it again, or Show all kinds, to "
+                          + "see the rest.";
+                };
+            }
+            _summaryFlash.Stop();
+            _summaryFlash.Start();
+        }
+
+        // WHAT THE BOXES SAID BEFORE THE LAST PRESS. One entry per press - a single box or a whole
+        // column's worth - so one Ctrl+Z undoes one action rather than one row of it.
+        private readonly Stack<List<Tuple<FixRow, bool, bool>>> _tickUndo
+            = new Stack<List<Tuple<FixRow, bool, bool>>>();
+
+        private void PushTickUndo(IEnumerable<FixRow> rows)
+        {
+            if (rows == null) return;
+            var before = rows.Where(r => r != null)
+                             .Select(r => Tuple.Create(r, r.Apply, r.Keep))
+                             .ToList();
+            if (before.Count == 0) return;
+
+            // Twenty presses back is further than anybody reaches, and it keeps a window that has been
+            // open all evening from holding a list as long as the log.
+            if (_tickUndo.Count >= 20)
+            {
+                var keepThese = _tickUndo.ToList();
+                keepThese.RemoveAt(keepThese.Count - 1);      // the oldest
+                _tickUndo.Clear();
+                for (int i = keepThese.Count - 1; i >= 0; i--) _tickUndo.Push(keepThese[i]);
+            }
+            _tickUndo.Push(before);
+        }
+
+        private void UndoTicks()
+        {
+            if (_tickUndo.Count == 0)
+            {
+                FlashSummary("Nothing to undo.");
+                return;
+            }
+
+            List<Tuple<FixRow, bool, bool>> before = _tickUndo.Pop();
+            _syncingKind = true;                              // one update at the end, not one per row
+            try
+            {
+                foreach (var was in before)
+                {
+                    // Keep first: setting Apply clears Keep, so putting them back the other way round
+                    // would undo half of what it had just restored.
+                    was.Item1.Keep = was.Item3;
+                    was.Item1.Apply = was.Item2;
+                }
+            }
+            finally { _syncingKind = false; }
+
+            UpdateFixButton();
+            UpdateFixAllBox();
+            UpdateKeepAllBox();
+            UpdateKindBoxes();
+
+            // And say that it happened. One tick going back on its own is easy to miss on a table of
+            // ninety-six rows, and a key that appears to have done nothing gets pressed again.
+            FlashSummary(before.Count == 1
+                ? "Undone. That row is back as it was."
+                : "Undone. " + before.Count.ToString("N0") + " rows are back as they were.");
         }
 
         // The right-click menu: the station's QRZ page, the whole QSO, and then the two copy commands.
@@ -4222,9 +4918,10 @@ namespace HolyLogger
         // three hundred and sixty all over again - and the ones he had already thought about buried the
         // ones he had not. That is how a check people trust turns into a list they stop opening.
         //
-        // So each QSO carries what he settled about it: 1 corrected, 2 looked at and left as it was.
-        // Neither is offered again unless he asks for it with "Include the ones I left".
-
+        // So each QSO carries what he settled about it: 1 corrected, 2 looked at and left as it was,
+        // 3 checked and clean. None of the three is offered again unless he asks for it by name in the
+        // window that opens first and asks which contacts to check.
+        //
         // NOTHING IS DECIDED BY CLOSING A WINDOW.
         //
         // Closing the Fixer used to ask whether the rows he had not ticked should stop being shown,
@@ -4233,8 +4930,216 @@ namespace HolyLogger
         // gets answered by whichever button the Enter key happens to be on. It silenced 4,522 contacts
         // that way on its first outing.
         //
-        // So Close closes. A QSO is remembered only when something really was settled about it: the
-        // Fix wrote to it. Not fixing is not an answer, and the program no longer pretends it is.
+        // So Close closes, and decides nothing. THE FIX BUTTON is what settles a run: it writes the
+        // ticked rows, and in the same breath records that the rows he left were left and the contacts
+        // that raised nothing were clean. That is a press he chose to make, on a table he was looking
+        // at - not a question ambushing him on his way out of the door.
+    }
+
+    // ── WHICH CONTACTS TO PUT IN FRONT OF HIM THIS TIME ─────────────────────────────────────────
+    //
+    // The Log Fixer used to open on everything the Log Workshop was showing - 28,580 contacts on this
+    // machine, a scan that takes a while, and a table whose first four hundred rows he settled last
+    // month. The second run is almost never the same job as the first, so he is asked before the scan
+    // starts rather than being handed the whole log again.
+    //
+    // Four answers, and each one carries its own count, because the count is what makes the choice
+    // obvious: "never checked - 12" on a Sunday evening says the week's contacts are clean in a way no
+    // wording could. An answer worth nothing is not offered at all - a greyed line saying 0 is an
+    // honest way to show that there is nothing there.
+    //
+    // ALL MEANS ALL, deliberately: every contact the Workshop is showing, whatever the Fixer has been
+    // told about it before. The other three are what the database remembers; the difference between
+    // All and the three of them together is the clean ones, which have nothing to show him.
+    internal enum FixerScope { All, NeverChecked, Fixed, Approved, ApprovedByUser, ApprovedByAi }
+
+    internal class LogFixerScopeWindow : Window
+    {
+        // THE WORDING, WRITTEN ONCE. This window asks the question and the Log Workshop's "Fixed" box
+        // filters on the same answers; two lists that mean the same thing but read differently is two
+        // things to learn, and the day one of them is reworded they stop agreeing altogether.
+        // APPROVED, NOT "NOT FIXED". These are contacts the Fixer questioned, the operator looked at,
+        // and the log turned out to be right about - a finished piece of work, not an unanswered one.
+        // "Not fixed" made a done job read as a job still waiting, on the very list he opens to see
+        // what is left to do.
+        public const string AllLabel        = "All";
+        public const string NeverLabel      = "Never checked";
+        public const string FixedLabel      = "Already checked and fixed";
+        public const string ApprovedLabel   = "Already checked and approved";
+
+        // The Log Workshop can ask WHO approved a contact, which the chooser deliberately does not:
+        // choosing what to check again is a question about work still to do, and there the two are one
+        // answer. Looking back over what was decided is a different question, and there they are not.
+        public const string ApprovedByUserLabel = "Approved by me";
+        public const string ApprovedByAiLabel   = "Approved with AI";
+
+        private FixerScope _choice = FixerScope.All;
+        private bool _accepted;
+
+        // Which contacts each answer means. The one place that decides it, so the Log Workshop's
+        // "Fixed" filter and this window can never drift apart on what "never checked" is.
+        public static bool Matches(QSO q, FixerScope scope)
+        {
+            if (q == null) return false;
+            switch (scope)
+            {
+                case FixerScope.NeverChecked:   return q.ReviewState == 0;
+                case FixerScope.Fixed:          return q.ReviewState == 1;
+                case FixerScope.Approved:       return q.ReviewState == 2 || q.ReviewState == 4;
+                case FixerScope.ApprovedByUser: return q.ReviewState == 2;
+                case FixerScope.ApprovedByAi:   return q.ReviewState == 4;
+                default:                        return true;
+            }
+        }
+
+        public static List<QSO> Pick(IEnumerable<QSO> qsos, FixerScope scope)
+        {
+            return (qsos ?? Enumerable.Empty<QSO>()).Where(q => Matches(q, scope)).ToList();
+        }
+
+        // Null means he closed the window or pressed Cancel, and nothing should open.
+        public static FixerScope? Ask(IList<QSO> qsos, Window owner)
+        {
+            var win = new LogFixerScopeWindow(qsos) { Owner = owner };
+            win.ShowDialog();
+            return win._accepted ? win._choice : (FixerScope?)null;
+        }
+
+        private LogFixerScopeWindow(IList<QSO> qsos)
+        {
+            var all = qsos ?? new List<QSO>();
+            Title = "Log Fixer";
+            SizeToContent = SizeToContent.WidthAndHeight;
+            ResizeMode = ResizeMode.NoResize;
+            ShowInTaskbar = false;
+            WindowStartupLocation = WindowStartupLocation.CenterOwner;
+            Background = ThemeManager.Brush("WindowBg");
+            MinWidth = 400;
+
+            var root = new StackPanel { Margin = new Thickness(20) };
+
+            root.Children.Add(new TextBlock
+            {
+                Text = "Which contacts should the Log Fixer check?",
+                FontSize = 18,
+                FontWeight = FontWeights.Bold,
+                Foreground = ThemeManager.Brush("TextBrush"),
+                Margin = new Thickness(0, 0, 0, 4),
+            });
+            root.Children.Add(new TextBlock
+            {
+                Text = "These are the QSOs the Log Workshop is showing.",
+                FontSize = 16,
+                Foreground = ThemeManager.Brush("TextBrush"),
+                Margin = new Thickness(0, 0, 0, 14),
+            });
+
+            // A COLOUR PER ANSWER, so the one he wants is found before the words are read. All is the
+            // whole log and wears the strongest blue; the three that report on what the Fixer has done
+            // take the colours the program already uses for the same ideas elsewhere - untouched blue,
+            // put-right green, left-alone red. Dark text on all but the deep blue, which takes white.
+            AddChoice(root, all.Count, FixerScope.All, AllLabel, "#2F6FB5", "#FFFFFF");
+            AddChoice(root, all.Count(q => Matches(q, FixerScope.NeverChecked)), FixerScope.NeverChecked,
+                      NeverLabel, "#CDE4F7", "#10243A");
+            AddChoice(root, all.Count(q => Matches(q, FixerScope.Fixed)), FixerScope.Fixed,
+                      FixedLabel, "#BFE5C2", "#12331A");
+            AddChoice(root, all.Count(q => Matches(q, FixerScope.Approved)), FixerScope.Approved,
+                      ApprovedLabel, "#F7CFCF", "#3A1414");
+
+            // CANCEL IN THE MIDDLE, under all four, where it belongs to none of them. Against one edge
+            // it reads as the partner of the button above it; centred, it is plainly the way out of the
+            // whole question. Nothing here is the default key either - Enter must not pick one of four
+            // answers on his behalf.
+            var cancel = new Button
+            {
+                Content = "Cancel",
+                FontSize = 16,
+                Padding = new Thickness(28, 5, 28, 5),
+                HorizontalAlignment = HorizontalAlignment.Center,
+                Margin = new Thickness(0, 14, 0, 0),
+                IsCancel = true,
+            };
+            root.Children.Add(cancel);
+
+            Content = root;
+        }
+
+        // ONE PRESS, NOT TWO. Choosing an answer and then confirming it is a second decision about a
+        // question already settled; the button IS the answer, and pressing it starts the check.
+        //
+        // "Never checked" over "12 QSOs", each on its own line: the count is what he is really reading,
+        // and at the end of a sentence it gets skipped. An answer worth nothing is greyed out rather
+        // than hidden - "already checked and fixed - 0" is itself worth knowing.
+        private void AddChoice(Panel host, int count, FixerScope scope, string label,
+                               string background, string foreground)
+        {
+            bool live = count > 0;
+
+            // BOTH LINES CENTRED, on the line above and on the button. A stack sizes itself to its
+            // widest child, so the shorter line sits under the start of the longer one unless it is
+            // told otherwise - which reads as a mistake on a button whose block is centred.
+            var text = new StackPanel { HorizontalAlignment = HorizontalAlignment.Stretch };
+            text.Children.Add(new TextBlock
+            {
+                Text = label,
+                FontSize = 17,
+                FontWeight = FontWeights.SemiBold,
+                TextAlignment = TextAlignment.Center,
+            });
+            text.Children.Add(new TextBlock
+            {
+                Text = count.ToString("N0") + (count == 1 ? " QSO" : " QSOs"),
+                FontSize = 16,
+                TextAlignment = TextAlignment.Center,
+                Margin = new Thickness(0, 1, 0, 0),
+            });
+
+            var button = new Button
+            {
+                Content = text,
+                Template = ChoiceTemplate,
+                Width = 300,
+                Padding = new Thickness(10, 5, 10, 5),
+                Margin = new Thickness(0, 0, 0, 7),
+                HorizontalAlignment = HorizontalAlignment.Center,
+                IsEnabled = live,
+                Background = Paint(live ? background : "#DDDDDD"),
+                Foreground = Paint(live ? foreground : "#666666"),
+                BorderBrush = Paint("#33000000"),   // AARRGGBB: a faint dark edge, not a black frame
+            };
+            button.Click += (s, e) => { _choice = scope; _accepted = true; Close(); };
+            host.Children.Add(button);
+        }
+
+        private static SolidColorBrush Paint(string hex)
+        {
+            var brush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(hex));
+            brush.Freeze();
+            return brush;
+        }
+
+        // THE WINDOWS BUTTON PAINTS ITS OWN GREY OVER ANY BACKGROUND IT IS GIVEN the moment the mouse
+        // touches it, which would take the colour off whichever button he is reaching for - the one
+        // moment the colour is doing its job. So the chrome is a plain rounded border that shows the
+        // colour it was handed, and the hover and the press are a change of weight rather than a
+        // change of colour.
+        private static readonly ControlTemplate ChoiceTemplate = (ControlTemplate)XamlReader.Parse(
+            "<ControlTemplate TargetType=\"Button\" "
+            + "xmlns=\"http://schemas.microsoft.com/winfx/2006/xaml/presentation\" "
+            + "xmlns:x=\"http://schemas.microsoft.com/winfx/2006/xaml\">"
+            + "  <Border x:Name=\"Chrome\" CornerRadius=\"5\" BorderThickness=\"1\""
+            + "          Background=\"{TemplateBinding Background}\""
+            + "          BorderBrush=\"{TemplateBinding BorderBrush}\""
+            + "          Padding=\"{TemplateBinding Padding}\">"
+            + "    <ContentPresenter HorizontalAlignment=\"Stretch\" VerticalAlignment=\"Center\"/>"
+            + "  </Border>"
+            + "  <ControlTemplate.Triggers>"
+            + "    <Trigger Property=\"IsMouseOver\" Value=\"True\">"
+            + "      <Setter TargetName=\"Chrome\" Property=\"Opacity\" Value=\"0.85\"/></Trigger>"
+            + "    <Trigger Property=\"IsPressed\" Value=\"True\">"
+            + "      <Setter TargetName=\"Chrome\" Property=\"Opacity\" Value=\"0.65\"/></Trigger>"
+            + "  </ControlTemplate.Triggers>"
+            + "</ControlTemplate>");
     }
 }
 

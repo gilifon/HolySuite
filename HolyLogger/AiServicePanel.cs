@@ -86,13 +86,10 @@ namespace HolyLogger
             _providerBox.SelectionChanged += Provider_Changed;
             chooser.Children.Add(_providerBox);
 
-            // A LIST OF ONE IS NOT A CHOICE, AND NEITHER IS A LABEL ABOVE IT.
-            //
-            // While OpenRouter is the only service, the dropdown asks him to pick something he has
-            // no say in - and the line that replaced it, "AI service: OpenRouter - paid, reaches
-            // GPT, Claude and Gemini", said what the paragraph above the panel already says. The
-            // box stays in the tree, wired as it always was, so the day a second service is added
-            // it is one line of code and not a rebuild of this panel.
+            // A LIST OF ONE IS NOT A CHOICE, AND NEITHER IS A LABEL ABOVE IT. While OpenRouter was the
+            // only service the dropdown asked him to pick something he had no say in, so it was left
+            // out of the panel - wired, but not shown. Google Gemini is back beside it, so there is
+            // a choice again and the box appears on its own, without this panel being touched.
             if (AiServices.All.Length > 1) Children.Add(chooser);
 
             // ── and everything that belongs to it ───────────────────────────────────────────────
@@ -222,7 +219,35 @@ namespace HolyLogger
         // seen are words he abandons halfway through.
         private void ShowTopUp(AiService service)
         {
-            if (service == null || string.IsNullOrEmpty(service.TopUpUrl)) return;
+            if (service == null) return;
+
+            // ── A SERVICE WITH NO PICTURES STILL HAS TO BE EXPLAINED ────────────────────────────
+            //
+            // The whole setup story moved behind that one button, and the button is built from
+            // TopUpUrl - which only a PAID service has. So when Google Gemini came back, the page it
+            // showed a man with no key was a line saying he had none and a model box: nowhere to get
+            // one, no address, not a word about what to do. The steps were in the service definition
+            // the whole time, unread.
+            //
+            // Written out here in the same order he does them, with the key page as a link he can
+            // press. Four short lines are not a wall, and they are all this service needs.
+            if (string.IsNullOrEmpty(service.TopUpUrl))
+            {
+                if (service.Steps != null)
+                {
+                    int step = 1;
+                    foreach (string s in service.Steps)
+                        _serviceHelp.Children.Add(Line(step++ + ". " + s, italic: false, dim: true));
+                }
+
+                if (!string.IsNullOrEmpty(service.KeyPageUrl))
+                    _serviceHelp.Children.Add(KeyPageLink(service));
+
+                if (!string.IsNullOrEmpty(service.Price))
+                    _serviceHelp.Children.Add(Line(service.Price, italic: true, dim: true));
+
+                return;
+            }
 
             var how = new Button
             {
@@ -455,6 +480,37 @@ namespace HolyLogger
             // NO NOTE UNDER THE BOX. It explained that a name can be typed by hand and that a
             // wrong one is refused without costing anything - both true, and both answers to
             // questions nobody had asked yet. The list is the instruction.
+        }
+
+        // The page where the key is made, as something to press. An address printed as words is an
+        // address somebody has to retype, and half of them mistype it.
+        private TextBlock KeyPageLink(AiService service)
+        {
+            var line = new TextBlock
+            {
+                FontSize = 16,
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(0, 4, 0, 6),
+                Foreground = ThemeManager.Brush("TextBrush"),
+            };
+            line.Inlines.Add(new System.Windows.Documents.Run("The key page is here: "));
+
+            string address = string.IsNullOrEmpty(service.KeyPageText) ? service.KeyPageUrl
+                                                                       : service.KeyPageText;
+            var link = new System.Windows.Documents.Hyperlink(
+                new System.Windows.Documents.Run(address))
+            {
+                NavigateUri = new Uri(service.KeyPageUrl),
+                ToolTip = service.KeyPageUrl,
+            };
+            link.RequestNavigate += (s, e) =>
+            {
+                try { System.Diagnostics.Process.Start(link.NavigateUri.ToString()); }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
+                e.Handled = true;
+            };
+            line.Inlines.Add(link);
+            return line;
         }
 
         private TextBlock Line(string text, bool italic, bool dim)

@@ -113,15 +113,6 @@ namespace HolyLogger
 
         internal static readonly AiService[] All =
         {
-            // GOOGLE GEMINI IS NO LONGER OFFERED, and its definition is kept out of this list
-            // rather than out of the file - the request shape it needs is still in AiQsoCheck, and
-            // an operator can still reach Gemini through OpenRouter as google/gemini-3.7-flash.
-            //
-            // Why: its free allowance is twenty checks a day, which runs out on the first real log,
-            // and on the same six QSOs it answered differently from the four paid models that all
-            // agreed with each other. A service offered inside this program is one this program is
-            // standing behind, and there is no promise here to give anybody an AI for nothing.
-            //
             new AiService
             {
                 Name = OpenRouter,
@@ -198,6 +189,44 @@ namespace HolyLogger
                 },
                 ReadModel = () => Properties.Settings.Default.AiModelOpenRouter,
                 WriteModel = v => Properties.Settings.Default.AiModelOpenRouter = v
+            },
+
+            // ── AND A WAY IN WITH NO CREDIT CARD ────────────────────────────────────────────────
+            //
+            // Taken out once, and put back on 2026-08-29 for the reason it was written in the first
+            // place: an operator who will not put money on an account is otherwise offered nothing at
+            // all, and nothing at all is worse than a small allowance.
+            //
+            // Both objections stand and are said out loud rather than hidden: the free allowance is
+            // about twenty checks a day, which one real log uses up, and on the same six QSOs it did
+            // not agree with the paid models that agreed with each other. It is second in the list,
+            // and its own words say what it is. What it is not is a locked door.
+            new AiService
+            {
+                Name = Gemini,
+                Label = "Google Gemini - free, no credit card",
+                ShortName = "Google Gemini",
+                Endpoint = "https://generativelanguage.googleapis.com/v1beta/interactions",
+                DefaultModel = "gemini-3.7-flash",
+                ChatShape = false,
+                Bearer = false,
+                KeyPageUrl = "https://aistudio.google.com/apikey",
+                KeyPageText = "aistudio.google.com/apikey",
+                Price = "Free. The allowance is small - around twenty checks a day - and when it runs "
+                      + "out it starts again tomorrow. Nothing is ever charged. On the same QSOs it "
+                      + "does not always agree with the paid models, so on a country you care about "
+                      + "it is worth asking one of those as well.",
+                Steps = new[]
+                {
+                    "Sign in with any Google account - a Gmail address is one.",
+                    "Open the key page below and press Create API key.",
+                    "Copy the key it shows you and paste it in the box.",
+                    "No credit card is asked for at any point."
+                },
+                ReadKey = () => Properties.Settings.Default.AiApiKey,
+                WriteKey = v => Properties.Settings.Default.AiApiKey = v,
+                ReadModel = () => Properties.Settings.Default.AiModelGemini,
+                WriteModel = v => Properties.Settings.Default.AiModelGemini = v
             }
         };
 
