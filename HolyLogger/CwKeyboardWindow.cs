@@ -967,6 +967,20 @@ namespace HolyLogger
         {
             if (_titleText == null || _currentWpm == null) return;
 
+            // ONE SPEED ON THIS BAR, NOT TWO. The measured figure was shown on the left while the one
+            // the operator sets sat on the right, and they disagreed - he set 30 and the left still
+            // read 23, which reads as the program contradicting itself. Where the speed can be
+            // COMMANDED the commanded number is the truth and the measurement has nothing to add, so
+            // the title stays plain and the number lives in the readout he turns.
+            if (_setSpeed != null && _wpmText != null)
+            {
+                if (_shownWpm == -1) return;
+                _shownWpm = -1;
+                _titleText.Inlines.Clear();
+                _titleText.Inlines.Add(new Run("CW Keyer") { Foreground = Brushes.Black });
+                return;
+            }
+
             // NOTHING UNTIL THERE IS SOMETHING TO SAY. At startup the speed is the default the program
             // was built with, not the radio's - so the title carries no number at all until a real
             // transmission has been timed.

@@ -3392,10 +3392,29 @@ namespace HolyLogger
 
                 // The WPM readout in its title bar: what to send when the wheel is turned, and what
                 // speeds this radio will accept.
+                //
+                // THE ANSWER IS NOT THROWN AWAY. It was, and that cost an evening: an operator set 30,
+                // the radio stayed where it was, and nothing anywhere said whether the command had even
+                // left the program. Every attempt is written to the log with the exact bytes, and a
+                // refusal is said out loud - once, because a wheel sends one of these per notch and a
+                // message box per notch is worse than the fault.
                 wpm =>
                 {
                     string command = BuildCwSpeedCommand(rigType, wpm);
-                    if (command != null) TrySendOmniRigCustomCommand(command);
+                    if (command == null) return;
+
+                    bool went = TrySendOmniRigCustomCommand(command);
+                    Log.Warn("CW keyer speed " + wpm + " WPM to " + rigType + ": " + command
+                             + (went ? "  sent" : "  REFUSED by OmniRig"));
+                    if (went || _cwSpeedRefusalReported) return;
+
+                    _cwSpeedRefusalReported = true;
+                    HolyMessageBox.ShowWarning(
+                        "The keyer speed could not be sent to " + rigType + ".\n\n"
+                        + "The speed on the radio has not changed.\n\n"
+                        + "When CAT is working, the radio's name shows in green at the right of the "
+                        + "status bar. Anything else there means it is not.",
+                        "CW Keyer", this);
                 },
                 (out int low, out int high) => CwSpeedRange(rigType, out low, out high))
             {
@@ -3566,6 +3585,10 @@ namespace HolyLogger
         // THE LIMITS ARE THE MAKERS' OWN, not one number for everybody. Asking an Elecraft for 60 WPM
         // or an Icom for 4 is asking for something its manual does not offer, and what a radio does
         // with a value outside its range is its own business - better to send the nearest it accepts.
+        // Said once a session. A wheel sends one command per notch, and a box per notch would be a
+        // worse fault than the one it is reporting.
+        private bool _cwSpeedRefusalReported;
+
         private const int WpmKenwoodLow = 4,  WpmKenwoodHigh = 60;
         private const int WpmYaesuLow   = 4,  WpmYaesuHigh   = 60;
         private const int WpmElecraftLow = 8, WpmElecraftHigh = 50;
@@ -3599,6 +3622,11 @@ namespace HolyLogger
             string icom = GetIcomCivAddress(rigType);
             if (icom != null)
             {
+                // 14 0C on every Icom checked - IC-705, IC-7300, IC-7610 and IC-9700 all read
+                //   "0C  0000 ~ 0255  Send/read keying speed  (0000=6 WPM ~ 0255=48 WPM)"
+                // in their own guides. Worth saying how that was established: pdftotext's -layout mode
+                // interleaves the two columns of these tables, and reading 0C out of THAT gave a
+                // sub-command belonging to a different row. Read in reading order they agree.
                 int level = (int)Math.Round((wpm - WpmIcomLow) * 255.0 / (WpmIcomHigh - WpmIcomLow));
                 if (level < 0) level = 0;
                 if (level > 255) level = 255;
