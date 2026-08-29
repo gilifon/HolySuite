@@ -785,8 +785,10 @@ namespace HolyLogger
             double lowKhz = band != null ? band.LowKhz : 0;
             double highKhz = band != null ? band.HighKhz : 0;
 
+            _ledZoneX = e.GetPosition(FreqLedLive).X;
+
             double? target = _ledWheel.Next(khz, e.Delta,
-                                            LedStepUnderPointer(e.GetPosition(FreqLedLive).X), lowKhz, highKhz);
+                                            LedStepUnderPointer(_ledZoneX.Value), lowKhz, highKhz);
             if (target == null) return;
 
             e.Handled = true;   // the radio is being tuned: the wheel belongs to us for this notch
@@ -832,6 +834,10 @@ namespace HolyLogger
             TB_FreqNoCat.Text = target.Value.ToString("0.000", CultureInfo.InvariantCulture);
             CommitFreqNoCat();   // the logged frequency and the Band box follow the number
 
+            // The digits just moved under the pointer; the band moves with them.
+            _noCatZoneX = e.GetPosition(TB_FreqNoCat).X;
+            ShowNoCatWheelZone();
+
             // And the radio, when there is one listening.
             if (Properties.Settings.Default.EnableOmniRigCAT && OmniRigEngine != null && Rig != null
                 && Rig.Status == OmniRig.RigStatusX.ST_ONLINE)
@@ -841,35 +847,51 @@ namespace HolyLogger
         }
 
         /// <summary>
-        /// Which digits the pointer is over on the LED: 1 kHz to the left of the decimal point, 0.1 kHz
-        /// to the right of it - the display is read the way the radio's own dial is, the digit you are
-        /// pointing at being the one that moves.
+        /// Where the number stands on the LED: the x it starts at, the x of the decimal point's right
+        /// edge, and the x it ends at. False when there is no point on show and so nothing to divide.
         ///
         /// The LED is right-aligned inside a fixed width, so where the point sits on screen depends on
         /// how many digits the frequency has. The text is measured as it is actually drawn - same font,
         /// same size, same screen - rather than guessed at from character counts, which a seven-segment
         /// font with its narrow dot would get wrong.
         /// </summary>
+        private bool LedTextBounds(out double start, out double split, out double end)
+        {
+            start = split = end = 0;
+
+            if (FreqLedLive == null) return false;
+
+            string text = FreqLedLive.Text ?? string.Empty;
+            int dot = text.IndexOf('.');
+            if (dot < 0) return false;
+
+            double dpi = VisualTreeHelper.GetDpi(FreqLedLive).PixelsPerDip;
+            var typeface = new Typeface(FreqLedLive.FontFamily, FreqLedLive.FontStyle,
+                                        FreqLedLive.FontWeight, FreqLedLive.FontStretch);
+
+            double whole = Measure(text, typeface, dpi);
+            double uptoDot = Measure(text.Substring(0, dot + 1), typeface, dpi);
+
+            // Right-aligned: the text ends at the right edge, so it begins that far back from it.
+            start = FreqLedLive.ActualWidth - whole;
+            split = start + uptoDot;
+            end = start + whole;
+            return true;
+        }
+
+        /// <summary>
+        /// Which digits the pointer is over on the LED: 1 kHz to the left of the decimal point, 0.1 kHz
+        /// to the right of it - the display is read the way the radio's own dial is, the digit you are
+        /// pointing at being the one that moves.
+        /// </summary>
         private double LedStepUnderPointer(double x)
         {
             try
             {
-                if (FreqLedLive == null) return 1.0;
+                double start, split, end;
+                if (!LedTextBounds(out start, out split, out end)) return 1.0;
 
-                string text = FreqLedLive.Text ?? string.Empty;
-                int dot = text.IndexOf('.');
-                if (dot < 0) return 1.0;
-
-                double dpi = VisualTreeHelper.GetDpi(FreqLedLive).PixelsPerDip;
-                var typeface = new Typeface(FreqLedLive.FontFamily, FreqLedLive.FontStyle,
-                                            FreqLedLive.FontWeight, FreqLedLive.FontStretch);
-
-                double whole = Measure(text, typeface, dpi);
-                double uptoDot = Measure(text.Substring(0, dot + 1), typeface, dpi);
-
-                // Right-aligned: the text ends at the right edge, so it begins that far back from it.
-                double textStart = FreqLedLive.ActualWidth - whole;
-                return x > textStart + uptoDot ? 0.1 : 1.0;
+                return x > split ? 0.1 : 1.0;
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
 
@@ -881,6 +903,193 @@ namespace HolyLogger
             return new FormattedText(text, CultureInfo.InvariantCulture, FlowDirection.LeftToRight,
                                      typeface, FreqLedLive.FontSize, System.Windows.Media.Brushes.Black,
                                      pixelsPerDip).WidthIncludingTrailingWhitespace;
+        }
+
+        // -- WHICH HALF THE WHEEL WOULD MOVE -------------------------------------
+        //
+        // The step depends on which side of the decimal point the pointer is, and nothing said so: the
+        // operator had to roll the wheel to find out which half he was on. So the half under the
+        // pointer wears a band of the EditFieldBg yellow while the mouse is over the number - here on
+        // the LED, on the white box that stands in its place in manual mode, and on the Radio Control
+        // Panel's box, all three reading the same rule.
+
+        // Where the pointer was last seen, in the coordinates of the number it is over, or null when
+        // the mouse is not over it. Kept because the digits move under a still mouse: a reading comes
+        // in from the radio, the right-aligned text grows or shrinks a digit, and the band has to be
+        // redrawn over what is now standing there.
+        private double? _ledZoneX;
+        private double? _noCatZoneX;
+
+        private void FreqLed_MouseMove(object sender, MouseEventArgs e)
+        {
+            _ledZoneX = e.GetPosition(FreqLedLive).X;
+            ShowLedWheelZone();
+        }
+
+        private void FreqLed_MouseLeave(object sender, MouseEventArgs e)
+        {
+            _ledZoneX = null;
+            ShowLedWheelZone();
+        }
+
+        private void FreqNoCat_MouseMove(object sender, MouseEventArgs e)
+        {
+            _noCatZoneX = e.GetPosition(TB_FreqNoCat).X;
+            ShowNoCatWheelZone();
+        }
+
+        private void FreqNoCat_MouseLeave(object sender, MouseEventArgs e)
+        {
+            _noCatZoneX = null;
+            ShowNoCatWheelZone();
+        }
+
+        /// <summary>Repaints both bands after the number - or the state of the radio - changed.</summary>
+        internal void RefreshFreqZoneMarks()
+        {
+            ShowLedWheelZone();
+            ShowNoCatWheelZone();
+        }
+
+        /// <summary>
+        /// The band on the LED. It shows only when a notch would actually do something: CAT on, the
+        /// rig online, the LED itself on show and the inline editor closed - the very conditions
+        /// FreqLed_PreviewMouseWheel tunes under.
+        /// </summary>
+        private void ShowLedWheelZone()
+        {
+            if (FreqLedZoneMark == null) return;
+
+            try
+            {
+                bool wheelTunes = _ledZoneX != null
+                                  && FreqLedBezel != null && FreqLedBezel.Visibility == Visibility.Visible
+                                  && (TB_FreqLedEdit == null || TB_FreqLedEdit.Visibility != Visibility.Visible)
+                                  && Properties.Settings.Default.EnableOmniRigCAT
+                                  && OmniRigEngine != null && Rig != null
+                                  && Rig.Status == OmniRig.RigStatusX.ST_ONLINE;
+
+                double start, split, end;
+                if (!wheelTunes || !LedTextBounds(out start, out split, out end))
+                {
+                    HideLedZone();
+                    return;
+                }
+
+                bool fraction = _ledZoneX.Value > split;
+                double left = fraction ? split : start;
+                double right = fraction ? end : split;
+
+                if (right - left <= 0)
+                {
+                    HideLedZone();
+                    return;
+                }
+
+                FreqLedZoneMark.Margin = new Thickness(left, 0, 0, 0);
+                FreqLedZoneMark.Width = right - left;
+                FreqLedZoneMark.Visibility = Visibility.Visible;
+                PaintLedDigits(fraction);   // the digits now standing on the band go black
+            }
+            catch (Exception swallowed)
+            {
+                Log.Swallow(swallowed);
+                HideLedZone();
+            }
+        }
+
+        /// <summary>The band goes out and the digits go back to their own colours.</summary>
+        private void HideLedZone()
+        {
+            FreqLedZoneMark.Visibility = Visibility.Collapsed;
+            PaintLedDigits(null);
+        }
+
+        /// <summary>
+        /// The digits standing on the yellow band go black - amber and soft white are both unreadable
+        /// on it. Which half turns needs no measuring: the display is built as two runs divided at the
+        /// decimal point, the very line the band is drawn on. Null puts both back to their own colour.
+        /// </summary>
+        private void PaintLedDigits(bool? fraction)
+        {
+            if (FreqLedLive == null) return;
+
+            try
+            {
+                var runs = FreqLedLive.Inlines.OfType<System.Windows.Documents.Run>().ToList();
+                if (runs.Count == 0) return;
+
+                // The kHz run first, the Hz run second - the blank display ("-------.---") has only
+                // the one, and then there is nothing to divide.
+                runs[0].Foreground = fraction == false ? LedOverBandBrush : LedAmberBrush;
+                if (runs.Count > 1)
+                    runs[1].Foreground = fraction == true ? LedOverBandBrush : LedWhiteBrush;
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        /// <summary>
+        /// The band on the white box that stands in the LED's place in manual mode, and whenever CAT
+        /// is off. Its wheel steps by what the BOX says, so an empty or half-typed box marks nothing:
+        /// there is no number there to step from.
+        /// </summary>
+        private void ShowNoCatWheelZone()
+        {
+            if (FreqNoCatZoneMark == null) return;
+
+            try
+            {
+                if (_noCatZoneX == null || TB_FreqNoCat == null
+                    || FreqNoCatBezel == null || FreqNoCatBezel.Visibility != Visibility.Visible)
+                {
+                    FreqNoCatZoneMark.Visibility = Visibility.Collapsed;
+                    return;
+                }
+
+                string text = TB_FreqNoCat.Text ?? string.Empty;
+                if (!double.TryParse(text.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture,
+                                     out double khz) || khz <= 0)
+                {
+                    FreqNoCatZoneMark.Visibility = Visibility.Collapsed;
+                    return;
+                }
+
+                // The text may have been set a moment ago, in this same call stack: without this the
+                // character rectangles are still the ones of the frequency before last.
+                TB_FreqNoCat.UpdateLayout();
+
+                Rect first = TB_FreqNoCat.GetRectFromCharacterIndex(0);
+                Rect last = TB_FreqNoCat.GetRectFromCharacterIndex(text.Length - 1, true);
+                if (first.IsEmpty || last.IsEmpty)
+                {
+                    FreqNoCatZoneMark.Visibility = Visibility.Collapsed;
+                    return;
+                }
+
+                // No point typed means one step for the whole box, so the whole number lights rather
+                // than half of a division that is not there.
+                int dot = text.IndexOf('.');
+                double? split = dot < 0 ? (double?)null : TB_FreqNoCat.GetRectFromCharacterIndex(dot).Right;
+                bool fraction = split != null && _noCatZoneX.Value > split.Value;
+
+                double left = fraction ? split.Value : first.Left;
+                double right = split == null ? last.Right : (fraction ? last.Right : split.Value);
+
+                if (right - left <= 0)
+                {
+                    FreqNoCatZoneMark.Visibility = Visibility.Collapsed;
+                    return;
+                }
+
+                FreqNoCatZoneMark.Margin = new Thickness(left, 0, 0, 0);
+                FreqNoCatZoneMark.Width = right - left;
+                FreqNoCatZoneMark.Visibility = Visibility.Visible;
+            }
+            catch (Exception swallowed)
+            {
+                Log.Swallow(swallowed);
+                FreqNoCatZoneMark.Visibility = Visibility.Collapsed;
+            }
         }
 
         private void RadioPanel_Closed(object sender, EventArgs e)

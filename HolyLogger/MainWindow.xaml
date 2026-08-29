@@ -1210,11 +1210,20 @@
                         Background="#080808" CornerRadius="4" BorderBrush="#3A3A3A" BorderThickness="1"
                         Cursor="ScrollNS" MouseLeftButtonUp="FreqLed_MouseLeftButtonUp"
                         PreviewMouseWheel="FreqLed_PreviewMouseWheel"
+                        MouseMove="FreqLed_MouseMove" MouseLeave="FreqLed_MouseLeave"
                         ToolTip="Working frequency in kHz — click to edit, or roll the mouse wheel to move the radio 1 kHz">
                     <Grid Margin="4,1,4,2">
                         <TextBlock x:Name="FreqLedGhost" FontFamily="./Fonts/#DSEG7 Classic" FontWeight="Bold"
                                    FontSize="18" VerticalAlignment="Center" Foreground="#1E1500"
                                    TextAlignment="Right"/>
+                        <!-- The band under the digits the wheel would move. It goes OVER the ghost
+                             segments and under the lit ones: behind the ghost, its dark all-segment
+                             8s stood on the yellow and the marked half read as a row of smudges.
+                             Placed and sized in code, off the same measurement the wheel's own step
+                             is read from, so what is lit is exactly what would move. -->
+                        <Rectangle x:Name="FreqLedZoneMark" Fill="{DynamicResource EditFieldBg}"
+                                   HorizontalAlignment="Left" Width="0" Visibility="Collapsed"
+                                   IsHitTestVisible="False"/>
                         <TextBlock x:Name="FreqLedLive" FontFamily="./Fonts/#DSEG7 Classic" FontWeight="Bold"
                                    FontSize="18" VerticalAlignment="Center" TextAlignment="Right"/>
                         <TextBox x:Name="TB_FreqLedEdit" Visibility="Collapsed" MinWidth="175"
@@ -1228,14 +1237,23 @@
                 <Border x:Name="FreqNoCatBezel" Margin="0,1,2,1"
                         Background="White" CornerRadius="4" BorderBrush="#D32F2F" BorderThickness="2"
                         Visibility="Hidden" HorizontalAlignment="Stretch">
-                    <TextBox x:Name="TB_FreqNoCat" Padding="4,0"
-                             FontFamily="Consolas" FontSize="22" FontWeight="Bold"
-                             Background="White" Foreground="Black" CaretBrush="Black" BorderThickness="0"
-                             TextAlignment="Right" MaxLength="11"
-                             VerticalContentAlignment="Center"
-                             PreviewMouseWheel="FreqNoCat_PreviewMouseWheel"
-                             KeyDown="TB_FreqNoCat_KeyDown" LostFocus="TB_FreqNoCat_LostFocus"
-                             GotFocus="TB_FreqNoCat_GotFocus" TextChanged="TB_FreqNoCat_TextChanged"/>
+                    <!-- Same three layers as the control panel's box: the band underneath, the text
+                         box over it with nothing of its own painted, so the band shows through. -->
+                    <Grid>
+                        <Rectangle x:Name="FreqNoCatZoneMark" Fill="{DynamicResource EditFieldBg}"
+                                   HorizontalAlignment="Left" Width="0" Visibility="Collapsed"
+                                   IsHitTestVisible="False"/>
+                        <TextBox x:Name="TB_FreqNoCat" Padding="4,0"
+                                 FontFamily="Consolas" FontSize="22" FontWeight="Bold"
+                                 Background="Transparent" Foreground="Black" CaretBrush="Black" BorderThickness="0"
+                                 TextAlignment="Right" MaxLength="11"
+                                 VerticalContentAlignment="Center"
+                                 Cursor="ScrollNS"
+                                 PreviewMouseWheel="FreqNoCat_PreviewMouseWheel"
+                                 MouseMove="FreqNoCat_MouseMove" MouseLeave="FreqNoCat_MouseLeave"
+                                 KeyDown="TB_FreqNoCat_KeyDown" LostFocus="TB_FreqNoCat_LostFocus"
+                                 GotFocus="TB_FreqNoCat_GotFocus" TextChanged="TB_FreqNoCat_TextChanged"/>
+                    </Grid>
                 </Border>
             </Grid>
             <TextBlock Text="kHz" FontWeight="Bold" FontSize="13" Foreground="{DynamicResource KHzText}"

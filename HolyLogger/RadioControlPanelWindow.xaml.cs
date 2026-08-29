@@ -254,12 +254,16 @@ namespace HolyLogger
             if (_cwButton != null) _cwButton.IsEnabled = rigOnline;
             TB_Frequency.IsEnabled = rigOnline;
 
-            if (!rigOnline) return;
+            // A dead box marks nothing: the band goes out with the radio.
+            if (!rigOnline) { ShowWheelZone(); return; }
 
             // The box shows where the radio is, until it is typed in - to the same three decimals
             // as the LED on the main window, so the two never disagree about where the radio is.
             if (_boxShowsRadio && khz > 0)
                 TB_Frequency.Text = khz.ToString("0.000", CultureInfo.InvariantCulture);
+
+            // The digits may have shifted under a mouse that never moved.
+            ShowWheelZone();
         }
 
         /// <summary>
@@ -275,10 +279,6 @@ namespace HolyLogger
             // With the window a fixed size there is no room for a line of explanation, so the label
             // itself carries it: a dark lamp over "NO RADIO" says why nothing in the panel answers.
             TxRxLabel.Text = _rigOnline ? "TX/RX" : "NO RADIO";
-        }
-
-        // ---- the operator presses something ------------------------------------------------
-
 
             // AND IT SAYS IT IN RED. A dark lamp is the absence of something, which is easy to look
             // straight past; the words in the theme's own red are not. TX/RX goes back to the plain
@@ -287,6 +287,10 @@ namespace HolyLogger
             // SetResourceReference rather than a brush taken once: the panel is open across scheme
             // changes, and a colour copied out of the palette would keep the old scheme's red.
             TxRxLabel.SetResourceReference(TextBlock.ForegroundProperty, _rigOnline ? "TextBrush" : "Danger");
+        }
+
+        // ---- the operator presses something ------------------------------------------------
+
         private void BandButton_Click(object sender, RoutedEventArgs e)
         {
             var button = (ToggleButton)sender;
@@ -375,13 +379,15 @@ namespace HolyLogger
         {
             if (!_rigOnline) return;   // nothing to tune: leave the wheel to whatever else wants it
 
+            _zonePointerX = e.GetPosition(TB_Frequency).X;
+
             // Inside the band and no further: the edges of whatever band the radio is in now.
             var band = RadioPanelPresets.BandFor(_rigKhz);
             double lowKhz = band != null ? band.LowKhz : 0;
             double highKhz = band != null ? band.HighKhz : 0;
 
             double? target = _wheel.Next(_rigKhz, e.Delta,
-                                         StepUnderPointer(e.GetPosition(TB_Frequency).X), lowKhz, highKhz);
+                                         StepUnderPointer(_zonePointerX.Value), lowKhz, highKhz);
             if (target == null) return;
 
             e.Handled = true;   // the radio is being tuned: the wheel belongs to us for this notch
@@ -390,11 +396,31 @@ namespace HolyLogger
             // request to change from data to SSB.
             _boxShowsRadio = true;
             TB_Frequency.Text = target.Value.ToString("0.000", CultureInfo.InvariantCulture);
+            ShowWheelZone();   // the digits just moved under the pointer; the band moves with them
 
             // QueueWheelTune, not TuneRadioToKhz: the wheel's path writes the frequency and nothing
             // else - no mode, no readback poll - and sends at most one command per 50 ms however fast
             // the wheel is spun.
             _main.QueueWheelTune(target.Value);
+        }
+
+        /// <summary>
+        /// x of the decimal point in the box, or null when there is not one on show. This is the one
+        /// line that divides the kHz digits from the fraction: the wheel's step and the band that
+        /// marks it both read it here, so what is lit is exactly what would move.
+        /// </summary>
+        private double? DotSplitX()
+        {
+            try
+            {
+                int dot = (TB_Frequency.Text ?? string.Empty).IndexOf('.');
+                if (dot < 0) return null;
+
+                return TB_Frequency.GetRectFromCharacterIndex(dot).Right;
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+            return null;
         }
 
         /// <summary>
@@ -404,17 +430,93 @@ namespace HolyLogger
         /// </summary>
         private double StepUnderPointer(double x)
         {
+            double? split = DotSplitX();
+            return split != null && x > split.Value ? 0.1 : 1.0;
+        }
+
+        // ── WHICH HALF THE WHEEL WOULD MOVE ─────────────────────────────────────
+        //
+        // The step depends on where the pointer is, and nothing said so: the operator had to roll the
+        // wheel to find out which half he was on. So the half under the pointer wears the yellow the
+        // box itself used to wear - it lights while the mouse is over the box and goes out when the
+        // mouse leaves, and it is the answer to "what does one notch do from here" before the notch.
+
+        // Where the pointer was last seen inside the box, in the box's own coordinates, or null when
+        // the mouse is not over it. Kept because the digits move under a still mouse: a reading comes
+        // in from the radio, the text is re-centred, and the band has to be redrawn over what is now
+        // standing there.
+        private double? _zonePointerX;
+
+        private void TB_Frequency_MouseMove(object sender, MouseEventArgs e)
+        {
+            _zonePointerX = e.GetPosition(TB_Frequency).X;
+            ShowWheelZone();
+        }
+
+        private void TB_Frequency_MouseLeave(object sender, MouseEventArgs e)
+        {
+            _zonePointerX = null;
+            ShowWheelZone();
+        }
+
+        /// <summary>
+        /// Paints the band over the half of the number a notch of the wheel would move: the kHz
+        /// digits with the pointer left of the point, the fraction with it right of the point.
+        /// </summary>
+        private void ShowWheelZone()
+        {
+            if (_zonePointerX == null || !_rigOnline || !TB_Frequency.IsEnabled)
+            {
+                FreqZoneMark.Visibility = Visibility.Collapsed;
+                return;
+            }
+
             try
             {
-                int dot = (TB_Frequency.Text ?? string.Empty).IndexOf('.');
-                if (dot < 0) return 1.0;
+                string text = TB_Frequency.Text ?? string.Empty;
+                if (text.Length == 0)
+                {
+                    FreqZoneMark.Visibility = Visibility.Collapsed;
+                    return;
+                }
 
-                Rect dotRect = TB_Frequency.GetRectFromCharacterIndex(dot);
-                return x > dotRect.Right ? 0.1 : 1.0;
+                // The text may have been set a moment ago, in this same call stack: without this the
+                // character rectangles are still the ones of the frequency before last.
+                TB_Frequency.UpdateLayout();
+
+                Rect first = TB_Frequency.GetRectFromCharacterIndex(0);
+                Rect last = TB_Frequency.GetRectFromCharacterIndex(text.Length - 1, true);
+                if (first.IsEmpty || last.IsEmpty)
+                {
+                    FreqZoneMark.Visibility = Visibility.Collapsed;
+                    return;
+                }
+
+                // No point on show means the whole box is the one step there is, so the whole number
+                // lights rather than half of a division that is not there.
+                double? split = DotSplitX();
+                bool fraction = split != null && _zonePointerX.Value > split.Value;
+
+                double left = fraction ? split.Value : first.Left;
+                double right = split == null ? last.Right : (fraction ? last.Right : split.Value);
+
+                if (right - left <= 0)
+                {
+                    FreqZoneMark.Visibility = Visibility.Collapsed;
+                    return;
+                }
+
+                Canvas.SetLeft(FreqZoneMark, left);
+                Canvas.SetTop(FreqZoneMark, first.Top);
+                FreqZoneMark.Width = right - left;
+                FreqZoneMark.Height = first.Height;
+                FreqZoneMark.Visibility = Visibility.Visible;
             }
-            catch (Exception swallowed) { Log.Swallow(swallowed); }
-
-            return 1.0;
+            catch (Exception swallowed)
+            {
+                Log.Swallow(swallowed);
+                FreqZoneMark.Visibility = Visibility.Collapsed;
+            }
         }
 
         private void TB_Frequency_KeyDown(object sender, KeyEventArgs e)

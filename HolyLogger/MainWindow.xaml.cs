@@ -8966,6 +8966,9 @@ namespace HolyLogger
             FreezeBrush(System.Windows.Media.Color.FromRgb(0xFF, 0xB0, 0x00));
         private static readonly System.Windows.Media.Brush LedWhiteBrush =
             FreezeBrush(System.Windows.Media.Color.FromRgb(0xF0, 0xF0, 0xF0));
+        // The digits standing on the yellow band go black: amber and soft white both vanish on it.
+        private static readonly System.Windows.Media.Brush LedOverBandBrush =
+            FreezeBrush(System.Windows.Media.Color.FromRgb(0x00, 0x00, 0x00));
 
         private static System.Windows.Media.Brush FreezeBrush(System.Windows.Media.Color c)
         {
@@ -9005,6 +9008,9 @@ namespace HolyLogger
                 // user is typing in it.
                 else if (TB_FreqNoCat != null && !TB_FreqNoCat.IsFocused)
                     FillFreqNoCatFromFrequency();
+
+                // The number under the pointer changed, or the display did.
+                RefreshFreqZoneMarks();
                 return;
             }
 
@@ -9030,6 +9036,9 @@ namespace HolyLogger
             FreqLedLive.Inlines.Clear();
             FreqLedLive.Inlines.Add(new System.Windows.Documents.Run(intPart + ".") { Foreground = LedAmberBrush });
             FreqLedLive.Inlines.Add(new System.Windows.Documents.Run(fracPart) { Foreground = LedWhiteBrush });
+
+            // The digits may have shifted under a mouse that never moved.
+            RefreshFreqZoneMarks();
         }
 
         // "No live frequency" state — dashes on the LED, with the dim all-segments ghost behind.
@@ -11925,6 +11934,15 @@ namespace HolyLogger
                 if (CallsignSuggestionsPopup.IsOpen)
                 {
                     ApplySelectedCallsignSuggestion();
+                    e.Handled = true;
+                }
+
+                // ESM IS ASKED HERE TOO, not only in Window_KeyDown. This box handles Enter itself
+                // and marks the key handled, so the window's handler never sees it - and this box is
+                // exactly where a contester's hands are. Below the suggestion list, which owns Enter
+                // while it is open.
+                else if (TryHandleEsmEnter())
+                {
                     e.Handled = true;
                 }
                 else if (Properties.Settings.Default.AddQSOWithEnter || !Properties.Settings.Default.DoNothing)
@@ -15042,6 +15060,15 @@ namespace HolyLogger
 
         private void Settings_PropertyChanged(object sender, PropertyChangedEventArgs e)
         {
+            // ESM is switched in the CW keyer's settings window, which writes these two directly.
+            // Nothing calls back to say so, and nothing needs to: the hint follows the setting.
+            if (e.PropertyName == nameof(Properties.Settings.Default.EsmEnabled)
+                || e.PropertyName == nameof(Properties.Settings.Default.EsmSearchAndPounce))
+            {
+                Dispatcher.BeginInvoke(new Action(() => { _esmStage = EsmStage.Nothing; RefreshEsmHint(); }),
+                                       DispatcherPriority.Background);
+            }
+
             if (e.PropertyName == nameof(Properties.Settings.Default.ShowOnTheAir))
             {
                 Dispatcher.BeginInvoke(new Action(UpdateShareIconVisibility), DispatcherPriority.Background);
@@ -15060,15 +15087,6 @@ namespace HolyLogger
             {
                 Dispatcher.BeginInvoke(new Action(() =>
                 {
-            // ESM is switched in the CW keyer's settings window, which writes these two directly.
-            // Nothing calls back to say so, and nothing needs to: the hint follows the setting.
-            if (e.PropertyName == nameof(Properties.Settings.Default.EsmEnabled)
-                || e.PropertyName == nameof(Properties.Settings.Default.EsmSearchAndPounce))
-            {
-                Dispatcher.BeginInvoke(new Action(() => { _esmStage = EsmStage.Nothing; RefreshEsmHint(); }),
-                                       DispatcherPriority.Background);
-            }
-
                     if (!Properties.Settings.Default.ShowPhotoFromQRZ)
                     {
                         ClearQrzPhoto();

@@ -35,7 +35,7 @@ namespace HolyLogger
         private readonly System.Collections.Generic.List<StackPanel> _propColumnsByDropOrder =
             new System.Collections.Generic.List<StackPanel>();
 
-        private const double PropBarBoxWidth = 26;
+        private const double PropBarBoxWidth = 22;
         private const double PropBarBoxHeight = 66;
 
         // The height inside the tube, once its border and padding are taken off. The ruler is exactly
@@ -87,7 +87,7 @@ namespace HolyLogger
             {
                 Orientation = Orientation.Vertical,
                 HorizontalAlignment = HorizontalAlignment.Center,
-                Margin = new Thickness(5, 0, 5, 0)
+                Margin = new Thickness(2, 0, 2, 0)
             };
 
             column.Children.Add(new TextBlock
@@ -112,7 +112,7 @@ namespace HolyLogger
             };
             fill = new Rectangle
             {
-                Width = 13,
+                Width = 9,
                 VerticalAlignment = VerticalAlignment.Bottom,
                 Height = 0
             };
@@ -265,7 +265,7 @@ namespace HolyLogger
             // What one bar takes, including the gaps either side of it. Before the first layout pass
             // ActualWidth is 0, so the built-in width stands in.
             double perBar = _propColumnsByDropOrder[_propColumnsByDropOrder.Count - 1].ActualWidth;
-            if (perBar <= 0) perBar = PropBarBoxWidth + 10;
+            if (perBar <= 0) perBar = PropBarBoxWidth + 4;
 
             // How many fit: one at the base width, and one more for every bar's width above it.
             int fits = 0;

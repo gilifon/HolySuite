@@ -83,13 +83,24 @@
                  are scenery: every click and every notch of the wheel goes straight through them to
                  the box underneath. Padding on the box keeps a long frequency from running under them. -->
             <Grid Grid.Column="1">
+                <!-- THE BOX IS PAINTED IN THREE LAYERS, because the band that marks what the wheel
+                     would move has to lie UNDER the digits, and the digits belong to a plain TextBox.
+                     Bottom: the box itself - fill and frame. Middle: the band. Top: the TextBox,
+                     transparent in both, so the two layers beneath it show through. -->
+                <Border Width="126" Height="34" Background="{DynamicResource FormBg}"
+                        BorderBrush="{DynamicResource InputBorder}" BorderThickness="1"/>
+                <Canvas x:Name="FreqZoneLayer" Width="126" Height="34" ClipToBounds="True" IsHitTestVisible="False">
+                    <Rectangle x:Name="FreqZoneMark" Fill="{DynamicResource EditFieldBg}" Visibility="Collapsed"/>
+                </Canvas>
                 <TextBox x:Name="TB_Frequency" Width="126" Height="34" FontSize="18" FontWeight="Bold" MaxLength="9"
                          VerticalContentAlignment="Center" HorizontalContentAlignment="Center"
                          Padding="0,0,14,0"
-                         Background="{DynamicResource EditFieldBg}" Foreground="{DynamicResource TextBrush}"
-                         BorderBrush="{DynamicResource InputBorder}" BorderThickness="1"
+                         Background="Transparent" Foreground="{DynamicResource TextBrush}"
+                         BorderBrush="Transparent" BorderThickness="1"
                          KeyDown="TB_Frequency_KeyDown" PreviewTextInput="TB_Frequency_PreviewTextInput"
+                         Cursor="ScrollNS"
                          PreviewMouseWheel="TB_Frequency_PreviewMouseWheel"
+                         MouseMove="TB_Frequency_MouseMove" MouseLeave="TB_Frequency_MouseLeave"
                          LostFocus="TB_Frequency_LostFocus"/>
                 <TextBlock Text="&#x21C5;" FontSize="15" FontWeight="Bold"
                            HorizontalAlignment="Right" VerticalAlignment="Center"
@@ -98,7 +109,6 @@
             </Grid>
             <!-- kHz, and under it the sign that the box can be rolled. A wheel over a text box is not
                  something anybody expects, so it has to be shown rather than discovered: the two
-                         Cursor="ScrollNS"
                  arrows say it in the one place the wheel works. -->
             <TextBlock Grid.Column="2" Text="kHz" FontSize="14" FontWeight="Bold"
                        HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="2,0,0,0"
