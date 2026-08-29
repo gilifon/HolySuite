@@ -107,6 +107,11 @@ namespace HolyLogger
         // expanded, so a button reads the same next year when the callsign in the form is different.
         private readonly Func<string, string> _expandMacros;
 
+        // Logs the QSO, for a button whose text carries {LOG}. The keyer does not know what logging
+        // is - it hands the job back to the main window, which is where Add lives.
+        private readonly Action _logQso;
+        private readonly Action _wipeForm;
+
         // Hands back a speed measured from a real transmission, so the program's idea of how fast the
         // radio keys improves every time this window is used - not only when a Msg button is pressed.
         private readonly Action<double> _learnWpm;
@@ -255,7 +260,8 @@ namespace HolyLogger
                                 Action<double> learnWpm, Func<string, string, string> editText,
                                 Func<int, string> getSharedText, Action<int, string> setSharedText,
                                 bool waitForTxIdle = false,
-                                Action<int> setSpeed = null, SpeedRange speedRange = null)
+                                Action<int> setSpeed = null, SpeedRange speedRange = null,
+                                Action logQso = null, Action wipeForm = null)
         {
             _waitForTxIdle = waitForTxIdle;
             _setSpeed = setSpeed;
@@ -268,6 +274,8 @@ namespace HolyLogger
             _isTransmitting = isTransmitting;
             _expandMacros = expandMacros;
             _macroProblem = macroProblem;
+            _logQso = logQso;
+            _wipeForm = wipeForm;
             _learnWpm = learnWpm;
             _editText = editText;
             _getSharedText = getSharedText;
@@ -1177,6 +1185,32 @@ namespace HolyLogger
 
         // The first few characters of what the button holds, or just its number when it holds nothing
         // - an empty button that looked like a full one would be pressed once and never again.
+        // THE ONE ESM WILL SEND NEXT, in the same green the Msg row uses on the main window - these
+        // are the same four texts shown twice, so they light up together. 0 clears them all, which is
+        // what arrives when ESM is off or has nothing to send.
+        //
+        // Only the first four: buttons 5-8 are the keyer's own, and ESM knows nothing about them.
+        internal void ShowEsmNext(int messageNumber)
+        {
+            for (int i = 0; i < SharedButtons && i < _buttons.Length; i++)
+            {
+                var button = _buttons[i];
+                if (button == null) continue;
+
+                if (i + 1 == messageNumber) button.Background = EsmNextBrush;
+                else button.ClearValue(BackgroundProperty);
+            }
+        }
+
+        private static readonly Brush EsmNextBrush = MakeEsmNextBrush();
+
+        private static Brush MakeEsmNextBrush()
+        {
+            var brush = new SolidColorBrush(Color.FromRgb(0x9E, 0xE4, 0x93));
+            brush.Freeze();
+            return brush;
+        }
+
         private void RefreshButtonFace(int index)
         {
             var button = _buttons[index];
@@ -1230,8 +1264,14 @@ namespace HolyLogger
                 string sends = _expandMacros != null ? _expandMacros(text) : text;
                 if (!string.Equals(sends, text, StringComparison.Ordinal))
                 {
-                    lines.Append("\nSends: ").Append(sends);
+                    lines.Append("\nSends: ").Append(sends.Trim());
                 }
+
+                // {LOG} keys nothing, so the line above cannot show it. Said in words instead,
+                // or the tooltip would quietly drop the one part of the button that changes
+                // the log.
+                if (MainWindow.CwMacroLogsQso(text)) lines.Append("\nAnd logs the QSO");
+                else if (MainWindow.CwMacroWipesForm(text)) lines.Append("\nAnd clears the form");
             }
 
             lines.Append("\nRight-click to edit");
@@ -1264,6 +1304,9 @@ namespace HolyLogger
                 }
             }
 
+            bool logsQso = _logQso != null && MainWindow.CwMacroLogsQso(stored);
+            bool wipesForm = _wipeForm != null && MainWindow.CwMacroWipesForm(stored);
+
             string text = _expandMacros != null ? _expandMacros(stored) : stored;
             text = (text ?? string.Empty).ToUpperInvariant();
 
@@ -1273,6 +1316,11 @@ namespace HolyLogger
 
             if (text.Length == 0)
             {
+                // A button holding nothing but {LOG} sends nothing and logs, which is a button
+                // working, not a button empty.
+                if (logsQso) { _logQso(); return; }
+                if (wipesForm) { _wipeForm(); return; }
+
                 // NOT ABOUT A CALLSIGN. It used to say the callsign was empty, and by this point
                 // that has already been ruled out - a missing callsign, serial or exchange is
                 // caught above, by name. What is left is a button whose text holds nothing a keyer
@@ -1299,6 +1347,14 @@ namespace HolyLogger
             _box.Text = (_box.Text ?? string.Empty) + text;
             _box.CaretIndex = _box.Text.Length;
             _box.Focus();
+
+            // AFTER the text is on its way, and without waiting for the radio to finish keying it -
+            // the whole point of putting {LOG} on the TU button is that the next callsign can be
+            // typed while the TU is still going out.
+            // Log wins over wipe - see RunCwMacroActions on the main window for why they are not
+            // both run.
+            if (logsQso) _logQso();
+            else if (wipesForm) _wipeForm();
         }
 
         private void EditButton(int index)
@@ -1543,6 +1599,7 @@ namespace HolyLogger
             stack.Children.Add(secondsRow);
             stack.Children.Add(secondsHint);
             stack.Children.Add(BuildHelp());
+            stack.Children.Add(BuildStandardTextsButton());
             stack.Children.Add(BuildRadioLink());
             stack.Children.Add(buttons);
 
@@ -1551,8 +1608,10 @@ namespace HolyLogger
                 Title = "CW Keyer Settings",
 
                 // A fixed width and a height that follows the content: the help below wraps its
-                // second column, and a column that may wrap has to be told how wide it is.
-                Width = 560,
+                // second column, and a column that may wrap has to be told how wide it is. WIDER
+                // SINCE THE HELP WENT INTO TWO COLUMNS - the keys on the left, everything that may go
+                // in a text on the right - which is what the width has to carry now.
+                Width = 1000,
                 SizeToContent = SizeToContent.Height,
                 ResizeMode = ResizeMode.NoResize,
                 ShowInTaskbar = false,
@@ -1609,6 +1668,63 @@ namespace HolyLogger
         // it in the middle of a settings dialog is a page standing between a man and the two boxes he
         // came to alter. It lives under Help now, and this is the door to it - here, because this is
         // where he is standing when the question occurs to him.
+        // THE STANDARD SET, in one press. The eight texts most CW contesters use, written with the
+        // macros so they fill themselves in - and in the order ESM expects: 1 is the CQ, 2 the
+        // exchange, 3 the TU, 4 your own callsign. A new installation starts with the first four
+        // already set to these; this is here for everybody else, whose buttons were filled in long
+        // before the macros existed.
+        private static readonly string[] StandardTexts =
+        {
+            "CQ TEST {MYCALL} {MYCALL} TEST",
+            "{CALL} {SENTRST} {EXCH}",
+            "TU {MYCALL} TEST {LOG}",
+            "{MYCALL}",
+            "{CALL}",
+            "AGN?",
+            "NR?",
+            "QSO B4"
+        };
+
+        private UIElement BuildStandardTextsButton()
+        {
+            var button = new Button
+            {
+                Content = "Use the standard contest texts",
+                FontSize = 16,
+                Padding = new Thickness(12, 4, 12, 4),
+                HorizontalAlignment = HorizontalAlignment.Left,
+                Margin = new Thickness(0, 18, 0, 0),
+                ToolTip = "Writes the eight texts most CW contesters use into all eight buttons."
+            };
+
+            button.Click += (s, e) =>
+            {
+                // IT OVERWRITES ALL EIGHT, so it asks first, and it says what it is about to write.
+                // Anything the operator wrote himself is gone after this, and there is no undo for it.
+                var said = new StringBuilder();
+                said.Append("This writes the standard contest texts into ALL EIGHT buttons.\n\n");
+                said.Append("Whatever they hold now is replaced, and it cannot be undone.\n\n");
+                for (int i = 0; i < StandardTexts.Length; i++)
+                {
+                    said.Append(i + 1).Append(".  ").Append(StandardTexts[i]).Append('\n');
+                }
+                said.Append("\nTxt 1 is the CQ, Txt 2 the exchange, Txt 3 the TU, Txt 4 your own callsign - ");
+                said.Append("which is the order ESM sends them in.");
+
+                if (!HolyMessageBox.ShowConfirm(said.ToString(), "CW Keyer", HolyMsgType.Warning, this, 620,
+                                                "Write them", "Leave mine")) return;
+
+                for (int i = 0; i < ButtonCount && i < StandardTexts.Length; i++)
+                {
+                    _buttonTexts[i] = StandardTexts[i];
+                    SaveButtonText(i, StandardTexts[i]);
+                    RefreshButtonFace(i);
+                }
+            };
+
+            return button;
+        }
+
         private UIElement BuildRadioLink()
         {
             var line = new TextBlock { Margin = new Thickness(0, 14, 0, 0), FontSize = 16 };
@@ -1796,36 +1912,194 @@ namespace HolyLogger
             RefreshSpeedText();
         }
 
-        // WHAT THE KEYS DO, in the one place the operator already opens to change how this window
-        // behaves. Every line here is something the window does that nothing on its face announces -
-        // a key with no button, or a button whose second meaning is on the right mouse button.
+        // WHAT THE KEYS DO, AND WHAT MAY GO IN A TEXT: the one place the operator already opens to
+        // change how this window behaves. Every line is something the window does that nothing on its
+        // face announces - a key with no button, a button whose second meaning is on the right mouse
+        // button, or a macro that shows itself only once it has been typed into a text.
+        //
+        // TWO COLUMNS SIDE BY SIDE, because the macro list has outgrown the keys. One under the other
+        // they had become a page to scroll through; the gear window is widened to carry them abreast.
         private UIElement BuildHelp()
         {
-            var pairs = new[]
+            var keys = new[]
             {
                 new[] { "Ctrl+K",       "Closes this window. On the main window it opens it." },
                 new[] { "Escape",       "Stops the radio now and drops whatever has not gone out. What has already gone stays in the record." },
                 new[] { "Backspace",    "Takes back only what has not gone out yet." },
-                new[] { "Mouse click",  "Puts that button's text into the typing row, and it goes out from there." },
-                new[] { "Right-click",  "Edits that button's text." },
-                new[] { "*",            "In a text: your Station Callsign." },
-                new[] { "!",            "In a text: the DX Callsign." },
-                new[] { "#",            "In a text: the serial number you are sending. Needs contest mode." },
-                new[] { "$",            "In a text: the rest of your sent exchange. Needs contest mode." }
+                // "Mouse click" alone left the operator asking "click on what?" - the row named no
+                // target at all. The buttons are named in the right-hand cell rather than the left,
+                // which is shared with every other row and would be squeezed to fit the longest label.
+                new[] { "Mouse click",  "On one of the keyer's macro buttons: puts its text into the typing row, and it goes out from there." },
+                new[] { "Right-click",  "On one of the keyer's macro buttons: edits its text." }
             };
 
+            // BOTH SPELLINGS OF EACH, because until now only the single character was shown and the
+            // long form was written down nowhere but in the source. A man who writes his messages in
+            // N1MM types {MYCALL} and {EXCH}; HolyLogger has always understood them, and had no way of
+            // telling him so. {ZONE} is ours - N1MM keeps the zone inside {EXCH} and has no macro of
+            // its own for it - and it is the one that still works with no contest selected.
+            var macros = new[]
+            {
+                new[] { "*  or  {MYCALL}", "Your Station Callsign." },
+                new[] { "!  or  {CALL}",   "The DX Callsign." },
+                new[] { "#",               "The serial number you are sending. Needs contest mode." },
+                new[] { "$  or  {EXCH}",   "The rest of your sent exchange. Needs contest mode." },
+                new[] { "{ZONE}",          "Your CQ zone. Works with or without contest mode." },
+                new[] { "{SENTRST}",       "The RST you are sending." },
+                new[] { "{GRID}",          "Your My Locator." },
+                new[] { "{GRIDSQUARE}",    "His DX Locator." },
+                new[] { "{NAME}",          "His Name." },
+                new[] { "{LASTCALL}",      "The callsign of the last QSO logged." },
+                new[] { "{LOG}",           "Logs the QSO, the same as pressing Add. It keys nothing itself, so TU {LOG} sends TU and logs. A text that is only {LOG} logs without transmitting." },
+                new[] { "{WIPE}",          "Clears the entry form, the same as pressing Clear. It keys nothing either." }
+            };
+
+            // ONE RUN OF ROWS, NOT TWO LISTS SIDE BY SIDE. Keys left and macros right left the left
+            // column ending half way down the window while the right ran on past the bottom of it.
+            // The rows now flow: the left column is filled first, and what will not fit continues in
+            // the right, headings included - so both columns end at about the same depth.
+            var rows = new List<HelpRow>();
+            rows.Add(HelpRow.Heading("What the keys do"));
+            foreach (string[] k in keys) rows.Add(HelpRow.Pair(k[0], k[1]));
+            rows.Add(HelpRow.Heading("What you can put in a text"));
+            foreach (string[] m in macros) rows.Add(HelpRow.Pair(m[0], m[1]));
+
+            int split = HelpSplitPoint(rows);
+            var leftRows = rows.Take(split).ToList();
+            var rightRows = rows.Skip(split).ToList();
+
+            // The break can fall in the middle of a section. A column that opens with rows standing
+            // under no heading at all says nothing about what they are, so the heading comes across
+            // with them.
+            if (rightRows.Count > 0 && !rightRows[0].IsHeading)
+            {
+                string section = leftRows.Where(r => r.IsHeading).Select(r => r.Label).LastOrDefault();
+                if (!string.IsNullOrEmpty(section))
+                {
+                    rightRows.Insert(0, HelpRow.Heading(section + " (continued)"));
+                }
+            }
+
+            Grid leftTable = BuildHelpTable(leftRows);
+            Grid rightTable = BuildHelpTable(rightRows);
+            AddHelpExample(rightTable, rightTable.RowDefinitions.Count);   // last of the flow
+
+            var both = new Grid();
+            both.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            both.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(28) });
+            both.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+            Grid.SetColumn(leftTable, 0);
+            both.Children.Add(leftTable);
+            Grid.SetColumn(rightTable, 2);
+            both.Children.Add(rightTable);
+
+            var separated = new Border
+            {
+                BorderThickness = new Thickness(0, 1, 0, 0),
+                Margin = new Thickness(0, 18, 0, 0),
+                Padding = new Thickness(0, 14, 0, 0),
+                Child = both
+            };
+            separated.SetResourceReference(Border.BorderBrushProperty, "MutedTextBrush");
+            return separated;
+        }
+
+        // A row of the help: either a heading, or a label and what it means.
+        private sealed class HelpRow
+        {
+            public string Label;
+            public string Meaning;
+            public bool IsHeading;
+
+            public static HelpRow Heading(string text)
+            {
+                return new HelpRow { Label = text, IsHeading = true };
+            }
+
+            public static HelpRow Pair(string label, string meaning)
+            {
+                return new HelpRow { Label = label, Meaning = meaning };
+            }
+        }
+
+        // WHERE THE LEFT COLUMN ENDS. Counting rows would not do it - one row of the list is a single
+        // short line and another wraps to three - so each row is weighed by how many lines it is
+        // likely to take at this column width, and the break comes as soon as the left half is full.
+        // A row added or reworded later moves the break by itself, with nothing to remember here.
+        private static int HelpSplitPoint(List<HelpRow> rows)
+        {
+            const double CharsPerLine = 44;   // the meaning column at half of a 1000-wide window
+
+            var weights = new double[rows.Count];
+            double total = 0;
+
+            for (int i = 0; i < rows.Count; i++)
+            {
+                double lines = rows[i].IsHeading
+                    ? 1.6                                    // a heading plus the space under it
+                    : Math.Max(1, Math.Ceiling((rows[i].Meaning ?? string.Empty).Length / CharsPerLine));
+                weights[i] = lines;
+                total += lines;
+            }
+
+            double running = 0;
+            for (int i = 0; i < rows.Count; i++)
+            {
+                running += weights[i];
+
+                // Never break just after a heading: a heading at the foot of a column with its first
+                // row over in the other one reads as a heading over nothing.
+                if (running >= total / 2 && !rows[i].IsHeading) return i + 1;
+            }
+
+            return rows.Count;
+        }
+
+        private static TextBlock HelpHeading(string text)
+        {
+            var heading = new TextBlock
+            {
+                Text = text,
+                FontSize = 16,
+                FontWeight = FontWeights.Bold,
+                Margin = new Thickness(0, 0, 0, 8)
+            };
+            heading.SetResourceReference(TextBlock.ForegroundProperty, "TextBrush");
+            return heading;
+        }
+
+        // One column of the help: bold label, a gap, and the wrapping meaning; a heading spans the lot.
+        private static Grid BuildHelpTable(IEnumerable<HelpRow> rows)
+        {
             var grid = new Grid();
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(12) });
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
 
-            for (int i = 0; i < pairs.Length; i++)
+            int i = 0;
+            foreach (HelpRow row in rows)
             {
                 grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
+                if (row.IsHeading)
+                {
+                    TextBlock heading = HelpHeading(row.Label);
+
+                    // Space above it, unless it is the first thing in the column - there the rule
+                    // above the whole block is the separation.
+                    heading.Margin = new Thickness(0, i == 0 ? 0 : 14, 0, 8);
+                    Grid.SetRow(heading, i);
+                    Grid.SetColumn(heading, 0);
+                    Grid.SetColumnSpan(heading, 3);
+                    grid.Children.Add(heading);
+                    i++;
+                    continue;
+                }
+
                 var key = new TextBlock
                 {
-                    Text = pairs[i][0],
+                    Text = row.Label,
                     FontSize = 16,
                     FontWeight = FontWeights.Bold,
                     Margin = new Thickness(0, 3, 0, 3)
@@ -1837,7 +2111,7 @@ namespace HolyLogger
 
                 var meaning = new TextBlock
                 {
-                    Text = pairs[i][1],
+                    Text = row.Meaning,
                     FontSize = 16,
                     TextWrapping = TextWrapping.Wrap,
                     Margin = new Thickness(0, 3, 0, 3)
@@ -1846,33 +2120,10 @@ namespace HolyLogger
                 Grid.SetRow(meaning, i);
                 Grid.SetColumn(meaning, 2);
                 grid.Children.Add(meaning);
+                i++;
             }
 
-            AddHelpExample(grid, pairs.Length);
-
-            var heading = new TextBlock
-            {
-                Text = "What the keys do",
-                FontSize = 16,
-                FontWeight = FontWeights.Bold,
-                Margin = new Thickness(0, 0, 0, 8)
-            };
-            heading.SetResourceReference(TextBlock.ForegroundProperty, "TextBrush");
-
-
-            var inner = new StackPanel();
-            inner.Children.Add(heading);
-            inner.Children.Add(grid);
-
-            var separated = new Border
-            {
-                BorderThickness = new Thickness(0, 1, 0, 0),
-                Margin = new Thickness(0, 18, 0, 0),
-                Padding = new Thickness(0, 14, 0, 0),
-                Child = inner
-            };
-            separated.SetResourceReference(Border.BorderBrushProperty, "MutedTextBrush");
-            return separated;
+            return grid;
         }
 
         // ONE LINE OF IT ACTUALLY DONE, with this station's own callsign in it rather than a made-up

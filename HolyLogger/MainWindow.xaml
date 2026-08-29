@@ -428,6 +428,39 @@
                 </Setter.Value>
             </Setter>
         </Style>
+        <!-- The middle of a three-way pill: square at both ends. Same template as the two above -
+             the corner radius lives inside it, so no two segments can share one style. -->
+        <Style x:Key="FreqSegMid" TargetType="RadioButton">
+            <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border x:Name="Seg" CornerRadius="0" Background="Transparent"
+                                Padding="9,3" SnapsToDevicePixels="True">
+                            <!-- See FreqSegLeft: the hidden bold twin reserves the width so bolding the
+                                 label cannot resize the segment. -->
+                            <Grid>
+                                <TextBlock Text="{Binding Content, RelativeSource={RelativeSource TemplatedParent}}"
+                                           FontWeight="Bold" Visibility="Hidden"/>
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                  TextElement.Foreground="{Binding Foreground, RelativeSource={RelativeSource TemplatedParent}}"/>
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Seg" Property="Background" Value="{DynamicResource GridHeaderBg}"/>
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Seg" Property="Background" Value="{DynamicResource AccentBrush}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource SelectionText}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
         <!-- Identical to FreqSegLeft but rounded on the other end - the corner radius lives inside the
              template, so the two halves cannot share one. -->
         <Style x:Key="FreqSegRight" TargetType="RadioButton">
@@ -1124,6 +1157,41 @@
                                     <RadioButton x:Name="RB_TimeAuto" GroupName="TimeMode" Content="Auto"
                                                  Style="{StaticResource FreqSegRight}" Click="TimeMode_Click"
                                                  ToolTip="The QSO's date and time follow the UTC clock."/>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </Border>
+                </StatusBarItem>
+                <!-- ESM - Enter Sends Message. One key walks the whole QSO: which of the four Msg
+                     texts Enter sends is worked out from how far the contact has got. Built like the
+                     two groups beside it so it reads as the same kind of choice, but with three
+                     segments, because "not now" is as much a state as Run and S&amp;P.
+
+                     RUN is you calling CQ; S&amp;P is you answering others. That is the only difference
+                     between them - in S&amp;P nothing is sent to an empty form, and the first Enter over
+                     a callsign sends your own call rather than the exchange.
+
+                     Ctrl+M switches it off and on from the keyboard, the same key N1MM uses. -->
+                <StatusBarItem>
+                    <Border CornerRadius="5" BorderThickness="1" BorderBrush="{DynamicResource AccentBrush}"
+                            Margin="10,0,0,0" Padding="7,3" VerticalAlignment="Center" SnapsToDevicePixels="True">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Text="ESM" FontSize="16" VerticalAlignment="Center" Margin="0,0,8,0"
+                                       ToolTip="Enter Sends Message: one key sends CQ, then the exchange, then TU - and logs the QSO."/>
+                            <Border CornerRadius="4" BorderThickness="1" BorderBrush="{DynamicResource ThemeBorderBrush}"
+                                    VerticalAlignment="Center" SnapsToDevicePixels="True">
+                                <StackPanel Orientation="Horizontal">
+                                    <RadioButton x:Name="RB_EsmOff" GroupName="EsmMode" Content="Off" FontSize="16"
+                                                 Style="{StaticResource FreqSegLeft}" Click="EsmMode_Click"
+                                                 ToolTip="Enter does what it always did."/>
+                                    <Rectangle Width="1" Fill="{DynamicResource ThemeBorderBrush}"/>
+                                    <RadioButton x:Name="RB_EsmRun" GroupName="EsmMode" Content="Run" FontSize="16"
+                                                 Style="{StaticResource FreqSegMid}" Click="EsmMode_Click"
+                                                 ToolTip="You are calling CQ. Enter sends Txt 1 (CQ); with a callsign in the form it sends Txt 2 (his call and your exchange), and the next Enter sends Txt 3 (TU) and logs the QSO."/>
+                                    <Rectangle Width="1" Fill="{DynamicResource ThemeBorderBrush}"/>
+                                    <RadioButton x:Name="RB_EsmSp" GroupName="EsmMode" Content="S&amp;P" FontSize="16"
+                                                 Style="{StaticResource FreqSegRight}" Click="EsmMode_Click"
+                                                 ToolTip="You are answering others. With his callsign typed in, Enter sends Txt 4 (your callsign), then Txt 2 (your exchange), then Txt 3 (TU) and logs the QSO."/>
                                 </StackPanel>
                             </Border>
                         </StackPanel>

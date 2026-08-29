@@ -2525,7 +2525,7 @@ namespace HolyLogger.Properties {
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("CQ CQ DE K")]
+        [global::System.Configuration.DefaultSettingValueAttribute("CQ TEST {MYCALL} {MYCALL} TEST")]
         public string CwMsgText1 {
             get {
                 return ((string)(this["CwMsgText1"]));
@@ -2537,7 +2537,7 @@ namespace HolyLogger.Properties {
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("DE K")]
+        [global::System.Configuration.DefaultSettingValueAttribute("{CALL} {SENTRST} {EXCH}")]
         public string CwMsgText2 {
             get {
                 return ((string)(this["CwMsgText2"]));
@@ -2549,7 +2549,7 @@ namespace HolyLogger.Properties {
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("TU 73")]
+        [global::System.Configuration.DefaultSettingValueAttribute("TU {MYCALL} TEST {LOG}")]
         public string CwMsgText3 {
             get {
                 return ((string)(this["CwMsgText3"]));
@@ -2561,7 +2561,7 @@ namespace HolyLogger.Properties {
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("NR?")]
+        [global::System.Configuration.DefaultSettingValueAttribute("{MYCALL}")]
         public string CwMsgText4 {
             get {
                 return ((string)(this["CwMsgText4"]));
@@ -3155,6 +3155,30 @@ namespace HolyLogger.Properties {
             }
             set {
                 this["RadioPanelWindowTop"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool EsmEnabled {
+            get {
+                return ((bool)(this["EsmEnabled"]));
+            }
+            set {
+                this["EsmEnabled"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool EsmSearchAndPounce {
+            get {
+                return ((bool)(this["EsmSearchAndPounce"]));
+            }
+            set {
+                this["EsmSearchAndPounce"] = value;
             }
         }
     }

@@ -618,16 +618,22 @@
       <Value Profile="(Default)"></Value>
     </Setting>
     <Setting Name="CwMsgText1" Type="System.String" Scope="User">
-      <Value Profile="(Default)">CQ CQ DE K</Value>
+      <Value Profile="(Default)">CQ TEST {MYCALL} {MYCALL} TEST</Value>
     </Setting>
     <Setting Name="CwMsgText2" Type="System.String" Scope="User">
-      <Value Profile="(Default)">DE K</Value>
+      <Value Profile="(Default)">{CALL} {SENTRST} {EXCH}</Value>
     </Setting>
     <Setting Name="CwMsgText3" Type="System.String" Scope="User">
-      <Value Profile="(Default)">TU 73</Value>
+      <Value Profile="(Default)">TU {MYCALL} TEST {LOG}</Value>
     </Setting>
     <Setting Name="CwMsgText4" Type="System.String" Scope="User">
-      <Value Profile="(Default)">NR?</Value>
+      <Value Profile="(Default)">{MYCALL}</Value>
+    </Setting>
+    <Setting Name="EsmEnabled" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">False</Value>
+    </Setting>
+    <Setting Name="EsmSearchAndPounce" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">False</Value>
     </Setting>
     <Setting Name="MapAreaDisplayMode" Type="System.Int32" Scope="User">
       <Value Profile="(Default)">0</Value>

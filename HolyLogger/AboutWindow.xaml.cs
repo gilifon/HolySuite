@@ -18,7 +18,7 @@ using System.Windows.Shapes;
 namespace HolyLogger
 {
     /// <summary>
-    /// Interaction logic for AboutWindow.xamlyes
+    /// Interaction logic for AboutWindow.xaml
     /// 
     /// </summary>
     public partial class AboutWindow : Window

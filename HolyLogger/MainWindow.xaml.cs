@@ -263,6 +263,11 @@ namespace HolyLogger
         private static readonly SolidColorBrush VoiceMessageDefaultBrush = new SolidColorBrush(Color.FromRgb(0xE6, 0xCC, 0xFF));
         private static readonly SolidColorBrush VoiceMessageActiveBrush = new SolidColorBrush(Color.FromRgb(0xFF, 0xC9, 0x57));
 
+        // The one ESM will send if Enter is pressed now. GREEN, where the transmitting orange above is
+        // orange: one says "this is what goes next", the other "this is going out". Told apart at a
+        // glance is the whole point of showing either.
+        private static readonly SolidColorBrush EsmNextBrush = new SolidColorBrush(Color.FromRgb(0x9E, 0xE4, 0x93));
+
         // CW sending monitor: visualises the keyed text with a blinking cursor advancing in sync
         // with the radio. The radio does not report keying progress, so the cursor is driven by a
         // self-calibrated WPM estimate (cwLearnedWpm), refined after each transmission from the real
@@ -546,6 +551,8 @@ namespace HolyLogger
 
             UpdateFreqModeRadios();
             UpdateTimeModeRadios();
+            UpdateEsmRadios();
+            RefreshEsmHint();
 
             AdifHandlerWorker = new BackgroundWorker();
             AdifHandlerWorker.WorkerReportsProgress = true;
@@ -2290,6 +2297,10 @@ namespace HolyLogger
 
         private void ClearBtn_Click(object sender, RoutedEventArgs e)
         {
+            // An empty form is the start of the next contact, so ESM's next Enter is a CQ again.
+            _esmStage = EsmStage.Nothing;
+            RefreshEsmHint();
+
             // Remember whatever F9 clears so the on-frequency auto-fill won't put it straight back -- and
             // so it can't sneak back into the DX box and get captured into the undo history (the "undo
             // brought back a call I'd F9'd" bug). Recorded UNCONDITIONALLY for any non-empty callsign:
@@ -2943,6 +2954,23 @@ namespace HolyLogger
                 return;
             }
 
+            // Ctrl+M: ESM off and on, the same key N1MM uses.
+            if (e.Key == Key.M && (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control)
+            {
+                ToggleEsm();
+                e.Handled = true;
+                return;
+            }
+
+            // ESM first: with it on, Enter sends the message this contact is up to. It hands the key
+            // back untouched when it is off, when there is no radio, and in S&P over an empty form -
+            // so "Enter adds the QSO" still works everywhere ESM has nothing to say.
+            if (e.Key == Key.Enter && TryHandleEsmEnter())
+            {
+                e.Handled = true;
+                return;
+            }
+
             if (e.Key == Key.Enter && Properties.Settings.Default.AddQSOWithEnter)
             {
                 AddBtn_Click(null, null);
@@ -2996,11 +3024,20 @@ namespace HolyLogger
             {
                 Title = title,
 
-                // Wider and taller than it was: there is a line under the box now showing what the
-                // text would actually key, and a callsign or an exchange in place of a macro needs
-                // more room than the macro did.
-                Width = 460,
-                Height = 190,
+                // Wider and taller than it was: there is a line under the box showing what the text
+                // would actually key - a callsign or an exchange in place of a macro needs more room
+                // than the macro did - and under that, the list of the marks themselves.
+                //
+                // THE LIST BELONGS HERE, in the window where a message is written. It was in the
+                // keyer's help, three clicks away behind the gear, which is no use to a man in the
+                // middle of writing a message and wondering how to put his callsign in it.
+                Width = 560,
+
+                // THE HEIGHT IS THE CONTENT'S, not a number typed here. What is under the box grew
+                // twice in a week - a preview line, then the list of marks - and each time the fixed
+                // height had to be guessed at again, with the Save button falling off the bottom when
+                // the guess was low. Let it measure itself and it cannot be got wrong.
+                SizeToContent = SizeToContent.Height,
                 ResizeMode = ResizeMode.NoResize,
                 WindowStartupLocation = WindowStartupLocation.CenterOwner,
                 ShowInTaskbar = false,
@@ -3015,6 +3052,8 @@ namespace HolyLogger
             grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });   // what you type
             grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(6) });
             grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });   // what it sends
+            grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(12) });
+            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });   // the marks
             grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(14) });
             grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });   // buttons
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
@@ -3091,7 +3130,7 @@ namespace HolyLogger
                 Height = 28,
                 IsDefault = true
             };
-            Grid.SetRow(btnSave, 4);
+            Grid.SetRow(btnSave, 6);
             Grid.SetColumn(btnSave, 2);
             grid.Children.Add(btnSave);
 
@@ -3102,7 +3141,7 @@ namespace HolyLogger
                 Height = 28,
                 IsCancel = true
             };
-            Grid.SetRow(btnCancel, 4);
+            Grid.SetRow(btnCancel, 6);
             Grid.SetColumn(btnCancel, 0);
             grid.Children.Add(btnCancel);
 
@@ -3132,6 +3171,11 @@ namespace HolyLogger
             tb.TextChanged += (s, e) => refreshPreview();
             refreshPreview();
 
+            var marks = BuildCwMacroLegend();
+            Grid.SetRow(marks, 4);
+            Grid.SetColumnSpan(marks, 3);
+            grid.Children.Add(marks);
+
             dialog.Content = grid;
 
             btnSave.Click += (s, e) => { dialog.DialogResult = true; };
@@ -3142,16 +3186,98 @@ namespace HolyLogger
             return dialog.ShowDialog() == true ? tb.Text.Trim() : null;
         }
 
+        // WHAT MAY BE PUT IN A MESSAGE, listed where the message is written. Both spellings of each
+        // are shown: the single character, and the long form for a man who writes his messages the
+        // way N1MM writes them.
+        private static UIElement BuildCwMacroLegend()
+        {
+            var pairs = new[]
+            {
+                new[] { "*  or  {MYCALL}", "your Station Callsign" },
+                new[] { "!  or  {CALL}",   "the DX Callsign" },
+                new[] { "#",               "the serial number  (contest mode)" },
+                new[] { "$  or  {EXCH}",   "the rest of your sent exchange  (contest mode)" },
+                new[] { "{ZONE}",          "your CQ zone" },
+                new[] { "{SENTRST}",       "the RST you are sending" },
+                new[] { "{GRID}",          "your My Locator" },
+                new[] { "{GRIDSQUARE}",    "his DX Locator" },
+                new[] { "{NAME}",          "his Name" },
+                new[] { "{LASTCALL}",      "the last callsign logged" },
+                new[] { "{LOG}",           "logs the QSO, like pressing Add" },
+                new[] { "{WIPE}",          "clears the form, like pressing Clear" }
+            };
+
+            var grid = new Grid();
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(12) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+            for (int i = 0; i < pairs.Length; i++)
+            {
+                grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+
+                var mark = new TextBlock
+                {
+                    Text = pairs[i][0],
+                    FontSize = 16,
+                    FontWeight = FontWeights.Bold,
+                    FontFamily = new System.Windows.Media.FontFamily("Consolas"),
+                    Margin = new Thickness(0, 2, 0, 2)
+                };
+                Grid.SetRow(mark, i);
+                Grid.SetColumn(mark, 0);
+                grid.Children.Add(mark);
+
+                var meaning = new TextBlock
+                {
+                    Text = pairs[i][1],
+                    FontSize = 16,
+                    TextWrapping = TextWrapping.Wrap,
+                    Margin = new Thickness(0, 2, 0, 2)
+                };
+                Grid.SetRow(meaning, i);
+                Grid.SetColumn(meaning, 2);
+                grid.Children.Add(meaning);
+            }
+
+            return grid;
+        }
+
         // THE MACROS. The same four N1MM leans on hardest, written the way N1MM writes them so a
         // message copied across from there works as it stands:
         //
         //   *  {MYCALL}    your own callsign
-        //   !  {HISCALL}   the callsign in the entry form
+        //   !  {CALL}      the callsign in the entry form
         //   #              the serial number you are sending for this QSO
         //   $  {EXCH}      the rest of your sent exchange
+        //   {ZONE}         your own CQ zone
+        //   {SENTRST}      the RST you are sending
+        //   {GRID}         your own square      {GRIDSQUARE}  his square
+        //   {NAME}         his name             {LASTCALL}    the last callsign logged
+        //   {LOG}          logs the QSO, the same as pressing Add
+        //   {WIPE}         clears the entry form, the same as pressing Clear
         //
-        // The $ is ours, not N1MM's - N1MM makes you type {EXCH} in full. It costs nothing to take
-        // both, and the long form still works for a message copied across from there.
+        // Both spellings of each, because N1MM's own list gives some of them only one way round:
+        // * and {MYCALL} are both N1MM's, ! and # are N1MM's with no long form, and {EXCH} is
+        // N1MM's with no short form. The $ is ours, so a man need not type {EXCH} in full.
+        //
+        // {LOG} IS N1MM'S TOO - "Logs the current contact. Same as the Log It button in the Entry
+        // Window" - and it does here what it does there. It keys NOTHING: it is taken out of the
+        // text before a character reaches the radio, so TU {LOG} sends TU and logs the contact.
+        //
+        // WHEN. N1MM runs a macro as the message goes out, not when the keying finishes (that is
+        // what its {END} is for), and this follows it: the contact is logged as the button is
+        // pressed, while the TU is still on its way. That is the point of it in a contest - the
+        // form is clear and the next callsign can be typed into it without waiting for the radio.
+        // Nothing on air is affected: the callsign and the exchange were put into the text before
+        // any of this, so emptying the form cannot change what is being keyed.
+        //
+        // A text that is nothing BUT {LOG} is allowed, and logs without transmitting.
+        //
+        // {CALL} IS NOT QUITE N1MM'S {CALL}. Over there it sends "the previous or uncorrected call"
+        // - the call as it stood before you fixed it, for the "sorry, I had you wrong" message.
+        // HolyLogger keeps no such thing: there is one callsign in the entry form and that is what
+        // {CALL} sends. It is the same in every case except the one N1MM built it for.
         //
         // The last two are read off the contest SEND frame, which only exists while a contest is
         // selected. Outside one there is no serial and no exchange - and rather than key a gap where
@@ -3165,12 +3291,63 @@ namespace HolyLogger
 
             return text
                 .Replace("{MYCALL}", MyCallForMacro())
-                .Replace("{HISCALL}", HisCallForMacro())
+                .Replace("{CALL}", HisCallForMacro())
                 .Replace("{EXCH}", SentExchangeForMacro())
                 .Replace("*", MyCallForMacro())
                 .Replace("!", HisCallForMacro())
                 .Replace("#", SentSerialForMacro())
-                .Replace("$", SentExchangeForMacro());
+                .Replace("$", SentExchangeForMacro())
+                .Replace("{ZONE}", MyZoneForMacro())
+                .Replace("{SENTRST}", SentRstForMacro())
+                .Replace("{GRIDSQUARE}", HisGridForMacro())
+                .Replace("{GRID}", MyGridForMacro())
+                .Replace("{NAME}", HisNameForMacro())
+                .Replace("{LASTCALL}", LastCallForMacro())
+
+                // Never keyed - they are instructions to the program, not to the radio.
+                .Replace("{LOG}", string.Empty)
+                .Replace("{WIPE}", string.Empty);
+        }
+
+        // Whether this text asks for the QSO to be logged. Read off the STORED text, before the
+        // expansion above has taken the mark out of it.
+        internal static bool CwMacroLogsQso(string text)
+        {
+            return !string.IsNullOrEmpty(text) && text.IndexOf("{LOG}", StringComparison.Ordinal) >= 0;
+        }
+
+        // Whether this text asks for the entry form to be cleared. Read off the STORED text, like
+        // {LOG} above, before the expansion has taken the mark out of it.
+        internal static bool CwMacroWipesForm(string text)
+        {
+            return !string.IsNullOrEmpty(text) && text.IndexOf("{WIPE}", StringComparison.Ordinal) >= 0;
+        }
+
+        // The Add button, reached from a message. Everything Add does it still does - the checks, the
+        // warnings, the entry form emptied afterwards - because a QSO logged from a macro is not a
+        // second kind of QSO.
+        internal void LogQsoFromCwMacro()
+        {
+            AddBtn_Click(null, null);
+        }
+
+        // {WIPE} - the Clear button, reached from a message. N1MM has it too, and it does here what
+        // it does there: empties the entry form so the next callsign can be typed into it.
+        internal void WipeFormFromCwMacro()
+        {
+            ClearBtn_Click(null, null);
+        }
+
+        // WHAT A MESSAGE ASKS THE PROGRAM TO DO, once the keying is under way.
+        //
+        // LOG WINS OVER WIPE, rather than both running. Add clears the form itself when it succeeds -
+        // and when it FAILS it deliberately leaves the form exactly as it was typed, so the operator
+        // can press Add again instead of retyping a callsign, a time, a band and a mode. A {WIPE}
+        // running after a refused {LOG} would empty the very thing that was kept for him.
+        private void RunCwMacroActions(bool logsQso, bool wipesForm)
+        {
+            if (logsQso) LogQsoFromCwMacro();
+            else if (wipesForm) WipeFormFromCwMacro();
         }
 
         // The same expansion, but with a name in place of anything that has nothing behind it yet,
@@ -3183,20 +3360,42 @@ namespace HolyLogger
             string his = HisCallForMacro();
             string serial = SentSerialForMacro();
             string exchange = SentExchangeForMacro();
+            string zone = MyZoneForMacro();
+            string rst = SentRstForMacro();
+            string myGrid = MyGridForMacro();
+            string hisGrid = HisGridForMacro();
+            string name = HisNameForMacro();
+            string lastCall = LastCallForMacro();
 
             if (mine.Length == 0) mine = "[Station Callsign]";
             if (his.Length == 0) his = "[DX Callsign]";
             if (serial.Length == 0) serial = "[serial]";
             if (exchange.Length == 0) exchange = "[exchange]";
+            if (zone.Length == 0) zone = "[zone]";
+            if (rst.Length == 0) rst = "[RST sent]";
+            if (myGrid.Length == 0) myGrid = "[My Locator]";
+            if (hisGrid.Length == 0) hisGrid = "[DX Locator]";
+            if (name.Length == 0) name = "[Name]";
+            if (lastCall.Length == 0) lastCall = "[last callsign]";
 
             return text
                 .Replace("{MYCALL}", mine)
-                .Replace("{HISCALL}", his)
+                .Replace("{CALL}", his)
                 .Replace("{EXCH}", exchange)
+                .Replace("{ZONE}", zone)
+                .Replace("{SENTRST}", rst)
+                .Replace("{GRIDSQUARE}", hisGrid)
+                .Replace("{GRID}", myGrid)
+                .Replace("{NAME}", name)
+                .Replace("{LASTCALL}", lastCall)
                 .Replace("*", mine)
                 .Replace("!", his)
                 .Replace("#", serial)
-                .Replace("$", exchange);
+                .Replace("$", exchange)
+
+                // Said rather than sent, so the line reads as what will happen: TU [logs the QSO].
+                .Replace("{LOG}", "[logs the QSO]")
+                .Replace("{WIPE}", "[clears the form]");
         }
 
         private string MyCallForMacro()
@@ -3229,6 +3428,75 @@ namespace HolyLogger
             return string.Join(" ", parts);
         }
 
+        // {ZONE} - your own CQ zone. NOT one of N1MM's: over there the zone rides inside {EXCH}, and
+        // there is no macro for it on its own. It is here because half of what a CQ WW message says is
+        // the zone, and because the zone is known from the callsign whether a contest is running or
+        // not - so 5NN {ZONE} keys correctly with no contest selected, which {EXCH} cannot do.
+        //
+        // The number the operator typed over the contest bar's zone cell wins, exactly as it does for
+        // the exchange itself; otherwise it comes from the country file, by the Station Callsign.
+        private string MyZoneForMacro()
+        {
+            string typed = (Properties.Settings.Default.ContestMyZoneOverride ?? string.Empty).Trim();
+            if (typed.Length > 0) return typed;
+
+            try
+            {
+                var d = rem != null ? rem.GetDXCC(MyCallForMacro()) : null;
+                if (d != null && d.CqZone > 0) return d.CqZone.ToString(CultureInfo.InvariantCulture);
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+            return string.Empty;
+        }
+
+        // {SENTRST} - the RST you are sending, as it stands in the RST-S box. N1MM's own macro, and
+        // the reason a message copied from there reads "{SENTRST} {EXCH}" rather than "5NN".
+        private string SentRstForMacro()
+        {
+            return TB_RSTSent != null ? (TB_RSTSent.Text ?? string.Empty).Trim() : string.Empty;
+        }
+
+        // {GRID} - your own square, from My Locator. N1MM takes it from Station Info; here it is the
+        // same box the log is written from.
+        private string MyGridForMacro()
+        {
+            return TB_MyLocator != null ? (TB_MyLocator.Text ?? string.Empty).Trim() : string.Empty;
+        }
+
+        // {GRIDSQUARE} - HIS square, from the DX Locator box of the entry form. The two are easy to
+        // confuse, so they are named here exactly as N1MM names them: {GRID} is mine, {GRIDSQUARE} is
+        // the one I am working.
+        private string HisGridForMacro()
+        {
+            return TB_DXLocator != null ? (TB_DXLocator.Text ?? string.Empty).Trim() : string.Empty;
+        }
+
+        // {NAME} - his name, from the entry form (filled by hand or by the QRZ lookup).
+        private string HisNameForMacro()
+        {
+            return TB_DX_Name != null ? (TB_DX_Name.Text ?? string.Empty).Trim() : string.Empty;
+        }
+
+        // {LASTCALL} - the callsign of the last QSO logged, for the "QSO B4" answer. The QSO this
+        // program logged itself if there has been one this session; otherwise the newest in the log,
+        // which is the first row of the collection (loaded date DESC, time DESC).
+        private string LastCallForMacro()
+        {
+            try
+            {
+                if (LastQSO != null && !string.IsNullOrWhiteSpace(LastQSO.DXCall))
+                    return LastQSO.DXCall.Trim();
+
+                var newest = Qsos != null ? Qsos.FirstOrDefault() : null;
+                if (newest != null && !string.IsNullOrWhiteSpace(newest.DXCall))
+                    return newest.DXCall.Trim();
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+            return string.Empty;
+        }
+
         // Names the FIRST macro in the text that has nothing to put there, in words the operator can
         // act on. Null when everything the message asks for can be supplied.
         internal string DescribeCwMacroProblem(string text)
@@ -3238,7 +3506,7 @@ namespace HolyLogger
             if (UsesCwMacro(text, "*", "{MYCALL}") && MyCallForMacro().Length == 0)
                 return "your own callsign is empty";
 
-            if (UsesCwMacro(text, "!", "{HISCALL}") && HisCallForMacro().Length == 0)
+            if (UsesCwMacro(text, "!", "{CALL}") && HisCallForMacro().Length == 0)
                 return "there is no callsign in the entry form";
 
             if (UsesCwMacro(text, "#") && SentSerialForMacro().Length == 0)
@@ -3246,6 +3514,24 @@ namespace HolyLogger
 
             if (UsesCwMacro(text, "$", "{EXCH}") && SentExchangeForMacro().Length == 0)
                 return "there is no sent exchange - turn contest mode on";
+
+            if (UsesCwMacro(text, "{ZONE}") && MyZoneForMacro().Length == 0)
+                return "your Station Callsign has no CQ zone in the country file";
+
+            if (UsesCwMacro(text, "{SENTRST}") && SentRstForMacro().Length == 0)
+                return "the RST you are sending is empty";
+
+            if (UsesCwMacro(text, "{GRID}") && MyGridForMacro().Length == 0)
+                return "your My Locator is empty";
+
+            if (UsesCwMacro(text, "{GRIDSQUARE}") && HisGridForMacro().Length == 0)
+                return "there is no DX Locator in the entry form";
+
+            if (UsesCwMacro(text, "{NAME}") && HisNameForMacro().Length == 0)
+                return "there is no Name in the entry form";
+
+            if (UsesCwMacro(text, "{LASTCALL}") && LastCallForMacro().Length == 0)
+                return "no QSO has been logged yet";
 
             return null;
         }
@@ -3257,6 +3543,153 @@ namespace HolyLogger
                 if (text.IndexOf(mark, StringComparison.Ordinal) >= 0) return true;
             }
             return false;
+        }
+
+        // ── ESM: ENTER SENDS MESSAGE ────────────────────────────────────────────────────────
+        //
+        // One key walks the whole contact. Which text Enter sends is decided by how far this QSO has
+        // got, so a callsign is typed and Enter pressed until the QSO is in the log:
+        //
+        //   RUN   empty form             ->  Txt 1   CQ
+        //         a callsign is in       ->  Txt 2   his call and your exchange
+        //         the exchange has gone  ->  Txt 3   TU, and the QSO is logged
+        //
+        //   S&P   a callsign is in       ->  Txt 4   your own callsign
+        //         he came back           ->  Txt 2   your exchange
+        //         the exchange has gone  ->  Txt 3   TU, and the QSO is logged
+        //
+        // FOUR FIXED TEXTS, the way N1MM fixes its own to F1/F2/F3: Txt 1 is the CQ, Txt 2 the
+        // exchange, Txt 3 the TU, Txt 4 your callsign. What they SAY is the operator's business -
+        // ESM only decides which of them Enter reaches for.
+        //
+        // IT INVENTS NOTHING. An empty text, or a macro with nothing behind it, is refused exactly as
+        // it is when the button itself is pressed. ESM changes which button is pressed, and no more.
+        private const int EsmCqMessage = 1;
+        private const int EsmExchangeMessage = 2;
+        private const int EsmTuMessage = 3;
+        private const int EsmMyCallMessage = 4;
+
+        // How far this contact has got. Cleared with the form - by F9, and by a QSO being logged,
+        // which clears the form itself - so the next contact starts at the beginning.
+        private enum EsmStage { Nothing, CalledHim, ExchangeSent }
+        private EsmStage _esmStage = EsmStage.Nothing;
+
+        // WHICH TEXT ENTER WOULD SEND, RIGHT NOW. 0 for none - ESM off, no radio to send to, or S&P
+        // over an empty form, where there is nobody being answered yet and Enter is left to do what
+        // it always did.
+        //
+        // ASKED BY BOTH the key and the highlight, so the button lit green is by construction the one
+        // Enter presses. Two copies of this rule would drift apart the first time either changed.
+        private int EsmNextMessage()
+        {
+            if (!Properties.Settings.Default.EsmEnabled) return 0;
+            if (!_messageSendAvailable) return 0;
+
+            bool searchAndPounce = Properties.Settings.Default.EsmSearchAndPounce;
+
+            if (HisCallForMacro().Length == 0) return searchAndPounce ? 0 : EsmCqMessage;
+
+            switch (_esmStage)
+            {
+                case EsmStage.Nothing:   return searchAndPounce ? EsmMyCallMessage : EsmExchangeMessage;
+                case EsmStage.CalledHim: return EsmExchangeMessage;
+                default:                 return EsmTuMessage;
+            }
+        }
+
+        /// <summary>Enter, with ESM on. True when ESM has dealt with the key.</summary>
+        private bool TryHandleEsmEnter()
+        {
+            int next = EsmNextMessage();
+            if (next == 0) return false;
+
+            if (next == EsmTuMessage)
+            {
+                SendEsmTuAndLog();
+                RefreshEsmHint();
+                return true;
+            }
+
+            // Where the contact stands AFTER this message. A CQ leaves it where it was - nobody has
+            // been worked yet - which is why an unanswered CQ can be sent again and again.
+            _esmStage = next == EsmMyCallMessage ? EsmStage.CalledHim
+                      : next == EsmExchangeMessage ? EsmStage.ExchangeSent
+                      : EsmStage.Nothing;
+
+            TriggerVoiceMessage(next);
+            RefreshEsmHint();
+            return true;
+        }
+
+        // Lights the button Enter will press, on the Msg row and on the keyer's first four buttons,
+        // which are the same four texts shown twice.
+        internal void RefreshEsmHint()
+        {
+            try
+            {
+                UpdateVoiceMessageButtonHighlight();
+                if (cwKeyboard != null) cwKeyboard.ShowEsmNext(EsmNextMessage());
+            }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        // THE LAST STEP LOGS, WHATEVER THE TEXT SAYS. The supplied TU text carries {LOG} and logs by
+        // itself; an operator who writes his own without it would otherwise press Enter, hear TU, and
+        // find nothing in the log. "TU and log" is what the last step of ESM IS, so where the text
+        // does not do it, this does.
+        //
+        // EXCEPT WHEN NOTHING WENT OUT. A text refused for an empty macro sends nothing at all, and a
+        // QSO logged after a message that was never keyed is a QSO the other station never made.
+        private void SendEsmTuAndLog()
+        {
+            string tu = GetCwMessageText(EsmTuMessage) ?? string.Empty;
+            bool cw = IsCwModeActive();
+            string problem = cw ? DescribeCwMacroProblem(tu) : null;
+
+            _esmStage = EsmStage.Nothing;
+            TriggerVoiceMessage(EsmTuMessage);
+
+            if (problem != null) return;            // refused: nothing sent, so nothing logged
+            if (cw && CwMacroLogsQso(tu)) return;   // the text logged it itself
+
+            LogQsoFromCwMacro();
+        }
+
+        private void EsmMode_Click(object sender, RoutedEventArgs e)
+        {
+            bool run = RB_EsmRun != null && RB_EsmRun.IsChecked == true;
+            bool searchAndPounce = RB_EsmSp != null && RB_EsmSp.IsChecked == true;
+
+            Properties.Settings.Default.EsmEnabled = run || searchAndPounce;
+            Properties.Settings.Default.EsmSearchAndPounce = searchAndPounce;
+            try { Properties.Settings.Default.Save(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+
+            // Changed in the middle of a contact: the next Enter starts that contact again rather
+            // than carrying on from a stage that belonged to the other way of working.
+            _esmStage = EsmStage.Nothing;
+            RefreshEsmHint();
+        }
+
+        private void UpdateEsmRadios()
+        {
+            bool on = Properties.Settings.Default.EsmEnabled;
+            bool searchAndPounce = Properties.Settings.Default.EsmSearchAndPounce;
+
+            if (RB_EsmOff != null) RB_EsmOff.IsChecked = !on;
+            if (RB_EsmRun != null) RB_EsmRun.IsChecked = on && !searchAndPounce;
+            if (RB_EsmSp != null) RB_EsmSp.IsChecked = on && searchAndPounce;
+        }
+
+        // Ctrl+M, the key N1MM uses for it. Off and on only: it comes back on the side it was last
+        // used on, because a man who works S&P does not want Run every time he switches it back.
+        private void ToggleEsm()
+        {
+            Properties.Settings.Default.EsmEnabled = !Properties.Settings.Default.EsmEnabled;
+            try { Properties.Settings.Default.Save(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+
+            _esmStage = EsmStage.Nothing;
+            UpdateEsmRadios();
+            RefreshEsmHint();
         }
 
         private string GetCwMessageText(int messageNumber)
@@ -3442,7 +3875,11 @@ namespace HolyLogger
                         + "status bar. Anything else there means it is not.",
                         "CW Keyer", this);
                 },
-                (out int low, out int high) => CwSpeedRange(rigType, out low, out high))
+                (out int low, out int high) => CwSpeedRange(rigType, out low, out high),
+
+                // What {LOG} and {WIPE} in a button's text do when that button is pressed.
+                LogQsoFromCwMacro,
+                WipeFormFromCwMacro)
             {
                 Owner = this,
                 Icon = Icon
@@ -3450,6 +3887,7 @@ namespace HolyLogger
 
             cwKeyboard.Closed += (s, e) => cwKeyboard = null;
             cwKeyboard.Show();
+            RefreshEsmHint();   // its first four buttons show the ESM hint from the moment it opens
         }
 
         private void CloseCwKeyboard()
@@ -3843,9 +4281,14 @@ namespace HolyLogger
             }
 
             string cwText = ExpandCwMacros(storedText);
+            bool logsQso = CwMacroLogsQso(storedText);
+            bool wipesForm = CwMacroWipesForm(storedText);
 
             if (string.IsNullOrWhiteSpace(cwText))
             {
+                // A button that only logs is a button doing its job, not an empty one.
+                if (logsQso || wipesForm) { RunCwMacroActions(logsQso, wipesForm); return; }
+
                 HolyMessageBox.ShowWarning(
                     "CW text " + messageNumber + " has nothing a keyer can send.\n\n"
                     + "Only letters, digits and  . , ? / @ = + -  go out over the air.\n\n"
@@ -3877,6 +4320,7 @@ namespace HolyLogger
                 pendingVoiceMessageDeadlineUtc = DateTime.UtcNow.AddSeconds(30);
 
                 ShowCwSendMonitor(cwText);
+                RunCwMacroActions(logsQso, wipesForm);
                 return;
             }
 
@@ -3909,6 +4353,7 @@ namespace HolyLogger
             pendingVoiceMessageDeadlineUtc = DateTime.UtcNow.AddSeconds(30);
 
             ShowCwSendMonitor(cwText);
+            RunCwMacroActions(logsQso, wipesForm);
         }
 
         // Opens (or replaces) the CW sending monitor window for the given text. The cursor does not
@@ -6560,6 +7005,10 @@ namespace HolyLogger
             }
 
             UpdateMessageButtonLabels();
+
+            // The radio arriving or going away changes whether ESM can send at all, and with it which
+            // button - if any - should be lit.
+            RefreshEsmHint();
         }
 
         private void SetVoiceMessageButtonsEnabled(bool isEnabled)
@@ -6587,6 +7036,10 @@ namespace HolyLogger
 
             bool isActive = activeVoiceMessageNumber == messageNumber;
 
+            // Going out beats about to go out: while a message is being keyed, that is the thing worth
+            // showing, and the green one is a second away anyway.
+            bool isEsmNext = !isActive && EsmNextMessage() == messageNumber;
+
             // In CW mode the style controls the idle colour (bright cyan). Use ClearValue (not
             // Background = null) when idle: a local null value would beat the style's Background
             // setter and make the inner KeyFace transparent, exposing the dark outer border across
@@ -6597,6 +7050,10 @@ namespace HolyLogger
                 {
                     button.Background = VoiceMessageActiveBrush;
                 }
+                else if (isEsmNext)
+                {
+                    button.Background = EsmNextBrush;
+                }
                 else
                 {
                     button.ClearValue(Control.BackgroundProperty);
@@ -6604,7 +7061,9 @@ namespace HolyLogger
                 return;
             }
 
-            button.Background = isActive ? VoiceMessageActiveBrush : VoiceMessageDefaultBrush;
+            button.Background = isActive ? VoiceMessageActiveBrush
+                              : isEsmNext ? EsmNextBrush
+                              : VoiceMessageDefaultBrush;
         }
 
         // How many digits an RST report has in the current mode: 2 on voice, 3 on CW and the data modes,
@@ -12519,6 +12978,10 @@ namespace HolyLogger
 
         private void TB_DXCallsign_TextChanged(object sender, TextChangedEventArgs e)
         {
+            // With ESM on, a callsign appearing in (or leaving) this box changes which message Enter
+            // would send, so the green button follows the typing.
+            RefreshEsmHint();
+
             // If the user is actively editing the DX textbox, consider this a manual edit and
             // clear the cluster auto-fill flag so the cluster no longer overwrites/clears it.
             try
