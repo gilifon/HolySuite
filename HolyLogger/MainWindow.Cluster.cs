@@ -642,6 +642,12 @@ namespace HolyLogger
             Log.Warn("STARTUP " + Log.SinceLaunch() + "  cluster window: showing");
             clusterWindow.Show();
 
+            // The cluster is up, so the CW keyer may open now if the radio is in CW. It is held back
+            // until this point so that a radio already in CW at startup does not put the keyer on the
+            // desktop ahead of the log and the cluster. Does nothing after the first call, so opening
+            // the cluster from the View menu later costs nothing.
+            MarkStartupWindowsReady();
+
             // The A / K / SFI bars start reading now and stop when this window closes - there is no
             // point asking NOAA about the sun for a window nobody has open.
             StartPropagationUpdates();

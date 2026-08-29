@@ -1481,6 +1481,32 @@ namespace HolyLogger
             };
             ContentRendered += showRadioPanel;
 
+            // AND THE SAME MOMENT LETS THE CW KEYER THROUGH - once the cluster is out of the way.
+            // The cluster window is shown from ApplyClusterWindowSetting below, and it calls
+            // MarkStartupWindowsReady itself; that is the normal path. Here we cover the two cases it
+            // cannot: the cluster is switched off (nothing else would ever open the gate), and the
+            // cluster was meant to open but did not - a fifteen-second backstop, because a keyer that
+            // never appears is a worse fault than one that appears late.
+            EventHandler releaseCwKeyer = null;
+            releaseCwKeyer = (sender3, args4) =>
+            {
+                ContentRendered -= releaseCwKeyer;
+
+                bool clusterIsComing = Properties.Settings.Default.ClusterActive
+                                       && Properties.Settings.Default.ShowClusterWindowOption;
+
+                if (!clusterIsComing)
+                {
+                    MarkStartupWindowsReady();
+                    return;
+                }
+
+                var backstop = new DispatcherTimer { Interval = TimeSpan.FromSeconds(15) };
+                backstop.Tick += (s4, e4) => { backstop.Stop(); MarkStartupWindowsReady(); };
+                backstop.Start();
+            };
+            ContentRendered += releaseCwKeyer;
+
             // Re-assert the log name in the title bar once the window is fully loaded. The constructor
             // already sets it, but if that early call hit a transient DB hiccup the title would be left
             // bare; doing it again here (dal + ActiveLogId are settled by now) makes it reliable.
@@ -6445,6 +6471,27 @@ namespace HolyLogger
         // opened on the CHANGE into CW and not on every pass through it.
         private bool _cwKeyboardWasWanted = false;
 
+        // THE KEYER WAITS ITS TURN. A radio already sitting in CW at startup had its keyer opened on
+        // the first OmniRig event, which arrives while the program is still building itself - so the
+        // first window on the desktop was the CW keyer, ahead of the log and ahead of the cluster.
+        // Nothing about the keyer is urgent (it is a convenience, and Ctrl+K opens it anyway), so it
+        // now waits until the windows the operator expects first are on screen. MarkStartupWindowsReady
+        // opens the gate, and asks once more, because the "came into CW" edge has long since passed by
+        // then and the keyer would otherwise never appear for a radio that was in CW the whole time.
+        private bool _startupWindowsReady = false;
+
+        internal void MarkStartupWindowsReady()
+        {
+            if (_startupWindowsReady) return;
+            _startupWindowsReady = true;
+
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                try { UpdateVoiceMessageAvailabilityState(); }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
+            }), DispatcherPriority.Background);
+        }
+
         private void UpdateVoiceMessageAvailabilityState()
         {
             if (PlayCommandsBorder == null)
@@ -6506,7 +6553,7 @@ namespace HolyLogger
                 CloseCwKeyboard();
                 _cwKeyboardWasWanted = false;
             }
-            else if (!_cwKeyboardWasWanted && IsLoaded)
+            else if (!_cwKeyboardWasWanted && IsLoaded && _startupWindowsReady)
             {
                 OpenCwKeyboard(true);
                 _cwKeyboardWasWanted = true;

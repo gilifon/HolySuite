@@ -639,6 +639,24 @@
                             </Viewbox>
                         </MenuItem.Icon>
                     </MenuItem>
+                    <MenuItem x:Name="RadioControlPanelMenuItem" Header="Radio Control Panel" ToolTip="Open the radio control panel - frequency, bands and mode" Click="RadioControlPanelMenuItem_Click">
+                        <MenuItem.Icon>
+                            <!-- A front panel seen head on: a knob and two sliders. Drawn here rather
+                                 than fetched from anywhere - it costs five shapes, carries no licence
+                                 to honour, and takes the theme's text colour like the CW key above. -->
+                            <Viewbox Width="16" Height="16">
+                                <Canvas Width="24" Height="24">
+                                    <Rectangle Canvas.Left="2" Canvas.Top="3.5" Width="20" Height="17" RadiusX="2" RadiusY="2"
+                                               Stroke="{DynamicResource TextBrush}" StrokeThickness="1.8" Fill="Transparent"/>
+                                    <Ellipse Canvas.Left="5" Canvas.Top="6.5" Width="6" Height="6"
+                                             Stroke="{DynamicResource TextBrush}" StrokeThickness="1.6" Fill="Transparent"/>
+                                    <Rectangle Canvas.Left="7.6" Canvas.Top="6.9" Width="1.5" Height="3" Fill="{DynamicResource TextBrush}"/>
+                                    <Rectangle Canvas.Left="13.5" Canvas.Top="8.4" Width="6" Height="1.6" RadiusX="0.8" RadiusY="0.8" Fill="{DynamicResource TextBrush}"/>
+                                    <Rectangle Canvas.Left="5" Canvas.Top="15.4" Width="14" Height="1.6" RadiusX="0.8" RadiusY="0.8" Fill="{DynamicResource TextBrush}"/>
+                                </Canvas>
+                            </Viewbox>
+                        </MenuItem.Icon>
+                    </MenuItem>
                     <Separator/>
                     <MenuItem x:Name="TimerItem" Header="Timer" ToolTip="Open a 1 hour countdown timer" Click="TimerMenuItem_Click">
                         <MenuItem.Icon>

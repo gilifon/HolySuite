@@ -697,6 +697,19 @@ namespace HolyLogger
 
         private RadioControlPanelWindow radioPanel;
 
+        /// <summary>
+        /// View > Radio Control Panel. The panel already had one switch - the "Show Control Panel"
+        /// tick in Options - which is a long way to go for a window you open and close all evening.
+        /// This writes the same setting, so the tick and the menu never disagree, and then lets
+        /// ApplyRadioControlPanelVisibility do the opening (or the activating, if it is already up).
+        /// </summary>
+        private void RadioControlPanelMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            Properties.Settings.Default.ShowRadioControlPanel = true;
+            try { Properties.Settings.Default.Save(); } catch (Exception swallowed) { Log.Swallow(swallowed); }
+            ApplyRadioControlPanelVisibility();
+        }
+
         /// <summary>Opens or closes the panel to match the "Show Control Panel" setting.</summary>
         internal void ApplyRadioControlPanelVisibility()
         {
@@ -730,10 +743,11 @@ namespace HolyLogger
         /// Called as the program shuts down, BEFORE the main window closes.
         ///
         /// WHY IT EXISTS: the panel is owned by the main window, so Windows closes it as part of the
-        /// shutdown - and that ran RadioPanel_Closed, which reads a close as "the operator switched
-        /// the panel off" and wrote the setting to false. The tick in Options was therefore cleared
-        /// by every exit, and the panel never came back. Letting go of the handler first means only
-        /// a close the operator actually performs switches it off.
+        /// shutdown, and that ran RadioPanel_Closed while the program was tearing itself down. Back
+        /// when that handler wrote ShowRadioControlPanel = false, every exit cleared the tick in
+        /// Options and the panel never came back. The handler writes nothing now, but letting go of
+        /// it on the way out is still right: a close Windows performs is not the operator closing
+        /// the panel.
         /// </summary>
         internal void DetachRadioPanelForShutdown()
         {
@@ -872,9 +886,11 @@ namespace HolyLogger
         private void RadioPanel_Closed(object sender, EventArgs e)
         {
             radioPanel = null;
-            // Closing the window IS switching the panel off. Without this it would come back on the
-            // next start, and a window that reappears after being closed is a window nobody trusts.
-            Properties.Settings.Default.ShowRadioControlPanel = false;
+            // CLOSING THE WINDOW DOES NOT UNTICK THE SETTING. It used to: closing the panel wrote
+            // ShowRadioControlPanel = false, and the exit saved that - so a panel closed once was
+            // gone from every future start, and the only way back was the tick in Options. That tick
+            // (and the View menu, which sets it) is the operator's "I want this panel"; a close is
+            // "not now". The cluster window has always worked this way, and this now matches it.
         }
 
         /// <summary>Rebuild the panel's buttons after the frequencies were edited in Options.</summary>
