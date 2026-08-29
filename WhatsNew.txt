@@ -50,7 +50,18 @@ New
 - One line per send: each thing you send becomes its own line, pushing the earlier lines down.
 - Typing too slowly: the radio falls silent in the middle of a word, which the listener hears
   as two words. When that happens a space is written into the line so you can see it.
-- Keying speed: the title bar shows the speed the program has measured from your radio.
+- Set the keying speed from the keyer: the CW Keyer's title bar shows WPM and a number. Roll
+  the mouse wheel over it and the radio's keyer speed changes with it, 5 to 30 words a minute,
+  so you never reach past the program to the radio's own menu. Arrows beside the number are
+  the hint that it turns.
+- The speed is sent again when the keyer opens, so the number you are reading is the speed the
+  radio is keying at. Turning the radio's own speed knob afterwards still wins - it is one
+  setting with two controls, and the last one touched decides.
+- Every speed command was taken from the maker's own command manual: KS on Kenwood, Yaesu and
+  Elecraft, command 14 sub-command 0C on Icom, and each radio is held to the range its manual
+  gives - a TS-480 no slower than 10, an Elecraft no slower than 8, an Icom no faster than 48.
+- On a radio HolyLogger cannot command, the title bar still shows the speed measured from your
+  keying, as before.
 - Eight buttons: along the bottom, for the things you send over and over. Left-click sends,
   right-click edits. The first four are the same texts as the Msg buttons.
 - Short marks: filled in when you send - * your Station Callsign, ! the DX Callsign, # the
