@@ -1686,8 +1686,15 @@ namespace HolyLogger
                 Foreground = Brushes.Black,
                 VerticalAlignment = VerticalAlignment.Center,
                 Cursor = System.Windows.Input.Cursors.SizeNS,
+                // The second line was learned the hard way on an IC-7610: a speed set here really
+                // is the speed the radio keys at, but the radio's own knob resumes from ITS last
+                // number - so one nudge of it puts the radio back near where it was and throws
+                // away what was set from here. Nothing in the program can prevent that; the least
+                // it can do is say so before somebody else spends an evening on it.
                 ToolTip = "The radio's keyer speed. Roll the wheel over it: "
-                        + low + " to " + high + " words a minute."
+                        + low + " to " + high + " words a minute.\n\n"
+                        + "The radio's own speed knob works separately — whichever you turn "
+                        + "last wins."
             };
             RefreshSpeedText();
 
