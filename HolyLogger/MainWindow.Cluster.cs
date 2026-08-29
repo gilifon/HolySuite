@@ -2012,6 +2012,10 @@ namespace HolyLogger
 
             clusterLiveScaleOn = !clusterLiveScaleOn;
 
+            // The pointer may already be sitting over the table, where no MouseMove is coming to
+            // correct it - so the cursor is put right here, as the switch is thrown.
+            if (clusterSpotsDataGrid != null) clusterSpotsDataGrid.Cursor = ClusterIdleCursor();
+
             // Live Scale is a remembered state: reopening the cluster (or restarting the program)
             // restores it.
             Properties.Settings.Default.ClusterLiveScaleOn = clusterLiveScaleOn;
@@ -2639,6 +2643,19 @@ namespace HolyLogger
             UpdateClusterActiveBandIndicatorPosition();
         }
 
+        // THE POINTER OVER THE SPOT LIST, where nothing under it is clickable. With Live Scale on the
+        // list is scrolling itself - the rows move under a still mouse - and a plain arrow says
+        // nothing about that. ScrollNS is the cursor Windows uses for a view that runs up and down on
+        // its own, so the pointer tells the operator what the table is doing before he wonders why it
+        // will not hold still.
+        //
+        // The Hand on the callsign, spotter and frequency cells is untouched: those are still a click
+        // that does something, and that is worth more than repeating what the whole table is up to.
+        private System.Windows.Input.Cursor ClusterIdleCursor()
+        {
+            return clusterLiveScaleOn ? Cursors.ScrollNS : Cursors.Arrow;
+        }
+
         private void ClusterSpotsGrid_MouseMove(object sender, MouseEventArgs e)
         {
             var dataGrid = sender as DataGrid;
@@ -2661,7 +2678,7 @@ namespace HolyLogger
             DataGridCell cell = FindVisualParent<DataGridCell>(e.OriginalSource as DependencyObject);
             if (cell == null)
             {
-                dataGrid.Cursor = Cursors.Arrow;
+                dataGrid.Cursor = ClusterIdleCursor();
                 if (clusterHoverToolTip != null)
                 {
                     clusterHoverToolTip.IsOpen = false;
@@ -2695,7 +2712,7 @@ namespace HolyLogger
             }
 
             bool isInteractiveColumn = cell.Column == clusterDxColumn || cell.Column == clusterSpotterColumn || cell.Column == clusterFreqColumn;
-            dataGrid.Cursor = isInteractiveColumn ? Cursors.Hand : Cursors.Arrow;
+            dataGrid.Cursor = isInteractiveColumn ? Cursors.Hand : ClusterIdleCursor();
 
             if (cell.Column == clusterDxColumn || cell.Column == clusterSpotterColumn)
             {
@@ -2720,7 +2737,7 @@ namespace HolyLogger
             var dataGrid = sender as DataGrid;
             if (dataGrid != null)
             {
-                dataGrid.Cursor = Cursors.Arrow;
+                dataGrid.Cursor = ClusterIdleCursor();
                 if (clusterHoverToolTip != null)
                 {
                     clusterHoverToolTip.IsOpen = false;
@@ -4658,7 +4675,7 @@ namespace HolyLogger
                 }
                 if (clusterSpotsDataGrid != null)
                 {
-                    clusterSpotsDataGrid.Cursor = Cursors.Arrow;
+                    clusterSpotsDataGrid.Cursor = ClusterIdleCursor();
                 }
                 clusterLastHoverToolTipColumn = null;
             }

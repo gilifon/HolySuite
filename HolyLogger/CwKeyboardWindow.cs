@@ -240,6 +240,18 @@ namespace HolyLogger
         // marks CW out from everything else on the screen, in any colour scheme.
         private static readonly Brush CwKeyBrush = MakeCwKeyBrush();
 
+        // The yellow a number wears while the pointer is on it - the same mark the frequency displays
+        // carry where the wheel does something. Fixed like the bar it sits on: that bar is one colour
+        // in every scheme, and the black number has to stay readable on it.
+        private static readonly Brush WheelZoneBrush = MakeWheelZoneBrush();
+
+        private static Brush MakeWheelZoneBrush()
+        {
+            var brush = new SolidColorBrush(Color.FromRgb(0xFF, 0xFF, 0x00));
+            brush.Freeze();
+            return brush;
+        }
+
         private static Brush MakeCwKeyBrush()
         {
             var brush = new SolidColorBrush(Color.FromRgb(0x7F, 0xFE, 0xFF));
@@ -1532,7 +1544,8 @@ namespace HolyLogger
             label.SetResourceReference(TextBlock.ForegroundProperty, "TextBrush");
 
             
-            var row = new DockPanel { LastChildFill = false };
+            // Second on the page now, under the clear-line setting, so it carries the gap between them.
+            var row = new DockPanel { LastChildFill = false, Margin = new Thickness(0, 18, 0, 0) };
             DockPanel.SetDock(label, Dock.Left);
             DockPanel.SetDock(rowsBox, Dock.Left);
             row.Children.Add(label);
@@ -1564,7 +1577,7 @@ namespace HolyLogger
             };
             secondsHint.SetResourceReference(TextBlock.ForegroundProperty, "MutedTextBrush");
 
-            var secondsRow = new DockPanel { LastChildFill = false, Margin = new Thickness(0, 18, 0, 0) };
+            var secondsRow = new DockPanel { LastChildFill = false };
             DockPanel.SetDock(secondsLabel, Dock.Left);
             DockPanel.SetDock(secondsBox, Dock.Left);
             // The unit sits after the number, where it is read: "... ended [3] Seconds".
@@ -1582,6 +1595,76 @@ namespace HolyLogger
             secondsRow.Children.Add(secondsBox);
             secondsRow.Children.Add(secondsUnit);
 
+            // ── ESM ────────────────────────────────────────────────────────────────────────
+            //
+            // It lived in the status bar of the main window and has been moved in here: the keyer is
+            // where a man is when he cares about it, and the status bar was carrying it in front of
+            // everybody else for ever. Written straight into the settings on OK, like the two above;
+            // the main window follows them through Settings.PropertyChanged, so nothing has to be
+            // told about this window at all.
+            var esmOff = new RadioButton
+            {
+                Content = "Off",
+                FontSize = 16,
+                GroupName = "EsmMode",
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 16, 0),
+                IsChecked = !Properties.Settings.Default.EsmEnabled,
+                ToolTip = "Enter does what it always did."
+            };
+            var esmRun = new RadioButton
+            {
+                Content = "Run",
+                FontSize = 16,
+                GroupName = "EsmMode",
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 16, 0),
+                IsChecked = Properties.Settings.Default.EsmEnabled && !Properties.Settings.Default.EsmSearchAndPounce,
+                ToolTip = "You are calling CQ. Enter sends Txt 1 (CQ); with a callsign in the form, Txt 2 (his call and your exchange); then Txt 3 (TU), which logs the QSO."
+            };
+            var esmSp = new RadioButton
+            {
+                Content = "S&P",
+                FontSize = 16,
+                GroupName = "EsmMode",
+                VerticalAlignment = VerticalAlignment.Center,
+                IsChecked = Properties.Settings.Default.EsmEnabled && Properties.Settings.Default.EsmSearchAndPounce,
+                ToolTip = "You are answering others. With his callsign typed in, Enter sends Txt 4 (your callsign), then Txt 2 (your exchange), then Txt 3 (TU), which logs the QSO."
+            };
+            esmOff.SetResourceReference(ForegroundProperty, "TextBrush");
+            esmRun.SetResourceReference(ForegroundProperty, "TextBrush");
+            esmSp.SetResourceReference(ForegroundProperty, "TextBrush");
+
+            var esmLabel = new TextBlock
+            {
+                Text = "Enter Sends Message (Ctrl+M):",
+                FontSize = 16,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 14, 0)
+            };
+            esmLabel.SetResourceReference(TextBlock.ForegroundProperty, "TextBrush");
+
+            var esmRow = new DockPanel { LastChildFill = false, Margin = new Thickness(0, 18, 0, 0) };
+            DockPanel.SetDock(esmLabel, Dock.Left);
+            DockPanel.SetDock(esmOff, Dock.Left);
+            DockPanel.SetDock(esmRun, Dock.Left);
+            DockPanel.SetDock(esmSp, Dock.Left);
+            esmRow.Children.Add(esmLabel);
+            esmRow.Children.Add(esmOff);
+            esmRow.Children.Add(esmRun);
+            esmRow.Children.Add(esmSp);
+
+            var esmHint = new TextBlock
+            {
+                Text = "One key walks the whole QSO: Run is you calling CQ, S&P is you answering others. "
+                     + "Which text goes out is decided by how far the contact has got, and the button Enter "
+                     + "will press is lit green.",
+                FontSize = 16,
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(0, 10, 0, 0)
+            };
+            esmHint.SetResourceReference(TextBlock.ForegroundProperty, "MutedTextBrush");
+
             var okBtn = new Button { Content = "OK", FontSize = 16, Width = 90, Height = 32, IsDefault = true };
             var cancelBtn = new Button { Content = "Cancel", FontSize = 16, Width = 90, Height = 32, IsCancel = true, Margin = new Thickness(10, 0, 0, 0) };
 
@@ -1595,9 +1678,11 @@ namespace HolyLogger
             buttons.Children.Add(cancelBtn);
 
             var stack = new StackPanel { Margin = new Thickness(16) };
-            stack.Children.Add(row);
             stack.Children.Add(secondsRow);
             stack.Children.Add(secondsHint);
+            stack.Children.Add(esmRow);
+            stack.Children.Add(esmHint);
+            stack.Children.Add(row);
             stack.Children.Add(BuildHelp());
             stack.Children.Add(BuildStandardTextsButton());
             stack.Children.Add(BuildRadioLink());
@@ -1649,6 +1734,12 @@ namespace HolyLogger
                                                "CW Keyer Settings", dialog);
                     return;
                 }
+
+                // The main window is watching these two, and puts its own green hint right the moment
+                // they change - so switching ESM here needs nothing said to anybody.
+                bool esmSearchAndPounce = esmSp.IsChecked == true;
+                Properties.Settings.Default.EsmEnabled = esmRun.IsChecked == true || esmSearchAndPounce;
+                Properties.Settings.Default.EsmSearchAndPounce = esmSearchAndPounce;
 
                 Properties.Settings.Default.CwKeyboardHistoryRows = rows;
                 Properties.Settings.Default.CwKeyboardBreakSeconds = seconds;
@@ -1759,6 +1850,7 @@ namespace HolyLogger
         private const int WheelWpmHigh = 30;
 
         private TextBlock _wpmText;
+        private Border _wpmNumberBox;
         private int _wpm;
 
         private UIElement BuildSpeedReadout()
@@ -1795,24 +1887,35 @@ namespace HolyLogger
 
             _wpm = Math.Max(low, Math.Min(high, remembered <= 0 ? 20 : remembered));
 
+            // THE WORD AND THE NUMBER ARE TWO PIECES, because only one of them lights. The wheel is
+            // answered over the whole patch, but what it CHANGES is the number - so the yellow goes
+            // round the digits and nothing else.
+            var wpmLabel = new TextBlock
+            {
+                Text = "WPM",
+                FontSize = 16,
+                FontWeight = FontWeights.Bold,
+                Foreground = Brushes.Black,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+
             _wpmText = new TextBlock
             {
                 FontSize = 16,
                 FontWeight = FontWeights.Bold,
                 Foreground = Brushes.Black,
-                VerticalAlignment = VerticalAlignment.Center,
-                Cursor = System.Windows.Input.Cursors.SizeNS,
-                // The second line was learned the hard way on an IC-7610: a speed set here really
-                // is the speed the radio keys at, but the radio's own knob resumes from ITS last
-                // number - so one nudge of it puts the radio back near where it was and throws
-                // away what was set from here. Nothing in the program can prevent that; the least
-                // it can do is say so before somebody else spends an evening on it.
-                ToolTip = "The radio's keyer speed. Roll the wheel over it: "
-                        + low + " to " + high + " words a minute.\n\n"
-                        + "The radio's own speed knob works separately — whichever you turn "
-                        + "last wins."
+                VerticalAlignment = VerticalAlignment.Center
             };
             RefreshSpeedText();
+
+            _wpmNumberBox = new Border
+            {
+                Background = Brushes.Transparent,
+                Padding = new Thickness(3, 0, 3, 0),
+                Margin = new Thickness(3, 0, 0, 0),
+                VerticalAlignment = VerticalAlignment.Center,
+                Child = _wpmText
+            };
 
             // THE ARROWS ARE THE WHOLE POINT OF SHOWING IT AS A NUMBER. A wheel over a piece of text
             // is not something anybody expects, so it is said rather than left to be discovered - and
@@ -1828,8 +1931,25 @@ namespace HolyLogger
             };
 
             var line = new StackPanel { Orientation = Orientation.Horizontal };
-            line.Children.Add(_wpmText);
+            line.Children.Add(wpmLabel);
+            line.Children.Add(_wpmNumberBox);
             line.Children.Add(hint);
+
+            // On the whole patch, so it answers wherever the pointer is when the question occurs to
+            // him. The second line was learned the hard way on an IC-7610: a speed set here really is
+            // the speed the radio keys at, but the radio's own knob resumes from ITS last number - so
+            // one nudge of it puts the radio back near where it was and throws away what was set from
+            // here. Nothing in the program can prevent that; the least it can do is say so before
+            // somebody else spends an evening on it.
+            // ScrollNS, the same cursor the frequency readouts and the cluster's Live Scale list
+            // wear: everywhere in this program that the wheel moves a number, the pointer says so the
+            // same way. It used to be SizeNS, which is the cursor for dragging an edge - close enough
+            // to be read as "drag me", which this is not.
+            holder.Cursor = System.Windows.Input.Cursors.ScrollNS;
+            holder.ToolTip = "The radio's keyer speed. Roll the wheel over it: "
+                           + low + " to " + high + " words a minute.\n\n"
+                           + "The radio's own speed knob works separately — whichever you turn "
+                           + "last wins.";
 
             holder.Child = line;
             System.Windows.Shell.WindowChrome.SetIsHitTestVisibleInChrome(holder, true);
@@ -1839,6 +1959,11 @@ namespace HolyLogger
                 Nudge(e2.Delta > 0 ? 1 : -1);
                 e2.Handled = true;
             };
+
+            // AND IT SAYS SO BEFORE THE WHEEL IS ROLLED. The arrows say a wheel works here; the
+            // yellow says exactly what it works ON, over the whole patch the wheel is answered in.
+            holder.MouseEnter += (s2, e2) => _wpmNumberBox.Background = WheelZoneBrush;
+            holder.MouseLeave += (s2, e2) => _wpmNumberBox.Background = Brushes.Transparent;
 
             // Sent once the window is up, not from here: the keyer is still being built and a command
             // that fails would raise its message box over a half-drawn window.
@@ -1896,7 +2021,7 @@ namespace HolyLogger
 
         private void RefreshSpeedText()
         {
-            if (_wpmText != null) _wpmText.Text = "WPM " + _wpm.ToString(CultureInfo.InvariantCulture);
+            if (_wpmText != null) _wpmText.Text = _wpm.ToString(CultureInfo.InvariantCulture);
         }
 
         // The speed the radio is really at, shown without being sent back to it.

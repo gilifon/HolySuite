@@ -98,6 +98,7 @@
             </Grid>
             <!-- kHz, and under it the sign that the box can be rolled. A wheel over a text box is not
                  something anybody expects, so it has to be shown rather than discovered: the two
+                         Cursor="ScrollNS"
                  arrows say it in the one place the wheel works. -->
             <TextBlock Grid.Column="2" Text="kHz" FontSize="14" FontWeight="Bold"
                        HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="2,0,0,0"

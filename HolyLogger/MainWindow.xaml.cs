@@ -551,7 +551,6 @@ namespace HolyLogger
 
             UpdateFreqModeRadios();
             UpdateTimeModeRadios();
-            UpdateEsmRadios();
             RefreshEsmHint();
 
             AdifHandlerWorker = new BackgroundWorker();
@@ -3655,31 +3654,6 @@ namespace HolyLogger
             LogQsoFromCwMacro();
         }
 
-        private void EsmMode_Click(object sender, RoutedEventArgs e)
-        {
-            bool run = RB_EsmRun != null && RB_EsmRun.IsChecked == true;
-            bool searchAndPounce = RB_EsmSp != null && RB_EsmSp.IsChecked == true;
-
-            Properties.Settings.Default.EsmEnabled = run || searchAndPounce;
-            Properties.Settings.Default.EsmSearchAndPounce = searchAndPounce;
-            try { Properties.Settings.Default.Save(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
-
-            // Changed in the middle of a contact: the next Enter starts that contact again rather
-            // than carrying on from a stage that belonged to the other way of working.
-            _esmStage = EsmStage.Nothing;
-            RefreshEsmHint();
-        }
-
-        private void UpdateEsmRadios()
-        {
-            bool on = Properties.Settings.Default.EsmEnabled;
-            bool searchAndPounce = Properties.Settings.Default.EsmSearchAndPounce;
-
-            if (RB_EsmOff != null) RB_EsmOff.IsChecked = !on;
-            if (RB_EsmRun != null) RB_EsmRun.IsChecked = on && !searchAndPounce;
-            if (RB_EsmSp != null) RB_EsmSp.IsChecked = on && searchAndPounce;
-        }
-
         // Ctrl+M, the key N1MM uses for it. Off and on only: it comes back on the side it was last
         // used on, because a man who works S&P does not want Run every time he switches it back.
         private void ToggleEsm()
@@ -3688,7 +3662,6 @@ namespace HolyLogger
             try { Properties.Settings.Default.Save(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
 
             _esmStage = EsmStage.Nothing;
-            UpdateEsmRadios();
             RefreshEsmHint();
         }
 
@@ -15087,6 +15060,15 @@ namespace HolyLogger
             {
                 Dispatcher.BeginInvoke(new Action(() =>
                 {
+            // ESM is switched in the CW keyer's settings window, which writes these two directly.
+            // Nothing calls back to say so, and nothing needs to: the hint follows the setting.
+            if (e.PropertyName == nameof(Properties.Settings.Default.EsmEnabled)
+                || e.PropertyName == nameof(Properties.Settings.Default.EsmSearchAndPounce))
+            {
+                Dispatcher.BeginInvoke(new Action(() => { _esmStage = EsmStage.Nothing; RefreshEsmHint(); }),
+                                       DispatcherPriority.Background);
+            }
+
                     if (!Properties.Settings.Default.ShowPhotoFromQRZ)
                     {
                         ClearQrzPhoto();

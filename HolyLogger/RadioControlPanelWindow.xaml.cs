@@ -279,6 +279,14 @@ namespace HolyLogger
 
         // ---- the operator presses something ------------------------------------------------
 
+
+            // AND IT SAYS IT IN RED. A dark lamp is the absence of something, which is easy to look
+            // straight past; the words in the theme's own red are not. TX/RX goes back to the plain
+            // text colour - it is a heading over a working lamp, not a warning.
+            //
+            // SetResourceReference rather than a brush taken once: the panel is open across scheme
+            // changes, and a colour copied out of the palette would keep the old scheme's red.
+            TxRxLabel.SetResourceReference(TextBlock.ForegroundProperty, _rigOnline ? "TextBrush" : "Danger");
         private void BandButton_Click(object sender, RoutedEventArgs e)
         {
             var button = (ToggleButton)sender;
