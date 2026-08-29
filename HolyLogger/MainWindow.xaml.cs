@@ -3578,6 +3578,9 @@ namespace HolyLogger
         //
         //   Elecraft K3S/K3/KX3/KX2 Programmer's Reference rev. G5
         //     "KS (Keyer Speed; GET/SET)  SET/RSP format: KSnnn; where nnn is 008-050 (8-50 WPM)."
+        //   Elecraft K4 Programmer's Reference rev. D5
+        //     "KS (Keyer Speed)  SET/RESP format: KSnnn; where nnn is the keyer speed, from 8 to 100
+        //     WPM."  - the wider ceiling costs nothing here, since the wheel stops at 30 either way.
         //
         //   Icom CI-V Reference Guides (IC-705, IC-7610, IC-9700) and the IC-7300 Full Manual
         //     command 14, sub-command 0C: "Send/read keying speed (0000=6 WPM ~ 0255=48 WPM)"
@@ -3602,7 +3605,17 @@ namespace HolyLogger
             if (IsYaesuKeyer(name))            { low = WpmYaesuLow;    high = WpmYaesuHigh;    return; }
             if (GetIcomCivAddress(name) != null) { low = WpmIcomLow;   high = WpmIcomHigh;     return; }
             if (name.StartsWith("TS", StringComparison.OrdinalIgnoreCase))
-                                               { low = WpmKenwoodLow;  high = WpmKenwoodHigh;  return; }
+            {
+                // THE TS-480 STARTS AT 10, and its brothers at 4. Its own reference says so -
+                // "KS  Sets and reads the CW electric keyer's keying speed ... 010 (min.) ~ 060 (max.)"
+                // against the TS-590S/SG, TS-890S and TS-990S, which all say 004 ~ 060. One number for
+                // "Kenwood" would have asked a TS-480 for a speed its manual does not offer.
+                low = name.StartsWith("TS-480", StringComparison.OrdinalIgnoreCase)
+                    || name.StartsWith("TS480", StringComparison.OrdinalIgnoreCase)
+                    ? 10 : WpmKenwoodLow;
+                high = WpmKenwoodHigh;
+                return;
+            }
             if (KeyedByKyCommand(name))        { low = WpmElecraftLow; high = WpmElecraftHigh; return; }
 
             low = 0; high = 0;   // not a radio this program can key
