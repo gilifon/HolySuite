@@ -1662,7 +1662,22 @@ namespace HolyLogger
             Limits(out low, out high);
             if (high == 0) return holder;
 
-            _wpm = Math.Max(low, Math.Min(high, 20));
+            // THE SPEED IT LAST SENT, and it is SENT AGAIN as this window opens.
+            //
+            // The readout used to start at a made-up 20 while the radio was at 10, so the first thing
+            // the operator read was a number that was not true - and it stayed untrue until he
+            // happened to turn the wheel. There is no asking the radio: OmniRig's custom commands are
+            // send-only, so nothing can be read back.
+            //
+            // So the program states rather than guesses. It opens with the speed it last put on this
+            // radio, sends it, and from that moment the number on the bar is the speed the radio is
+            // keying at. (The radio's own knob can still overrule it afterwards - two controls for one
+            // setting, and the last one to speak wins. That is the radio's arrangement, not ours.)
+            int remembered = 20;
+            try { remembered = Properties.Settings.Default.CwKeyerWpm; }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+            _wpm = Math.Max(low, Math.Min(high, remembered <= 0 ? 20 : remembered));
 
             _wpmText = new TextBlock
             {
@@ -1702,6 +1717,10 @@ namespace HolyLogger
                 e2.Handled = true;
             };
 
+            // Sent once the window is up, not from here: the keyer is still being built and a command
+            // that fails would raise its message box over a half-drawn window.
+            Dispatcher.BeginInvoke(new Action(SendSpeed), DispatcherPriority.Loaded);
+
             return holder;
         }
 
@@ -1732,8 +1751,23 @@ namespace HolyLogger
 
             _wpm = wanted;
             RefreshSpeedText();
+            SendSpeed();
+        }
+
+        private void SendSpeed()
+        {
+            if (_setSpeed == null) return;
 
             try { _setSpeed(_wpm); }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+            // Kept for the next time this window opens, so it starts where he left it rather than at
+            // a number nobody chose.
+            try
+            {
+                Properties.Settings.Default.CwKeyerWpm = _wpm;
+                SettingsFlush.RequestSave();
+            }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
         }
 
