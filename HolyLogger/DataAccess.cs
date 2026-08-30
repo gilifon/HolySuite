@@ -12,6 +12,20 @@ using System.Threading.Tasks;
 
 namespace HolyLogger
 {
+    // ONE FIELD OF ONE CONTACT, AS THE LOG FIXER FOUND IT AND AS IT LEFT IT.
+    //
+    // Field is the name the operator READS at the top of the column - "Country", "DX Locator" - and
+    // not the name of the database column or of the property. What is being kept here is a sentence
+    // he will be shown a year from now, and "dx_locator" is not a word he ever typed.
+    public class FixNote
+    {
+        public int QsoId;
+        public string When;    // "yyyyMMdd HHmm", UTC, the moment Fix was pressed
+        public string Field;
+        public string Was;
+        public string Now;
+    }
+
     public class DataAccess
     {
         // Private static instance variable to hold the single instance of the class.
@@ -1401,11 +1415,16 @@ Environment.NewLine +
                 try
                 {
                     foreach (var delId in ids)
+                    {
                         using (var del = new SQLiteCommand("DELETE FROM qso WHERE Id = ?", con))
                         {
                             del.Parameters.Add(new SQLiteParameter(null, delId));
                             del.ExecuteNonQuery();
                         }
+                        // And what the Log Fixer wrote down about it: a record of a change to a
+                        // contact that no longer exists is not history, it is litter.
+                        ForgetFixHistory(delId);
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -2199,6 +2218,138 @@ Environment.NewLine +
                     "[key] nvarchar(60) NOT NULL COLLATE NOCASE PRIMARY KEY, " +
                     "[value] TEXT NULL)", con))
                     cmd.ExecuteNonQuery();
+            }
+            catch (Exception ex) { Log.Swallow(ex); }
+        }
+
+        // ── WHAT THE LOG FIXER CHANGED, FIELD BY FIELD ──────────────────────────────────────
+        //
+        // review_state = 1 says a contact was corrected. It does not say WHAT was corrected, and the
+        // man looking at "Already checked and fixed" months later has no way of finding out: the old
+        // value is gone from the QSO, and the only copy of it left in the world is inside a whole-
+        // database backup file. One row here per field per press - the value as it stood and the value
+        // that replaced it - so the list can say "Country: Spain -> Balearic Is." instead of showing
+        // him a contact he has to take on trust.
+        //
+        // Never dropped, and no foreign key: a contact that leaves the log takes its rows with it by
+        // way of ForgetFixHistory, and a file made before this table existed simply has nothing in it.
+        private void EnsureFixHistoryTable()
+        {
+            try
+            {
+                using (var cmd = new SQLiteCommand(
+                    "CREATE TABLE IF NOT EXISTS [qso_fix] (" +
+                    "[Id] INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                    "[qso_id] INTEGER NOT NULL, " +
+                    "[when_utc] nvarchar(20) NULL, " +
+                    "[field] nvarchar(40) NOT NULL COLLATE NOCASE, " +
+                    "[was] TEXT NULL, " +
+                    "[now] TEXT NULL)", con))
+                    cmd.ExecuteNonQuery();
+                // The one question ever asked of it is "what was done to THIS contact", and the list
+                // asks it four thousand times in a row.
+                using (var ix = new SQLiteCommand(
+                    "CREATE INDEX IF NOT EXISTS [ix_qso_fix_qso] ON [qso_fix] ([qso_id])", con))
+                    ix.ExecuteNonQuery();
+            }
+            catch (Exception ex) { Log.Swallow(ex); }
+        }
+
+        // Written from inside the Fixer's own transaction, so the record of what was changed is
+        // committed with the change itself: a run that fails halfway leaves neither.
+        public void SaveFixHistory(IEnumerable<FixNote> notes)
+        {
+            if (notes == null) return;
+            lock (_dbLock)
+            {
+                if (con == null || con.State != System.Data.ConnectionState.Open) return;
+                try
+                {
+                    using (var cmd = new SQLiteCommand(
+                        "INSERT INTO [qso_fix] ([qso_id],[when_utc],[field],[was],[now]) "
+                        + "VALUES (?,?,?,?,?)", con))
+                    {
+                        var qsoId = new SQLiteParameter(); cmd.Parameters.Add(qsoId);
+                        var when  = new SQLiteParameter(); cmd.Parameters.Add(when);
+                        var field = new SQLiteParameter(); cmd.Parameters.Add(field);
+                        var was   = new SQLiteParameter(); cmd.Parameters.Add(was);
+                        var now   = new SQLiteParameter(); cmd.Parameters.Add(now);
+                        foreach (FixNote n in notes)
+                        {
+                            if (n == null || n.QsoId <= 0 || string.IsNullOrEmpty(n.Field)) continue;
+                            qsoId.Value = (long)n.QsoId;
+                            when.Value  = n.When ?? "";
+                            field.Value = n.Field;
+                            was.Value   = n.Was ?? "";
+                            now.Value   = n.Now ?? "";
+                            cmd.ExecuteNonQuery();
+                        }
+                    }
+                }
+                catch (Exception ex) { Log.Swallow(ex); }
+            }
+        }
+
+        // What was done to each of these contacts, oldest press first. Contacts with nothing recorded
+        // are simply absent from the answer - the caller shows those as "not recorded" rather than as
+        // contacts nothing was done to, which is a different thing and would be a lie.
+        public Dictionary<int, List<FixNote>> GetFixHistory(IEnumerable<int> qsoIds)
+        {
+            var found = new Dictionary<int, List<FixNote>>();
+            if (qsoIds == null) return found;
+            var ids = qsoIds.Where(id => id > 0).Distinct().ToList();
+            if (ids.Count == 0) return found;
+
+            lock (_dbLock)
+            {
+                if (con == null || con.State != System.Data.ConnectionState.Open) return found;
+                try
+                {
+                    // Nine hundred at a time, for the same reason SetReviewState does it: the list can
+                    // be the whole log, and one IN clause carrying 28,000 numbers is a quarter of a
+                    // megabyte of SQL to parse.
+                    for (int at = 0; at < ids.Count; at += 900)
+                    {
+                        string batch = string.Join(",", ids.Skip(at).Take(900));
+                        using (var cmd = new SQLiteCommand(
+                            "SELECT [qso_id],[when_utc],[field],[was],[now] FROM [qso_fix] "
+                            + "WHERE [qso_id] IN (" + batch + ") ORDER BY [Id]", con))
+                        using (var rdr = cmd.ExecuteReader())
+                            while (rdr.Read())
+                            {
+                                var n = new FixNote
+                                {
+                                    QsoId = Convert.ToInt32(rdr["qso_id"]),
+                                    When  = rdr["when_utc"] == DBNull.Value ? "" : Convert.ToString(rdr["when_utc"]),
+                                    Field = rdr["field"] == DBNull.Value ? "" : Convert.ToString(rdr["field"]),
+                                    Was   = rdr["was"] == DBNull.Value ? "" : Convert.ToString(rdr["was"]),
+                                    Now   = rdr["now"] == DBNull.Value ? "" : Convert.ToString(rdr["now"])
+                                };
+                                List<FixNote> list;
+                                if (!found.TryGetValue(n.QsoId, out list))
+                                    found[n.QsoId] = list = new List<FixNote>();
+                                list.Add(n);
+                            }
+                    }
+                }
+                catch (Exception ex) { Log.Swallow(ex); }
+            }
+            return found;
+        }
+
+        // A contact that has left the log takes its record with it. Ids are never reused - the column
+        // is AUTOINCREMENT - so leaving them would only be untidy, but untidy in a file that is
+        // exported, backed up and read by hand.
+        public void ForgetFixHistory(long qsoId)
+        {
+            if (qsoId <= 0) return;
+            try
+            {
+                using (var cmd = new SQLiteCommand("DELETE FROM [qso_fix] WHERE [qso_id] = ?", con))
+                {
+                    cmd.Parameters.Add(new SQLiteParameter(null, qsoId));
+                    cmd.ExecuteNonQuery();
+                }
             }
             catch (Exception ex) { Log.Swallow(ex); }
         }
@@ -5625,6 +5776,7 @@ Environment.NewLine +
             EnsureLogsTable();
             EnsureLogStateTable();
             EnsureDbStateTable();
+            EnsureFixHistoryTable();
 
             // ── THE 2s THAT NEVER MEANT ANYTHING ────────────────────────────────────────────────
             //

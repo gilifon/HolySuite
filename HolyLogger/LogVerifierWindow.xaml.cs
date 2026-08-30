@@ -390,6 +390,11 @@ namespace HolyLogger
             public bool UserEdited;
             public Action Changed;
 
+            // NOTHING HERE TO ANSWER. The lower half is a text box because a fault the program cannot
+            // answer is settled by typing into it - but a list of contacts already put right is a
+            // record, not a question, and a caret blinking in it invites an answer nobody reads.
+            public bool ReadOnly { get; set; }
+
             // WHAT IS WRONG, for a fault with no answer to offer. A red cell on its own says only that
             // something is the matter - "Club Log lists this as never valid" is not something anyone
             // can read out of a red callsign. It sits in the lower half as a grey note and vanishes the
@@ -446,6 +451,13 @@ namespace HolyLogger
                 Raise("NowBg"); Raise("ThenBg"); Raise("NowFg"); Raise("ThenFg");
             }
 
+            // A CELL THAT IS NOT A VALUE. The history list needs one column that says nothing about the
+            // contact at all - it only names the two lines, was and now - and painting it in the red
+            // and green of the argument going on beside it would make a label look like a verdict.
+            // Set, it wins over everything below: both halves take this colour and neither is red,
+            // green or grey.
+            public Brush Tint;
+
             // Only a cell with something at stake changes colour: one that is red, or one that has a
             // proposal under it. Anything else is untouched log data and stays looking like it.
             private bool InPlay { get { return Wrong || Proposed.Length > 0; } }
@@ -456,6 +468,7 @@ namespace HolyLogger
             {
                 get
                 {
+                    if (Tint != null) return Tint;
                     if (InPlay && ai == AiSide.Now) return RightBg;
                     if (InPlay && ai == AiSide.Then) return DeadBg;
                     return Wrong ? WrongBg : Brushes.Transparent;
@@ -465,6 +478,7 @@ namespace HolyLogger
             {
                 get
                 {
+                    if (Tint != null) return Tint;
                     if (Proposed.Length == 0) return Brushes.Transparent;
                     return ai == AiSide.Now ? DeadBg : RightBg;
                 }
@@ -473,6 +487,7 @@ namespace HolyLogger
             {
                 get
                 {
+                    if (Tint != null) return LabelFg;
                     if (InPlay && ai == AiSide.Now) return RightFg;
                     if (InPlay && ai == AiSide.Then) return DeadFg;
                     return Wrong ? WrongFg : DimFg;
@@ -481,7 +496,15 @@ namespace HolyLogger
             // The lower half's text used to be green in the template itself, which left a greyed-out
             // proposal reading as green writing on a grey ground - the one combination that says
             // nothing at all.
-            public Brush ThenFg { get { return ai == AiSide.Now ? DeadFg : RightFg; } }
+            public Brush ThenFg
+            {
+                get { return Tint != null ? LabelGreenFg : ai == AiSide.Now ? DeadFg : RightFg; }
+            }
+
+            // THE UPPER LINE IS NORMALLY LOG DATA and log data is not shouted. The label column is the
+            // exception: both its words are the heading of a line, and a heading in the same weight as
+            // the values it names is a heading nobody sees.
+            public FontWeight NowWeight { get { return Tint != null ? FontWeights.Bold : FontWeights.Normal; } }
             public FontWeight ThenWeight { get { return Proposed.Length > 0 ? FontWeights.Bold : FontWeights.Normal; } }
 
             // A proper alarm red, not the pale wash it started as - a fault has to look like one.
@@ -494,6 +517,14 @@ namespace HolyLogger
             private static readonly Brush DeadBg = Freeze(Color.FromRgb(0xDE, 0xDE, 0xDE));
             private static readonly Brush DeadFg = Freeze(Color.FromRgb(0x6E, 0x6E, 0x6E));
             private static readonly Brush RightFg = Freeze(Color.FromRgb(0x0B, 0x4A, 0x0E));
+            // The history column: a pale blue that belongs to neither side of the argument, and a navy
+            // to write on it in.
+            public static readonly Brush LabelBg = Freeze(Color.FromRgb(0xD6, 0xE7, 0xFA));
+            // BLUE AND GREEN THAT LOOK IT. The first pair of these was a navy and a bottle green, and
+            // at this size on a pale blue ground both read as black - two words the same colour, which
+            // is the one thing this column exists not to be.
+            private static readonly Brush LabelFg = Freeze(Color.FromRgb(0x15, 0x46, 0xA0));
+            private static readonly Brush LabelGreenFg = Freeze(Color.FromRgb(0x11, 0xA5, 0x2B));
             private static Brush Freeze(Color c) { var b = new SolidColorBrush(c); b.Freeze(); return b; }
         }
 
@@ -506,6 +537,32 @@ namespace HolyLogger
             public Dictionary<string, Cell> Cells { get; private set; }
 
             public FixRow() { Cells = new Dictionary<string, Cell>(); }
+
+            // ── PUTTING IT BACK ─────────────────────────────────────────────────────────────
+            //
+            // What the Log Fixer recorded about this contact, oldest press first, carried on the row
+            // in the list of contacts already corrected. A revert writes these values back, so it is
+            // reading from the log's own record rather than working the old value out from the new
+            // one - which cannot be done at all once a country name has been replaced.
+            public List<FixNote> History;
+
+            // A contact fixed before any of this was written down has nothing to go back TO, so its
+            // box is not offered. Not a grey box either - see the tick column - but an empty cell.
+            public bool CanRevert { get { return History != null && History.Count > 0; } }
+
+            private bool revert;
+            public bool Revert
+            {
+                get { return revert; }
+                set
+                {
+                    if (revert == value) return;
+                    revert = value;
+                    if (PropertyChanged != null) PropertyChanged(this, new PropertyChangedEventArgs("Revert"));
+                    if (RevertChanged != null) RevertChanged();
+                }
+            }
+            public Action RevertChanged;
 
             // A row can be put right either because the program proposed something or because the
             // operator typed something. Recomputed as they type, so the tick box comes alive under
@@ -779,6 +836,20 @@ namespace HolyLogger
         // Callsign always appear - they are how an operator recognises the contact; the rest appear
         // only when something is wrong with them.
         private static readonly string[] AlwaysColumns = { "Date", "Time", "Callsign" };
+
+        // The header over the date the Fixer ran, in the list of contacts it has already put right.
+        // Named once: it is a column key, and a column key spelt two ways is a column that never fills.
+        private const string WhenColumn = "Fixed on";
+
+        // AND THE COLUMN THAT SAYS WHICH LINE IS WHICH.
+        //
+        // Every cell in this window is two lines, and in a list of contacts already put right the two
+        // are the contact BEFORE and the contact AFTER - which the colours alone do not say. Red and
+        // green mean "wrong" and "proposed" everywhere else in the Fixer, so a man arriving at this
+        // list has every reason to read the red line as a fault still standing. The leftmost column
+        // names the pair on every row - was, now - in a pale blue of its own, because it is a label
+        // and not a value the log ever held.
+        private const string WasNowColumn = "History";
         private static readonly string[] IssueColumns =
         {
             "Band", "Mode", "Country", "Country Code", "Continent", "DX Locator", "Comment",
@@ -2356,8 +2427,43 @@ namespace HolyLogger
             _rowByQso.Clear();
             _kinds.Clear();
 
-            var columns = new List<string> { "Country", "Country Code", "Continent", "DX Locator", "Comment" };
+            // ── WHAT WAS DONE TO EACH OF THEM ───────────────────────────────────────────────
+            //
+            // The whole point of this list. review_state = 1 says a contact was corrected and nothing
+            // more; the values it held before are not in the QSO any longer. They are here, one row
+            // per field per press, and the cells show the pair the operator already knows how to read:
+            // red on top is what the contact said, green underneath is what it says now.
+            var dal = DataAccess.GetInstance();
+            Dictionary<int, List<FixNote>> history = null;
+            try
+            {
+                if (dal != null)
+                    history = dal.GetFixHistory(_qsos.Where(q => q != null).Select(q => q.id));
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+            if (history == null) history = new Dictionary<int, List<FixNote>>();
 
+            // ONLY THE COLUMNS SOMETHING ACTUALLY HAPPENED IN. A fixed set of five put a column of
+            // Comments on screen that nothing had ever been written to, and left the CQ zone - which a
+            // country correction really does move - off the edge of the window entirely.
+            var used = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var kv in history)
+                foreach (FixNote n in kv.Value)
+                    if (!string.IsNullOrEmpty(n.Field)) used.Add(n.Field);
+
+            var columns = new List<string> { WasNowColumn };
+            columns.AddRange(AlwaysColumns);
+            columns.Add(WhenColumn);
+            // In the order the operator meets them elsewhere in this window, so the table does not
+            // rearrange itself between one press of the chooser and the next.
+            foreach (string key in FieldsAFixCanTouch)
+                if (used.Contains(key) && !columns.Contains(key)) columns.Add(key);
+            // And anything written by a build that knew a field this one does not, rather than
+            // dropping it silently.
+            foreach (string key in used)
+                if (!columns.Contains(key)) columns.Add(key);
+
+            int recorded = 0;
             foreach (QSO q in _qsos)
             {
                 if (q == null) continue;
@@ -2365,22 +2471,88 @@ namespace HolyLogger
                 CellFor(row, "Date").Current = FormatDate(q.Date);
                 CellFor(row, "Time").Current = FormatTime(q.Time);
                 CellFor(row, "Callsign").Current = Text(q.DXCall);
-                foreach (string key in columns) CellFor(row, key).Current = CurrentOf(q, key);
+
+                List<FixNote> notes;
+                if (history.TryGetValue(q.id, out notes) && notes.Count > 0)
+                {
+                    recorded++;
+                    // Kept on the row, because putting the contact back means writing these values
+                    // into it again and nothing else in the window knows them.
+                    row.History = notes;
+                    FixRow reverting = row;   // captured, or every row would close over the last
+                    row.RevertChanged = () => UpdateRevertButton();
+                    // The key to the two lines, painted in the same red and green as the values it is
+                    // standing beside, so it reads as part of them and not as another field of the QSO.
+                    Cell key = CellFor(row, WasNowColumn);
+                    key.Current = "was";
+                    key.Suggest("now");
+                    key.Tint = Cell.LabelBg;
+                    // The LAST press, not the first: if a contact has been through the Fixer twice,
+                    // the date that matters is the one that left it looking as it does now.
+                    CellFor(row, WhenColumn).Current = WhenText(notes[notes.Count - 1].When);
+                    foreach (FixNote n in notes)
+                    {
+                        if (string.IsNullOrEmpty(n.Field)) continue;
+                        Cell cell = CellFor(row, n.Field);
+                        cell.Current = n.Was ?? "";
+                        cell.Wrong = true;
+                        cell.Suggest(n.Now ?? "");
+                    }
+                }
+                else
+                {
+                    // FIXED BEFORE ANYTHING WAS WRITTEN DOWN. Said in the cell rather than left blank:
+                    // a blank would read as a contact nothing was done to, which is a different thing.
+                    CellFor(row, WhenColumn).Note = "not recorded";
+                }
+
+                // The columns this contact was not touched in still show what it holds, so each line
+                // reads as a QSO rather than as two coloured boxes floating in space.
+                foreach (string key in columns)
+                    if (!row.Cells.ContainsKey(key)) CellFor(row, key).Current = CurrentOf(q, key);
+
+                // Nothing on this window writes, so nothing on it is typed into either.
+                foreach (var kv in row.Cells) kv.Value.ReadOnly = true;
+
                 _rows.Add(row);
                 _rowByQso[q] = row;
             }
 
             BuildColumns(columns);
+
+            // LEFTMOST MEANS LEFTMOST, AND REVERT COMES NEXT. BuildColumns puts its own four - the
+            // three box columns and the "?" - in front of every data column, so the key to the rows
+            // would have sat fifth. Set in this order: History takes 0 and pushes the rest right,
+            // then Revert takes 1 and the "?" lands where it belongs, third.
+            foreach (var c in FindingsGrid.Columns)
+                if ((c.Header as string) == WasNowColumn) { c.DisplayIndex = 0; break; }
+            if (_revertColumn != null)
+            {
+                _revertColumn.Visibility = Visibility.Visible;
+                _revertColumn.DisplayIndex = 1;
+            }
+
             FindingsGrid.ItemsSource = _rows;
 
             TB_Header.Text = headline;
-            TB_Summary.Text = "Double-click a row to open the QSO.";
-            TB_KindsSummary.Text = "";
+            TB_Summary.Text = recorded > 0
+                ? "Red is what the contact said before the Log Fixer changed it; green is what it says "
+                  + "now.  Double-click a row to open the QSO."
+                : "Double-click a row to open the QSO.";
+            // THE FRAME THAT WAS STANDING EMPTY. In a list there are no kinds to tick, so the panel
+            // above the table held nothing at all - and that is where the one thing this screen can
+            // DO belongs, with the sentence that explains it on the left and the button on the right.
+            TB_KindsSummary.Text = recorded > 0
+                ? "You can revert any QSO by checking the Revert check box"
+                : "";
             if (TB_Intro != null) TB_Intro.Inlines.Clear();
             if (Btn_Fix != null) { Btn_Fix.Visibility = Visibility.Collapsed; }
             if (Btn_Ai != null) Btn_Ai.Visibility = Visibility.Collapsed;
             if (Btn_ShowAll != null) Btn_ShowAll.Visibility = Visibility.Collapsed;
+            if (Btn_Revert != null)
+                Btn_Revert.Visibility = recorded > 0 ? Visibility.Visible : Visibility.Collapsed;
             ShowAnswerColumns(false);
+            UpdateRevertButton();
         }
 
         // True while the window is a list of settled contacts rather than a check. Nothing writes,
@@ -2568,6 +2740,78 @@ namespace HolyLogger
             return "";
         }
 
+        // ── WHAT A FIX ACTUALLY CHANGED, WRITTEN DOWN BEFORE IT IS FORGOTTEN ────────────────
+        //
+        // Every field the Fixer is able to write, under the name the operator READS at the top of the
+        // column. Three of them - the DXCC string and the two zones - have no column of their own:
+        // they travel behind a country correction, and a man told his country was mended and not told
+        // his CQ zone moved with it has been told half of it.
+        private static readonly string[] FieldsAFixCanTouch =
+        {
+            "Callsign", "Date", "Time", "Band", "Mode", "Country", "Country Code", "DXCC",
+            "Continent", "CQ Zone", "ITU Zone", "DX Locator", "Comment", "IOTA", "SOTA", "POTA", "WWFF"
+        };
+
+        // CurrentOf knows the columns; these three are not columns.
+        private static string ValueOf(QSO q, string key)
+        {
+            if (q == null) return "";
+            switch (key)
+            {
+                case "DXCC": return Text(q.DXCC);
+                case "CQ Zone": return Text(q.CQZone);
+                case "ITU Zone": return Text(q.ITUZone);
+                default: return CurrentOf(q, key);
+            }
+        }
+
+        private static Dictionary<string, string> Snapshot(QSO q)
+        {
+            var was = new Dictionary<string, string>();
+            foreach (string key in FieldsAFixCanTouch) was[key] = ValueOf(q, key);
+            return was;
+        }
+
+        // BY COMPARISON, NOT BY ASKING THE FINDINGS WHAT THEY MEANT TO DO. A country correction writes
+        // five fields through one finding, a typed cell writes one through another path, and a finding
+        // whose value turns out to be the one already in the log writes nothing at all. Reading the
+        // contact before and after catches all three cases in the same eight lines, and cannot drift
+        // out of step with ApplyTo the way a hand-kept list of "what this finding changes" would.
+        private static void NoteChanges(QSO q, Dictionary<string, string> before, string when,
+                                        List<FixNote> into)
+        {
+            if (q == null || before == null || into == null) return;
+            foreach (string key in FieldsAFixCanTouch)
+            {
+                string now = ValueOf(q, key);
+                string then;
+                if (!before.TryGetValue(key, out then)) then = "";
+                if (string.Equals(then ?? "", now ?? "", StringComparison.Ordinal)) continue;
+                into.Add(new FixNote
+                {
+                    QsoId = q.id,
+                    When = when,
+                    Field = key,
+                    Was = then ?? "",
+                    Now = now ?? ""
+                });
+            }
+        }
+
+        // "20260830 1455" as the operator writes a date and a time. Anything else - an empty stamp, a
+        // stamp from a build that wrote it differently - is handed back as it stands rather than
+        // thrown away: an odd-looking date is still evidence, a blank cell is not.
+        private static string WhenText(string stamp)
+        {
+            stamp = (stamp ?? "").Trim();
+            if (stamp.Length == 0) return "";
+            string[] parts = stamp.Split(' ');
+            if (parts.Length != 2 || parts[0].Length != 8) return stamp;
+            string date = FormatDate(parts[0]);
+            string time = FormatTime(parts[1]);
+            return time.Length > 0 ? date + "  " + time : date;
+        }
+
         // The columns are made here rather than in the XAML because WHICH of them exist depends on what
         // the scan found. Each is the two-half cell; the tick column is built once at the front.
         private void BuildColumns(List<string> columns)
@@ -2670,6 +2914,56 @@ namespace HolyLogger
 
             FindingsGrid.Columns.Add(keep);
 
+            // ── AND THE COLUMN THAT PUTS ONE BACK ───────────────────────────────────────────────
+            //
+            // Only ever on show in the list of contacts already corrected, and shown there ALWAYS -
+            // it is the one thing that list is for beyond reading. A contact with nothing recorded
+            // shows no box at all rather than a dead one, exactly as a kind with no answer does up in
+            // the panel: a box that cannot be pressed is an invitation the window then refuses.
+            var revert = new DataGridTemplateColumn { Width = 80, CanUserSort = false };
+            var revertBox = new FrameworkElementFactory(typeof(CheckBox));
+            revertBox.SetValue(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Center);
+            revertBox.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
+            revertBox.SetValue(FrameworkElement.ToolTipProperty,
+                               "Put this QSO back to the values it held before the Log Fixer changed it");
+            revertBox.SetBinding(UIElement.VisibilityProperty,
+                new System.Windows.Data.Binding("CanRevert")
+                {
+                    Converter = new System.Windows.Controls.BooleanToVisibilityConverter()
+                });
+            revertBox.SetBinding(System.Windows.Controls.Primitives.ToggleButton.IsCheckedProperty,
+                new System.Windows.Data.Binding("Revert")
+                {
+                    Mode = System.Windows.Data.BindingMode.TwoWay,
+                    UpdateSourceTrigger = System.Windows.Data.UpdateSourceTrigger.PropertyChanged
+                });
+            revert.CellTemplate = new DataTemplate { VisualTree = revertBox };
+
+            var revertAll = new CheckBox
+            {
+                IsThreeState = true,
+                VerticalAlignment = VerticalAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                ToolTip = "Put every QSO on show back, or clear them all"
+            };
+            revertAll.Click += Chk_RevertAll_Click;
+            _revertAllBox = revertAll;
+
+            var revertHeader = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center };
+            revertHeader.Children.Add(revertAll);
+            revertHeader.Children.Add(new TextBlock
+            {
+                Text = "Revert",
+                FontWeight = FontWeights.Bold,
+                Margin = new Thickness(5, 0, 0, 0),
+                VerticalAlignment = VerticalAlignment.Center
+            });
+            revert.Header = revertHeader;
+
+            _revertColumn = revert;
+            revert.Visibility = _listHeadline != null ? Visibility.Visible : Visibility.Collapsed;
+            FindingsGrid.Columns.Add(revert);
+
             // NEITHER BOX EXISTS UNTIL THERE IS A KIND TO ANSWER. With every kind listed the table is a
             // summary of the work and nothing on this window will write - so two columns of boxes that
             // do nothing when pressed are two invitations the window then refuses. They appear with the
@@ -2723,6 +3017,7 @@ namespace HolyLogger
                     + "<Border Grid.Row='0' Background='{Binding Cells[" + safe + "].NowBg}' Padding='7,3,7,3' "
                     + "MinHeight='24' BorderBrush='#C0C0C0' BorderThickness='0,0,0,1'>"
                     + "<TextBlock Text='{Binding Cells[" + safe + "].Current}' TextWrapping='Wrap' "
+                    + "FontWeight='{Binding Cells[" + safe + "].NowWeight}' "
                     + "Foreground='{Binding Cells[" + safe + "].NowFg}'/></Border>"
                     // THE LOWER HALF IS ALWAYS THERE, even when the program has nothing to propose.
                     // An empty line under every contact is what makes the table read as pairs; letting
@@ -2746,6 +3041,7 @@ namespace HolyLogger
                     + "Foreground='#8C8C8C' IsHitTestVisible='False'/>"
                     + "<TextBox Text='{Binding Cells[" + safe + "].Proposed, Mode=TwoWay, "
                     + "UpdateSourceTrigger=PropertyChanged}' Background='Transparent' BorderThickness='0' "
+                    + "IsReadOnly='{Binding Cells[" + safe + "].ReadOnly}' "
                     + "Padding='3,2,3,2' Foreground='{Binding Cells[" + safe + "].ThenFg}' "
                     + "FontWeight='{Binding Cells[" + safe + "].ThenWeight}'/></Grid></Border>"
                     + "</Grid></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>";
@@ -3137,10 +3433,60 @@ namespace HolyLogger
         // The header's box, built in BuildColumns because the columns are remade on every scan.
         private CheckBox _fixAllBox;
         private CheckBox _keepAllBox;
+        private CheckBox _revertAllBox;
 
         // The two answer columns, hidden until a kind is on show. Remade with the columns on every scan.
         private DataGridColumn _fixColumn;
         private DataGridColumn _keepColumn;
+        // And the third, which is the other way round: on show ONLY in the list of contacts already
+        // corrected, where the other two mean nothing.
+        private DataGridColumn _revertColumn;
+
+        // Nothing ticked -> tick every row that has something to go back to; anything ticked -> clear
+        // the lot. The same header box as Fix and Do not change, and it obeys the same rule.
+        private void Chk_RevertAll_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var rows = FindingsGrid.Items.OfType<FixRow>().Where(r => r.CanRevert).ToList();
+                bool all = !rows.Any(r => r.Revert);
+                _syncingKind = true;                       // one update at the end, not one per row
+                try
+                {
+                    foreach (FixRow r in rows) r.Revert = all;
+                }
+                finally { _syncingKind = false; }
+            }
+            catch (Exception ex) { Log.Swallow(ex); }
+
+            UpdateRevertButton();
+        }
+
+        // GREY UNTIL ONE IS TICKED, AND GREY AGAIN WHEN THE LAST IS CLEARED. The count goes into the
+        // label, so the press he is about to make is a number he has read rather than one he has
+        // counted himself.
+        private void UpdateRevertButton()
+        {
+            if (Btn_Revert == null) return;
+            int n = 0;
+            try { n = FindingsGrid.Items.OfType<FixRow>().Count(r => r.Revert && r.CanRevert); }
+            catch (Exception ex) { Log.Swallow(ex); }
+
+            Btn_Revert.IsEnabled = n > 0;
+            Btn_Revert.Content = n > 0 ? "Revert " + n.ToString("N0") + " selected" : "Revert Selected";
+
+            if (_revertAllBox != null && !_syncingKind)
+            {
+                try
+                {
+                    int rows = FindingsGrid.Items.OfType<FixRow>().Count(r => r.CanRevert);
+                    _revertAllBox.IsChecked = n == 0 ? (bool?)false
+                                            : n == rows ? (bool?)true
+                                            : null;
+                }
+                catch (Exception ex) { Log.Swallow(ex); }
+            }
+        }
 
         private void ShowAnswerColumns(bool show)
         {
@@ -4506,6 +4852,15 @@ namespace HolyLogger
 
             int written = 0;
             var gone = new List<QSO>();      // the contacts actually removed, for the windows showing them
+
+            // WHAT EACH CONTACT SAID BEFORE THIS PRESS. Written into the log beside the correction, in
+            // the same transaction, so that "Already checked and fixed" can show him the old value
+            // months later instead of a contact he has to take on trust. Until this existed the only
+            // surviving copy of the old value was inside a whole-database backup file.
+            // ONE STAMP FOR THE WHOLE PRESS, not one per contact: this was one act, and four thousand
+            // rows differing by a second would read as four thousand acts.
+            var history = new List<FixNote>();
+            string stamp = DateTime.UtcNow.ToString("yyyyMMdd HHmm");
             try
             {
 
@@ -4550,6 +4905,10 @@ namespace HolyLogger
                             continue;
                         }
 
+                        // Read before a single field moves. Compared again below, once everything
+                        // this row is going to write has been written.
+                        var wasBefore = Snapshot(qso);
+
                         foreach (Finding f in r.Findings) if (f.Fixable) ApplyTo(qso, f);
 
                         // Anything the operator typed is written AFTER the suggestions, so their word
@@ -4561,6 +4920,7 @@ namespace HolyLogger
                                 WriteField(qso, kv.Key, kv.Value.Proposed.Trim());
 
                         dal.Update(qso);
+                        NoteChanges(qso, wasBefore, stamp, history);
                         written++;
 
                         // A count that moves, so a long job is visibly a long job and not a dead one.
@@ -4570,6 +4930,10 @@ namespace HolyLogger
                             Dispatcher.BeginInvoke(new Action(() => UpdateFixOverlay(done, total)));
                         }
                     }
+
+                    // Inside the transaction with the corrections themselves: a run that falls over
+                    // halfway leaves neither the change nor the record of it.
+                    dal.SaveFixHistory(history);
                 }));
             }
             catch (Exception ex)
@@ -4841,6 +5205,195 @@ namespace HolyLogger
                     if (f.NewItu > 0) qso.ITUZone = f.NewItu.ToString();
                     break;
             }
+        }
+
+        // ── PUTTING A CONTACT BACK THE WAY IT WAS ───────────────────────────────────────────
+        //
+        // The reverse of WriteField, and deliberately NOT the same method: WriteField is for a value
+        // somebody has just typed, so it tidies what it is given - a callsign to capitals, a mode to
+        // capitals. Nothing may be tidied here. What is written back is what the log itself held,
+        // character for character, and a revert that returns a contact in a different case from the
+        // one it left in has not put it back.
+        //
+        // The three fields with no column of their own are here too. They travel behind a country
+        // correction, so a revert that did not carry them would leave the contact half returned:
+        // Spain again, with Puerto Rico's zones.
+        private static void RestoreField(QSO q, string key, string v)
+        {
+            if (q == null) return;
+            v = v ?? "";
+            switch (key)
+            {
+                case "Callsign": q.DXCall = v; break;
+                case "Date": { string d = UnformatDate(v); if (d != null) q.Date = d; break; }
+                case "Time": { string t = UnformatTime(v); if (t != null) q.Time = t; break; }
+                case "Band": q.Band = v; break;
+                case "Mode": q.Mode = v; break;
+                case "Country": q.Country = v; break;
+                // An empty one goes back to 0, which is what "no entity" is in this column. Guarding
+                // on "only if it parses" would leave the new number standing in a contact that never
+                // had one.
+                case "Country Code": { int c; q.DxccCode = int.TryParse(v, out c) ? c : 0; break; }
+                case "DXCC": q.DXCC = v; break;
+                case "Continent": q.Continent = v; break;
+                case "CQ Zone": q.CQZone = v; break;
+                case "ITU Zone": q.ITUZone = v; break;
+                case "DX Locator": q.DXLocator = v; break;
+                case "Comment": q.Comment = v; break;
+                case "IOTA": q.Iota = v; break;
+                case "SOTA": q.SotaRef = v; break;
+                case "POTA": q.PotaRef = v; break;
+                case "WWFF": q.WwffRef = v; break;
+            }
+        }
+
+        // The headline counts the contacts on the list, and the ones just put back have left it.
+        private void RetitleList()
+        {
+            if (_listHeadline == null) return;
+            var m = System.Text.RegularExpressions.Regex.Match(_listHeadline, @"^[\d,]+ QSOs? (?<rest>.*)$");
+            if (!m.Success) return;
+            int n = _qsos.Count;
+            _listHeadline = n.ToString("N0") + " QSO" + (n == 1 ? "" : "s") + " " + m.Groups["rest"].Value;
+        }
+
+        private async void Btn_Revert_Click(object sender, RoutedEventArgs e)
+        {
+            // WHAT IS TICKED ON SCREEN, read before anything is written or awaited - the same rule the
+            // Fix button obeys, and for the same reason.
+            List<FixRow> rows = FindingsGrid.Items.OfType<FixRow>()
+                .Where(r => r.Revert && r.CanRevert && r.Qso != null).ToList();
+            if (rows.Count == 0) return;
+
+            var dal = DataAccess.GetInstance();
+            if (dal == null)
+            {
+                HolyMessageBox.ShowWarning(
+                    "The log database is not open.\n\nClose HolyLogger and open it again.",
+                    "Log Fixer", this);
+                return;
+            }
+
+            // Fields, not contacts: five contacts can be twenty values going back, and the number that
+            // matters to a man about to press this is how much of his log is about to move.
+            int fields = rows.Sum(r => r.History
+                                        .Select(n => n.Field)
+                                        .Distinct(StringComparer.OrdinalIgnoreCase).Count());
+
+            if (!HolyMessageBox.ShowConfirm(
+                    rows.Count.ToString("N0") + " QSO" + (rows.Count == 1 ? "" : "s")
+                    + " will be put back to the value" + (fields == 1 ? "" : "s")
+                    + " held before the Log Fixer changed "
+                    + (rows.Count == 1 ? "it" : "them") + " — "
+                    + fields.ToString("N0") + " field" + (fields == 1 ? "" : "s") + " in all."
+                    + "\n\nThey go back to NEVER CHECKED, so the next run of the Log Fixer will look at "
+                    + (rows.Count == 1 ? "it" : "them") + " again and will very likely propose the same "
+                    + "correction. The record of what was changed is dropped with "
+                    + (rows.Count == 1 ? "it" : "them") + ", so "
+                    + (rows.Count == 1 ? "this contact leaves" : "these contacts leave") + " this list."
+                    + "\n\nYour WHOLE DATABASE — every log in it, not only this one — is copied first, "
+                    + "into\n" + (string.IsNullOrEmpty(dal.BackupsFolder) ? "your Backups folder"
+                                                                         : dal.BackupsFolder)
+                    + "\nwhere Tools > Backups & Restore lists it and can put it back for you."
+                    + "\n\nPut " + (rows.Count == 1 ? "it" : "them") + " back now?",
+                    "Log Fixer", HolyMsgType.Warning, this))
+                return;
+
+            ShowFixOverlay(0, "Copying your database…", "");
+            string backup = await Task.Run(() => SaveBackup(dal));
+            if (backup == null)
+            {
+                HideFixOverlay();
+                if (!HolyMessageBox.ShowConfirm("The safety copy of the log could not be written.\n\n"
+                        + "Put them back anyway?", "Log Fixer", HolyMsgType.Warning, this))
+                    return;
+            }
+
+            Btn_Revert.IsEnabled = false;
+            ShowFixOverlay(rows.Count);
+
+            int put = 0;
+            try
+            {
+                await Task.Run(() => dal.RunInTransaction(() =>
+                {
+                    foreach (FixRow r in rows)
+                    {
+                        QSO qso = r.Qso;
+
+                        // THE FIRST VALUE RECORDED FOR EACH FIELD, not the last. A contact that has
+                        // been through the Fixer twice has two rows for its country, and the one the
+                        // operator wants back is the one it started with - so each field is taken from
+                        // the earliest press that touched it and every later one is passed over.
+                        var already = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                        foreach (FixNote n in r.History)
+                            if (!string.IsNullOrEmpty(n.Field) && already.Add(n.Field))
+                                RestoreField(qso, n.Field, n.Was);
+
+                        dal.Update(qso);
+                        // The record described a correction that is no longer in the log. Kept, it
+                        // would show this contact among the corrected ones for ever, holding up a
+                        // change that has been undone.
+                        dal.ForgetFixHistory(qso.id);
+
+                        put++;
+                        if (put % 50 == 0 || put == rows.Count)
+                        {
+                            int at = put;
+                            Dispatcher.BeginInvoke(new Action(() => UpdateFixOverlay(at, rows.Count)));
+                        }
+                    }
+                }));
+            }
+            catch (Exception ex)
+            {
+                Log.Swallow(ex);
+                HideFixOverlay();
+                HolyMessageBox.ShowError("Something went wrong while putting them back:\n\n" + ex.Message
+                    + "\n\nNothing was written — the whole job is one transaction, so the log is exactly "
+                    + "as it was."
+                    + (backup != null ? "\n\nThe copy taken before it started is in:\n" + backup : ""),
+                    "Log Fixer", this);
+                UpdateRevertButton();
+                return;
+            }
+
+            ShowFixOverlay(0, "Updating the log…", "");
+
+            // NEVER CHECKED AGAIN, and written OUTSIDE the transaction above: SetReviewState opens one
+            // of its own, and SQLite has no nested transactions.
+            var back = rows.Select(r => r.Qso).Where(q => q != null).Distinct().ToList();
+            try
+            {
+                dal.SetReviewState(back.Select(q => q.id), 0);
+                foreach (QSO q in back) q.ReviewState = 0;
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+            // The log table and the Log Workshop are holding these same QSO objects, read before this
+            // press; nothing on those grids can notice a property that has quietly changed underneath.
+            try
+            {
+                var main = Application.Current == null ? null
+                         : Application.Current.Windows.OfType<MainWindow>().FirstOrDefault();
+                if (main != null) main.ReloadActiveLogQsos();
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+            // And they are no longer contacts the Fixer has corrected, so they leave this list.
+            var goneBack = new HashSet<int>(back.Select(q => q.id));
+            _qsos.RemoveAll(q => q != null && goneBack.Contains(q.id));
+            RetitleList();
+            ShowList(_listHeadline);
+
+            HideFixOverlay();
+
+            HolyMessageBox.Show(
+                put.ToString("N0") + " QSO" + (put == 1 ? " is" : "s are") + " back to the value"
+                + (fields == 1 ? "" : "s") + " held before the Log Fixer changed "
+                + (put == 1 ? "it" : "them") + "."
+                + (backup != null ? "\n\nYour database as it was a moment ago is in:\n" + backup : ""),
+                "Log Fixer", HolyMsgType.Info, this);
         }
 
         // Opens Explorer with the file already selected, rather than merely opening the folder and

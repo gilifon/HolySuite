@@ -159,6 +159,67 @@
                         <!-- 38, THE HEIGHT OF THE BUTTONS BESIDE IT. At 40 the row grew by two
                              pixels the moment the spinner appeared and shrank again when it went,
                              so the whole frame twitched at the start and end of every run. -->
+                        <!-- PUTTING A CONTACT BACK THE WAY IT WAS. Only ever on show in the list of
+                             contacts the Fixer has already corrected, where every row carries the values
+                             it held before - so this is not an undo of the last press but a return to
+                             what the log said, whenever that was.
+                             It stands immediately after the sentence that explains it rather than away
+                             at the far right of the frame with the buttons of the other screen: the two
+                             are one thought, and a foot of empty panel between them breaks it. Same cell
+                             as the AI spinner, which is never on show at the same time.
+                             Its colours live in a style with a template of its own, for the same reason
+                             Check with AI has one: a Background set on the element outranks the trigger
+                             that greys it, so a button coloured in place can never go grey again. -->
+                        <Button x:Name="Btn_Revert" Grid.Column="1" Height="38" MinWidth="210"
+                                HorizontalAlignment="Left" VerticalAlignment="Center" Margin="16,0,0,0"
+                                FontSize="16" Visibility="Collapsed" IsEnabled="False"
+                                Click="Btn_Revert_Click" Content="Revert Selected" BorderThickness="1.5">
+                            <Button.Style>
+                                <Style TargetType="Button">
+                                    <Setter Property="Background" Value="#2E7D32"/>
+                                    <Setter Property="Foreground" Value="White"/>
+                                    <Setter Property="BorderBrush" Value="#1B5E20"/>
+                                    <Setter Property="FontWeight" Value="Bold"/>
+                                    <Setter Property="Padding" Value="14,0"/>
+                                    <Setter Property="Template">
+                                        <Setter.Value>
+                                            <ControlTemplate TargetType="Button">
+                                                <Border x:Name="Chrome" CornerRadius="6"
+                                                        Background="{TemplateBinding Background}"
+                                                        BorderBrush="{TemplateBinding BorderBrush}"
+                                                        BorderThickness="{TemplateBinding BorderThickness}"
+                                                        SnapsToDevicePixels="True">
+                                                    <ContentPresenter HorizontalAlignment="Center"
+                                                                      VerticalAlignment="Center"
+                                                                      Margin="{TemplateBinding Padding}"/>
+                                                </Border>
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter TargetName="Chrome" Property="Background" Value="#388E3C"/>
+                                                    </Trigger>
+                                                    <Trigger Property="IsPressed" Value="True">
+                                                        <Setter TargetName="Chrome" Property="Background" Value="#1B5E20"/>
+                                                    </Trigger>
+                                                    <Trigger Property="IsEnabled" Value="False">
+                                                        <Setter TargetName="Chrome" Property="Background" Value="#E6E6E6"/>
+                                                        <Setter TargetName="Chrome" Property="BorderBrush" Value="#C8C8C8"/>
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </Setter.Value>
+                                    </Setter>
+                                    <Style.Triggers>
+                                        <Trigger Property="IsEnabled" Value="False">
+                                            <Setter Property="Background" Value="#E6E6E6"/>
+                                            <Setter Property="Foreground" Value="#8C8C8C"/>
+                                            <Setter Property="BorderBrush" Value="#C8C8C8"/>
+                                            <Setter Property="FontWeight" Value="Normal"/>
+                                        </Trigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+
                         <StackPanel x:Name="PB_Ai" Grid.Column="1" Orientation="Horizontal"
                                     HorizontalAlignment="Left" VerticalAlignment="Center"
                                     Margin="12,0,0,0" Visibility="Collapsed">
