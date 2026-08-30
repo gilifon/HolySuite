@@ -916,7 +916,53 @@
                          keyer links to it. -->
                     <MenuItem x:Name="CwRadiosMenuItem" Header="Which radios can send CW"
                               ToolTip="Which radios HolyLogger can key over CAT, and whether yours is one"
-                              Click="CwRadiosMenuItem_Click"/>
+                              Click="CwRadiosMenuItem_Click">
+                        <MenuItem.Icon>
+                            <!-- THE SAME STRAIGHT KEY THE CW KEYER WEARS, drawn again rather than
+                                 shared: a MenuItem.Icon is a live element and one element cannot
+                                 hang in two menus at once. Base, upright, lever arm, knob. -->
+                            <Viewbox Width="16" Height="16">
+                                <Canvas Width="24" Height="24">
+                                    <Rectangle Canvas.Left="2" Canvas.Top="18.5" Width="20" Height="3" RadiusX="1.2" RadiusY="1.2" Fill="{DynamicResource TextBrush}"/>
+                                    <Rectangle Canvas.Left="15.2" Canvas.Top="11" Width="2.6" Height="7.5" Fill="{DynamicResource TextBrush}"/>
+                                    <Rectangle Canvas.Left="4.5" Canvas.Top="10.4" Width="14" Height="2.4" RadiusX="1.2" RadiusY="1.2" Fill="{DynamicResource TextBrush}"/>
+                                    <Rectangle Canvas.Left="6.6" Canvas.Top="12.8" Width="1.8" Height="5.7" Fill="{DynamicResource TextBrush}"/>
+                                    <Ellipse Canvas.Left="3.6" Canvas.Top="6.2" Width="7.8" Height="5" Fill="{DynamicResource TextBrush}"/>
+                                </Canvas>
+                            </Viewbox>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    <!-- ITS TWIN, FOR THE OTHER THING THE Msg BUTTONS DO. The four buttons send CW
+                         text in CW and play a message recorded in the radio in SSB, and the second
+                         works on a different set of radios from the first - so the man who has read
+                         the CW page still does not know about his voice messages. -->
+                    <MenuItem x:Name="VoiceRadiosMenuItem" Header="Which radios can play a voice message"
+                              ToolTip="Which radios HolyLogger can start a recorded voice message on, and whether yours is one"
+                              Click="VoiceRadiosMenuItem_Click">
+                        <MenuItem.Icon>
+                            <!-- A HANDHELD MIC LYING ON THE DIAGONAL: the ball head at the top right,
+                                 the handle running down to the left, the lead hooking off its end.
+                                 Drawn here like the straight key above rather than fetched from
+                                 anywhere - three shapes, no licence to honour, and it takes the
+                                 theme's text colour, which a picture file cannot: in the dark scheme
+                                 a black PNG would sit on a black menu.
+
+                                 ONE SOLID SILHOUETTE, NOT A BAR TURNED BY A TRANSFORM. The first
+                                 attempt rotated a rounded rectangle and left the ball and the handle
+                                 meeting at a seam; this is the outline itself, a taper from under the
+                                 ball to a rounded tip, so the two read as one object at 16 pixels. -->
+                            <Viewbox Width="16" Height="16">
+                                <Canvas Width="24" Height="24">
+                                    <Path Data="M11.83,8.49 L15.51,12.17 L8.01,18.81 A2,2 0 0 1 5.19,15.99 Z"
+                                          Fill="{DynamicResource TextBrush}"/>
+                                    <Ellipse Canvas.Left="11" Canvas.Top="2" Width="11" Height="11" Fill="{DynamicResource TextBrush}"/>
+                                    <Path Data="M5.9,18.9 C4.1,20.7 5.7,22.7 7.6,21.7"
+                                          Stroke="{DynamicResource TextBrush}" StrokeThickness="1.8"
+                                          StrokeStartLineCap="Round" StrokeEndLineCap="Round" Fill="Transparent"/>
+                                </Canvas>
+                            </Viewbox>
+                        </MenuItem.Icon>
+                    </MenuItem>
                     <Separator />
                     <!-- THE SITE, REACHABLE FROM INSIDE THE PROGRAM. Everything about HolyLogger that
                          is not in the program itself lives there, and an operator who has only ever

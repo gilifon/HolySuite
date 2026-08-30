@@ -244,18 +244,111 @@ namespace HolyLogger
         TimerWindow timerscreen = null;
         MatrixWindow matrix = null;
 
-        private static readonly Dictionary<string, RadioVoiceCommandProfile> VoiceCommandProfiles = new Dictionary<string, RadioVoiceCommandProfile>(StringComparer.OrdinalIgnoreCase)
+        // ── THE RADIOS THAT CAN PLAY A RECORDED VOICE MESSAGE BY CAT ────────────────────────────
+        //
+        // The four Msg buttons record nothing and send no audio. They tell the radio to play back a
+        // message its owner recorded into the radio itself, which is why each one is a single short
+        // command - and why it can only work on a radio whose maker provided such a command.
+        //
+        // EVERY LINE HERE WAS READ OUT OF THE MAKER'S OWN DOCUMENT. Not from a forum, not from
+        // another logger's source, and not from memory:
+        //
+        //   Icom      IC-7300 Full Manual (p. 19-8) and the CI-V Reference Guides for the IC-705,
+        //             IC-7300MK2, IC-9700 and IC-7760:
+        //             "28 00 - Transmits the Voice TX memory content (01=T1 to 08=T8,
+        //             0x00=Cancel TX)".
+        //   Yaesu     CAT Operation Reference Manuals for the FTDX10, FTDX101MP/D, FT-891, FT-991,
+        //             FT-991A, FT-710 and FTDX3000, which all carry the same command:
+        //             "PB PLAY BACK - 0: DVS (Playback Stop), 1 to 5: DVS CH 1 to 5 Playback Start".
+        //   Kenwood   PC Control Command Reference Guides for the TS-480 and TS-590S/SG:
+        //             "PB - sets and reads the voice and CW message playback status", where 0 stops
+        //             and 1 upwards plays a channel. Four channels on a TS-590, three on a TS-480.
+        //   Elecraft  K4 Programmer's Reference rev. D5: "PB (DVR Message Playback) - PBn; where n
+        //             is message number 1 to 8. PB0; will cancel any dvr action".
+        //             K3S/K3/KX3/KX2 Programmer's Reference rev. G5, Table 7: the K3 has no message
+        //             command at all. Its messages are played by pressing its own M1 to M4 keys,
+        //             which from here means switch emulation - and there is no documented way to
+        //             stop one once it is playing.
+        //
+        // WHY NOT EVERY RADIO OF A MAKE. The command belongs to the radio, not to the maker. An
+        // IC-7100 records voice messages and plays them from its own keys, but its CI-V guide has
+        // no command 28 and never did - so an IC-7100 is not on this list, and its owner is told so
+        // rather than being left pressing a button that does nothing. Same for the older Icoms.
+        //
+        // WHAT THIS REPLACED. Nine lines typed in by hand with no document behind any of them. The
+        // K3's five commands were five unrelated front-panel switches - VFO A/B, REV, A>B, PRE and
+        // AGC - so pressing Msg1 on a K3 swapped his VFOs and stopping a message changed his AGC.
+        // Three of the nine keys ("K3", "FTDX3000", "FT-891 - DATA") are not names OmniRig ever
+        // reports, so those rows could never match a radio at all. Kenwood was missing entirely.
+
+        // The Icom models whose own CI-V guide carries command 28. Compared against the name with
+        // its punctuation taken out (see VoiceModelKey), and by the START of that name, because
+        // OmniRig lists one radio several times - "IC-7610", "IC-7610-DATA", "IC-7610-DATA-FIL1"
+        // are one transceiver, and "IC-7300MK2" is a radio in its own right that begins the same
+        // way as the IC-7300 and carries the same command.
+        private static readonly string[] IcomVoiceModels = { "IC705", "IC7300", "IC7610", "IC9700", "IC7760" };
+
+        // The Yaesu models whose CAT manual carries the PB command. Matched the same way, which is
+        // what lets "FT-891 - WA2FZW", "FTdx3000" and "FTDX-3000-DATA" - all names in OmniRig's own
+        // rig list - reach the radio they name.
+        private static readonly string[] YaesuVoiceModels = { "FT710", "FT891", "FT991", "FTDX10", "FTDX3000" };
+
+        // OMNIRIG'S NAME, REDUCED TO THE MODEL. Its rig list carries an entry per way of using a
+        // radio and per author who contributed a file: "IC-9700-SAT", "FT-891 - WA2FZW", "FTdx3000",
+        // "Elecraft K3". Taking out the spaces, the dashes and the maker's name leaves the model,
+        // and a table matched on that turns nobody away over a suffix.
+        private static string VoiceModelKey(string rigType)
         {
-            { "IC-7300", new RadioVoiceCommandProfile("FE FE 94 E0 28 00 01 FD", "FE FE 94 E0 28 00 02 FD", "FE FE 94 E0 28 00 03 FD", "FE FE 94 E0 28 00 04 FD", "FE FE 94 E0 28 00 00 FD") },
-            { "IC-7300MK2", new RadioVoiceCommandProfile("FE FE B6 E0 28 00 01 FD", "FE FE B6 E0 28 00 02 FD", "FE FE B6 E0 28 00 03 FD", "FE FE B6 E0 28 00 04 FD", "FE FE B6 E0 28 00 00 FD") },
-            { "IC-7610", new RadioVoiceCommandProfile("FE FE 98 E0 28 00 01 FD", "FE FE 98 E0 28 00 02 FD", "FE FE 98 E0 28 00 03 FD", "FE FE 98 E0 28 00 04 FD", "FE FE 98 E0 28 00 00 FD") },
-            { "K3", new RadioVoiceCommandProfile("SWT11;", "SWT12;", "SWT13;", "SWT24;", "SWT27;") },
-            { "FTDX10", new RadioVoiceCommandProfile("PB01;", "PB02;", "PB03;", "PB04;", "PB00;") },
-            { "FTDX101D", new RadioVoiceCommandProfile("PB01;", "PB02;", "PB03;", "PB04;", "PB00;") },
-            { "FTDX3000", new RadioVoiceCommandProfile("PB01;", "PB02;", "PB03;", "PB04;", "PB00;") },
-            { "FT-891", new RadioVoiceCommandProfile("PB01;", "PB02;", "PB03;", "PB04;", "PB00;") },
-            { "FT-891 - DATA", new RadioVoiceCommandProfile("PB01;", "PB02;", "PB03;", "PB04;", "PB00;") },
-        };
+            string name = (rigType ?? string.Empty).Trim().ToUpperInvariant();
+            if (name.StartsWith("ELECRAFT", StringComparison.Ordinal))
+                name = name.Substring("ELECRAFT".Length);
+
+            var model = new StringBuilder(name.Length);
+            foreach (char c in name)
+                if (char.IsLetterOrDigit(c)) model.Append(c);
+
+            return model.ToString();
+        }
+
+        private static RadioVoiceCommandProfile VoiceProfileFor(string rigType)
+        {
+            string key = VoiceModelKey(rigType);
+            if (key.Length == 0) return null;
+
+            // ICOM. One command for every model that has it, and only the address changes. The
+            // address is asked of OmniRig's own rig file rather than kept in a table here, so it is
+            // the same number OmniRig is obeying - including on a radio whose owner changed it in
+            // the Set mode to run two Icoms at once.
+            if (IcomVoiceModels.Any(m => key.StartsWith(m, StringComparison.Ordinal)))
+            {
+                string address = GetIcomCivAddress(rigType);
+                if (address == null) return null;
+
+                string head = "FE FE " + address + " E0 28 00 ";
+                return new RadioVoiceCommandProfile(head + "01 FD", head + "02 FD", head + "03 FD",
+                                                    head + "04 FD", head + "00 FD");
+            }
+
+            if (YaesuVoiceModels.Any(m => key.StartsWith(m, StringComparison.Ordinal)))
+                return new RadioVoiceCommandProfile("PB01;", "PB02;", "PB03;", "PB04;", "PB00;");
+
+            // KENWOOD. Four messages on a TS-590 and three on a TS-480, so on a TS-480 the fourth
+            // button has nothing to play and is left empty - which it says for itself when pressed,
+            // instead of sending the radio a channel it does not have.
+            if (key.StartsWith("TS590", StringComparison.Ordinal))
+                return new RadioVoiceCommandProfile("PB1;", "PB2;", "PB3;", "PB4;", "PB0;");
+            if (key.StartsWith("TS480", StringComparison.Ordinal))
+                return new RadioVoiceCommandProfile("PB1;", "PB2;", "PB3;", null, "PB0;");
+
+            // ELECRAFT. K3 before K4 would match neither, so both are asked by name. The K3 line is
+            // switch emulation - Table 7 of the Programmer's Reference - and carries no stop.
+            if (key.StartsWith("K4", StringComparison.Ordinal))
+                return new RadioVoiceCommandProfile("PB1;", "PB2;", "PB3;", "PB4;", "PB0;");
+            if (key.StartsWith("K3", StringComparison.Ordinal))
+                return new RadioVoiceCommandProfile("SWT21;", "SWT31;", "SWT35;", "SWT39;", null);
+
+            return null;
+        }
 
         private int? pendingVoiceMessageNumber;
         private int? activeVoiceMessageNumber;
@@ -2745,31 +2838,29 @@ namespace HolyLogger
             }
         }
 
-        // "Create Regular Log" button in ViewLogsWindow: name it (duplicates rejected), confirm, then
-        // create an empty log and make it active. No QSOs are deleted — the previous log's QSOs stay
-        // in the database. Returns true if a log was created and activated; false if cancelled.
-        // The station callsign / operator currently entered on the main form — used to pre-fill a new
-        // log's identity for the copy-to-log feature.
+        // "Create Regular Log" button in ViewLogsWindow: name it (duplicates rejected) and create it.
+        // Returns the new log's Id, or 0 if cancelled.
+        //
+        // CREATING A LOG DOES NOT ACTIVATE IT. Making a log is one thing - starting to operate in it is
+        // another, and the operator asked for exactly that separation: a new log goes into the database
+        // and the log he is working in stays on the screen, untouched. Activating is its own deliberate
+        // act in the Log Manager (Activate & Open Log, or a double-click), which is also what fills the
+        // main window's Station callsign from the log's own callsign.
+        //
+        // The station callsign / operator currently entered on the main form — the callsign pre-fills a
+        // new log's own callsign.
         public string CurrentStationCallsign => (TB_MyCallsign.Text ?? string.Empty).Trim();
         public string CurrentOperator => (TB_Operator.Text ?? string.Empty).Trim();
 
-        public bool CreateNewRegularLog(Window owner)
+        public long CreateNewRegularLog(Window owner)
         {
             var dlg = new NewLogWindow(dal, "Enter a name for the new log:", string.Empty, 0,
-                                       showCopyOptions: true, defaultCallsign: CurrentStationCallsign,
-                                       defaultOperator: CurrentOperator) { Owner = owner };
-            if (dlg.ShowDialog() != true) return false;
+                                       showCopyOptions: true, defaultCallsign: CurrentStationCallsign) { Owner = owner };
+            if (dlg.ShowDialog() != true) return 0;
 
-            if (!HolyMessageBox.ShowConfirm(
-                    "A new empty log \"" + dlg.LogName + "\" will be created and shown.\n\n" +
-                    "The current log table will be cleared from view, but every QSO stays safely in the " +
-                    "HolyLogger database under its log — nothing is deleted.\n\nCreate the new log now?",
-                    "Create New Log", HolyMsgType.Info, owner))
-                return false;
-
-            long id = dal.CreateLog(dlg.LogName, string.Empty, dlg.LogCallsign, dlg.LogOperator, dlg.CopyTargetLogId);   // normal (day-by-day) log
-            SwitchActiveLog(id);
-            return true;
+            // No confirmation: nothing is cleared and nothing is switched, so there is nothing to warn
+            // about. The new log simply appears in the list.
+            return dal.CreateLog(dlg.LogName, string.Empty, dlg.LogCallsign, dlg.CopyTargetLogId);   // normal (day-by-day) log
         }
 
         // File -> View Logs: open the log manager (list all logs; open / rename / delete / export).
@@ -2992,11 +3083,17 @@ namespace HolyLogger
 
         private void MessageButton_PreviewLeftDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
         {
-            // With no radio to send to, swallow the left-press so the button doesn't animate or fire
-            // (it would do nothing anyway), making its inactive state obvious. Right-click — the CW text
-            // editor — uses a separate event and still works.
-            if (!_messageSendAvailable)
-                e.Handled = true;
+            // With no radio to send to, the left-press is taken here so the button does not animate
+            // as though something went out. Right-click - the CW text editor - uses a separate event
+            // and still works.
+            //
+            // BUT IT IS NOT SWALLOWED IN SILENCE ANY MORE. Taking the press here stops Click, and
+            // stopping Click stopped TriggerVoiceMessage, which is where the reason is said - so the
+            // whole point of pressing the button went nowhere. The answer is given here instead.
+            if (_messageSendAvailable) return;
+
+            e.Handled = true;
+            ExplainWhyMessageCannotBeSent();
         }
 
         // The Msg buttons' editor: the shared one below, and then the one thing only they need done
@@ -3759,16 +3856,11 @@ namespace HolyLogger
 
             string rigType = NormalizeRigType(Rig != null ? Rig.RigType : null);
 
-            if (!CanKeyCw(rigType))
-            {
-                if (!silent) HolyMessageBox.ShowWarning(
-                    "CW keying by CAT is not supported for this radio model (" + rigType + ").\n\n"
-                    + "Nothing was sent.\n\n"
-                    + (string.IsNullOrEmpty(RigFileTrouble) ? string.Empty : RigFileTrouble + "\n\n")
-                    + "Use the radio's own memory keyer instead.",
-                    "CW Keyer", this);
-                return;
-            }
+            // A RADIO THAT CANNOT BE KEYED NO LONGER CLOSES THE DOOR. The window used to refuse to
+            // open here, and took the operator's eight macros away with it - this is the only place
+            // they can be written. So it opens either way, and CannotKey below tells it to say why
+            // nothing will go out and to stop pretending it can send.
+            bool canKey = CanKeyCw(rigType);
 
             cwKeyboard = new CwKeyboardWindow(
                 chunk =>
@@ -3857,6 +3949,13 @@ namespace HolyLogger
                 Owner = this,
                 Icon = Icon
             };
+
+            if (!canKey)
+                cwKeyboard.CannotKey(
+                    "This radio (" + rigType + ") cannot be keyed by CAT, so nothing typed here will "
+                    + "go out. Send CW from the radio's own memory keys."
+                    + (string.IsNullOrEmpty(RigFileTrouble) ? string.Empty : "  " + RigFileTrouble)
+                    + "  You can still write and edit the eight macros below - right-click one.");
 
             cwKeyboard.Closed += (s, e) => cwKeyboard = null;
             cwKeyboard.Show();
@@ -3975,9 +4074,16 @@ namespace HolyLogger
             if (KeyedByKyCommand(rig))
                 return "Yes. HolyLogger sends the text with the KY command.";
 
-            string address = GetIcomCivAddress(rig);
+            string address = IcomCwAddress(rig);
             if (address != null)
                 return "Yes. HolyLogger sends the text with CI-V command 17, at address " + address + ".";
+
+            // AN ICOM THAT WAS REFUSED IS OWED THE REASON. It has an address like any Icom, so the
+            // line below about "no CW command for this model" would leave him wondering why the
+            // radio next to his on the same list can be keyed.
+            if (GetIcomCivAddress(rig) != null)
+                return "No. This model's own CI-V command table has no command for keying typed "
+                     + "text - Icom added that later. Use the radio's own memory keyer.";
 
             if (IsYaesuKeyer(rig))
                 return "Yes, in two steps. Yaesu has no command that keys typed text, so HolyLogger "
@@ -3991,13 +4097,45 @@ namespace HolyLogger
             return "No. HolyLogger has no CW command for this model. Use the radio's own memory keyer.";
         }
 
+        // THE SAME ANSWER FOR THE VOICE BUTTONS, in his own words and about his own radio. Asked by
+        // the Help page, which puts it under the radio's name.
+        internal string VoiceMessageForThisRadio()
+        {
+            string rig = ConnectedRigName();
+            if (rig.Length == 0)
+                return "No radio is connected, so there is nothing to say yet.";
+
+            RadioVoiceCommandProfile profile = VoiceProfileFor(rig);
+            if (profile == null)
+                return "No. This radio has no CAT command for playing a recorded voice message. "
+                     + "Play your messages from the radio's own memory keys.";
+
+            int held = profile.MessageCommands.Count(c => !string.IsNullOrWhiteSpace(c));
+
+            // A RADIO WITH FEWER MEMORIES THAN BUTTONS. The TS-480 has three, and its owner is owed
+            // that plainly rather than finding out by pressing Msg4 and being told it is empty.
+            string howMany = held >= 4
+                ? "All four Msg buttons play a message recorded in the radio, in SSB."
+                : "Msg 1 to " + held + " play a message recorded in the radio, in SSB. This model has "
+                  + "only " + held + " message memories, so the last button has nothing to play.";
+
+            // The K3 is the one radio here whose maker documents no way to stop a message once it has
+            // started, and Escape is where he will go looking.
+            string stopping = string.IsNullOrWhiteSpace(profile.StopCommand)
+                ? " Escape cannot stop one once it is playing - this radio's maker publishes no "
+                  + "command for that. Stop it at the radio."
+                : string.Empty;
+
+            return "Yes. " + howMany + stopping;
+        }
+
         // CAN THIS RADIO BE KEYED AT ALL, by any of the three ways? The gates in front of the keyer
         // and the canned messages ask this and nothing else - which command does the work is the
         // business of whoever builds it.
         private static bool CanKeyCw(string rigType)
         {
             return KeyedByKyCommand(rigType)
-                || GetIcomCivAddress(rigType) != null
+                || IcomCwAddress(rigType) != null
                 || IsYaesuKeyer(rigType);
         }
 
@@ -4435,6 +4573,36 @@ namespace HolyLogger
             }
         }
 
+        // ── THE ICOMS THAT CANNOT BE KEYED, WHATEVER THEIR ADDRESS IS ───────────────────────────
+        //
+        // Reading the CI-V address out of OmniRig's rig file says WHERE to send a command. It says
+        // nothing about whether the radio understands it. Command 17 - the one that keys typed text
+        // - did not exist when the older Icoms were built, and their own command tables prove it:
+        //
+        //   IC-718 Advanced Manual, "Control command" - the table runs to 1A and has no 17.
+        //   IC-7200 Instruction Manual, same - no 17.
+        //
+        // So an IC-718 owner pressed a key, HolyLogger read his address, sent him command 17, and
+        // his radio stayed silent with nothing said. He is now told instead.
+        //
+        // NAMED ONE BY ONE, AND ONLY WHERE THE DOCUMENT SAYS SO. The other way round - keying only
+        // the models whose manual has been read - would turn away every Icom nobody has looked up
+        // yet, an IC-9100 or an IC-7851 among them, which is the worse mistake of the two. Radios
+        // join this list when their maker's own table is seen to lack the command, not before.
+        private static readonly string[] IcomWithoutCwCommand = { "IC718", "IC7200" };
+
+        // The address to key this Icom at, or null when it is one of the radios above. Every CW
+        // path asks this rather than GetIcomCivAddress, so the refusal cannot be forgotten in one
+        // place and remembered in another.
+        private static string IcomCwAddress(string rigType)
+        {
+            string key = VoiceModelKey(rigType);
+            if (key.Length > 0 && IcomWithoutCwCommand.Any(m => key.StartsWith(m, StringComparison.Ordinal)))
+                return null;
+
+            return GetIcomCivAddress(rigType);
+        }
+
         private static string BuildCwSendCommand(string rigType, string text)
         {
             // The same one test the keyer uses, so the two cannot come to disagree about which radios
@@ -4454,7 +4622,7 @@ namespace HolyLogger
             }
 
             // Icom CI-V: FE FE <addr> E0 17 00 <ASCII bytes as hex> FD
-            string icomAddress = GetIcomCivAddress(rigType);
+            string icomAddress = IcomCwAddress(rigType);
             if (icomAddress != null)
             {
                 // Keep only printable ASCII (space–Z range is safe for CW keyer)
@@ -4477,7 +4645,7 @@ namespace HolyLogger
         // Returns null for radios where a verified CW-abort command is not available.
         private static string BuildCwStopCommand(string rigType)
         {
-            string icomAddress = GetIcomCivAddress(rigType);
+            string icomAddress = IcomCwAddress(rigType);
             if (icomAddress != null)
             {
                 return "FE FE " + icomAddress + " E0 17 FF FD";
@@ -5864,6 +6032,7 @@ namespace HolyLogger
                 if (dlg.ShowDialog() == true)
                 {
                     dal.SetLogIdentity(id, dlg.Callsign, dlg.Operator);
+                    RefreshActiveLogCallsigns();   // the log has a callsign now; the guard must know it
                     return dal.LogHasIdentity(id);
                 }
                 return false;   // cancelled -> still no identity; caller blocks logging
@@ -6620,10 +6789,12 @@ namespace HolyLogger
                 return;
             }
 
-            // Sending needs the radio/CAT. The buttons stay enabled only so they can be right-clicked to
-            // edit the CW text, so a left-click / F-key send is simply ignored when sending isn't possible.
+            // Sending needs the radio/CAT. The buttons stay enabled only so they can be right-clicked
+            // to edit the CW text - but a left-click that did NOTHING AT ALL was the fault here: the
+            // row dims and the reason sits in a tooltip, and a man pressing F5 does not hover.
             if (!_messageSendAvailable)
             {
+                ExplainWhyMessageCannotBeSent();
                 return;
             }
 
@@ -6689,6 +6860,58 @@ namespace HolyLogger
             pendingVoiceMessageDeadlineUtc = DateTime.UtcNow.AddSeconds(30);
         }
 
+        // ── WHY THAT BUTTON DID NOTHING ─────────────────────────────────────────────────────────
+        //
+        // SAID ONCE, NOT ON EVERY PRESS. F5 is a key a man leans on, and four message boxes in a row
+        // are worse than the silence they replaced. The situation is remembered as the radio and the
+        // reason together, so a different radio - or the same radio for a different reason - is
+        // still worth saying out loud.
+        private string _messageRefusalTold;
+
+        private void ExplainWhyMessageCannotBeSent()
+        {
+            string gap = Environment.NewLine + Environment.NewLine;
+            string rigType = NormalizeRigType(Rig != null ? Rig.RigType : null);
+            string reason;
+
+            if (!Properties.Settings.Default.EnableOmniRigCAT || OmniRigEngine == null || Rig == null)
+            {
+                reason = "OmniRig CAT is not available." + gap
+                       + "Tick Enable Omni-Rig CAT in Options > General, and check the radio is "
+                       + "powered and its cable connected.";
+            }
+            else if (Rig.Status != OmniRig.RigStatusX.ST_ONLINE)
+            {
+                reason = "The radio is offline." + gap
+                       + "When CAT is working, the radio's name shows in green at the right of the "
+                       + "status bar. Anything else there means it is not.";
+            }
+            else if (IsCwModeActive())
+            {
+                // In CW these buttons send CW text, and that path says its own piece with the
+                // radio's name in it. Two answers to one press is one too many.
+                return;
+            }
+            else if (!IsVoiceMessageModeActive())
+            {
+                reason = "These buttons play a message recorded in the radio itself, and the radio "
+                       + "will only play one in SSB." + gap
+                       + "In CW they send CW text instead.";
+            }
+            else
+            {
+                reason = "This radio (" + rigType + ") has no CAT command for playing a recorded "
+                       + "voice message, so HolyLogger cannot start one." + gap
+                       + "Play it from the radio's own memory keys.";
+            }
+
+            string situation = rigType + "|" + reason;
+            if (string.Equals(_messageRefusalTold, situation, StringComparison.Ordinal)) return;
+            _messageRefusalTold = situation;
+
+            HolyMessageBox.ShowWarning(reason, "Voice Message", this);
+        }
+
         // Aborts any message transmission in progress (SSB voice or CW) by sending the radio's stop
         // CAT command and resetting the message state. Returns true if something was actually stopped.
         // Best-effort: if the stop CAT command can't be sent we still reset state so the UI recovers.
@@ -6725,8 +6948,8 @@ namespace HolyLogger
                 return false;
             }
 
-            profile = VoiceCommandProfiles[rigType];
-            return true;
+            profile = VoiceProfileFor(rigType);
+            return profile != null;
         }
 
 
@@ -6748,9 +6971,12 @@ namespace HolyLogger
                 return false;
             }
 
-            if (string.IsNullOrWhiteSpace(rigType) || !VoiceCommandProfiles.Keys.Contains(rigType))
+            // THE RADIO IS ASKED FOR ONCE, HERE. VoiceProfileFor is what decides whether this model
+            // has a play-back command at all - and on an Icom it also has to reach OmniRig's rig
+            // file for the address, which can fail on its own. Either way there is nothing to send.
+            if (string.IsNullOrWhiteSpace(rigType) || VoiceProfileFor(rigType) == null)
             {
-                errorMessage = "No voice-message CAT commands are defined for this radio model.";
+                errorMessage = "Playing a recorded voice message by CAT is not supported for this radio model.";
                 return false;
             }
 
@@ -8568,11 +8794,28 @@ namespace HolyLogger
         {
             try
             {
-                if (!ProfileManager.CurrentDiffersFromActive()) return true;
+                var changed = ProfileManager.WhatDiffersFromActive();
+                if (changed.Count == 0) return true;
+
+                // ── WHICH SETTINGS, BY NAME ─────────────────────────────────────────────────────
+                //
+                // The question could not be answered as it stood. A man is asked whether to keep
+                // "the changes" without being told what they are, so Yes and No are both a guess -
+                // and the safe-looking guess, Yes, writes whatever moved into his profile for good.
+                // Told that it is the CW keyer speed, he knows in a second which he wants.
+                //
+                // Six at most: the list is here to be recognised, not read through, and a profile
+                // that differs in forty places is a different situation with a different answer.
+                const int MostToName = 6;
+                string what = string.Join("\n",
+                    changed.Take(MostToName).Select(s => "   • " + ProfileManager.PlainName(s)));
+                if (changed.Count > MostToName)
+                    what += "\n   • and " + (changed.Count - MostToName) + " more";
 
                 string name = ProfileManager.ActiveProfile;
                 bool save = HolyMessageBox.ShowConfirm(
                     $"You changed settings since the profile \"{name}\" was saved.\n\n" +
+                    (changed.Count == 1 ? "This one:\n" : "These:\n") + what + "\n\n" +
                     $"YES - save the changes into \"{name}\".\n" +
                     "NO  - discard them; HolyLogger will start from the profile as it was saved.",
                     "Unsaved profile changes", HolyMsgType.Warning, this);
@@ -10130,21 +10373,59 @@ namespace HolyLogger
 
         private void GenerateNewSignboardWindow()
         {
-            signboard = new SignboardWindow(TB_MyCallsign.Text, TB_MyHolyland.Text);
-            signboard.Left = Properties.Settings.Default.SignBoardWindowLeft < 0 ? 0 : Properties.Settings.Default.SignBoardWindowLeft;
-            signboard.Top = Properties.Settings.Default.SignBoardWindowTop < 0 ? 0 : Properties.Settings.Default.SignBoardWindowTop;
-            signboard.Width = Properties.Settings.Default.SignBoardWindowWidth;
-            signboard.Height = Properties.Settings.Default.SignBoardWindowHeight;
+            signboard = new SignboardWindow(TB_MyCallsign.Text, TB_MyHolyland.Text) { Owner = this };
+
+            // Same as the Timer above: a position saved on a monitor that has since gone opens the
+            // window where it cannot be seen, and clamping only negatives never noticed.
+            double left = Properties.Settings.Default.SignBoardWindowLeft;
+            double top = Properties.Settings.Default.SignBoardWindowTop;
+            if (IsPositionOnScreen(left, top))
+            {
+                signboard.Left = left;
+                signboard.Top = top;
+            }
+            else
+            {
+                signboard.WindowStartupLocation = WindowStartupLocation.CenterOwner;
+            }
+
+            double w = Properties.Settings.Default.SignBoardWindowWidth;
+            double h = Properties.Settings.Default.SignBoardWindowHeight;
+            if (w >= 120) signboard.Width = w;
+            if (h >= 120) signboard.Height = h;
+
             signboard.Show();
         }
 
         private void GenerateNewTimerWindow()
         {
-            timerscreen = new TimerWindow("kuku");
-            timerscreen.Left = Properties.Settings.Default.TimerWindowLeft < 0 ? 0 : Properties.Settings.Default.TimerWindowLeft;
-            timerscreen.Top = Properties.Settings.Default.TimerWindowTop < 0 ? 0 : Properties.Settings.Default.TimerWindowTop;
-            timerscreen.Width = Properties.Settings.Default.TimerWindowWidth;
-            timerscreen.Height = Properties.Settings.Default.TimerWindowHeight;
+            timerscreen = new TimerWindow("kuku") { Owner = this };
+
+            // "PRESSING TIMER DOES NOTHING." It did open - at Left 2,998, Top 832, saved from a monitor
+            // that was not there any more, so it opened where nothing could show it. The old line only
+            // pulled a NEGATIVE position back to zero, which says nothing about whether the spot exists:
+            // 2,998 is a perfectly positive number and perfectly out of reach. Same test the Matrix
+            // window already uses - is the title bar somewhere a mouse can reach it? - and if not, the
+            // window opens over the program that opened it instead.
+            double left = Properties.Settings.Default.TimerWindowLeft;
+            double top = Properties.Settings.Default.TimerWindowTop;
+            if (IsPositionOnScreen(left, top))
+            {
+                timerscreen.Left = left;
+                timerscreen.Top = top;
+            }
+            else
+            {
+                timerscreen.WindowStartupLocation = WindowStartupLocation.CenterOwner;
+            }
+
+            // A saved size of nothing is not a size. Zero came from a session that never got to paint
+            // the window, and restoring it opens a window with no window in it.
+            double w = Properties.Settings.Default.TimerWindowWidth;
+            double h = Properties.Settings.Default.TimerWindowHeight;
+            if (w >= 120) timerscreen.Width = w;
+            if (h >= 120) timerscreen.Height = h;
+
             timerscreen.Show();
         }
 
@@ -11543,6 +11824,21 @@ namespace HolyLogger
             }
         }
 
+        // Help > Which radios can play a voice message. The twin of the page above, for the other
+        // thing the four Msg buttons do.
+        private void VoiceRadiosMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            try { CwRadiosWindow.ShowVoice(this); }
+            catch (Exception ex)
+            {
+                Log.Swallow(ex);
+                HolyMessageBox.ShowError(
+                    "That page could not be opened.\n\n" + ex.Message + "\n\n"
+                    + HolyMessageBox.WhatToDo(ex.Message, null),
+                    "Which radios can play a voice message", this);
+            }
+        }
+
         private async void WhatsNewMenuItem_Click(object sender, RoutedEventArgs e)
         {
             string file = await ReleaseNotes.FetchAsync();
@@ -12068,21 +12364,54 @@ namespace HolyLogger
         private bool HandleStationCallsignChange(string now)
         {
             if (dal == null || state != State.New) return false;   // only guard while logging new QSOs
+
+            // Nothing open: there is nowhere for a QSO to go, whatever callsign is typed. Say so and
+            // offer the Log Manager, where he can open a log for this call or create one.
+            if (!dal.HasActiveLog)
+            {
+                SetCallsignLocked(true, null, "No log");
+                bool openManager = HolyMessageBox.ShowConfirm(
+                    "No log is open, so there is nowhere to put a QSO made as \"" + now + "\".\n\n" +
+                    "Every QSO belongs to a log, and a log is for a station callsign. Open a log for " +
+                    now + " or create one — the new log takes " + now + " as its callsign.\n\n" +
+                    "Open the Log Manager now?",
+                    "No log open", HolyMsgType.Warning, this);
+                if (openManager) OpenLogManager(now);
+                RefreshCallsignLockState();
+                return true;
+            }
+
             string idCall = ActiveLogIdentityCallsign();
-            if (idCall.Length == 0) return false;                  // log has no identity yet -> this call becomes it
-            if (CallsignIdentity.Same(idCall, now)) return false;  // same identity (stroke suffixes ignored) -> fine
+            if (idCall.Length == 0) return false;                      // log has no callsign yet -> this becomes it
+            // The log's current callsign, or one it already holds QSOs under (a call he used years ago
+            // and still has contacts from). Either way this log is the right place - say nothing.
+            if (ActiveLogAcceptsCallsign(now)) return false;
 
             SetCallsignLocked(true, now);   // block DX entry until a log for this callsign is set
-            bool open = HolyMessageBox.ShowConfirm(
-                "The active log belongs to station callsign \"" + idCall + "\".\n\n" +
-                "A log holds QSOs for one station callsign only, so you can't log as \"" + now + "\" until a " +
-                "log is set for it. Open an existing log for this callsign or create a new one — its identity " +
-                "fills in automatically.\n\nOpen the Log Manager now?",
-                "Select a log for " + now, HolyMsgType.Warning, this);
-            if (open)
+            // Two ways out, and both are here in the window: put this callsign into the log he is
+            // already in, or go and find/create a log for it. Cancelling is closing the Log Manager
+            // without choosing - the box simply stays locked until the question is answered.
+            bool addHere = HolyMessageBox.ShowConfirm(
+                "The log you have open is for \"" + idCall + "\", and it has no QSOs made as \"" + now + "\".\n\n" +
+                "If " + now + " is your callsign now, add it to this log — the log keeps everything it " +
+                "already holds and " + now + " becomes the callsign it is for. If " + now + " belongs " +
+                "somewhere else, choose or create a log for it instead.",
+                "Which log is " + now + " logging into?", HolyMsgType.Warning, this,
+                yesText: "Add " + now + " to this log", noText: "Choose a log…");
+
+            if (addHere)
+            {
+                dal.SetCurrentLogCallsign(dal.ActiveLogId, now);
+                RefreshActiveLogCallsigns();
+                RefreshCopyIndicator();
+            }
+            else
+            {
                 OpenLogManager(now);   // filter the list to logs for this callsign
-            // Opening/creating a matching log re-syncs the station box and unlocks; otherwise the DX box
-            // stays "Select Log" until a log for this callsign is chosen.
+            }
+
+            // Adding it here, or opening/creating a matching log, unlocks; otherwise the DX box stays
+            // "Select Log" until the callsign has a log.
             RefreshCallsignLockState();
             return true;
         }
@@ -12153,8 +12482,10 @@ namespace HolyLogger
             }
 
             string idCall = ActiveLogIdentityCallsign();
+            // Not "is this the log's callsign" but "does this log accept it": a call the log already
+            // holds QSOs under is as much at home here as the current one.
             bool mismatch = idCall.Length > 0 && boxCall.Length > 0
-                            && !CallsignIdentity.Same(idCall, boxCall);
+                            && !ActiveLogAcceptsCallsign(boxCall);
             SetCallsignLocked(mismatch, boxCall);
         }
 
@@ -12165,6 +12496,7 @@ namespace HolyLogger
         private void SyncCallsignToActiveLog()
         {
             if (dal == null || TB_MyCallsign == null) return;
+            RefreshActiveLogCallsigns();
             string idCall = ActiveLogIdentityCallsign();
             if (idCall.Length > 0 &&
                 !CallsignIdentity.Same(idCall, (TB_MyCallsign.Text ?? string.Empty).Trim()))
@@ -12173,6 +12505,39 @@ namespace HolyLogger
                 _callsignOnFocus = idCall;
             }
             RefreshCallsignLockState();
+        }
+
+        // For the Log Manager: the active log's callsigns were changed there (another one added, or a
+        // different one made current), so the box on the main window has to follow - the two must never
+        // disagree about which callsign is being used.
+        public void SyncStationCallsignFromActiveLog() => SyncCallsignToActiveLog();
+
+        // ── The active log's callsigns, held in memory ───────────────────────────────────────────────
+        // The question "may this log hold a QSO made with this callsign?" is asked on every keystroke
+        // while the DX box is locked. Asked of the database each time it would be a walk over the log's
+        // QSOs per letter typed, so the answer is kept here and re-read only when it can have changed:
+        // the active log changed, or its callsigns were edited.
+        private HashSet<string> _activeLogCallsigns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        private void RefreshActiveLogCallsigns()
+        {
+            var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            try
+            {
+                if (dal != null && dal.HasActiveLog)
+                    foreach (var use in dal.GetCallsignsInLog(dal.ActiveLogId))
+                        set.Add(use.Callsign);
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+            _activeLogCallsigns = set;
+        }
+
+        // True when the active log is for this callsign now, or already holds QSOs made with it.
+        private bool ActiveLogAcceptsCallsign(string call)
+        {
+            call = (call ?? string.Empty).Trim();
+            if (call.Length == 0) return false;
+            return _activeLogCallsigns.Contains(CallsignIdentity.Base(call));
         }
 
         // Holds a services check that arrived while a dialog was open, until the dialog closes.

@@ -981,22 +981,15 @@ Environment.NewLine +
                         if (eo != null && eo != DBNull.Value && !string.IsNullOrWhiteSpace(eo.ToString())) return 0;
                     }
 
-                    string tcall = string.Empty, toper = string.Empty;
-                    using (var ic = new SQLiteCommand("SELECT log_callsign, log_operator FROM logs WHERE Id = ?", con))
-                    {
-                        ic.Parameters.Add(new SQLiteParameter(null, targetId));
-                        using (var rdr = ic.ExecuteReader())
-                            if (rdr.Read())
-                            {
-                                tcall = rdr["log_callsign"] == DBNull.Value ? string.Empty : rdr["log_callsign"].ToString();
-                                toper = rdr["log_operator"] == DBNull.Value ? string.Empty : rdr["log_operator"].ToString();
-                            }
-                    }
-                    // Identity filter: BOTH station callsign AND operator must match the target log's identity.
-                    // Callsigns match per CallsignIdentity: stroke suffixes (/M, /2, ...) don't matter.
-                    if (string.IsNullOrWhiteSpace(tcall) || string.IsNullOrWhiteSpace(toper)) return 0;
-                    if (!CallsignIdentity.Same(qso.MyCall, tcall)) return 0;
-                    if (!string.Equals((qso.Operator ?? string.Empty).Trim(), toper.Trim(), StringComparison.OrdinalIgnoreCase)) return 0;
+                    // NO CALLSIGN TEST. The target is whatever log the operator chose, and a QSO made
+                    // under any callsign is copied there: a log that receives QSOs made as 4X6ZZ simply
+                    // holds that callsign too from then on, which is the same thing that happens to any
+                    // log whose owner changes his call. The filter that used to stand here (the target
+                    // must already be for this callsign) meant a target could be chosen in the Log
+                    // Manager and then silently receive nothing at all.
+                    //
+                    // The two rules that remain are above: never into a contest log, and never into
+                    // itself. Below: never twice.
 
                     // Duplicate check in the target log (same worked call + band + mode + date + time).
                     using (var dc = new SQLiteCommand("SELECT count(*) FROM qso WHERE log_id = @lid AND dx_callsign = @c AND band = @b AND mode = @m AND date = @d AND time = @t", con))
@@ -2336,10 +2329,12 @@ Environment.NewLine +
             }
         }
 
-        // Full create: also stores the log's identity (station callsign + operator) and an optional
-        // copy-target (another log this one's new QSOs are mirrored into). The identity callsign is
-        // stored in its base form (4Z5SL/M -> 4Z5SL): stroke variants are one identity.
-        public long CreateLog(string name, string eventType, string callsign, string opr, long? copyTargetLogId)
+        // Full create: also stores the log's identity (its station callsign) and an optional copy-target
+        // (another log this one's new QSOs are mirrored into). The identity callsign is stored in its
+        // base form (4Z5SL/M -> 4Z5SL): stroke variants are one identity. The OPERATOR is not part of a
+        // log's identity - one station callsign can be operated by many people (a club station), so the
+        // operator belongs to the QSO, not to the log. log_operator is left empty on new logs.
+        public long CreateLog(string name, string eventType, string callsign, long? copyTargetLogId)
         {
             lock (_dbLock)
             {
@@ -2349,7 +2344,7 @@ Environment.NewLine +
                     cmd.Parameters.Add(new SQLiteParameter(null, eventType ?? string.Empty));
                     cmd.Parameters.Add(new SQLiteParameter(null, DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss")));
                     cmd.Parameters.Add(new SQLiteParameter(null, (object)CallsignIdentity.Base(callsign)));
-                    cmd.Parameters.Add(new SQLiteParameter(null, (object)(opr ?? string.Empty)));
+                    cmd.Parameters.Add(new SQLiteParameter(null, (object)string.Empty));
                     cmd.Parameters.Add(new SQLiteParameter(null, copyTargetLogId.HasValue ? (object)copyTargetLogId.Value : DBNull.Value));
                     cmd.ExecuteNonQuery();
                 }
@@ -2371,11 +2366,12 @@ Environment.NewLine +
                 }
         }
 
-        // True when a log has BOTH a station callsign and an operator identity.
+        // True when a log has a station callsign. That callsign IS the log's identity; the operator is
+        // not part of it (one callsign, many operators - a club station), so it is not required here.
         public bool LogHasIdentity(long logId)
         {
-            GetLogIdentity(logId, out string c, out string o);
-            return !string.IsNullOrWhiteSpace(c) && !string.IsNullOrWhiteSpace(o);
+            GetLogIdentity(logId, out string c, out string _);
+            return !string.IsNullOrWhiteSpace(c);
         }
 
         // Sets a log's identity ONCE. A log's identity is permanent: if it already has one this is a no-op.
@@ -2391,8 +2387,7 @@ Environment.NewLine +
                         if (rdr.Read())
                         {
                             string c = rdr["log_callsign"] == DBNull.Value ? string.Empty : rdr["log_callsign"].ToString();
-                            string o = rdr["log_operator"] == DBNull.Value ? string.Empty : rdr["log_operator"].ToString();
-                            if (!string.IsNullOrWhiteSpace(c) && !string.IsNullOrWhiteSpace(o)) return;   // already set -> frozen
+                            if (!string.IsNullOrWhiteSpace(c)) return;   // already set -> frozen
                         }
                 }
                 using (var cmd = new SQLiteCommand("UPDATE logs SET log_callsign = ?, log_operator = ? WHERE Id = ?", con))
@@ -2448,6 +2443,102 @@ Environment.NewLine +
                     hit.Count += cand.Count;
             }
             return merged.OrderByDescending(m => m.Count).ToList();
+        }
+
+        // ── The callsigns a log holds ────────────────────────────────────────────────────────────────
+        // A log has ONE CURRENT callsign (log_callsign - the one that fills the main window when the log
+        // is opened) and accepts every callsign it already holds QSOs under. Nothing is stored for the
+        // older ones: the QSOs are the record. That is what lets a log made in 1991 under 4X6XX still be
+        // the same log today under 4Z5SL, without splitting it or inventing a second identity.
+
+        // Every callsign in this log, most-used first, with the current one included even when it has no
+        // QSOs yet (a log just created). Stroke variants are merged (4Z5SL/M counts as 4Z5SL).
+        public List<LogCallsignUse> GetCallsignsInLog(long logId)
+        {
+            var counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            lock (_dbLock)
+            {
+                if (con == null || con.State != ConnectionState.Open) return new List<LogCallsignUse>();
+                using (var cmd = new SQLiteCommand(
+                    "SELECT my_callsign, count(*) AS cnt FROM qso WHERE log_id = @lid GROUP BY my_callsign", con))
+                {
+                    cmd.Parameters.Add(new SQLiteParameter("@lid", logId));
+                    using (var rdr = cmd.ExecuteReader())
+                        while (rdr.Read())
+                        {
+                            string c = rdr["my_callsign"] == DBNull.Value ? string.Empty : rdr["my_callsign"].ToString();
+                            if (string.IsNullOrWhiteSpace(c)) continue;
+                            string baseCall = CallsignIdentity.Base(c);
+                            int n = rdr["cnt"] == DBNull.Value ? 0 : Convert.ToInt32(rdr["cnt"]);
+                            counts[baseCall] = (counts.TryGetValue(baseCall, out int had) ? had : 0) + n;
+                        }
+                }
+            }
+
+            GetLogIdentity(logId, out string current, out string _);
+            current = CallsignIdentity.Base(current);
+            if (current.Length > 0 && !counts.ContainsKey(current)) counts[current] = 0;
+
+            return counts
+                .Select(kv => new LogCallsignUse
+                {
+                    Callsign = kv.Key,
+                    Count = kv.Value,
+                    IsCurrent = current.Length > 0 && string.Equals(kv.Key, current, StringComparison.OrdinalIgnoreCase)
+                })
+                .OrderByDescending(u => u.IsCurrent).ThenByDescending(u => u.Count).ThenBy(u => u.Callsign)
+                .ToList();
+        }
+
+        // True when this log may hold a QSO made with this callsign: it is the log's current callsign, or
+        // the log already has QSOs under it. This is the one question every callsign guard asks.
+        public bool LogAcceptsCallsign(long logId, string call)
+        {
+            call = (call ?? string.Empty).Trim();
+            if (call.Length == 0) return false;
+            return GetCallsignsInLog(logId).Any(u => CallsignIdentity.Same(u.Callsign, call));
+        }
+
+        // The callsigns held by EVERY log, in one pass over the QSO table. For callers that must ask the
+        // question of many logs at once (which logs may receive a copy) - one scan instead of one query
+        // per log per keystroke.
+        public Dictionary<long, HashSet<string>> GetCallsignsByLog()
+        {
+            var map = new Dictionary<long, HashSet<string>>();
+            lock (_dbLock)
+            {
+                if (con == null || con.State != ConnectionState.Open) return map;
+                using (var cmd = new SQLiteCommand("SELECT DISTINCT log_id, my_callsign FROM qso", con))
+                using (var rdr = cmd.ExecuteReader())
+                    while (rdr.Read())
+                    {
+                        if (rdr["log_id"] == DBNull.Value) continue;
+                        long lid = Convert.ToInt64(rdr["log_id"]);
+                        string c = rdr["my_callsign"] == DBNull.Value ? string.Empty : rdr["my_callsign"].ToString();
+                        if (string.IsNullOrWhiteSpace(c)) continue;
+                        if (!map.TryGetValue(lid, out var set))
+                            map[lid] = set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                        set.Add(CallsignIdentity.Base(c));
+                    }
+            }
+            return map;
+        }
+
+        // Changes WHICH callsign a log is currently for - the one that fills the main window when the log
+        // is opened. Deliberate, unlike SetLogIdentity (which only ever fills in a blank). The previous
+        // callsign is not erased anywhere: it stays accepted for as long as its QSOs are in the log.
+        public void SetCurrentLogCallsign(long logId, string callsign)
+        {
+            string call = CallsignIdentity.Base(callsign);
+            if (call.Length == 0) return;
+            BumpContentVersion();
+            lock (_dbLock)
+                using (var cmd = new SQLiteCommand("UPDATE logs SET log_callsign = ? WHERE Id = ?", con))
+                {
+                    cmd.Parameters.Add(new SQLiteParameter(null, (object)call));
+                    cmd.Parameters.Add(new SQLiteParameter(null, logId));
+                    cmd.ExecuteNonQuery();
+                }
         }
 
         // A log's copy-target, or null if it doesn't copy. Used on QSO insert and for the live indicator.
@@ -2986,6 +3077,16 @@ Environment.NewLine +
                 // same 3,292 lookups take 0.72 seconds, and building it costs 165 ms, once.
                 using (var cmd = new SQLiteCommand(
                     "CREATE INDEX IF NOT EXISTS idx_qso_source_qso_id ON qso(source_qso_id)", con))
+                    cmd.ExecuteNonQuery();
+
+                // WHICH CALLSIGNS EACH LOG HOLDS - the question behind "may this log hold a QSO made as
+                // 4X6ZZ?", asked by the Log Manager for every log at once, by the callsign guard on the
+                // main window, and by the copy-target lists. Without it every one of those is a scan of
+                // the whole qso table (and the Log Manager's DISTINCT builds a temporary tree on top of
+                // it) - the operator opened the Log Manager and waited. The index covers both columns,
+                // so the answer is read from the index alone and the table is never touched.
+                using (var cmd = new SQLiteCommand(
+                    "CREATE INDEX IF NOT EXISTS idx_qso_log_mycall ON qso(log_id, my_callsign)", con))
                     cmd.ExecuteNonQuery();
 
                 // ── THE THREE QUESTIONS THIS PROGRAM ASKS MOST ────────────────────────────────
@@ -5567,7 +5668,7 @@ Environment.NewLine +
             {
                 using (var fixNoId = new SQLiteCommand(
                     "UPDATE logs SET copy_target_log_id = NULL WHERE copy_target_log_id IS NOT NULL AND " +
-                    "(log_callsign IS NULL OR trim(log_callsign) = '' OR log_operator IS NULL OR trim(log_operator) = '')", con))
+                    "(log_callsign IS NULL OR trim(log_callsign) = '')", con))
                     fixNoId.ExecuteNonQuery();
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
@@ -5640,6 +5741,17 @@ Environment.NewLine +
         public long? CopyTargetLogId { get; set; }  // this log copies its new QSOs into this log (null = off)
         public string Callsign { get; set; }        // this log's station-callsign identity
         public string Operator { get; set; }        // this log's operator identity
+    }
+
+    // One station callsign a log holds QSOs under (or its current one), with how many QSOs use it.
+    // A log is allowed to hold more than one over the years: an operator whose callsign changes keeps
+    // the same log rather than splitting his life's work in two.
+    public class LogCallsignUse
+    {
+        public string Callsign { get; set; }
+        public int Count { get; set; }
+        public bool IsCurrent { get; set; }
+        public string Display => Callsign + "   (" + Count.ToString("N0") + " QSOs)" + (IsCurrent ? "   — current" : "");
     }
 
     // A (station callsign, operator) pair found in a log's QSOs, with how many use it — used to pre-fill

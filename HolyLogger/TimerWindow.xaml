@@ -5,12 +5,16 @@
     <Grid x:Name="LayoutGrid">
         <!-- Define Columns -->
         <Grid.RowDefinitions>
-            <RowDefinition Height="30px"/>
+            <!-- Auto, not a fixed 30: the button row must be as tall as the buttons in it, or a taller
+                 font (or a Windows text-size setting other than 100%) clips them from below. -->
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
         <DockPanel Grid.Row="0">
-            <Button x:Name="ResetBtn" Content="Reset" HorizontalAlignment="Left" Margin="5,2,0,0" VerticalAlignment="Top" Width="82" Grid.Row="1" Click="ResetBtn_Click" FontSize="16" ToolTip="Reset the timer"/>
-            <Button x:Name="StartStopBtn" Content="Start" HorizontalAlignment="right" Margin="5,2,5,0" VerticalAlignment="Top" Width="82" Grid.Row="1" Click="StartStopBtn_Click" FontSize="16" ToolTip="Start / Stop the timer"/>
+            <!-- MinWidth + Padding, not a fixed Width: at 16pt "Reset" and "Stop" were cut off at the
+                 sides. The buttons keep their look at 82 and grow if the words need it. -->
+            <Button x:Name="ResetBtn" Content="Reset" HorizontalAlignment="Left" Margin="5,2,0,0" VerticalAlignment="Top" MinWidth="82" Padding="10,1" Grid.Row="1" Click="ResetBtn_Click" FontSize="16" ToolTip="Reset the timer"/>
+            <Button x:Name="StartStopBtn" Content="Start" HorizontalAlignment="right" Margin="5,2,5,0" VerticalAlignment="Top" MinWidth="82" Padding="10,1" Grid.Row="1" Click="StartStopBtn_Click" FontSize="16" ToolTip="Start / Stop the timer"/>
 
         </DockPanel>
         <Viewbox Grid.Row="1">

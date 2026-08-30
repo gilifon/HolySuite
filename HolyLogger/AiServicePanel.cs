@@ -120,6 +120,27 @@ namespace HolyLogger
             // placed by Refresh instead, straight after the how-to, where the eye already is.
 
             Refresh();
+
+            // THE LAST LINE, WHEREVER THIS PANEL IS SHOWN. An answer from an AI reads like an answer
+            // from a book, and it is not one: it can be wrong about a callsign, a country or a date
+            // with exactly the same confidence it is right. Said once, here, under every place the
+            // service is chosen - Options, the check window and the Log Fixer all host this panel -
+            // so nobody meets an AI answer in this program without having been told.
+            //
+            // Added AFTER Refresh, and outside _serviceHelp, so it stays at the bottom: Refresh empties
+            // that panel and fills it again on every change of service.
+            var caution = new TextBlock
+            {
+                Text = "Please note that AI can make mistakes.",
+                FontSize = 16,
+                FontStyle = FontStyles.Italic,
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(0, 10, 0, 0),
+            };
+            // The theme's own red, by reference rather than by a brush taken once: this panel is open
+            // across colour-scheme changes, and a copied colour would keep the old scheme's red.
+            caution.SetResourceReference(TextBlock.ForegroundProperty, "Danger");
+            Children.Add(caution);
         }
 
         internal void FocusKey() { _keyBox.Focus(); }
@@ -377,17 +398,11 @@ namespace HolyLogger
             label.Margin = new Thickness(0, 10, 0, 2);
             _serviceHelp.Children.Add(label);
 
+            // NO SAVE BUTTON. It existed because nothing else wrote the box down, and that is no longer
+            // true: the run dialog stores it when OK is pressed and the Options window stores it as it
+            // closes. A button that only does what leaving the page already does is one more thing to
+            // press and one more way to think you have lost your choice by not pressing it.
             var row = new DockPanel { LastChildFill = true };
-
-            var save = new Button
-            {
-                Content = "Save model",
-                FontSize = 16,
-                Padding = new Thickness(14, 4, 14, 4),
-                Margin = new Thickness(8, 0, 0, 0),
-            };
-            DockPanel.SetDock(save, Dock.Right);
-            row.Children.Add(save);
 
             // THE NAMES ARE OFFERED, NOT DEMANDED.
             //
@@ -469,10 +484,10 @@ namespace HolyLogger
             // The box was only written to settings by the Save model button, so in the run dialog an
             // operator could pick a model, press OK, and be answered by the previous one - four runs
             // in a row reported opus-5 while he was choosing something else each time. Whoever hosts
-            // this panel can now commit the box themselves, and the dialog does it on OK.
+            // this panel commits the box itself now: the run dialog on OK, Options as it closes.
             _commitModel = store;
 
-            save.Click += (s2, e2) => store();
+            // Enter still stores it, for the man who types a model name and expects Enter to mean it.
             box.KeyDown += (s2, e2) => { if (e2.Key == Key.Enter) store(); };
 
             _serviceHelp.Children.Add(row);

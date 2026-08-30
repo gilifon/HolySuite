@@ -620,6 +620,51 @@ namespace HolyLogger
             CB_Mode.IsHitTestVisible = !rigDrivesMode;
         }
 
+        // ── "The panel shows the radio, the main window does not" ────────────────────────────────────
+        // Reported from another station, with a photograph: the Radio Control Panel on 14030.000 while
+        // the main window's box held a different frequency entirely, in CAT mode. Both are written from
+        // the same reading, a few lines apart, so a picture cannot say which of the three gates below
+        // stopped the second one - and only that station can reproduce it.
+        //
+        // So the program says it itself. One line whenever the ANSWER CHANGES (not on every report from
+        // OmniRig, which arrives constantly): the mode, whether CAT is enabled, what OmniRig says about
+        // the rig, what the form is doing, what the radio reads, and what the box holds. The next
+        // occurrence names its own cause instead of being read off a screenshot.
+        private string _lastRigDecision;
+
+        private void LogRigDecision(bool rigOnline)
+        {
+            try
+            {
+                string status = Rig == null ? "no rig object" : Rig.Status.ToString();
+                string rigFreq = "n/a";
+                if (rigOnline)
+                {
+                    try { rigFreq = ((double)Rig.GetRxFrequency() / 1000000.0).ToString("###0.000000", CultureInfo.InvariantCulture); }
+                    catch (Exception swallowed) { Log.Swallow(swallowed); rigFreq = "read failed"; }
+                }
+
+                string outcome = !rigOnline ? "BOX NOT UPDATED (no live rig)"
+                               : Properties.Settings.Default.isManualMode ? "BOX NOT UPDATED (Manual mode)"
+                               : state == State.Edit ? "BOX NOT UPDATED (editing a QSO)"
+                               : "box updated from the radio";
+
+                string line = "RIG  " + outcome
+                            + " | manual=" + Properties.Settings.Default.isManualMode
+                            + " | CAT enabled=" + Properties.Settings.Default.EnableOmniRigCAT
+                            + " | OmniRig=" + status
+                            + " | form=" + state
+                            + " | radio=" + rigFreq
+                            + " | box=" + (TB_Frequency != null ? (TB_Frequency.Text ?? string.Empty).Trim() : "(none)")
+                            + " | band=" + (TB_Band != null ? (TB_Band.Text ?? string.Empty).Trim() : "(none)");
+
+                if (line == _lastRigDecision) return;   // nothing changed -> nothing to say
+                _lastRigDecision = line;
+                Log.Warn(line);
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
         private void ShowRigParams()
         {
             ShowRigStatus();
@@ -631,6 +676,8 @@ namespace HolyLogger
             bool rigOnline = OmniRigEngine != null && Rig != null
                              && Rig.Status == OmniRig.RigStatusX.ST_ONLINE
                              && Properties.Settings.Default.EnableOmniRigCAT;
+
+            LogRigDecision(rigOnline);
 
             UpdateModeComboLock();
 
@@ -667,8 +714,13 @@ namespace HolyLogger
                     // The immediately following ParamsChange will carry the real value.
                     if (radioRX > 0)
                     {
-                        RX = radioRX.ToString("###0.000000");
-                        TX = radioTX.ToString("###0.000000");
+                        // INVARIANT, LIKE EVERY OTHER FREQUENCY THE PROGRAM WRITES. Left to the machine's
+                        // own regional settings, this one line wrote "14,030000" on a Windows set to a
+                        // comma country - and the band lookup reads a comma as a thousands mark, so the
+                        // radio on 14.030 became fourteen million and the wrong band was logged. The
+                        // string also goes into the settings file, where the same dot is expected back.
+                        RX = radioRX.ToString("###0.000000", CultureInfo.InvariantCulture);
+                        TX = radioTX.ToString("###0.000000", CultureInfo.InvariantCulture);
                         TB_Frequency.Text = RX;
                         Properties.Settings.Default.Frequency = RX;
                     }

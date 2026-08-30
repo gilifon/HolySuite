@@ -72,6 +72,10 @@ namespace HolyLogger
             // closed this window with the X while the caret was still in the box, and the port was back
             // to what it had been - the box had never lost focus, so the value never left it.
             if (GeneralSettingsControlControlInstance != null) GeneralSettingsControlControlInstance.SaveAll();
+            // And the AI model box, for the same reason: it had a Save button of its own because
+            // nothing here committed it, and a model chosen and not saved was a model ignored. Saved on
+            // the way out now, like everything else on these pages - so the button could go.
+            if (_aiPanel != null) _aiPanel.CommitModel();
             base.OnClosing(e);
         }
 

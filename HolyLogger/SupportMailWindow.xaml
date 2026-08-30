@@ -72,10 +72,12 @@
 
         <TextBlock Grid.Row="5" Grid.ColumnSpan="2" FontSize="16" Margin="0,6,0,4"
                    Foreground="{DynamicResource TextBrush}" TextWrapping="Wrap">
-            <!-- Starred after all. The message is what the mail is MADE of - the server refuses one
-                 without it - so a subject line alone cannot be the whole thing. -->
+            <!-- Starred, but a pasted picture answers the star. The message is what the mail is MADE
+                 of and the server refuses an empty one, so a subject line alone cannot be the whole
+                 thing - but a screenshot of what went wrong is not nothing, and an operator who had
+                 pasted one sat looking at a Send button that would not press. -->
             <Run Text="What happened - or what you would like"/><Run Text=" *" Foreground="Red" FontWeight="Bold"/><Run
-                Text=".  A picture can be pasted straight in with Ctrl+V."/>
+                Text=".  A picture can be pasted straight in with Ctrl+V — and a picture on its own is enough to send."/>
         </TextBlock>
         <TextBox   Grid.Row="6" Grid.ColumnSpan="2" x:Name="TB_Body" FontSize="16"
                    AcceptsReturn="True" TextWrapping="Wrap" SpellCheck.IsEnabled="True"

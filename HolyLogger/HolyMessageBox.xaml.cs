@@ -350,6 +350,7 @@ namespace HolyLogger
 
             if (!string.IsNullOrWhiteSpace(yesText)) dlg.YesBtn.Content = yesText;
             if (!string.IsNullOrWhiteSpace(noText)) dlg.NoBtn.Content = noText;
+            dlg.FitWidthToButtons();   // the words just set may need more room than the text did
 
             dlg.ShowDialog();
             return dlg.Confirmed;
@@ -410,6 +411,31 @@ namespace HolyLogger
                     if (candidate > room) break;
                     if (HeightAt(plain, candidate) <= 340 || candidate >= 880) { Width = candidate; break; }
                 }
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        // A WINDOW WIDE ENOUGH FOR ITS OWN BUTTONS. The width above is chosen for the TEXT, but a
+        // confirm may name its buttons ("Add 4Z1KD to this log" / "Choose a log…") and two of those do
+        // not fit across 460 - the reader was shown "Choose a lo". The buttons are measured for the
+        // words they now carry and the window is widened to hold them, even past a width the caller
+        // asked for: a choice that cannot be read is worse than a window wider than requested.
+        internal void FitWidthToButtons()
+        {
+            try
+            {
+                if (YesBtn == null || NoBtn == null) return;
+
+                var free = new Size(double.PositiveInfinity, double.PositiveInfinity);
+                YesBtn.Measure(free);
+                NoBtn.Measure(free);
+
+                // The 10 between the buttons, the 24 of margin each side, and a little air.
+                double needed = YesBtn.DesiredSize.Width + NoBtn.DesiredSize.Width + 10 + 24 + 24 + 16;
+                if (needed <= Width) return;
+
+                double room = Math.Max(460, SystemParameters.WorkArea.Width - 80);
+                Width = Math.Min(needed, room);
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
         }

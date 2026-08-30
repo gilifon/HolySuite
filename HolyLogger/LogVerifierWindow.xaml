@@ -65,9 +65,68 @@
                          Show all kinds, Check with AI, Fix selected: look at everything, ask about
                          the one pile that needs judgement, then write. Declared after Fix because a
                          DockPanel lays right-docked children out from the right inwards. -->
+                    <!-- Starts disabled: the AI is asked about ONE kind, and no kind is chosen yet.
+                         UpdateAiButton turns it on when a country kind is being worked through. -->
                     <Button x:Name="Btn_Ai" DockPanel.Dock="Right" Height="38" MinWidth="170"
-                            Margin="0,0,10,0" FontSize="16" Click="Btn_Ai_Click"
-                            Content="Check with AI"/>
+                            Margin="0,0,10,0" FontSize="16" Click="Btn_Ai_Click" IsEnabled="False"
+                            Content="Check with AI" BorderThickness="1.5">
+                        <Button.Style>
+                            <!-- THE COLOURS LIVE IN THE STYLE, NOT ON THE BUTTON. A value set on the
+                                 element itself outranks a style trigger in WPF, so a blue written
+                                 there could never be turned grey again.
+
+                                 Blue while it can be pressed, plain grey while it cannot: a faded
+                                 blue still reads as a button somebody has broken, where grey is the
+                                 ordinary look of a control that is not offered yet. It is disabled
+                                 until a country kind is chosen, which is most of the time. -->
+                            <Style TargetType="Button">
+                                <Setter Property="Background" Value="#1565C0"/>
+                                <Setter Property="Foreground" Value="White"/>
+                                <Setter Property="BorderBrush" Value="#0D47A1"/>
+                                <Setter Property="FontWeight" Value="Bold"/>
+                                <Setter Property="Padding" Value="14,0"/>
+                                <!-- A template of its own, because the stock button paints its own
+                                     square chrome and ignores a corner radius. Everything else is
+                                     kept: the colours come through TemplateBinding, so the grey
+                                     disabled state below still reaches the same border. -->
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="Button">
+                                            <Border x:Name="Chrome" CornerRadius="6"
+                                                    Background="{TemplateBinding Background}"
+                                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                                    SnapsToDevicePixels="True">
+                                                <ContentPresenter HorizontalAlignment="Center"
+                                                                  VerticalAlignment="Center"
+                                                                  Margin="{TemplateBinding Padding}"/>
+                                            </Border>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter TargetName="Chrome" Property="Background" Value="#1976D2"/>
+                                                </Trigger>
+                                                <Trigger Property="IsPressed" Value="True">
+                                                    <Setter TargetName="Chrome" Property="Background" Value="#0D47A1"/>
+                                                </Trigger>
+                                                <Trigger Property="IsEnabled" Value="False">
+                                                    <Setter TargetName="Chrome" Property="Background" Value="#E6E6E6"/>
+                                                    <Setter TargetName="Chrome" Property="BorderBrush" Value="#C8C8C8"/>
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                                <Style.Triggers>
+                                    <Trigger Property="IsEnabled" Value="False">
+                                        <Setter Property="Background" Value="#E6E6E6"/>
+                                        <Setter Property="Foreground" Value="#8C8C8C"/>
+                                        <Setter Property="BorderBrush" Value="#C8C8C8"/>
+                                        <Setter Property="FontWeight" Value="Normal"/>
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
                     <Button x:Name="Btn_ShowAll" DockPanel.Dock="Right" Height="38" MinWidth="150"
                             Margin="0,0,10,0" FontSize="16" Visibility="Collapsed" Click="Btn_ShowAll_Click"
                             Content="Show all kinds"/>
@@ -89,10 +148,13 @@
                              line started at the frame's edge and the buttons start after their tick
                              boxes, so the two were a box-width out of step down the left-hand side.
                              Same number, so they cannot drift apart. -->
+                        <!-- WRAPS, NOT TRIMS. It says two things after an AI run - which lines will be
+                             changed and which will not - and an ellipsis in the middle of that is the
+                             half he needed cut off. -->
                         <TextBlock x:Name="TB_KindsSummary" Grid.Column="0" VerticalAlignment="Center"
-                                   Margin="34,0,0,0"
+                                   Margin="34,0,8,0"
                                    FontSize="16" Foreground="{DynamicResource MutedTextBrush}"
-                                   TextTrimming="CharacterEllipsis"/>
+                                   TextWrapping="Wrap"/>
 
                         <!-- 38, THE HEIGHT OF THE BUTTONS BESIDE IT. At 40 the row grew by two
                              pixels the moment the spinner appeared and shrank again when it went,
@@ -126,7 +188,28 @@
                 <!-- 190 cut the fifth button in half: each one is about 39px with its padding, border
                      and margin, so five come to 195 and the cap sliced the last. 320 holds eight
                      comfortably and still stops the frame growing into the table. -->
-                <ScrollViewer MaxHeight="320" VerticalScrollBarVisibility="Auto">
+                <!-- A SECOND SCROLLBAR, ON THE LEFT. The list of kinds is wide, and its own scrollbar
+                     stands at the far right of the window - a foot away from the buttons the eye is
+                     actually on, and easily never noticed at all. This one is the same bar: it moves
+                     the same ScrollViewer, follows it when the wheel or the right-hand bar moves it,
+                     and it appears only when there is something to scroll. -->
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <ScrollBar x:Name="KindsLeftBar" Grid.Column="0" Orientation="Vertical"
+                               Width="16" Margin="0,0,6,0" Visibility="Collapsed"
+                               Minimum="0"
+                               Maximum="{Binding ScrollableHeight, ElementName=KindsScroller}"
+                               ViewportSize="{Binding ViewportHeight, ElementName=KindsScroller}"
+                               Value="{Binding VerticalOffset, ElementName=KindsScroller, Mode=OneWay}"
+                               Scroll="KindsLeftBar_Scroll"/>
+
+                    <ScrollViewer x:Name="KindsScroller" Grid.Column="1"
+                                  MaxHeight="320" VerticalScrollBarVisibility="Auto"
+                                  ScrollChanged="KindsScroller_ScrollChanged">
                     <ItemsControl x:Name="IC_Kinds">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
@@ -258,7 +341,8 @@
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
-                </ScrollViewer>
+                    </ScrollViewer>
+                </Grid>
             </DockPanel>
         </Border>
 

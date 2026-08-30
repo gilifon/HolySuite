@@ -97,11 +97,10 @@ namespace HolyLogger
             string suggested = UniqueLogName(c.Name + " " + DateTime.UtcNow.ToString("yyyy-MM-dd"));
             var dlg = new NewLogWindow(dal,
                 "Name the log for the contest \"" + c.Name + "\":", suggested, 0,
-                showCopyOptions: true, defaultCallsign: CurrentStationCallsign,
-                defaultOperator: CurrentOperator) { Owner = this };
+                showCopyOptions: true, defaultCallsign: CurrentStationCallsign) { Owner = this };
             if (dlg.ShowDialog() != true) return false;   // cancelled -> do not enter the contest
 
-            long id = dal.CreateLog(dlg.LogName, c.Id, dlg.LogCallsign, dlg.LogOperator, dlg.CopyTargetLogId);
+            long id = dal.CreateLog(dlg.LogName, c.Id, dlg.LogCallsign, dlg.CopyTargetLogId);
 
             // A freshly selected contest starts clean: serial back to 001 and no zone override (use
             // cty.dat). Set these before switching; ApplyContestModeForActiveLog won't reset them.
@@ -211,6 +210,7 @@ namespace HolyLogger
                 TextBox box = AddContestCell(label, width, tab++, ContestRxPanel);
                 box.Text = _contestRxBoxes.Count == 0 && TB_Exchange != null ? TB_Exchange.Text : string.Empty;
                 box.TextChanged += ContestRxBox_TextChanged;
+                if (IsSerialField(field)) AllowDigitsOnly(box);
                 _contestRxBoxes.Add(box);
             }
 
@@ -236,6 +236,7 @@ namespace HolyLogger
                     sbox.Text = GetSendFieldValue(sf, myCall);   // set before wiring, so it isn't "an edit"
                     string fieldKey = (sf ?? string.Empty).ToUpperInvariant();
                     sbox.TextChanged += (s, e2) => SaveSendFieldEdit(fieldKey, sbox.Text);
+                    if (IsSerialField(fieldKey)) AllowDigitsOnly(sbox);
                     if (fieldKey == "SERIAL") _contestSendSerialBox = sbox;
                     _contestSendBoxes.Add(sbox);
                 }
@@ -396,6 +397,38 @@ namespace HolyLogger
         {
             foreach (var b in _contestRxBoxes)
                 b.Text = string.Empty;
+        }
+
+        private static bool IsSerialField(string field)
+            => string.Equals((field ?? string.Empty).Trim(), "SERIAL", StringComparison.OrdinalIgnoreCase);
+
+        // A SERIAL IS A NUMBER. Nothing else can be sent or received in that cell, and a contest log
+        // carrying "FIX IT" where a serial belongs is a QSO the adjudicator throws out - so the letters
+        // are refused as they are typed rather than found at Cabrillo time. Typing AND pasting: a paste
+        // is the way a wrong value most often arrives, and blocking only the keyboard would leave the
+        // rule half-enforced. (STATE_OR_SERIAL is deliberately not included: in those contests the cell
+        // holds a state OR a serial, and letters are correct there.)
+        private static void AllowDigitsOnly(TextBox box)
+        {
+            if (box == null) return;
+
+            box.PreviewTextInput += (s, e) =>
+            {
+                foreach (char c in e.Text ?? string.Empty)
+                    if (!char.IsDigit(c)) { e.Handled = true; return; }
+            };
+
+            // The space bar does not raise PreviewTextInput as printable text in a TextBox.
+            box.PreviewKeyDown += (s, e) => { if (e.Key == Key.Space) e.Handled = true; };
+
+            DataObject.AddPastingHandler(box, (s, e) =>
+            {
+                string pasted = e.DataObject.GetDataPresent(DataFormats.UnicodeText)
+                    ? (e.DataObject.GetData(DataFormats.UnicodeText) as string ?? string.Empty)
+                    : string.Empty;
+                if (pasted.Length > 0 && pasted.All(char.IsDigit)) return;   // clean paste -> let it through
+                e.CancelCommand();
+            });
         }
 
         // Friendly label + box width for a contest exchange field name.

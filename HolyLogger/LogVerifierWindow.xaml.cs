@@ -289,6 +289,8 @@ namespace HolyLogger
                         return "The fix will add the country and its code";
                     case "Wrong country name":
                         return "The country code is right — only the name belongs to another country";
+                    case WrongCountryCode:
+                        return "The country name is right — only its code is wrong, so the QSO counts for another country";
                     case "Country spelled differently":
                         return "The same country in other words — nothing counts wrongly";
                     case "Wrong continent":
@@ -576,19 +578,116 @@ namespace HolyLogger
                 }
             }
 
+            // ── ONE VERDICT PER AI, KEPT ────────────────────────────────────────────────────────
+            //
+            // A second opinion is only worth asking for if the first one is still there to compare it
+            // with. Each AI's answer is kept under its own name (service AND model - OpenRouter alone
+            // offers dozens), so asking again does not overwrite what the last one said: where they
+            // agree the row is settled, and where they split THAT is the row worth reading. Asking the
+            // same model twice replaces its own answer rather than counting it twice.
+            public sealed class AiVerdict
+            {
+                public string Who;
+                public AiSide Side;
+                public string Reason;
+            }
+
+            private readonly List<AiVerdict> _verdicts = new List<AiVerdict>();
+            public List<AiVerdict> AiVerdictList { get { return _verdicts; } }
+            public int AiCount { get { return _verdicts.Count; } }
+
+            public bool AskedBy(string who)
+            {
+                if (string.IsNullOrWhiteSpace(who)) return false;
+                foreach (AiVerdict v in _verdicts)
+                    if (string.Equals(v.Who, who.Trim(), StringComparison.OrdinalIgnoreCase)) return true;
+                return false;
+            }
+
+            // True when the verdicts do not all say the same thing. The row the operator must read.
+            public bool AiSplit { get; private set; }
+
+            // What the AI column says once more than one has answered. One answer keeps the plain tick
+            // it always had; there is nothing to tally.
+            public string AiTally
+            {
+                get
+                {
+                    if (_verdicts.Count < 2) return string.Empty;
+                    if (!AiSplit) return _verdicts.Count + " AI agree";
+
+                    int top = 0, second = 0;
+                    foreach (AiSide s in new[] { AiSide.Now, AiSide.Then, AiSide.Neither, AiSide.Unsure })
+                    {
+                        int n = 0;
+                        foreach (AiVerdict v in _verdicts) if (v.Side == s) n++;
+                        if (n > top) { second = top; top = n; }
+                        else if (n > second) second = n;
+                    }
+                    return "AI split " + top + " – " + second;
+                }
+            }
+
+            public Visibility AiTallyVisible
+            {
+                get { return _verdicts.Count >= 2 ? Visibility.Visible : Visibility.Collapsed; }
+            }
+
             public void SetAi(AiSide side, string reason, string who)
             {
-                aiSide = side;
-                AiReason = (reason ?? string.Empty).Trim();
-                AiWho = (who ?? string.Empty).Trim();
+                who = (who ?? string.Empty).Trim();
 
-                foreach (var kv in Cells) kv.Value.SetAi(side);
+                AiVerdict mine = null;
+                foreach (AiVerdict v in _verdicts)
+                    if (who.Length > 0 && string.Equals(v.Who, who, StringComparison.OrdinalIgnoreCase)) { mine = v; break; }
 
-                if (side == AiSide.Now) Apply = false;
+                if (mine == null) _verdicts.Add(mine = new AiVerdict { Who = who });
+                mine.Side = side;
+                mine.Reason = (reason ?? string.Empty).Trim();
+
+                // THE ROW'S OWN SIDE IS THE MAJORITY OF THEM, and a tie is not a verdict: with one AI
+                // for the log and one for the correction there is no answer to paint, so the row is
+                // marked unsure and the split is what the column shows. Anything else would put a
+                // green tick on a value half the witnesses rejected.
+                int nNow = 0, nThen = 0, nNeither = 0, nUnsure = 0;
+                foreach (AiVerdict v in _verdicts)
+                {
+                    if (v.Side == AiSide.Now) nNow++;
+                    else if (v.Side == AiSide.Then) nThen++;
+                    else if (v.Side == AiSide.Neither) nNeither++;
+                    else if (v.Side == AiSide.Unsure) nUnsure++;
+                }
+
+                int best = Math.Max(Math.Max(nNow, nThen), Math.Max(nNeither, nUnsure));
+                int winners = (nNow == best ? 1 : 0) + (nThen == best ? 1 : 0)
+                            + (nNeither == best ? 1 : 0) + (nUnsure == best ? 1 : 0);
+
+                AiSplit = _verdicts.Count > 1 && best < _verdicts.Count;
+
+                aiSide = winners > 1 ? AiSide.Unsure
+                       : nNow == best ? AiSide.Now
+                       : nThen == best ? AiSide.Then
+                       : nNeither == best ? AiSide.Neither
+                       : AiSide.Unsure;
+
+                // The reason shown on the row is the winning side's; the ? panel lists them all.
+                AiReason = string.Empty;
+                foreach (AiVerdict v in _verdicts)
+                    if (v.Side == aiSide && v.Reason.Length > 0) { AiReason = v.Reason; break; }
+
+                var names = new List<string>();
+                foreach (AiVerdict v in _verdicts)
+                    if (v.Who.Length > 0 && !names.Contains(v.Who)) names.Add(v.Who);
+                AiWho = string.Join(", ", names);
+
+                foreach (var kv in Cells) kv.Value.SetAi(aiSide);
+
+                if (aiSide == AiSide.Now) Apply = false;
                 Recompute();
 
                 Raise("AiOnNow"); Raise("AiOnThen"); Raise("AiUnsure"); Raise("AiNeither");
                 Raise("AiReason"); Raise("AiReasonVisible");
+                Raise("AiTally"); Raise("AiTallyVisible"); Raise("AiSplit");
             }
 
             public Visibility AiOnNow
@@ -1047,6 +1146,23 @@ namespace HolyLogger
             {
                 sb.AppendLine();
                 sb.AppendLine("Why: " + row.AiReason);
+            }
+
+            // EVERY VERDICT, EACH UNDER ITS OWN NAME, once more than one AI has answered. The line
+            // above is the majority's; this is the whole vote, which is the reason for asking twice.
+            if (row.AiCount > 1)
+            {
+                sb.AppendLine();
+                sb.AppendLine(row.AiSplit ? "They do not agree:" : "Both were asked, and they agree:");
+                foreach (FixRow.AiVerdict v in row.AiVerdictList)
+                {
+                    string said = v.Side == AiSide.Now ? "your log is correct"
+                                : v.Side == AiSide.Then ? "HolyLogger's correction is right"
+                                : v.Side == AiSide.Neither ? "neither country is right"
+                                : "could not tell";
+                    sb.AppendLine("  " + (v.Who.Length > 0 ? v.Who : "AI") + ": " + said
+                                  + (v.Reason.Length > 0 ? " - " + v.Reason : string.Empty));
+                }
             }
 
             sb.AppendLine();
@@ -1897,9 +2013,21 @@ namespace HolyLogger
                     try { why = lookup.Explain(call, when); }
                     catch (Exception swallowed) { Log.Swallow(swallowed); }
 
-                    string kind = why != null && !why.Agree
-                        ? CountryNeedsDecision
-                        : CountryBothAgree;
+                    // THE NAME MAY ALREADY BE RIGHT, AND THEN THIS IS NOT A DIFFERENT COUNTRY AT ALL.
+                    // IZ5TJD/P7 logged as "Italy" with code 344: the word Italy is correct and only the
+                    // number is not, so the QSO counts for another country while reading perfectly well.
+                    // Calling that "Different country" describes something the operator cannot see - he
+                    // looks at the row, reads Italy on both lines, and is asked to accept a change of
+                    // country. It is the mirror of "Wrong country name", and it is named for what is
+                    // actually wrong with it.
+                    bool nameAlreadyRight = storedCountry.Length > 0
+                        && string.Equals(storedCountry, dated.Name, StringComparison.OrdinalIgnoreCase);
+
+                    string kind = nameAlreadyRight
+                        ? WrongCountryCode
+                        : why != null && !why.Agree
+                            ? CountryNeedsDecision
+                            : CountryBothAgree;
 
                     Finding f = New(q, kind,
                                     Named(storedCode, storedCountry) + ZoneSuffix(q.CQZone, q.ITUZone),
@@ -2096,6 +2224,9 @@ namespace HolyLogger
             if (problem == CountryNeedsDecision) return 2;
             if (problem == CountryBothAgree) return 3;
             if (problem == "Different country") return 3;
+            // Right beside the two above: the QSO counts for the wrong country just the same, it only
+            // says the right name while doing it.
+            if (problem == WrongCountryCode) return 3;
             if (problem == "No country code") return 4;
             if (problem == "No country") return 5;
             if (problem == "Damaged callsign") return 6;
@@ -2654,6 +2785,7 @@ namespace HolyLogger
         {
             const string xaml =
                 "<DataGridTemplateColumn xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' "
+                + "xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml' "
                 + "Header='AI' Width='Auto' MinWidth='58' CanUserSort='False'>"
                 + "<DataGridTemplateColumn.CellTemplate><DataTemplate>"
                 + "<Grid ToolTip='{Binding AiReason}'>"
@@ -2661,7 +2793,10 @@ namespace HolyLogger
                 + "</Grid.RowDefinitions>"
                 + "<Border Grid.Row='0' Padding='7,3,7,3' MinHeight='24' "
                 + "BorderBrush='#C0C0C0' BorderThickness='0,0,0,1'>"
-                + "<Grid>"
+                // SIDE BY SIDE, NOT ON TOP OF EACH OTHER. All of these used to share one Grid cell, so
+                // the tally was printed over the tick and the two were unreadable together. A row of
+                // them: only one mark is ever visible, and the tally follows whichever it is.
+                + "<StackPanel Orientation='Horizontal'>"
                 + "<TextBlock Text='&#x2714; AI' Visibility='{Binding AiOnNow}' "
                 + "FontWeight='Bold' Foreground='#0B4A0E'/>"
                 // The doubt sits on the upper line for want of a better place: it belongs to the row,
@@ -2672,7 +2807,28 @@ namespace HolyLogger
                 // looking at, and it needs looking at more than the ones the AI simply agreed with.
                 + "<TextBlock Text='&#x2260; AI' Visibility='{Binding AiNeither}' "
                 + "FontWeight='Bold' Foreground='#B00020'/>"
-                + "</Grid></Border>"
+                // MORE THAN ONE AI HAS ANSWERED, so a tick alone no longer tells the whole story:
+                // "2 AI agree" is a settled row and "AI split 2 - 1" is one to read. Shown only from
+                // the second answer on - a single verdict has nothing to tally - and turned WHITE on a
+                // selected row, where the blue swallows the amber it is written in.
+                + "<TextBlock Text='{Binding AiTally}' Visibility='{Binding AiTallyVisible}' "
+                + "FontSize='12' Margin='8,0,0,0' VerticalAlignment='Center'>"
+                // WHITE ON A BLUE ROW. The blue is not the grid's selection - it is painted by the row
+                // style on any row whose Fix box is ticked (see the RowStyle in the XAML) - so the
+                // trigger watches Apply, the same thing that turns the row blue. The selection is
+                // watched too, for a row that is blue for that reason instead.
+                + "<TextBlock.Style><Style TargetType='TextBlock'>"
+                + "<Setter Property='Foreground' Value='#8A6D00'/>"
+                + "<Style.Triggers>"
+                + "<DataTrigger Binding='{Binding Apply}' Value='True'>"
+                + "<Setter Property='Foreground' Value='White'/>"
+                + "</DataTrigger>"
+                + "<DataTrigger Binding='{Binding IsSelected, RelativeSource={RelativeSource AncestorType={x:Type DataGridRow}}}' Value='True'>"
+                + "<Setter Property='Foreground' Value='White'/>"
+                + "</DataTrigger>"
+                + "</Style.Triggers></Style></TextBlock.Style>"
+                + "</TextBlock>"
+                + "</StackPanel></Border>"
                 + "<Border Grid.Row='1' Padding='7,3,7,3' MinHeight='24'>"
                 + "<TextBlock Text='&#x2714; AI' Visibility='{Binding AiOnThen}' "
                 + "FontWeight='Bold' Foreground='#0B4A0E'/>"
@@ -3290,20 +3446,24 @@ namespace HolyLogger
             // the AI would be shown the same two countries and asked the same thing. On a free
             // allowance of twenty requests a day, that is paying twice for one answer.
             //
-            // The verdicts already given are kept exactly as they are. This asks about the rest.
-            var rows = ofThisKind.Where(r => !r.AiAsked).ToList();
+            // ASKED ONCE PER AI, NOT ONCE PER ROW FOR EVER.
+            //
+            // The same model is never asked the same question twice - nothing is written to the log
+            // until Fix, so its answer would be word for word the one already on the row, bought again
+            // out of a free allowance of twenty a day. But ANOTHER model is a second witness, and that
+            // is worth having: the two disagree often enough to matter (Gemini said 5 and 1 where
+            // OpenRouter said 4 and 2 on the same six QSOs), and a row they split on is exactly the
+            // one to read. So what is skipped is what THIS AI has answered, not what any AI has.
+            string current = AiServices.Current.ShortName + " (" + AiServices.Current.Model + ")";
+            var rows = ofThisKind.Where(r => !r.AskedBy(current)).ToList();
             int already = ofThisKind.Count - rows.Count;
 
-            if (rows.Count == 0)
-            {
-                HolyMessageBox.Show(
-                    "The AI has already answered about all " + already + " of them." + gap
-                    + "Its verdict is the green line on each row, and pressing ? on a row shows what "
-                    + "it said and why. Nothing is asked again: the question has not changed, because "
-                    + "nothing is written to your log until you press Fix selected.",
-                    "Check with AI", HolyMsgType.Info, this);
-                return;
-            }
+            // "Check with another AI" MEANS SHOW HIM THE CHOOSER, NOT A NOTICE. When the AI in use has
+            // already answered every row on screen, the only thing the press can mean is "let me pick a
+            // different one" - so it goes straight to the run dialog, which IS the chooser, with the
+            // reason across the top. A message saying "go to Options and choose another" was an errand
+            // where the program could simply have opened the door.
+            bool pickAnother = rows.Count == 0;
 
             // NO KEY: SAY SO, AND OFFER THE PLACE IT IS SET.
             //
@@ -3344,8 +3504,13 @@ namespace HolyLogger
             // wonder what happened to the other one.
             // THE SERVICE IS PART OF THE QUESTION, so it is named here and can be changed here.
             // AiRunPrompt is this dialog with the chooser standing in it.
-            string asking =
-                  "**" + rows.Count + " QSO" + (rows.Count == 1 ? "" : "s") + "** will be checked by AI."
+            string asking = pickAnother
+                ? "**" + current + "** has already answered all " + already
+                  + (already == 1 ? " of these QSOs." : " of these QSOs.")
+                  + Environment.NewLine + "Choose a different AI model to re check the " + already
+                  + " QSO" + (already == 1 ? "" : "s") + "."
+                  + Environment.NewLine + "Both answers are kept, and the AI column says where they disagree."
+                : "**" + rows.Count + " QSO" + (rows.Count == 1 ? "" : "s") + "** will be checked by AI."
                 + (already > 0
                     ? Environment.NewLine + already + (already == 1 ? " has" : " have")
                       + " been answered already and will not be asked again."
@@ -3354,6 +3519,26 @@ namespace HolyLogger
                 + Environment.NewLine + "The process may take a few minutes.";
 
             if (!AiRunPrompt.Ask(this, asking)) return;
+
+            // THE SERVICE CAN BE CHANGED IN THAT DIALOG - it has the chooser standing in it - so the
+            // list is worked out again against whatever he settled on. Without this, switching to a
+            // model that had already answered would buy its answers a second time.
+            string chosen = AiServices.Current.ShortName + " (" + AiServices.Current.Model + ")";
+            if (pickAnother || !string.Equals(chosen, current, StringComparison.OrdinalIgnoreCase))
+            {
+                rows = ofThisKind.Where(r => !r.AskedBy(chosen)).ToList();
+                if (rows.Count == 0)
+                {
+                    // He came here to pick another and pressed OK on the same one. Nothing is spent, and
+                    // the way out is the same button - so say which one it is and leave it at that.
+                    HolyMessageBox.Show(
+                        chosen + " has already answered about all of these." + gap
+                        + "Press Check with another AI again and choose a service or a model it has not "
+                        + "seen - its answers are then kept beside the ones already there.",
+                        "Check with AI", HolyMsgType.Info, this);
+                    return;
+                }
+            }
 
             var questions = new List<AiCountryVote.Question>();
             foreach (FixRow r in rows)
@@ -3389,11 +3574,10 @@ namespace HolyLogger
             //
             // The summary line beside it runs the width of the frame and is doing nothing while the
             // AI is out, so the progress goes there and the button just stays a button.
-            string wasSummary = TB_KindsSummary.Text;
 
             // The button stays alive and becomes the way out. Everything the run has already been
-            // given - the rows it answered before it hung - is kept.
-            object wasAiLabel = Btn_Ai.Content;
+            // given - the rows it answered before it hung - is kept. Its own label is not saved: when
+            // the run settles, UpdateAiButton writes the one that fits what has happened since.
             Btn_Ai.Content = "Stop AI check";
 
             // A LINE THAT NEVER CHANGES IS A WINDOW THAT LOOKS HUNG.
@@ -3456,9 +3640,14 @@ namespace HolyLogger
                 ticker.Stop();
                 AiSpinnerRotate.BeginAnimation(System.Windows.Media.RotateTransform.AngleProperty, null);
                 PB_Ai.Visibility = Visibility.Collapsed;
-                TB_KindsSummary.Text = wasSummary;
-                Btn_Ai.Content = wasAiLabel;
-                Btn_Ai.IsEnabled = true;
+                // Not the line it had before the run: an AI has answered since, and the line now has
+                // something better to say than what to press.
+                UpdateKindsSummary();
+                // NOT put back to the label it had. It said "Check with AI" when the run started and an
+                // AI has answered since, so the button's next press means another one - UpdateAiButton
+                // writes the words as well as the enabled state. Restoring wasAiLabel here first was
+                // harmless but read as though this line decided the text; it does not.
+                UpdateAiButton();
             };
 
             try
@@ -3475,6 +3664,7 @@ namespace HolyLogger
                         (index, a) => Dispatcher.Invoke(new Action(() =>
                         {
                             if (a == null || index < 0 || index >= rows.Count) return;
+                            _aiAnswered = true;   // an AI has spoken in this window; the button says so
                             switch (a.Backs)
                             {
                                 case AiCountryVote.Backs.Log:
@@ -3497,6 +3687,12 @@ namespace HolyLogger
                     // A contact the AI never answered about is left exactly as it was. Silence is not
                     // agreement, and colouring it either way would say something nobody said.
                     if (!answers.TryGetValue(i, out a) || a == null) continue;
+
+                    // THE OTHER ROUTE A VERDICT TAKES. A service that streams its answers has already
+                    // set this in the callback above; one that returns them all at once arrives here,
+                    // AFTER settle - which is why the line under the kinds, written in settle, still
+                    // said "press this" over a table full of verdicts.
+                    _aiAnswered = true;
 
                     switch (a.Backs)
                     {
@@ -3686,6 +3882,14 @@ namespace HolyLogger
                 if (_aiRunning != null) { _aiRunning.Dispose(); _aiRunning = null; }
                 settle();
 
+                // AND AGAIN HERE, OUTSIDE settle. settle runs once and it runs EARLY - as soon as the
+                // service answers, before the verdicts are counted, before the report and before the
+                // message the operator reads. Both of these were therefore decided while the run was
+                // still finishing, and the second call, in this finally, was swallowed by settle's own
+                // once-only guard. These are not.
+                UpdateAiButton();
+                UpdateKindsSummary();
+
                 // Queued rather than called: this one is still inside its own finally, and starting
                 // the next before that has finished would meet its own half-cleared state.
                 if (startAgain && IsLoaded)
@@ -3716,9 +3920,7 @@ namespace HolyLogger
             if (Btn_ShowAll != null)
                 Btn_ShowAll.Visibility = kindName == null ? Visibility.Collapsed : Visibility.Visible;
 
-            TB_KindsSummary.Text = kindName == null
-                ? "One kind at a time: click a kind above to work through its QSOs."
-                : "Showing only: " + kindName + ".  Click it again, or Show all kinds, to see the rest.";
+            UpdateKindsSummary();
 
             // The two answer columns belong to a kind, and so does the green button's offer.
             ShowAnswerColumns(kindName != null);
@@ -3727,6 +3929,93 @@ namespace HolyLogger
             UpdateFixButton();
             UpdateFixAllBox();
             UpdateKeepAllBox();
+            UpdateAiButton();
+        }
+
+        // THE AI IS ASKED ABOUT ONE KIND, SO IT CANNOT BE PRESSED WITHOUT ONE. The question put to it
+        // is written for the kind on screen - which country is right for this callsign on this date -
+        // and with every kind listed together there is no such question to ask. It used to be pressable
+        // at any time and answer with a message explaining why it would not run; a button that can only
+        // say no is better greyed, with the reason in its tooltip.
+        //
+        // Only the two COUNTRY kinds qualify. The rest are not matters of opinion: a locator either is
+        // a locator or it is not, a band either matches the frequency or it does not.
+        // THE LINE UNDER THE KINDS, AND WHAT IT IS FOR AT THIS MOMENT.
+        //
+        // Before the AI is asked it says what to do next. Afterwards it says the one thing a man
+        // looking at a table of blue and grey lines wants to know: which of them the press will
+        // change. Two short lines, one fact each - see the standing rule about plain wording.
+        private void UpdateKindsSummary()
+        {
+            if (TB_KindsSummary == null) return;
+
+            // ONLY AFTER THE AI HAS ANSWERED. These two lines explain a result, and put on screen
+            // before there is one they describe colours the operator has not seen the meaning of yet.
+            // Until then the line says what to press, which is what he needs at that moment.
+            if (_aiAnswered)
+            {
+                TB_KindsSummary.Text =
+                      "AI suggests to correct the QSOs in the blue lines only." + Environment.NewLine
+                    + "QSOs in the grey lines remain unchanged.";
+                return;
+            }
+
+            TB_KindsSummary.Text = _filterKind == null
+                ? "Click a kind above to work through its QSOs."
+                : "Showing one kind only. Press Show all kinds to see the rest.";
+        }
+
+        private string _lastAiButtonLabel;
+
+        // True from the first verdict this window ever receives. Set in the answer callback, so it does
+        // not depend on finding the answered rows again afterwards.
+        private bool _aiAnswered;
+
+        private void UpdateAiButton()
+        {
+            if (Btn_Ai == null) return;
+
+            bool aiKind = string.Equals(_filterKind, CountryNeedsDecision, StringComparison.Ordinal)
+                       || string.Equals(_filterKind, CountryBothAgree, StringComparison.Ordinal);
+
+            // ONCE ONE AI HAS ANSWERED, THE BUTTON OFFERS THE NEXT ONE. The words matter: "Check with
+            // AI" on a screen full of green ticks reads as "do it again", and he would expect the same
+            // answers back. "Check with another AI" says what a second press is actually for.
+            // ASKED OF EVERY ROW IN THE WINDOW, not only the ones on show. RowsOnShow answers nothing
+            // at all while no kind is chosen, so the label fell back to "Check with AI" every time he
+            // pressed Show all kinds and came back - after an AI had plainly answered.
+            int withAnswer = 0;
+            foreach (FixRow r in _rows) if (r != null && r.AiCount > 0) withAnswer++;
+
+            // OR SIMPLY: AN AI HAS ANSWERED IN THIS WINDOW. The count above is the honest measure and
+            // it is kept, but the label must not depend on finding those rows again - it went on saying
+            // "Check with AI" over a screen of green ticks, and that is the one thing the button must
+            // never do. _aiAnswered is set as each verdict lands and never cleared.
+            bool answered = withAnswer > 0 || _aiAnswered;
+            string label = answered ? "Check with another AI" : "Check with AI";
+
+            // WRITTEN DOWN WHEN IT CHANGES. The label stayed at "Check with AI" on a screen full of
+            // verdicts and the reason was not visible from a screenshot - this line says what this
+            // method saw and what it wrote, so the next time it is answered from the operator's own log
+            // instead of by reading pixels.
+            if (!string.Equals(_lastAiButtonLabel, label, StringComparison.Ordinal))
+            {
+                _lastAiButtonLabel = label;
+                Log.Warn("Log Fixer: AI button -> \"" + label + "\"  (rows holding an AI answer: "
+                         + withAnswer + " of " + _rows.Count + ")");
+            }
+
+            Btn_Ai.Content = label;
+
+            Btn_Ai.IsEnabled = aiKind;
+            Btn_Ai.ToolTip = aiKind
+                ? (answered
+                    ? "Ask a second AI about the same QSOs. Both answers are kept, and the AI column "
+                      + "says where they disagree. Pick the service or model in the next dialog."
+                    : "Ask the AI about the QSOs listed below.")
+                : "Click \"" + CountryNeedsDecision + "\" or \"" + CountryBothAgree + "\" above first. "
+                  + "The AI is asked which country is right for a callsign on the date of the QSO, so it "
+                  + "is only offered for those two kinds.";
         }
 
         // ── THE PRESS THAT WRITES NOTHING AND STILL SETTLES SOMETHING ───────────────────────────────
@@ -3841,6 +4130,22 @@ namespace HolyLogger
 
         // The rows the green button acts on: the ones listed, which is one kind's worth. Empty while
         // all kinds are on show, which is what makes the button inert there.
+        // ── THE SECOND SCROLLBAR ────────────────────────────────────────────────────────────────────
+        // The one on the left drives the same ScrollViewer as the one on the right, and follows it:
+        // drag either, or turn the wheel, and both show the same place in the list. It is hidden while
+        // the whole list fits, so it never stands there as a bar that cannot move.
+        private void KindsLeftBar_Scroll(object sender, System.Windows.Controls.Primitives.ScrollEventArgs e)
+        {
+            if (KindsScroller != null) KindsScroller.ScrollToVerticalOffset(e.NewValue);
+        }
+
+        private void KindsScroller_ScrollChanged(object sender, ScrollChangedEventArgs e)
+        {
+            if (KindsLeftBar == null || KindsScroller == null) return;
+            KindsLeftBar.Visibility = KindsScroller.ScrollableHeight > 0
+                ? Visibility.Visible : Visibility.Collapsed;
+        }
+
         private List<FixRow> RowsOnShow()
         {
             if (FindingsGrid == null || _filterKind == null) return new List<FixRow>();
@@ -3950,6 +4255,10 @@ namespace HolyLogger
         // right, where there is room for it.
         private const string CountryBothAgree = "Different country — safe to accept";
         private const string CountryNeedsDecision = "Different country — needs a decision";
+
+        // The country NAME in the log is already right and only its code is not, so the QSO counts for
+        // a country it does not say. Named for what is wrong, like "Wrong country name" beside it.
+        private const string WrongCountryCode = "Wrong country code";
 
         private const string LocatorProblem = "DX Locator is wrong";
 

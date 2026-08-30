@@ -3,6 +3,61 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Logs" SizeToContent="Width" Height="440" MinWidth="640"
         WindowStartupLocation="CenterOwner" ShowInTaskbar="False" Background="{DynamicResource WindowBg}">
+    <Window.Resources>
+        <!-- The station-callsign drop-down, framed in red so BOTH halves of it are unmistakable: the
+             closed box in the cell, which would otherwise read as one more line of text in a grid full
+             of them, and the list that drops open, which Windows draws with a hairline grey border that
+             disappears against the rows behind it. Everything else here is the stock ComboBox parts -
+             only the two frames and their colour are ours. -->
+        <SolidColorBrush x:Key="CallsignFrame" Color="#C62828"/>
+
+        <Style x:Key="CallsignComboStyle" TargetType="ComboBox">
+            <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBox">
+                        <Grid>
+                            <ToggleButton Focusable="False" ClickMode="Press"
+                                          IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}">
+                                <!-- CLOSED, IT IS NOT A BOX AT ALL. The cell must read exactly like the
+                                     cells that hold a single callsign - no frame, no fill, the same text
+                                     in the same place - with only the chevron to say there is more here.
+                                     The red frame belongs to the list, and appears when the list does. -->
+                                <ToggleButton.Template>
+                                    <ControlTemplate TargetType="ToggleButton">
+                                        <Border Background="Transparent" SnapsToDevicePixels="True">
+                                            <Path HorizontalAlignment="Right" VerticalAlignment="Center"
+                                                  Margin="0,0,4,0" Fill="{StaticResource CallsignFrame}"
+                                                  Data="M 0 0 L 4 4 L 8 0 Z"/>
+                                        </Border>
+                                    </ControlTemplate>
+                                </ToggleButton.Template>
+                            </ToggleButton>
+
+                            <ContentPresenter IsHitTestVisible="False" VerticalAlignment="Center"
+                                              Margin="0,2,18,2"
+                                              Content="{TemplateBinding SelectionBoxItem}"
+                                              ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"/>
+
+                            <Popup x:Name="PART_Popup" Placement="Bottom" Focusable="False"
+                                   AllowsTransparency="True"
+                                   IsOpen="{TemplateBinding IsDropDownOpen}">
+                                <Border BorderBrush="{StaticResource CallsignFrame}" BorderThickness="2"
+                                        CornerRadius="2" Background="{DynamicResource WindowBg}"
+                                        MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}"
+                                        SnapsToDevicePixels="True">
+                                    <ScrollViewer MaxHeight="240">
+                                        <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Contained"/>
+                                    </ScrollViewer>
+                                </Border>
+                            </Popup>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
     <Grid Margin="12">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -29,9 +84,9 @@
                 <!-- Bigger left gap separates the "generate a new log" group (Regular / Contest / Import)
                      from the per-log actions. Widening row 1 also pushes the right-aligned export pair
                      below, so Export Cabrillo stays lined up with "Activate & Open Log". -->
-                <Button x:Name="Btn_SetIdentity" Content="Set Identity" Height="34" Padding="9,0" FontSize="16"
-                        Margin="28,0,8,0" Click="Btn_SetIdentity_Click"
-                        ToolTip="Give this log its permanent station callsign + operator identity"/>
+                <Button x:Name="Btn_Callsigns" Content="Callsigns" Height="34" Padding="9,0" FontSize="16"
+                        Margin="28,0,8,0" Click="Btn_Callsigns_Click"
+                        ToolTip="The station callsigns this log holds QSOs under: which one it is for now, and add another"/>
                 <Button x:Name="Btn_Open" Content="Activate &amp; Open Log" Height="34" Padding="9,0" FontSize="16" FontWeight="Bold"
                         IsEnabled="False" Click="Btn_Open_Click"/>
             </StackPanel>
@@ -122,7 +177,47 @@
                 <DataGridTextColumn Header="Start Date" Binding="{Binding StartDate}" Width="Auto"/>
                 <DataGridTextColumn Header="End Date" Binding="{Binding EndDate}" Width="Auto"/>
                 <DataGridTextColumn Header="No. of QSOs" Binding="{Binding QsoCount}" Width="Auto"/>
-                <DataGridTextColumn Header="Identity" Binding="{Binding Identity}" Width="Auto"/>
+                <!-- One callsign: plain text. More than one: a drop-down, closed on the log's current
+                     callsign and opening to the whole list, so a log carried through several callsigns
+                     never widens the column. The tooltip spells them all out either way. -->
+                <DataGridTemplateColumn Header="Station Callsigns" Width="Auto" SortMemberPath="Identity">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <Grid ToolTip="{Binding IdentityTip}">
+                                <TextBlock Text="{Binding Identity}" VerticalAlignment="Center">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding HasManyCallsigns}" Value="True">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                                <!-- The red frame is what says "there are more callsigns in here": without
+                                     it a closed drop-down sitting in a grid reads as just another line of
+                                     text, indistinguishable from the single callsign in the row below.
+                                     The box itself is left the row's own colour - the frame marks the
+                                     control, and tinting the line would only say something that isn't
+                                     true about the log. -->
+                                <ComboBox ItemsSource="{Binding Callsigns}" SelectedIndex="0" FontSize="16"
+                                          Style="{StaticResource CallsignComboStyle}"
+                                          HorizontalAlignment="Left" Margin="0,1,0,1"
+                                          PreviewMouseLeftButtonDown="CallsignCombo_PreviewMouseLeftButtonDown">
+                                    <ComboBox.Visibility>
+                                        <Binding Path="HasManyCallsigns">
+                                            <Binding.Converter>
+                                                <BooleanToVisibilityConverter/>
+                                            </Binding.Converter>
+                                        </Binding>
+                                    </ComboBox.Visibility>
+                                </ComboBox>
+                            </Grid>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
                 <DataGridTextColumn Header="Copy New Qso to…" Binding="{Binding CopiesTo}" Width="Auto">
                     <DataGridTextColumn.ElementStyle>
                         <!-- No trimming: the column auto-sizes to the full target-log name so long names

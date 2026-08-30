@@ -74,16 +74,29 @@ namespace HolyLogger
             UpdateSendEnabled();
         }
 
+        // ── A PICTURE IS A MESSAGE ──────────────────────────────────────────────────────────────
+        //
+        // Reported by an operator on 2026-08-29: he pasted a screenshot of the thing that was wrong,
+        // pressed Send, and nothing happened. Send was grey because the BODY was empty, and a
+        // screenshot is not body text - so a man who had said exactly what he meant, in a picture,
+        // was refused by a window that would not tell him why in words he could act on. He typed a
+        // sentence at last, and only then did it go.
+        //
+        // A subject and a screenshot is a real report. So the body is required only when there is no
+        // picture, and when it IS the thing that is missing the line under the button says so by
+        // name instead of pointing at a row of asterisks.
         private void UpdateSendEnabled()
         {
-            bool ready = TB_Name.Text.Trim().Length > 0
+            bool named = TB_Name.Text.Trim().Length > 0
                       && TB_Callsign.Text.Trim().Length > 0
-                      && TB_Email.Text.Trim().Length > 0
-                      && TB_Subject.Text.Trim().Length > 0
-                      && TB_Body.Text.Trim().Length > 0;
+                      && TB_Email.Text.Trim().Length > 0;
+            bool subject = TB_Subject.Text.Trim().Length > 0;
+            bool says = TB_Body.Text.Trim().Length > 0 || _pictures.Count > 0;
 
-            Btn_Send.IsEnabled = ready;
-            TB_Status.Text = ready ? "" : "The fields marked * have to be filled in.";
+            Btn_Send.IsEnabled = named && subject && says;
+            TB_Status.Text = !named || !subject ? "The fields marked * have to be filled in."
+                           : !says             ? "Write the message, or paste a picture of the problem."
+                                               : "";
         }
 
         private Control FirstEmpty()
@@ -277,7 +290,19 @@ namespace HolyLogger
             if (email.Length == 0) { Complain("Please put your email address in - without it there is nowhere to send the answer.", TB_Email); return; }
             if (!LooksLikeAnAddress(email)) { Complain("That does not look like an email address. Please check it - the answer goes there.", TB_Email); return; }
             if (subject.Length == 0) { Complain("Please give the message a subject.", TB_Subject); return; }
-            if (body.Length == 0) { Complain("Please write the message itself - the subject alone is not enough to answer.", TB_Body); return; }
+            // A picture says it too. See UpdateSendEnabled: the subject alone is not enough to answer,
+            // but a subject and a screenshot of the thing that is wrong is.
+            if (body.Length == 0 && _pictures.Count == 0)
+            { Complain("Please write the message, or paste a picture of the problem - the subject alone "
+                       + "is not enough to answer.", TB_Body); return; }
+
+            // THE MAIL STILL NEEDS A BODY, whatever the window accepts. The server refuses a message
+            // with nothing in it, so a report that IS its picture is sent with a line saying so -
+            // which is also what the developer wants to read at the other end, rather than a blank.
+            if (body.Length == 0)
+                body = _pictures.Count == 1
+                    ? "(No text - the picture below is the message.)"
+                    : "(No text - the " + _pictures.Count + " pictures below are the message.)";
 
             // Remembered only once the operator has actually sent something with them.
             try

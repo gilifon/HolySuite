@@ -134,6 +134,15 @@ namespace HolyLogger
         // Buttons 1..SharedButtons are the Msg buttons' texts; the rest are this window's own.
         private const int SharedButtons = 4;
         private readonly Button[] _buttons = new Button[ButtonCount];
+
+        // The window's stack, kept so the "this radio cannot be keyed" line can be put into it after
+        // the window is built - see CannotKey.
+        private DockPanel _body;
+
+        // TRUE WHEN THE RADIO IN FRONT OF HIM CANNOT BE KEYED AT ALL. The window still opens: its
+        // eight buttons are where his macros live, and writing them is worth doing with no radio on
+        // the desk, let alone with the wrong one. What it will not do is pretend to send.
+        private bool _cannotKey;
         private readonly string[] _buttonTexts;
 
         // Is the radio keying THIS INSTANT? Null when nothing can be asked. The line below is
@@ -431,7 +440,7 @@ namespace HolyLogger
             sendFrame.SetBinding(Border.BackgroundProperty,
                 new System.Windows.Data.Binding("Background") { Source = _history });
 
-            var body = new DockPanel { LastChildFill = false };
+            _body = new DockPanel { LastChildFill = false };
 
             var titleBar = BuildTitleBar();
             DockPanel.SetDock(titleBar, Dock.Top);
@@ -441,13 +450,13 @@ namespace HolyLogger
             var buttonGrid = BuildButtons(typeface);
             DockPanel.SetDock(buttonGrid, Dock.Top);
 
-            body.Children.Add(titleBar);
-            body.Children.Add(sendFrame);
-            body.Children.Add(_history);
-            body.Children.Add(buttonGrid);
+            _body.Children.Add(titleBar);
+            _body.Children.Add(sendFrame);
+            _body.Children.Add(_history);
+            _body.Children.Add(buttonGrid);
 
             // WindowStyle.None takes the OS frame with it, so this border IS the window's visible edge.
-            var frame = new Border { BorderThickness = new Thickness(1), Child = body };
+            var frame = new Border { BorderThickness = new Thickness(1), Child = _body };
             frame.SetResourceReference(Border.BorderBrushProperty, "TextBrush");
 
             Content = frame;
@@ -460,6 +469,61 @@ namespace HolyLogger
             // Where the operator put it is where it comes back. WindowBounds is the one that knows how
             // to bring a corner saved on a second screen back onto a screen that is still there.
             WindowBounds.Attach(this, "CwKeyboard");
+        }
+
+        // ── A KEYER IN FRONT OF A RADIO IT CANNOT KEY ───────────────────────────────────────────
+        //
+        // The window used to refuse to open at all on such a radio, which took his eight macros away
+        // with it: the only place they can be written is here, and there is no reason a man should
+        // need a keyable radio switched on to write "CQ CQ DE ...". So it opens, and says plainly
+        // why nothing will go out - a window that merely looked dead would read as a fault.
+        //
+        // WHAT IS TAKEN AWAY IS SENDING, AND ONLY SENDING. The typing line goes read-only and the
+        // buttons are dimmed and refuse a left-click; right-click still opens the editor, which is
+        // the whole point of letting the window open.
+        private string _cannotKeyReason = string.Empty;
+
+        internal void CannotKey(string reason)
+        {
+            _cannotKey = true;
+            _cannotKeyReason = reason ?? string.Empty;
+
+            // READ-ONLY, NOT DISABLED. A disabled box is skipped by the caret and by selection, and
+            // the operator cannot even mark what he had already typed to copy it somewhere useful.
+            _box.IsReadOnly = true;
+            _box.IsTabStop = false;
+
+            foreach (var button in _buttons)
+                if (button != null) button.Opacity = 0.5;
+
+            var line = new TextBlock
+            {
+                Text = _cannotKeyReason,
+                FontSize = 16,
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(10, 8, 10, 0)
+            };
+            line.SetResourceReference(TextBlock.ForegroundProperty, "MutedTextBrush");
+
+            var banner = new Border
+            {
+                BorderThickness = new Thickness(1),
+                Padding = new Thickness(6, 2, 6, 6),
+                Margin = new Thickness(10, 8, 10, 0),
+                Child = line
+            };
+            banner.SetResourceReference(Border.BorderBrushProperty, "MutedTextBrush");
+
+            DockPanel.SetDock(banner, Dock.Top);
+
+            // Under the title bar and above the typing line, where it is read before anything is
+            // typed rather than after.
+            if (_body != null && _body.Children.Count > 0) _body.Children.Insert(1, banner);
+
+            // NOTHING IS DONE ABOUT THE HEIGHT HERE ON PURPOSE. Adding a row usually means raising
+            // Height and MinHeight by hand or the bottom is cut off - but this window sizes itself
+            // to its content on Loaded and locks its minimum to what it measured (LockMinimumHeight),
+            // and this line goes in before Show. Adding to Height as well would grow it twice.
         }
 
         // Only the characters a keyer can actually send. Anything else would be dropped by the radio
@@ -1294,6 +1358,16 @@ namespace HolyLogger
         // sending path, one record, and Escape still stops it half way like anything else typed.
         private void SendButton(int index)
         {
+            // NOT A SILENT REFUSAL. The line across the top already says the radio cannot be keyed,
+            // but a button that is still there to be right-clicked will be left-clicked sooner or
+            // later, and a press that does nothing at all is the fault this window was opened to
+            // stop being.
+            if (_cannotKey)
+            {
+                HolyMessageBox.ShowWarning(_cannotKeyReason, "CW Keyer", this);
+                return;
+            }
+
             string stored = _buttonTexts[index] ?? string.Empty;
 
             if (stored.Trim().Length == 0)
@@ -2313,16 +2387,63 @@ namespace HolyLogger
     // HIS OWN RADIO COMES FIRST and in the accent colour, because it is the only line he is really
     // asking about. The four makers follow, for the day he is choosing a radio or helping somebody
     // else with one.
+    // ONE PAGE, TWO QUESTIONS. "Can my radio send CW" and "can my radio play a recorded voice
+    // message" are the same question asked about a different command, and they want the same page:
+    // his own radio first, the makers under it, and a line saying where the list came from. Written
+    // once and told what to say, rather than copied and left to drift apart.
     internal sealed class CwRadiosWindow : Window
     {
         internal static void Show(Window owner)
         {
-            new CwRadiosWindow { Owner = owner }.ShowDialog();
+            new CwRadiosWindow(
+                "Which radios can send CW",
+                main => main.CwKeyingForThisRadio(),
+                new[]
+                {
+                    new[] { "Icom",     "IC-705, IC-7300, IC-7300MK2, IC-7610, IC-9700" },
+                    new[] { "Kenwood",  "TS-480, TS-590S, TS-590SG, TS-890S, TS-990S" },
+                    new[] { "Elecraft", "K3, K3S, K4, KX2, KX3" },
+                    new[] { "Yaesu",    "FT-891, FT-991, FT-991A, FTDX10, FTDX101D, FTDX101MP, FT-710" }
+                })
+            { Owner = owner }.ShowDialog();
         }
 
-        private CwRadiosWindow()
+        // ── WHICH RADIOS CAN PLAY A RECORDED VOICE MESSAGE ──────────────────────────────────────
+        //
+        // The four Msg buttons do not record anything and send no audio: they tell the radio to play
+        // a message its owner recorded into the radio itself. Every model below was read out of its
+        // maker's own command document - Icom's CI-V Reference Guides and the IC-7300 Full Manual
+        // (command 28 00, "Transmits the Voice TX memory content"), Yaesu's CAT Operation Reference
+        // Manuals ("PB PLAY BACK"), Kenwood's PC Control Command Reference Guides ("PB", voice and
+        // CW message playback) and Elecraft's Programmer's References.
+        //
+        // NOT EVERY RADIO OF A MAKE. An IC-7100 records voice messages and plays them from its own
+        // keys, but its CI-V guide has no command for it, so it is not here.
+        internal static void ShowVoice(Window owner)
         {
-            Title = "Which radios can send CW";
+            new CwRadiosWindow(
+                "Which radios can play a voice message",
+                main => main.VoiceMessageForThisRadio(),
+                new[]
+                {
+                    new[] { "Icom",     "IC-705, IC-7300, IC-7300MK2, IC-7610, IC-7760, IC-9700" },
+                    new[] { "Kenwood",  "TS-590S, TS-590SG, TS-480 (three messages, not four)" },
+                    new[] { "Elecraft", "K3, K3S, K4" },
+                    new[] { "Yaesu",    "FT-891, FT-991, FT-991A, FTDX10, FTDX101D, FTDX101MP, "
+                                        + "FT-710, FTDX3000" }
+                })
+            { Owner = owner }.ShowDialog();
+        }
+
+        private readonly Func<MainWindow, string> _answerForThisRadio;
+        private readonly string[][] _makers;
+
+        private CwRadiosWindow(string title, Func<MainWindow, string> answerForThisRadio, string[][] makers)
+        {
+            _answerForThisRadio = answerForThisRadio;
+            _makers = makers;
+
+            Title = title;
             Width = 620;
             SizeToContent = SizeToContent.Height;
             ResizeMode = ResizeMode.NoResize;
@@ -2375,7 +2496,7 @@ namespace HolyLogger
                 if (main != null)
                 {
                     rigName = main.ConnectedRigName();
-                    mine = main.CwKeyingForThisRadio();
+                    mine = _answerForThisRadio(main);
                 }
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
@@ -2401,11 +2522,31 @@ namespace HolyLogger
             {
                 var answer = new TextBlock
                 {
-                    Text = mine,
                     FontSize = 16,
                     TextWrapping = TextWrapping.Wrap,
                     Margin = new Thickness(0, 0, 0, 14)
                 };
+
+                // THE ANSWER IS THE FIRST WORD, so it is the word carrying the weight. He came here
+                // to learn yes or no, and the rest is why - which he reads afterwards, or not at all.
+                //
+                // Matched on "Yes" or "No" followed by a stop or a comma, and no further: "No radio
+                // is connected" opens with the same two letters and is not an answer about a radio's
+                // commands at all, so bolding its "No" would be answering a question nobody asked.
+                var opening = System.Text.RegularExpressions.Regex.Match(mine, @"^(Yes|No)[.,]");
+                if (opening.Success)
+                {
+                    answer.Inlines.Add(new System.Windows.Documents.Run(opening.Value)
+                    {
+                        FontWeight = FontWeights.Bold
+                    });
+                    answer.Inlines.Add(new System.Windows.Documents.Run(mine.Substring(opening.Length)));
+                }
+                else
+                {
+                    answer.Inlines.Add(new System.Windows.Documents.Run(mine));
+                }
+
                 answer.SetResourceReference(TextBlock.ForegroundProperty, "TextBrush");
                 box.Children.Add(answer);
             }
@@ -2427,13 +2568,7 @@ namespace HolyLogger
             // A SHORT LIST ON PURPOSE. It is the popular radios, not every model ever made: a list that
             // tries to be complete from memory is a list with mistakes in it, and a mistake here tells
             // a man his radio cannot do something it can.
-            var makers = new[]
-            {
-                new[] { "Icom",     "IC-705, IC-7300, IC-7300MK2, IC-7610, IC-9700" },
-                new[] { "Kenwood",  "TS-480, TS-590S, TS-590SG, TS-890S, TS-990S" },
-                new[] { "Elecraft", "K3, K3S, K4, KX2, KX3" },
-                new[] { "Yaesu",    "FT-891, FT-991, FT-991A, FTDX10, FTDX101D, FTDX101MP, FT-710" }
-            };
+            var makers = _makers;
 
             var grid = new Grid();
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });

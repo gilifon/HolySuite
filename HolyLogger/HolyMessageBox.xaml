@@ -59,12 +59,16 @@
                     x:Name="ConfirmPanel"
                     Orientation="Horizontal" HorizontalAlignment="Center"
                     Visibility="Collapsed">
+            <!-- MinWidth, NOT Width. "Yes" and "No" need 110 and get it, but ShowConfirm lets a caller
+                 name its own buttons ("Add 4Z1KD to this log", "Choose a log…") and a fixed width cut
+                 those in half - the reader was offered a choice he could not read. They grow to their
+                 words now, and the window widens to hold them (see FitWidthToButtons). -->
             <Button x:Name="YesBtn" Content="Yes"
-                    Width="110" Height="38" FontSize="17"
+                    MinWidth="110" Height="38" FontSize="17" Padding="14,0"
                     IsDefault="True" Margin="0,0,10,0"
                     Click="YesBtn_Click"/>
             <Button x:Name="NoBtn" Content="No"
-                    Width="110" Height="38" FontSize="17"
+                    MinWidth="110" Height="38" FontSize="17" Padding="14,0"
                     IsCancel="True"
                     Click="NoBtn_Click"/>
         </StackPanel>

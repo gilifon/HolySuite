@@ -103,6 +103,10 @@ namespace HolyLogger
         int _lastNewCountryCount = 0;
         DateTime _lastNewCountryAlertUtc = DateTime.MinValue;   // throttles the new-country alert sound
         DateTime _lastUnconfirmedAlertUtc = DateTime.MinValue;  // throttles the unconfirmed-spot alert sound
+        // When the current cluster connection was made. Spots older than this are the BACKLOG the server
+        // replays on connect ({"initial":true} / "everything since last_time"), not news: they were on
+        // the air before the program was even started. See the alert tests below.
+        long _clusterConnectedUnix;
         StackPanel clusterOnMyFreqLegendItem = null;
         FrameworkElement clusterLegendPanel = null;
         Canvas clusterHeaderCanvas = null;
@@ -3048,6 +3052,8 @@ namespace HolyLogger
                     }
                     AppendClusterLog("Connected successfully.");
                     attempt = 0;
+                    // Everything the server sends from here that is OLDER than this moment is backlog.
+                    _clusterConnectedUnix = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
 
                     if (statusText != null)
                     {
@@ -4524,8 +4530,9 @@ namespace HolyLogger
             if (item == null || !item.IsNeededCountry) return false;
             if (!Properties.Settings.Default.ClusterNewCountrySoundOn) return false;
             if (!IsClusterModeEnabled(item.Mode)) return false;
+            if (!ClusterSpotArrivedWhileConnected(item)) return false;
 
-            // Ignore stale spots (e.g. the backlog replayed on connect) outside the "Last N min" window.
+            // Ignore stale spots outside the "Last N min" window.
             if (item.UnixTime <= 0 ||
                 item.UnixTime < DateTimeOffset.UtcNow.ToUnixTimeSeconds() - (clusterLastMinutesFilterValue * 60L))
                 return false;
@@ -4544,6 +4551,18 @@ namespace HolyLogger
             return GetEnabledClusterBands().Contains(band);
         }
 
+        // THE SOUND IS FOR SPOTS THAT ARRIVE WHILE YOU ARE THERE. On connect the program asks the server
+        // for the backlog ({"initial":true}, or everything since the last spot it saw), and those spots
+        // come down the same pipe as live ones. They are recent - that is what a backlog is - so the
+        // "Last N min" test lets them through, and the program rang the moment it started, for a spot
+        // that had been on the air before it was even launched. A spot posted before this connection was
+        // made is not news; it is history, and history is read, not announced.
+        private bool ClusterSpotArrivedWhileConnected(ClusterSpotViewItem item)
+        {
+            if (_clusterConnectedUnix <= 0) return true;   // not connected through the socket -> nothing to judge
+            return item.UnixTime >= _clusterConnectedUnix;
+        }
+
         // One ring per burst: a batch (or reconnect backlog) with several needed spots plays once.
         private void PlayNewCountrySpotAlert()
         {
@@ -4559,6 +4578,7 @@ namespace HolyLogger
             if (item == null || !item.IsUnconfirmedCountry) return false;
             if (!Properties.Settings.Default.ClusterUnconfirmedSoundOn) return false;
             if (!IsClusterModeEnabled(item.Mode)) return false;
+            if (!ClusterSpotArrivedWhileConnected(item)) return false;
 
             if (item.UnixTime <= 0 ||
                 item.UnixTime < DateTimeOffset.UtcNow.ToUnixTimeSeconds() - (clusterLastMinutesFilterValue * 60L))

@@ -49,6 +49,17 @@ namespace HolyLogger
             // The serial number the contest is up to - it counts itself, one per QSO.
             "ContestNextSerial",
 
+            // THE CW SPEED, for the same reason as the frequency above it, and reported from a real
+            // evening: 8.9.3, an operator working CW who took the keyer from 18 WPM up to 26 with the
+            // wheel as the other station's fist changed - and was asked, on closing, whether to save
+            // the settings he had changed. He had changed his sending speed. It is written to settings
+            // on every step of the wheel (CwKeyboardWindow), so one evening on CW guarantees the
+            // question, and nothing about it is a decision about how the program behaves.
+            //
+            // Still remembered, exactly as before - it lives in user.config with the window positions,
+            // so the keyer still opens at the speed he left it. It is only out of PROFILES.
+            "CwKeyerWpm",
+
             // What eQSL, QRZ and Club Log sent back when their confirmations were last downloaded.
             // Downloaded data, not settings. The LoTW ones were already excluded above; these three
             // were simply missed, and a confirmation check made the profile look changed.
@@ -249,13 +260,29 @@ namespace HolyLogger
         // compare against and nothing to warn about.
         public static bool CurrentDiffersFromActive()
         {
+            return WhatDiffersFromActive().Count > 0;
+        }
+
+        // ── AND WHAT, BY NAME ───────────────────────────────────────────────────────────────────
+        //
+        // "You changed settings since the profile was saved" is a question a man cannot answer,
+        // because it does not say what changed - so Yes and No are both a guess, and the safe guess
+        // is Yes, which quietly writes whatever moved into his profile for ever.
+        //
+        // Every one of them, not the first: a man who spent the evening on CW and also turned the
+        // cluster's Live Scale on wants to see both, or he answers about one and is surprised by the
+        // other. The whole list is walked now rather than returning at the first difference.
+        public static List<string> WhatDiffersFromActive()
+        {
+            var changed = new List<string>();
+
             string name = ActiveProfile;
-            if (string.IsNullOrWhiteSpace(name) || !Exists(name)) return false;
+            if (string.IsNullOrWhiteSpace(name) || !Exists(name)) return changed;
             try
             {
                 var saved = JsonConvert.DeserializeObject<Dictionary<string, string>>(
                     File.ReadAllText(PathFor(name)));
-                if (saved == null) return false;
+                if (saved == null) return changed;
 
                 foreach (var kv in CaptureCurrent())
                 {
@@ -265,11 +292,61 @@ namespace HolyLogger
 
                     saved.TryGetValue(kv.Key, out string old);
                     if (!string.Equals(old ?? string.Empty, kv.Value ?? string.Empty, StringComparison.Ordinal))
-                        return true;
+                    {
+                        // ── AND WHICH SETTING IT WAS ────────────────────────────────────────────
+                        //
+                        // "You changed settings" has now been asked of more than one man who had
+                        // changed nothing, and each time finding out which setting moved meant reading
+                        // the source and guessing. The answer costs one line, and the next report
+                        // carries it instead of a photograph of the question.
+                        //
+                        // THE NAME ONLY, NEVER THE VALUE. A profile holds every setting there is,
+                        // and that includes LotwWebPassword, ClublogPassword and the AI API keys.
+                        // This log is written to be MAILED to the developer, so a line printing what
+                        // a setting changed to would post somebody's password to me the first time it
+                        // was a password that had changed. The name is what identifies the culprit;
+                        // the value never was.
+                        Log.Warn("Profile \"" + name + "\" differs from what is running: "
+                                 + kv.Key + " (value not logged)");
+                        changed.Add(kv.Key);
+                    }
                 }
-                return false;
+                return changed;
             }
-            catch (Exception ex) { return Failed(ex); }
+            catch (Exception ex) { Failed(ex); return changed; }
+        }
+
+        // ── A SETTING'S NAME AS SOMETHING TO READ ───────────────────────────────────────────────
+        //
+        // "CwKeyerWpm" is what the file calls it, and it tells an operator nothing. The ones he is
+        // likely to meet are written out; anything not on the list is split at its capitals, which
+        // turns ClusterLiveScaleOn into "Cluster Live Scale On" - not English, but a great deal more
+        // than the run-together form, and honest about being the setting's own name.
+        //
+        // A list, not a rule: only a person can say that CwKeyerWpm is "CW keyer speed". It is added
+        // to when somebody meets a name that puzzles him, and no build depends on it being complete.
+        private static readonly Dictionary<string, string> PlainNames =
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            { "ClusterLiveScaleOn", "Cluster: Live Scale" },
+            { "SignBoardWindowIsOpen", "Sign Board window open" },
+            { "MatrixWindowIsOpen", "Matrix window open" },
+            { "TimerWindowIsOpen", "Timer window open" },
+            { "HasClosedClusterWindow", "Cluster window closed" },
+        };
+
+        public static string PlainName(string setting)
+        {
+            if (string.IsNullOrEmpty(setting)) return string.Empty;
+            if (PlainNames.TryGetValue(setting, out string plain)) return plain;
+
+            var sb = new System.Text.StringBuilder(setting.Length + 8);
+            for (int i = 0; i < setting.Length; i++)
+            {
+                if (i > 0 && char.IsUpper(setting[i]) && !char.IsUpper(setting[i - 1])) sb.Append(' ');
+                sb.Append(setting[i]);
+            }
+            return sb.ToString();
         }
 
         // Loads a profile into Properties.Settings and saves. The caller restarts the app so everything
