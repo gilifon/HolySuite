@@ -2095,6 +2095,10 @@ namespace HolyLogger
             // name a log id that matches no row, and the contact would be stored where nothing reads.
             if (!RequireActiveLog("log a QSO into")) return;
             if (!Validate()) return;
+            // Soft callsign guard: warn when what is in the callsign box is not shaped like a callsign,
+            // and let him log it anyway. Runs before the frequency question so the most basic thing
+            // about the contact is settled first.
+            if (!ConfirmCallsignBeforeSave()) return;
             // Optional HAM-frequency check (Options > General). Applies in Manual AND CAT: if the
             // frequency is not an amateur band the operator is warned and can save anyway, bail out, or
             // jump to the setting to switch the check off. Runs after Validate so field-presence is
@@ -3724,7 +3728,9 @@ namespace HolyLogger
 
             try
             {
-                string json = Properties.Settings.Default.CwKeyerButtonsJson;
+                // Whichever bank the keyer is showing - Run or Search and Pounce. ESM sends the set the
+                // operator is working with, which is the whole point of there being two.
+                string json = CwKeyboardWindow.ReadBankJson(CwKeyboardWindow.ShowingSpBank);
                 if (string.IsNullOrWhiteSpace(json)) return string.Empty;
 
                 var saved = Newtonsoft.Json.JsonConvert.DeserializeObject<string[]>(json);
@@ -3995,6 +4001,13 @@ namespace HolyLogger
 
             // The readout follows the radio's own knob from here on - see BuildCwSpeedReadCommand.
             cwKeyboard.AskSpeed = AskRadioCwSpeed;
+
+            // The macro editor writes the four Msg texts as well as the keyer's own twelve.
+            cwKeyboard.SetMsgText = (number, text) =>
+            {
+                SetCwMessageText(number, text);
+                UpdateMessageButtonLabel(GetMessageButton(number), number, IsCwModeActive());
+            };
 
             // Where the radio is listening, so the CQ button can tell a frequency it has already called
             // on from one it has only just arrived at - see ShouldAskQrl.
@@ -5072,7 +5085,17 @@ namespace HolyLogger
 
             if (panel.Children[0] is TextBlock labelBlock)
             {
-                labelBlock.Text = isCw ? "Txt " + messageNumber : "Msg" + messageNumber;
+                // HIS OWN NAME FOR IT WHERE HE HAS GIVEN ONE. "Txt 1" says which of the four it is and
+                // nothing about what it holds; a man who has written a name for it in the macro editor
+                // is told that instead. Empty falls back to the numbering, which is what it always was.
+                string[] labels = CwKeyboardWindow.ReadLabels(CwKeyboardWindow.MsgLabelsSetting, 4);
+                string own = messageNumber >= 1 && messageNumber <= labels.Length
+                           ? (labels[messageNumber - 1] ?? string.Empty).Trim()
+                           : string.Empty;
+
+                labelBlock.Text = own.Length > 0
+                                ? own
+                                : (isCw ? "Txt " + messageNumber : "Msg" + messageNumber);
                 labelBlock.Foreground = System.Windows.Media.Brushes.Black;
             }
 
@@ -9939,6 +9962,42 @@ namespace HolyLogger
                 }
             }
             catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        // Soft callsign guard on Add (F1). Returns true to let the save proceed, false to stop it.
+        //
+        // The two questions the Log Fixer asks of a callsign already in the log, asked before the QSO
+        // goes in: are the characters ones a callsign can hold, and is there a letter and a digit in it.
+        // A word typed into the callsign box passes the first and fails the second - that is how a name
+        // or a note left in the box gets caught before it becomes a QSO.
+        //
+        // IT ONLY WARNS. He may be in a pile-up, know the call is not right, and have no second to spare
+        // for it - so "Log it anyway" saves exactly what he typed, and the Log Fixer will put the same
+        // QSO in front of him when he has the time. Refusing the save would cost him the contact.
+        private bool ConfirmCallsignBeforeSave()
+        {
+            string call = (TB_DXCallsign.Text ?? string.Empty).Trim();
+            if (call.Length == 0) return true;                  // Validate() already refused an empty box
+
+            if (CallsignIdentity.HasOnlyCallsignCharacters(call)
+                && CallsignIdentity.HasCallsignShape(call)) return true;
+
+            // WHAT HE TYPED, IN BOLD, AND NOTHING ELSE. The message does not explain what a callsign
+            // looks like: he has been licensed for years and knows better than the program does. The
+            // one thing he needs to see is the text now sitting in the box.
+            bool logItAnyway = HolyMessageBox.ShowConfirm(
+                "**\"" + call + "\"** does not look like a callsign." + Environment.NewLine + Environment.NewLine
+                + "Log the QSO with it as typed anyway?",
+                "Check the callsign", HolyMsgType.Warning, this, 0, "Log it anyway", "Let me fix it");
+
+            // He chose to fix it: put the caret back in the callsign box with the text selected, so the
+            // right call can be typed straight over it.
+            if (!logItAnyway)
+            {
+                TB_DXCallsign.Focus();
+                TB_DXCallsign.SelectAll();
+            }
+            return logItAnyway;
         }
 
         // Soft HAM-frequency guard on Add (F1). Returns true to let the save proceed, false to stop it.

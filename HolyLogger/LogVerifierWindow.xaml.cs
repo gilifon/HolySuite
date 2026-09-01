@@ -885,10 +885,6 @@ namespace HolyLogger
         // their own count back up cannot turn into a loop.
         private bool _syncingKind;
 
-        // A callsign may legitimately hold letters, digits and strokes - anything else is damage, and the
-        // log has at least one row that arrived from an import with rubbish bytes in front of the call.
-        private static readonly Regex LegalCallChars = new Regex("^[A-Z0-9/]+$", RegexOptions.Compiled);
-
         // Maidenhead: field, square, and optionally subsquare and extended square.
         private static readonly Regex LegalLocator =
             new Regex("^[A-R]{2}[0-9]{2}([A-X]{2}([0-9]{2})?)?$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
@@ -1857,7 +1853,7 @@ namespace HolyLogger
                     continue;   // nothing else can be judged without a callsign
                 }
 
-                if (!LegalCallChars.IsMatch(call.ToUpperInvariant()))
+                if (!CallsignIdentity.HasOnlyCallsignCharacters(call))
                 {
                     // Junk at the front or the back is padding that arrived with an import and can be
                     // trimmed off with confidence. Junk in the MIDDLE is a note the operator squeezed
@@ -1868,7 +1864,7 @@ namespace HolyLogger
                     while (trimmed.Length > 0 && !IsCallChar(trimmed[trimmed.Length - 1]))
                         trimmed = trimmed.Substring(0, trimmed.Length - 1);
 
-                    if (trimmed.Length >= 3 && LegalCallChars.IsMatch(trimmed))
+                    if (trimmed.Length >= 3 && CallsignIdentity.HasOnlyCallsignCharacters(trimmed))
                     {
                         Finding f = New(q, "Damaged callsign", call, trimmed, "illegal characters");
                         f.Field = "DXCall";

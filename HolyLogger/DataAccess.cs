@@ -6073,6 +6073,36 @@ Environment.NewLine +
             return false;
         }
 
+        // A callsign may legitimately hold letters, digits and strokes - anything else is damage:
+        // brackets, spaces, or the rubbish bytes an import sometimes puts in front of a call. This is
+        // the Log Fixer's rule, and it lives here so the Fixer and the entry form ask the same question.
+        static readonly System.Text.RegularExpressions.Regex CallChars =
+            new System.Text.RegularExpressions.Regex("^[A-Z0-9/]+$",
+                System.Text.RegularExpressions.RegexOptions.Compiled);
+
+        public static bool HasOnlyCallsignCharacters(string s)
+        {
+            string t = (s ?? string.Empty).Trim().ToUpperInvariant();
+            return t.Length > 0 && CallChars.IsMatch(t);
+        }
+
+        // The weakest thing that is true of EVERY amateur callsign: it has at least one letter and at
+        // least one digit. Deliberately not FullCall, which is the shape of an ORDINARY callsign and
+        // rejects the long special-event ones - LZ1771SDG, OE2008OHO, DL40RRDXA are all real, and
+        // warning about them would be the program crying wolf at every one of them. A word typed into
+        // the callsign box has no digit in it, and that is what this catches.
+        public static bool HasCallsignShape(string s)
+        {
+            string t = (s ?? string.Empty).Trim().ToUpperInvariant();
+            bool letter = false, digit = false;
+            foreach (char c in t)
+            {
+                if (c >= 'A' && c <= 'Z') letter = true;
+                else if (c >= '0' && c <= '9') digit = true;
+            }
+            return letter && digit;
+        }
+
         // Splits a callsign into its prefix and suffix halves, cutting at the LAST digit of the base
         // callsign - the digit belongs to the prefix, being part of what identifies the country/area:
         //
