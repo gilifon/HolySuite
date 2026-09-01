@@ -473,7 +473,7 @@ namespace HolyLogger
             frame.SetResourceReference(Border.BorderBrushProperty, "TextBrush");
 
             Content = frame;
-            Loaded += (s, e) => { _box.Focus(); LockMinimumHeight(); };
+            Loaded += (s, e) => { _box.Focus(); LockMinimumHeight(); LockMinimumWidth(); };
 
             _pump = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(50) };
             _pump.Tick += Pump_Tick;
@@ -564,6 +564,47 @@ namespace HolyLogger
             }
         }
 
+        // -- TYPE, OR WRITE IT FIRST AND SEND IT ON ENTER -----------------------------------------
+        //
+        // The keyer has always sent each character the moment it was typed, which is what a keyboard on
+        // the air is for. But a long message cannot be written that way: the first half is on the air
+        // before the second is thought of, and a mistake has gone out before the finger has left the
+        // key. So the operator can hold the line back instead - write it, fix it, put macros into it,
+        // and send the lot with Enter.
+        //
+        // ONE INDEX DOES IT. Nothing past _releasedUpTo is ever handed to the radio, and Enter moves it
+        // to the end of what he has written. Typing straight onto the air ignores it altogether.
+        // Everything else in this window - the chunking, the colouring, Escape, the record below - works
+        // the same in both, because once text has been handed over the two are indistinguishable.
+        private int _releasedUpTo;
+
+        // A button pressed while holding puts its text in the line rather than sending it, so whatever
+        // that text asked for - log the QSO, clear the form - has to wait for the line to go out too.
+        private bool _heldLogQso;
+        private bool _heldWipeForm;
+
+        private bool HoldForEnter
+        {
+            get
+            {
+                try { return Properties.Settings.Default.CwKeyerHoldForEnter; }
+                catch (Exception swallowed) { Log.Swallow(swallowed); return false; }
+            }
+        }
+
+        private void ReleaseTypedText()
+        {
+            _releasedUpTo = (_box.Text ?? string.Empty).Length;
+
+            bool log = _heldLogQso, wipe = _heldWipeForm;
+            _heldLogQso = false;
+            _heldWipeForm = false;
+
+            // Log wins over wipe - the same rule as a button pressed straight onto the air.
+            if (log && _logQso != null) _logQso();
+            else if (wipe && _wipeForm != null) _wipeForm();
+        }
+
         private void Box_PreviewKeyDown(object sender, KeyEventArgs e)
         {
             // Ctrl+K again puts the window away - the key that opened it. The X in the corner does the
@@ -584,14 +625,20 @@ namespace HolyLogger
 
             if (e.Key == Key.Enter)
             {
-                // Swallowed on purpose. There is nothing for it to do - what is typed is already on
-                // its way out - and it must NOT close the window: the operator keeps typing.
+                // HOLDING FOR ENTER, THIS IS THE MOMENT. Everything written so far is released to the
+                // radio; anything typed after it waits for the next Enter. Typing straight onto the air
+                // there is nothing for the key to do - what is typed is already on its way out - and in
+                // neither case may it close the window: the operator keeps typing.
+                if (HoldForEnter) ReleaseTypedText();
+
                 e.Handled = true;
                 return;
             }
 
             // WHAT HAS GONE IS GONE. The front of this row is in the radio's hands even though it is
             // still on the screen, so Backspace and Delete are not allowed to reach into it.
+            // Holding for Enter this reaches almost nothing, which is the point: none of the line has
+            // been handed over yet, so all of it can still be corrected.
             if ((e.Key == Key.Back || e.Key == Key.Delete) && _box.SelectionStart < _handedUpTo)
             {
                 e.Handled = true;
@@ -613,8 +660,12 @@ namespace HolyLogger
 
             string text = _box.Text ?? string.Empty;
 
-            // Everything in the row is already in the radio's hands; there is nothing new to hand it.
-            if (text.Length <= _handedUpTo)
+            // HOW MUCH OF THE ROW MAY GO OUT. Typing straight onto the air, it is all of it. Holding
+            // for Enter, it is only what Enter has released - the rest is still being written.
+            int released = HoldForEnter ? Math.Min(_releasedUpTo, text.Length) : text.Length;
+
+            // Everything released is already in the radio's hands; there is nothing new to hand it.
+            if (released <= _handedUpTo)
             {
                 if (text.Length == 0) FinishLineIfSilent();
                 return;
@@ -626,7 +677,7 @@ namespace HolyLogger
             // A radio with no buffer gets nothing until it has stopped sending the last lot.
             if (_waitForTxIdle && _isTransmitting != null && _isTransmitting()) return;
 
-            int waiting = text.Length - _handedUpTo;
+            int waiting = released - _handedUpTo;
             int take = Math.Min(_maxChunk, waiting);
 
             // CUT AT A SPACE, not at the twelfth character. If the radio ever runs dry at a chunk
@@ -789,6 +840,7 @@ namespace HolyLogger
                 _box.Text = text.Substring(drop);
                 _box.CaretIndex = Math.Max(0, caret - drop);
                 _handedUpTo = Math.Max(0, _handedUpTo - drop);
+                _releasedUpTo = Math.Max(0, _releasedUpTo - drop);
 
                 // The units of what just left go with it, or the sum would be measuring a row that is
                 // no longer there and everything still on screen would come up already keyed.
@@ -836,6 +888,7 @@ namespace HolyLogger
                 _box.Text = text.Substring(drop);
                 _box.CaretIndex = Math.Max(0, caret - drop);
                 _handedUpTo = Math.Max(0, _handedUpTo - drop);
+                _releasedUpTo = Math.Max(0, _releasedUpTo - drop);
                 _unitsKeyed = Math.Max(0, _unitsKeyed - CwSendMonitorWindow.ComputeTotalUnits(text.Substring(0, drop)));
 
                 if (sent.Value) _openLine += " ";
@@ -942,6 +995,7 @@ namespace HolyLogger
 
                 _box.Text = text.Substring(drop);
                 _handedUpTo = Math.Max(0, _handedUpTo - drop);
+                _releasedUpTo = Math.Max(0, _releasedUpTo - drop);
 
                 // The units of what just left go with it, or the sum would be measuring a row that is
                 // no longer there and everything still on screen would come up already keyed.
@@ -1281,6 +1335,7 @@ namespace HolyLogger
             _unitsThisSend = 0;
             _inFlight.Clear();
             _handedUpTo = 0;
+            _releasedUpTo = 0;
             _unitsKeyed = 0;
             _box.Text = string.Empty;
         }
@@ -1326,6 +1381,32 @@ namespace HolyLogger
         // buttons entirely - the window still had them, there was simply nowhere for them to be drawn.
         // The floor is whatever the rows currently need, so it rises and falls with the history row
         // count set at the gear instead of being a number written down once.
+        // AS NARROW AS THE BAR, AND NO NARROWER. The width is the operator's to drag, but the bar now
+        // carries the name, the three ESM choices, the two send choices, the speed, the gear and the X -
+        // and dragged past what those need they start losing their words. It is MEASURED rather than
+        // written down: another item on the bar one day, or a wider system font, moves this by itself.
+        private Border _titleBar;
+
+        private void LockMinimumWidth()
+        {
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                try
+                {
+                    if (_titleBar == null) return;
+
+                    _titleBar.Measure(new Size(double.PositiveInfinity, _titleBar.Height));
+                    double wanted = _titleBar.DesiredSize.Width;
+                    if (wanted <= 0) return;
+
+                    // The window's frame is a few pixels wider than what it holds.
+                    MinWidth = wanted + 16;
+                    if (Width < MinWidth) Width = MinWidth;
+                }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
+            }), System.Windows.Threading.DispatcherPriority.Loaded);
+        }
+
         private void LockMinimumHeight()
         {
             Dispatcher.BeginInvoke(new Action(() =>
@@ -1603,6 +1684,15 @@ namespace HolyLogger
             _box.CaretIndex = _box.Text.Length;
             _box.Focus();
 
+            // HOLDING FOR ENTER, THE BUTTON WRITES RATHER THAN SENDS. That is what makes a message out
+            // of several macros possible. What its text asked for waits with it - see ReleaseTypedText.
+            if (HoldForEnter)
+            {
+                _heldLogQso |= logsQso;
+                _heldWipeForm |= wipesForm;
+                return;
+            }
+
             // AFTER the text is on its way, and without waiting for the radio to finish keying it -
             // the whole point of putting {LOG} on the TU button is that the next callsign can be
             // typed while the TU is still going out.
@@ -1717,6 +1807,231 @@ namespace HolyLogger
             SendButton(index);
         }
 
+        // -- OFF / RUN / S&P, ON THE BAR -----------------------------------------------------------
+        //
+        // It was three radio buttons behind the gear, which is three clicks and a dialog away - and a
+        // man switches between running and searching many times in an evening, mid-QSO, with one hand
+        // on the paddle. It belongs where he can see which of the three he is in and change it in one
+        // press, and that is the bar he is already looking at for the speed.
+        //
+        // THE LIT ONE IS THE ONE HE IS IN, in the same green that lights the button Enter will press,
+        // so the bar and the buttons under it say the same thing in the same colour.
+        private Button _esmOffBtn;
+        private Button _esmRunBtn;
+        private Button _esmSpBtn;
+
+        private UIElement BuildEsmSelector()
+        {
+            _esmOffBtn = EsmChoiceButton("Off", "Enter does what it always did.");
+            _esmRunBtn = EsmChoiceButton("Run",
+                "You are calling CQ. Enter sends button 1 (CQ); with a callsign in the form, button 2 "
+                + "(his call and your exchange); then button 3 (TU), which logs the QSO.");
+            _esmSpBtn = EsmChoiceButton("S&P",
+                "You are answering others. With his callsign typed in, Enter sends button 4 (your own "
+                + "callsign), then button 2 (your exchange), then button 3 (TU), which logs the QSO.");
+
+            _esmOffBtn.Click += (s2, e2) => SetEsm(false, false);
+            _esmRunBtn.Click += (s2, e2) => SetEsm(true, false);
+            _esmSpBtn.Click += (s2, e2) => SetEsm(true, true);
+
+            var panel = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            panel.Children.Add(_esmOffBtn);
+            panel.Children.Add(_esmRunBtn);
+            panel.Children.Add(_esmSpBtn);
+
+            RefreshEsmChoice();
+            return GroupFrame(panel);
+        }
+
+        // TWO QUESTIONS, TWO FRAMES. Five words in a row on one bar read as five separate switches;
+        // rounded off in pairs they read as what they are - what ENTER does, and WHEN the text goes out.
+        // A thin line of the bar's own colour darkened, so it groups without shouting.
+        private static UIElement GroupFrame(UIElement inner)
+        {
+            var frame = new Border
+            {
+                CornerRadius = new CornerRadius(5),
+                BorderThickness = new Thickness(1),
+                BorderBrush = GroupEdgeBrush,
+                Padding = new Thickness(3, 1, 3, 1),
+                Margin = new Thickness(0, 0, 12, 0),
+                VerticalAlignment = VerticalAlignment.Center,
+                Child = inner
+            };
+            System.Windows.Shell.WindowChrome.SetIsHitTestVisibleInChrome(frame, true);
+
+            return frame;
+        }
+
+        private static readonly Brush GroupEdgeBrush = MakeGroupEdgeBrush();
+
+        private static Brush MakeGroupEdgeBrush()
+        {
+            var brush = new SolidColorBrush(Color.FromRgb(0x06, 0x2A, 0x2C));
+            brush.Freeze();
+            return brush;
+        }
+
+        private Button EsmChoiceButton(string text, string tip)
+        {
+            return new Button
+            {
+                Content = text,
+                FontSize = 16,
+                FontWeight = FontWeights.Bold,
+                Foreground = Brushes.Black,
+                BorderThickness = new Thickness(0),
+                Padding = new Thickness(7, 0, 7, 0),
+                Margin = new Thickness(2, 0, 0, 0),
+                Height = 24,
+                Cursor = System.Windows.Input.Cursors.Hand,
+                ToolTip = tip
+            };
+        }
+
+        // Written straight into the settings. The main window watches these two and moves its own green
+        // hint the moment they change, so there is nothing to tell it.
+        private void SetEsm(bool on, bool searchAndPounce)
+        {
+            try
+            {
+                Properties.Settings.Default.EsmEnabled = on;
+                Properties.Settings.Default.EsmSearchAndPounce = searchAndPounce;
+                Properties.Settings.Default.Save();
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+            // RUN AND S&P ARE TYPE. They are contest working: the macros do the talking, Enter walks
+            // the QSO from the callsign box, and there is no long sentence to compose. Holding the line
+            // back for an Enter that belongs to the other window would only be a trap, so choosing
+            // either of them puts the pair back on Type - and sends anything already written.
+            if (on && HoldForEnter) SetHoldForEnter(false);
+
+            RefreshEsmChoice();
+            _box.Focus();
+        }
+
+        // Also called from the main window: Ctrl+M switches ESM off and on from over there, and this bar
+        // must not go on showing the one he has just left.
+        internal void RefreshEsmChoice()
+        {
+            if (_esmOffBtn == null) return;
+
+            bool on = false, sp = false;
+            try
+            {
+                on = Properties.Settings.Default.EsmEnabled;
+                sp = Properties.Settings.Default.EsmSearchAndPounce;
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+            PaintEsmChoice(_esmOffBtn, !on);
+            PaintEsmChoice(_esmRunBtn, on && !sp);
+            PaintEsmChoice(_esmSpBtn, on && sp);
+
+            // Ctrl+M reaches here too, so the pair beside it has to be told as well.
+            RefreshSendMode();
+        }
+
+        // THE YELLOW THE FREQUENCY WEARS. EditFieldBg is the token behind that mark, and its light-scheme
+        // value is this - taken as a fixed colour rather than through the theme because this bar is one
+        // colour in every scheme and its text is always black: the dark schemes turn that token into a
+        // brown nobody could read black on.
+        private static readonly Brush ChosenBrush = MakeChosenBrush();
+
+        private static Brush MakeChosenBrush()
+        {
+            var brush = new SolidColorBrush(Color.FromRgb(0xFF, 0xFF, 0x00));
+            brush.Freeze();
+            return brush;
+        }
+
+        private static void PaintEsmChoice(Button button, bool chosen)
+        {
+            if (button == null) return;
+
+            if (chosen) button.Background = ChosenBrush;
+            else button.Background = Brushes.Transparent;
+        }
+
+        // -- TYPE / ENTER, ON THE BAR -------------------------------------------------------------
+        //
+        // Beside the ESM trio, and read the same way: the lit one is the one he is in. The two pairs
+        // answer two different questions and both belong in front of him - what ENTER does, and WHEN
+        // the text goes out.
+        private Button _sendNowBtn;
+        private Button _sendOnEnterBtn;
+
+        private UIElement BuildSendModeSelector()
+        {
+            _sendNowBtn = EsmChoiceButton("Type",
+                "Each character goes to the radio the moment you type it.");
+            _sendOnEnterBtn = EsmChoiceButton("Enter",
+                "Nothing goes out while you write. Type it, put macros in it, correct it - and the whole "
+                + "line goes when you press Enter.");
+
+            _sendNowBtn.Click += (s2, e2) => SetHoldForEnter(false);
+            _sendOnEnterBtn.Click += (s2, e2) => SetHoldForEnter(true);
+
+            var panel = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            panel.Children.Add(_sendNowBtn);
+            panel.Children.Add(_sendOnEnterBtn);
+
+            RefreshSendMode();
+            return GroupFrame(panel);
+        }
+
+        private void SetHoldForEnter(bool hold)
+        {
+            try
+            {
+                Properties.Settings.Default.CwKeyerHoldForEnter = hold;
+                Properties.Settings.Default.Save();
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+            // TURNING IT OFF SENDS WHAT IS ALREADY WRITTEN. Anything else would leave a line sitting
+            // there that nothing will ever release - Enter no longer does, and he would have to clear it
+            // by hand and wonder why.
+            if (!hold) ReleaseTypedText();
+
+            RefreshSendMode();
+            _box.Focus();
+        }
+
+        private void RefreshSendMode()
+        {
+            if (_sendNowBtn == null) return;
+
+            bool hold = HoldForEnter;
+            PaintEsmChoice(_sendNowBtn, !hold);
+            PaintEsmChoice(_sendOnEnterBtn, hold);
+
+            // ENTER IS NOT ON OFFER WHILE ESM IS. In Run or S&P the Enter key belongs to the QSO - it
+            // walks the contact from the callsign box - so a mode here that waits for Enter is a mode
+            // that would never be released. Switching ESM on already puts this pair back on Type; this
+            // stops him choosing it the other way round and wondering why nothing goes out.
+            bool esmOn = false;
+            try { esmOn = Properties.Settings.Default.EsmEnabled; }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+            _sendOnEnterBtn.IsEnabled = !esmOn;
+            _sendOnEnterBtn.Opacity = esmOn ? 0.45 : 1.0;
+            _sendOnEnterBtn.ToolTip = esmOn
+                ? "Not while Run or S&P is on: there the Enter key walks the QSO from the callsign box. "
+                  + "Switch to Off to write a message and send it with Enter."
+                : "Nothing goes out while you write. Type it, put macros in it, correct it - and the "
+                  + "whole line goes when you press Enter.";
+        }
+
         // Our own caption: the title, then the gear, then the X. The gear is the way in to anything
         // this window ever needs asking about - today the history rows, tomorrow whatever else.
         private Border BuildTitleBar()
@@ -1725,6 +2040,11 @@ namespace HolyLogger
             {
                 Content = "",
                 FontSize = 16,
+
+                // NARROWER THAN THE SHARED CAPTION WIDTH. That style is 42 wide for the main window's
+                // own buttons, and 42 around a small gear glyph left a hole between it and the X.
+                // Overridden here rather than in the style, which the main window's caption also wears.
+                Width = 28,
                 Style = Application.Current.Resources["CaptionButtonStyle"] as Style,
                 Foreground = Brushes.Black,
                 ToolTip = "CW keyer settings"
@@ -1735,6 +2055,9 @@ namespace HolyLogger
             var closeBtn = new Button
             {
                 Content = "",
+                // Narrowed like the gear beside it: the shared 42 centres a small glyph, and the space
+                // it leaves on the side facing the gear reads as a gap between the two.
+                Width = 32,
                 Style = Application.Current.Resources["CaptionCloseButtonStyle"] as Style,
                 Foreground = Brushes.Black,
                 ToolTip = "Close"
@@ -1744,6 +2067,8 @@ namespace HolyLogger
 
             var right = new StackPanel { Orientation = Orientation.Horizontal };
             DockPanel.SetDock(right, Dock.Right);
+            right.Children.Add(BuildEsmSelector());
+            right.Children.Add(BuildSendModeSelector());
             right.Children.Add(BuildSpeedReadout());
             right.Children.Add(gearBtn);
             right.Children.Add(closeBtn);
@@ -1754,10 +2079,18 @@ namespace HolyLogger
                 FontSize = 16,
                 FontWeight = FontWeights.Bold,
                 VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(10, 0, 0, 0)
+
+                // Close to the key beside it: the icon and the name are one label, and the bar has
+                // four more things on it that want the room.
+                Margin = new Thickness(5, 0, 0, 0),
+
+                // EVERY THING ON THIS BAR SAYS WHAT IT IS. There are five of them now and none is more
+                // than a word, so the bar has to answer for itself when the pointer rests on it.
+                ToolTip = "Type here and the radio sends it. Ctrl+K closes this window."
             };
             _titleText.Foreground = Brushes.Black;
             var keyIcon = BuildStraightKeyIcon();
+            ToolTipService.SetToolTip(keyIcon, "The CW keyer.");
             DockPanel.SetDock(keyIcon, Dock.Left);
             DockPanel.SetDock(_titleText, Dock.Left);
             RefreshTitle();
@@ -1769,6 +2102,7 @@ namespace HolyLogger
 
             // The pale cyan of the CW keycaps, so the window is plainly part of the same set.
             var border = new Border { Height = 32, Child = bar, Background = CwKeyBrush };
+            _titleBar = border;
             return border;
         }
 
@@ -1847,76 +2181,6 @@ namespace HolyLogger
             secondsRow.Children.Add(secondsBox);
             secondsRow.Children.Add(secondsUnit);
 
-            // ── ESM ────────────────────────────────────────────────────────────────────────
-            //
-            // It lived in the status bar of the main window and has been moved in here: the keyer is
-            // where a man is when he cares about it, and the status bar was carrying it in front of
-            // everybody else for ever. Written straight into the settings on OK, like the two above;
-            // the main window follows them through Settings.PropertyChanged, so nothing has to be
-            // told about this window at all.
-            var esmOff = new RadioButton
-            {
-                Content = "Off",
-                FontSize = 16,
-                GroupName = "EsmMode",
-                VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(0, 0, 16, 0),
-                IsChecked = !Properties.Settings.Default.EsmEnabled,
-                ToolTip = "Enter does what it always did."
-            };
-            var esmRun = new RadioButton
-            {
-                Content = "Run",
-                FontSize = 16,
-                GroupName = "EsmMode",
-                VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(0, 0, 16, 0),
-                IsChecked = Properties.Settings.Default.EsmEnabled && !Properties.Settings.Default.EsmSearchAndPounce,
-                ToolTip = "You are calling CQ. Enter sends Txt 1 (CQ); with a callsign in the form, Txt 2 (his call and your exchange); then Txt 3 (TU), which logs the QSO."
-            };
-            var esmSp = new RadioButton
-            {
-                Content = "S&P",
-                FontSize = 16,
-                GroupName = "EsmMode",
-                VerticalAlignment = VerticalAlignment.Center,
-                IsChecked = Properties.Settings.Default.EsmEnabled && Properties.Settings.Default.EsmSearchAndPounce,
-                ToolTip = "You are answering others. With his callsign typed in, Enter sends Txt 4 (your callsign), then Txt 2 (your exchange), then Txt 3 (TU), which logs the QSO."
-            };
-            esmOff.SetResourceReference(ForegroundProperty, "TextBrush");
-            esmRun.SetResourceReference(ForegroundProperty, "TextBrush");
-            esmSp.SetResourceReference(ForegroundProperty, "TextBrush");
-
-            var esmLabel = new TextBlock
-            {
-                Text = "Enter Sends Message (Ctrl+M):",
-                FontSize = 16,
-                VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(0, 0, 14, 0)
-            };
-            esmLabel.SetResourceReference(TextBlock.ForegroundProperty, "TextBrush");
-
-            var esmRow = new DockPanel { LastChildFill = false, Margin = new Thickness(0, 18, 0, 0) };
-            DockPanel.SetDock(esmLabel, Dock.Left);
-            DockPanel.SetDock(esmOff, Dock.Left);
-            DockPanel.SetDock(esmRun, Dock.Left);
-            DockPanel.SetDock(esmSp, Dock.Left);
-            esmRow.Children.Add(esmLabel);
-            esmRow.Children.Add(esmOff);
-            esmRow.Children.Add(esmRun);
-            esmRow.Children.Add(esmSp);
-
-            var esmHint = new TextBlock
-            {
-                Text = "One key walks the whole QSO: Run is you calling CQ, S&P is you answering others. "
-                     + "Which text goes out is decided by how far the contact has got, and the button Enter "
-                     + "will press is lit green.",
-                FontSize = 16,
-                TextWrapping = TextWrapping.Wrap,
-                Margin = new Thickness(0, 10, 0, 0)
-            };
-            esmHint.SetResourceReference(TextBlock.ForegroundProperty, "MutedTextBrush");
-
             var okBtn = new Button { Content = "OK", FontSize = 16, Width = 90, Height = 32, IsDefault = true };
             var cancelBtn = new Button { Content = "Cancel", FontSize = 16, Width = 90, Height = 32, IsCancel = true, Margin = new Thickness(10, 0, 0, 0) };
 
@@ -1932,8 +2196,6 @@ namespace HolyLogger
             var stack = new StackPanel { Margin = new Thickness(16) };
             stack.Children.Add(secondsRow);
             stack.Children.Add(secondsHint);
-            stack.Children.Add(esmRow);
-            stack.Children.Add(esmHint);
             stack.Children.Add(row);
             stack.Children.Add(BuildHelp());
             stack.Children.Add(BuildStandardTextsButton());
@@ -1986,12 +2248,6 @@ namespace HolyLogger
                                                "CW Keyer Settings", dialog);
                     return;
                 }
-
-                // The main window is watching these two, and puts its own green hint right the moment
-                // they change - so switching ESM here needs nothing said to anybody.
-                bool esmSearchAndPounce = esmSp.IsChecked == true;
-                Properties.Settings.Default.EsmEnabled = esmRun.IsChecked == true || esmSearchAndPounce;
-                Properties.Settings.Default.EsmSearchAndPounce = esmSearchAndPounce;
 
                 Properties.Settings.Default.CwKeyboardHistoryRows = rows;
                 Properties.Settings.Default.CwKeyboardBreakSeconds = seconds;
@@ -2107,8 +2363,11 @@ namespace HolyLogger
         {
             var holder = new Border
             {
-                Margin = new Thickness(0, 0, 10, 0),
-                Padding = new Thickness(6, 0, 6, 0),
+                // TIGHT AGAINST THE GEAR. The padding and margin on this side were sized for the
+                // arrows that used to sit after the number, and with them gone the number was left
+                // stranded in the middle of a gap.
+                Margin = new Thickness(0, 0, 2, 0),
+                Padding = new Thickness(6, 0, 0, 0),
                 Background = Brushes.Transparent,
                 VerticalAlignment = VerticalAlignment.Center
             };
@@ -2141,7 +2400,10 @@ namespace HolyLogger
                 FontWeight = FontWeights.Bold,
                 Foreground = Brushes.Black,
                 VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(6, 0, 0, 0)
+
+                // Close to the word it belongs to: "WPM 26" reads as one thing, not as a caption and
+                // a number that happen to be near each other.
+                Margin = new Thickness(3, 0, 0, 0)
             };
             RefreshSpeedText();
 
@@ -2248,6 +2510,7 @@ namespace HolyLogger
             {
                 new[] { "F1 to F12",    "Press the twelve buttons, 1 to 12, while this window is open - even when you are typing in the main window." },
                 new[] { "Ctrl+K",       "Closes this window. On the main window it opens it." },
+                new[] { "Ctrl+M",       "Turns Enter Sends Message off and on - the Off / Run / S&P choice on this window's bar. It comes back on the side it was last used on." },
                 new[] { "Escape",       "Stops the radio now and drops whatever has not gone out. What has already gone stays in the record." },
                 new[] { "Backspace",    "Takes back only what has not gone out yet." },
                 // "Mouse click" alone left the operator asking "click on what?" - the row named no

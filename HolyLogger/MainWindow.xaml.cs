@@ -3781,7 +3781,13 @@ namespace HolyLogger
             try
             {
                 UpdateVoiceMessageButtonHighlight();
-                if (cwKeyboard != null) cwKeyboard.ShowEsmNext(EsmNextMessage());
+                if (cwKeyboard == null) return;
+
+                cwKeyboard.ShowEsmNext(EsmNextMessage());
+
+                // Ctrl+M switches ESM from over here; the Off / Run / S&P choice on the keyer's own bar
+                // must not go on showing the one he has just left.
+                cwKeyboard.RefreshEsmChoice();
             }
             catch (System.Exception swallowed) { Log.Swallow(swallowed); }
         }

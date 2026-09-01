@@ -3040,6 +3040,18 @@ namespace HolyLogger.Properties {
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool CwKeyerHoldForEnter {
+            get {
+                return ((bool)(this["CwKeyerHoldForEnter"]));
+            }
+            set {
+                this["CwKeyerHoldForEnter"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("")]
         public string CwKeyerButtonsJson {
             get {

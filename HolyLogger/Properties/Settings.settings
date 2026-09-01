@@ -761,6 +761,9 @@
     <Setting Name="CwKeyerWpm" Type="System.Int32" Scope="User">
       <Value Profile="(Default)">20</Value>
     </Setting>
+    <Setting Name="CwKeyerHoldForEnter" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">False</Value>
+    </Setting>
     <Setting Name="CwKeyerButtonsJson" Type="System.String" Scope="User">
       <Value Profile="(Default)" />
     </Setting>
