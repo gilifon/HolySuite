@@ -433,7 +433,12 @@ namespace HolyLogger
                 // Real lines, so one transmission sits on one row and the rest are under it. Without
                 // AcceptsReturn a read-only box shows the whole record run together on a single line.
                 AcceptsReturn = true,
-                TextWrapping = TextWrapping.NoWrap,
+
+                // AND IT WRAPS. A transmission can now be as long as the operator keeps feeding it, and
+                // a record that does not wrap simply hides everything past the right-hand edge. Wrapped,
+                // a long one uses two or three of the rows set at the gear and every character of it can
+                // be read. WPF does the measuring, so it fits the width whatever the window is dragged to.
+                TextWrapping = TextWrapping.Wrap,
                 VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
                 HorizontalScrollBarVisibility = ScrollBarVisibility.Hidden,
                 Margin = new Thickness(10, 6, 10, 10),
@@ -604,6 +609,7 @@ namespace HolyLogger
             RefreshButtonAvailability();
             RepaintSendLine();
             DropWhatTheRadioHasKeyed();
+            TrimRowToWidth();
 
             string text = _box.Text ?? string.Empty;
 
@@ -791,6 +797,53 @@ namespace HolyLogger
                 if (sent.Value) _openLine += " ";
                 _openLine += chunk;
                 moved = true;
+            }
+
+            if (moved) RenderHistory();
+        }
+
+        // -- THE ROW NEVER RUNS OFF THE SIDE ------------------------------------------------------
+        //
+        // A row can now hold as many presses as the operator makes, and a single line that grows past
+        // its box scrolls: what is being keyed slides left out of sight and he is left reading the
+        // middle of his own transmission. So when it no longer fits, the row hands its OLDEST piece
+        // down to the record and goes on doing that until it fits again. The text moves DOWNWARDS
+        // instead of sideways, and what stays in front of him is what is going out now and what is
+        // still to come.
+        //
+        // ONLY PIECES THE RADIO HAS FINISHED WITH. Nothing that has not been keyed ever leaves the row
+        // - that is the whole rule this window works by - so a burst of presses that fills the row with
+        // text still waiting to go out will scroll until the front of it has been sent. There is no way
+        // round that: the alternative is throwing away something the operator asked to send.
+        private void TrimRowToWidth()
+        {
+            if (_box == null || _box.ViewportWidth <= 0) return;
+
+            bool moved = false;
+
+            while (_box.ExtentWidth > _box.ViewportWidth && _inFlight.Count > 0)
+            {
+                string text = _box.Text ?? string.Empty;
+                var sent = _inFlight.Peek();
+
+                int drop = Math.Min(sent.Key.Length + (sent.Value ? 1 : 0), text.Length);
+                if (drop <= 0) break;
+                if (KeyedSoFar(text) < drop) break;   // still being sent: it stays where he can see it
+
+                _inFlight.Dequeue();
+
+                int caret = _box.CaretIndex;
+                _box.Text = text.Substring(drop);
+                _box.CaretIndex = Math.Max(0, caret - drop);
+                _handedUpTo = Math.Max(0, _handedUpTo - drop);
+                _unitsKeyed = Math.Max(0, _unitsKeyed - CwSendMonitorWindow.ComputeTotalUnits(text.Substring(0, drop)));
+
+                if (sent.Value) _openLine += " ";
+                _openLine += sent.Key;
+                moved = true;
+
+                // The box has to be re-measured before the loop asks again whether it still overflows.
+                _box.UpdateLayout();
             }
 
             if (moved) RenderHistory();
