@@ -106,6 +106,91 @@ namespace HolyLogger
         internal Action AskSpeed { set { _askSpeed = value; } }
         private Action _askSpeed;
 
+        // Where the radio is listening, in Hz. Null on a radio that cannot be asked, and then the QRL
+        // rule below simply never applies.
+        internal Func<double> RadioFrequencyHz { set { _rxFrequencyHz = value; } }
+        private Func<double> _rxFrequencyHz;
+
+        // -- ASK BEFORE YOU CLAIM A FREQUENCY -----------------------------------------------------
+        //
+        // A CQ on top of a QSO already in progress is the rudest thing a man can do on a band, and it
+        // is almost always an accident: he tunes away, comes back to something that looks empty, and
+        // presses the CQ button out of habit. So the first press after the radio has MOVED does not
+        // call CQ - it asks QRL?, which is the question every operator knows the answer to.
+        //
+        // MOVED means more than this far from where button 1 last went out. A hundred and fifty hertz
+        // is inside one CW signal's own width, so nudging the dial to zero-beat somebody is not a move;
+        // anything wider is a different frequency and wants asking about.
+        //
+        // THE SECOND PRESS CALLS CQ. Asking moves the mark to where he asked, so once he has listened
+        // and pressed again the button does what it says. Nothing is remembered between sessions - a
+        // keyer that has just opened has not asked anybody anything.
+        // AND TIME COUNTS TOO, not only the dial. A frequency is only yours while you are using it: go
+        // away for a quarter of an hour and somebody else has every right to have taken it, and a CQ
+        // over the top of them is the same rudeness whether the dial moved or not. So a CQ button that
+        // has not been used for longer than the operator's own number asks QRL? as well. His number,
+        // because how long is too long is a matter of how busy the band is; nought never asks on time.
+        private const double QsyGuardHz = 150.0;
+
+        // WHAT IT ASKS WITH IS HIS. QRL? is the question, and it is what this arrives set to - but a
+        // busy operator on a crowded band sends a bare ? and everybody knows what he means, so the
+        // words are not ours to fix. Empty falls back to QRL? rather than asking with nothing at all.
+        private const string QrlDefaultText = "QRL?";
+
+        private static string QrlText()
+        {
+            try
+            {
+                string text = Properties.Settings.Default.CwKeyerQrlText;
+                return string.IsNullOrWhiteSpace(text) ? QrlDefaultText : text.Trim();
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); return QrlDefaultText; }
+        }
+        private double _cqFreqHz;
+        private DateTime _cqSentUtc = DateTime.MinValue;
+
+        private static int QrlMinutes()
+        {
+            try
+            {
+                int minutes = Properties.Settings.Default.CwKeyerQrlMinutes;
+                return minutes < 0 ? 0 : minutes;
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); return 0; }
+        }
+
+        private bool ShouldAskQrl()
+        {
+            if (_rxFrequencyHz == null) return false;
+
+            double now;
+            try { now = _rxFrequencyHz(); }
+            catch (Exception swallowed) { Log.Swallow(swallowed); return false; }
+
+            if (now <= 0) return false;
+
+            // Never called from here at all.
+            if (_cqFreqHz <= 0 || _cqSentUtc == DateTime.MinValue) return true;
+
+            // The dial has moved off it.
+            if (Math.Abs(now - _cqFreqHz) > QsyGuardHz) return true;
+
+            // Or it has been quiet on it for longer than he allows.
+            int minutes = QrlMinutes();
+
+            return minutes > 0 && DateTime.UtcNow - _cqSentUtc > TimeSpan.FromMinutes(minutes);
+        }
+
+        private void RememberCqFrequency()
+        {
+            _cqSentUtc = DateTime.UtcNow;
+
+            if (_rxFrequencyHz == null) return;
+
+            try { _cqFreqHz = _rxFrequencyHz(); }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
         public delegate void SpeedRange(out int low, out int high);
 
         // Turns * and ! into callsigns. The stored text keeps the macro; only what goes on air is
@@ -1231,6 +1316,53 @@ namespace HolyLogger
                 double wanted = usable ? 1.0 : 0.5;
                 if (button.Opacity != wanted) button.Opacity = wanted;
             }
+
+            PaintCqButton();
+        }
+
+        // THE CQ BUTTON GOES RED WHEN IT WILL NOT CALL. Pressing it on a frequency it has not called on
+        // asks the question instead, and a button that does something other than what it says has to
+        // say so BEFORE it is pressed - after is too late, the question is already going out. Red beats
+        // the green ESM light on the same button: what the button will do matters more than whose turn
+        // it is, and the two never disagree for long anyway.
+        //
+        // ASKED ONCE A SECOND, not on every tick: it is a question that leaves the program for the
+        // radio's frequency, and the answer cannot change faster than a hand can turn the dial.
+        private static readonly Brush QrlWarningBrush = MakeQrlWarningBrush();
+        private DateTime _qrlCheckedUtc = DateTime.MinValue;
+        private bool _qrlNext;
+
+        private static Brush MakeQrlWarningBrush()
+        {
+            var brush = new SolidColorBrush(Color.FromRgb(0xFF, 0x6E, 0x6E));
+            brush.Freeze();
+            return brush;
+        }
+
+        private void PaintCqButton()
+        {
+            var button = _buttons.Length > 0 ? _buttons[0] : null;
+            if (button == null) return;
+
+            if (DateTime.UtcNow - _qrlCheckedUtc >= TimeSpan.FromSeconds(1))
+            {
+                _qrlCheckedUtc = DateTime.UtcNow;
+                _qrlNext = ShouldAskQrl();
+            }
+
+            if (_qrlNext)
+            {
+                button.Background = QrlWarningBrush;
+                button.ToolTip = "This frequency has not been called on. Pressing this sends "
+                               + QrlText() + " instead, to ask whether it is free.";
+                return;
+            }
+
+            // Back to whatever it wore before - the ESM light if it is that button's turn, and the
+            // keycap's own colour otherwise. The tooltip is built as it opens, so it only has to be
+            // let go of here.
+            button.ClearValue(BackgroundProperty);
+            button.ClearValue(ToolTipProperty);
         }
 
         private void RefreshTitle()
@@ -1490,6 +1622,12 @@ namespace HolyLogger
                 var button = _buttons[i];
                 if (button == null) continue;
 
+                // NOT THE CQ BUTTON WHILE IT IS WARNING. This is called on every frequency change the
+                // radio reports, so while the dial was being turned it and PaintCqButton took turns
+                // painting the same button and it flickered red and blue in the operator's hand. The
+                // red is the one that matters: it says the button will ask rather than call.
+                if (i == 0 && _qrlNext) continue;
+
                 if (i + 1 == messageNumber) button.Background = EsmNextBrush;
                 else button.ClearValue(BackgroundProperty);
             }
@@ -1586,6 +1724,13 @@ namespace HolyLogger
             }
 
             string stored = _buttonTexts[index] ?? string.Empty;
+
+            // BUTTON 1 IS THE CQ, and on a frequency it has not called on yet it asks first. Everything
+            // below - the macros, the sending, the record - treats QRL? as any other text.
+            bool isCqButton = index == 0;
+            bool askingQrl = isCqButton && ShouldAskQrl();
+            if (askingQrl) stored = QrlText();
+            if (isCqButton) RememberCqFrequency();
 
             if (stored.Trim().Length == 0)
             {
@@ -2181,6 +2326,89 @@ namespace HolyLogger
             secondsRow.Children.Add(secondsBox);
             secondsRow.Children.Add(secondsUnit);
 
+            var qrlBox = new TextBox
+            {
+                Text = QrlMinutes().ToString(CultureInfo.InvariantCulture),
+                FontSize = 16,
+                Width = 70,
+                Padding = new Thickness(4, 2, 4, 2),
+                VerticalContentAlignment = VerticalAlignment.Center
+            };
+
+            var qrlTextBox = new TextBox
+            {
+                Text = QrlText(),
+                FontSize = 16,
+                Width = 110,
+                Padding = new Thickness(4, 2, 4, 2),
+                CharacterCasing = CharacterCasing.Upper,
+                VerticalContentAlignment = VerticalAlignment.Center
+            };
+
+            var qrlTextLabel = new TextBlock
+            {
+                Text = "Ask the frequency is free with",
+                FontSize = 16,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 10, 0)
+            };
+            qrlTextLabel.SetResourceReference(TextBlock.ForegroundProperty, "TextBrush");
+
+            var qrlTextNote = new TextBlock
+            {
+                Text = "Recommended: QRL?",
+                FontSize = 16,
+                FontWeight = FontWeights.Bold,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(12, 0, 0, 0)
+            };
+            qrlTextNote.SetResourceReference(TextBlock.ForegroundProperty, "MutedTextBrush");
+
+            var qrlTextRow = new DockPanel { LastChildFill = false, Margin = new Thickness(0, 18, 0, 0) };
+            DockPanel.SetDock(qrlTextLabel, Dock.Left);
+            DockPanel.SetDock(qrlTextBox, Dock.Left);
+            DockPanel.SetDock(qrlTextNote, Dock.Left);
+            qrlTextRow.Children.Add(qrlTextLabel);
+            qrlTextRow.Children.Add(qrlTextBox);
+            qrlTextRow.Children.Add(qrlTextNote);
+
+            var qrlLabel = new TextBlock
+            {
+                Text = "Ask it if the CQ button has not been used for",
+                FontSize = 16,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 10, 0)
+            };
+            qrlLabel.SetResourceReference(TextBlock.ForegroundProperty, "TextBrush");
+
+            var qrlUnit = new TextBlock
+            {
+                Text = "Minutes",
+                FontSize = 16,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(10, 0, 0, 0)
+            };
+            qrlUnit.SetResourceReference(TextBlock.ForegroundProperty, "TextBrush");
+
+            var qrlHint = new TextBlock
+            {
+                Text = "The CQ button asks instead of calling, whenever the radio has moved off the "
+                     + "frequency it last called on - or has sat on it this long without calling. 0 never "
+                     + "asks on time alone.",
+                FontSize = 16,
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(0, 10, 0, 0)
+            };
+            qrlHint.SetResourceReference(TextBlock.ForegroundProperty, "MutedTextBrush");
+
+            var qrlRow = new DockPanel { LastChildFill = false, Margin = new Thickness(0, 18, 0, 0) };
+            DockPanel.SetDock(qrlLabel, Dock.Left);
+            DockPanel.SetDock(qrlBox, Dock.Left);
+            DockPanel.SetDock(qrlUnit, Dock.Left);
+            qrlRow.Children.Add(qrlLabel);
+            qrlRow.Children.Add(qrlBox);
+            qrlRow.Children.Add(qrlUnit);
+
             var okBtn = new Button { Content = "OK", FontSize = 16, Width = 90, Height = 32, IsDefault = true };
             var cancelBtn = new Button { Content = "Cancel", FontSize = 16, Width = 90, Height = 32, IsCancel = true, Margin = new Thickness(10, 0, 0, 0) };
 
@@ -2196,6 +2424,9 @@ namespace HolyLogger
             var stack = new StackPanel { Margin = new Thickness(16) };
             stack.Children.Add(secondsRow);
             stack.Children.Add(secondsHint);
+            stack.Children.Add(qrlTextRow);
+            stack.Children.Add(qrlRow);
+            stack.Children.Add(qrlHint);
             stack.Children.Add(row);
             stack.Children.Add(BuildHelp());
             stack.Children.Add(BuildStandardTextsButton());
@@ -2249,6 +2480,15 @@ namespace HolyLogger
                     return;
                 }
 
+                if (!int.TryParse((qrlBox.Text ?? string.Empty).Trim(), out int qrlMinutes) || qrlMinutes < 0)
+                {
+                    HolyMessageBox.ShowWarning("Type a whole number of minutes, or 0 to never ask on time alone.",
+                                               "CW Keyer Settings", dialog);
+                    return;
+                }
+
+                Properties.Settings.Default.CwKeyerQrlText = (qrlTextBox.Text ?? string.Empty).Trim();
+                Properties.Settings.Default.CwKeyerQrlMinutes = qrlMinutes;
                 Properties.Settings.Default.CwKeyboardHistoryRows = rows;
                 Properties.Settings.Default.CwKeyboardBreakSeconds = seconds;
                 try { Properties.Settings.Default.Save(); }

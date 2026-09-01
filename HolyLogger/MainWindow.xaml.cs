@@ -3996,6 +3996,18 @@ namespace HolyLogger
             // The readout follows the radio's own knob from here on - see BuildCwSpeedReadCommand.
             cwKeyboard.AskSpeed = AskRadioCwSpeed;
 
+            // Where the radio is listening, so the CQ button can tell a frequency it has already called
+            // on from one it has only just arrived at - see ShouldAskQrl.
+            cwKeyboard.RadioFrequencyHz = () =>
+            {
+                try
+                {
+                    if (!IsCatLive()) return 0;
+                    return Rig.GetRxFrequency();
+                }
+                catch (System.Exception swallowed) { Log.Swallow(swallowed); return 0; }
+            };
+
             cwKeyboard.Closed += (s, e) =>
             {
                 cwKeyboard = null;

@@ -3040,6 +3040,30 @@ namespace HolyLogger.Properties {
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("QRL?")]
+        public string CwKeyerQrlText {
+            get {
+                return ((string)(this["CwKeyerQrlText"]));
+            }
+            set {
+                this["CwKeyerQrlText"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("5")]
+        public int CwKeyerQrlMinutes {
+            get {
+                return ((int)(this["CwKeyerQrlMinutes"]));
+            }
+            set {
+                this["CwKeyerQrlMinutes"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("False")]
         public bool CwKeyerHoldForEnter {
             get {

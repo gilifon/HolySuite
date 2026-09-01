@@ -761,6 +761,12 @@
     <Setting Name="CwKeyerWpm" Type="System.Int32" Scope="User">
       <Value Profile="(Default)">20</Value>
     </Setting>
+    <Setting Name="CwKeyerQrlText" Type="System.String" Scope="User">
+      <Value Profile="(Default)">QRL?</Value>
+    </Setting>
+    <Setting Name="CwKeyerQrlMinutes" Type="System.Int32" Scope="User">
+      <Value Profile="(Default)">5</Value>
+    </Setting>
     <Setting Name="CwKeyerHoldForEnter" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">False</Value>
     </Setting>
