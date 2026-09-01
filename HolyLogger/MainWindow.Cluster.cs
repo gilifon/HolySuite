@@ -210,7 +210,9 @@ namespace HolyLogger
         bool qrzPhotoClearQueued = false;
 
         BackgroundWorker AdifHandlerWorker;
-        private bool _isShutdownCleanupDone = false;
+        // volatile: the UDP receive callbacks read this on their own threads, to tell a real
+        // datagram from the pending receive waking up because the socket was closed on the way out.
+        private volatile bool _isShutdownCleanupDone = false;
         private bool _uploadOnExitHandled = false; // guards the single upload-on-exit pass in Window_Closing
         private bool _uploadInFlight = false; // true only while UploadAllAndCloseAsync's async work is actually running
         // UNUSED: BackgroundWorker for entire log QRZ processing was disabled.
@@ -2158,9 +2160,14 @@ namespace HolyLogger
             // Manual mode and with CAT off, where there is no radio to tune - and Live Scale's own
             // ClusterLiveScale_BlockWheel is still on this grid to keep the list from scrolling away
             // from the VFO, so nothing is needed from us for that.
-            // Manual mode says where the LOG gets its frequency, not whether the radio can be tuned.
-            if (!Properties.Settings.Default.EnableOmniRigCAT) return;
-            if (OmniRigEngine == null || Rig == null || Rig.Status != OmniRig.RigStatusX.ST_ONLINE) return;
+            // The same question the pointer asks - see CanTuneRadioByWheel.
+            if (!CanTuneRadioByWheel()) return;
+
+            // NOT OVER THE TWO CALLSIGNS. Those cells are a click that opens QRZ, and they wear the
+            // hand to say so - a wheel that tuned the radio from under a hand would be two different
+            // promises in one place. The rest of the row is the wheel's.
+            DataGridCell under = FindVisualParent<DataGridCell>(e.OriginalSource as DependencyObject);
+            if (under != null && (under.Column == clusterDxColumn || under.Column == clusterSpotterColumn)) return;
 
             double khz;
             try { khz = (double)Rig.GetRxFrequency() / 1000.0; }
@@ -2653,11 +2660,44 @@ namespace HolyLogger
         // its own, so the pointer tells the operator what the table is doing before he wonders why it
         // will not hold still.
         //
-        // The Hand on the callsign, spotter and frequency cells is untouched: those are still a click
-        // that does something, and that is worth more than repeating what the whole table is up to.
+        // The Hand on the DX and spotter callsign cells is untouched: those are still a click that
+        // does something, and that is worth more than repeating what the whole table is up to.
+        //
+        // AND ONLY WHILE THE RADIO CAN ACTUALLY BE TUNED. Live Scale on with no CAT - the setting
+        // off, OmniRig not running, the radio not on line, whatever the reason - is a list nothing
+        // is driving and a wheel with nothing to turn. The pointer said otherwise, and a pointer
+        // that promises a thing the wheel will not do is worse than a plain arrow. It asks exactly
+        // what the wheel itself asks, so the two cannot come to disagree.
         private System.Windows.Input.Cursor ClusterIdleCursor()
         {
-            return clusterLiveScaleOn ? Cursors.ScrollNS : Cursors.Arrow;
+            return clusterLiveScaleOn && CanTuneRadioByWheel() ? Cursors.ScrollNS : Cursors.Arrow;
+        }
+
+        // IS THERE A RADIO TO TURN? Manual mode says where the LOG gets its frequency, not whether
+        // the radio can be tuned, so it has no part in this.
+        //
+        // THE ANSWER IS KEPT FOR A FIFTH OF A SECOND. This is asked on every mouse move across the
+        // spot list, and asking OmniRig is a question that leaves the program - it cannot change
+        // meaningfully inside that, and a pointer a fifth of a second behind a radio going off line
+        // is not something anybody can see.
+        private DateTime _wheelTunableAskedUtc = DateTime.MinValue;
+        private bool _wheelTunable;
+
+        private bool CanTuneRadioByWheel()
+        {
+            if (DateTime.UtcNow - _wheelTunableAskedUtc < TimeSpan.FromMilliseconds(200)) return _wheelTunable;
+            _wheelTunableAskedUtc = DateTime.UtcNow;
+
+            try
+            {
+                _wheelTunable = Properties.Settings.Default.EnableOmniRigCAT
+                             && OmniRigEngine != null
+                             && Rig != null
+                             && Rig.Status == OmniRig.RigStatusX.ST_ONLINE;
+            }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); _wheelTunable = false; }
+
+            return _wheelTunable;
         }
 
         private void ClusterSpotsGrid_MouseMove(object sender, MouseEventArgs e)
@@ -2715,7 +2755,12 @@ namespace HolyLogger
                 ClearClusterMapHover();
             }
 
-            bool isInteractiveColumn = cell.Column == clusterDxColumn || cell.Column == clusterSpotterColumn || cell.Column == clusterFreqColumn;
+            // THE HAND IS FOR THE TWO CALLSIGNS AND NOTHING ELSE. They are the only cells where a
+            // single click does something - it opens QRZ - and they are the only cells the wheel
+            // keeps out of. The frequency cell needs no single click of its own (the radio is sent
+            // there by a double-click on the row), so it belongs to the wheel like the rest of the
+            // row and wears the wheel's cursor.
+            bool isInteractiveColumn = cell.Column == clusterDxColumn || cell.Column == clusterSpotterColumn;
             dataGrid.Cursor = isInteractiveColumn ? Cursors.Hand : ClusterIdleCursor();
 
             if (cell.Column == clusterDxColumn || cell.Column == clusterSpotterColumn)
@@ -5364,7 +5409,10 @@ namespace HolyLogger
             switch (mode)
             {
                 case "CW":
-                    return PM_CW_U;
+                    // NOT a constant: which of OmniRig's two CW modes is CW normal is
+                    // read from the connected radio's own OmniRig .ini. See
+                    // CwRigModeForConnectedRig in MainWindow.Rig.cs.
+                    return CwRigModeForConnectedRig();
                 case "USB":
                     return PM_SSB_U;   // explicit sideband (Channels) — honor the operator's choice
                 case "LSB":

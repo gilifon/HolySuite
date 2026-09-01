@@ -52,9 +52,9 @@ namespace HolyLogger
             // THE CW SPEED, for the same reason as the frequency above it, and reported from a real
             // evening: 8.9.3, an operator working CW who took the keyer from 18 WPM up to 26 with the
             // wheel as the other station's fist changed - and was asked, on closing, whether to save
-            // the settings he had changed. He had changed his sending speed. It is written to settings
-            // on every step of the wheel (CwKeyboardWindow), so one evening on CW guarantees the
-            // question, and nothing about it is a decision about how the program behaves.
+            // the settings he had changed. He had changed his sending speed. Nothing about it is a
+            // decision about how the program behaves. (The keyer stopped writing it altogether when the
+            // speed became the radio knob's business alone - see CwKeyboardWindow.)
             //
             // Still remembered, exactly as before - it lives in user.config with the window positions,
             // so the keyer still opens at the speed he left it. It is only out of PROFILES.

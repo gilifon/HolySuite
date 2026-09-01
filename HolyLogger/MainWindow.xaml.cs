@@ -820,6 +820,15 @@ namespace HolyLogger
 
         private async void StartUDPClient(IAsyncResult res)
         {
+            // Closing the window disposes this socket, and that wakes the receive that was still
+            // pending up one last time. Nothing below may run then: the field has already been set
+            // to null (NullReferenceException) and the dispatcher is on its way out
+            // (TaskCanceledException). Both were thrown on every single exit; under the debugger
+            // they stopped the program mid-close, so the window stayed on screen until Continue
+            // was pressed. Take one copy of the socket and work through that.
+            var udp = Client;
+            if (_isShutdownCleanupDone || udp == null) return;
+
             try
             {
             if (!Properties.Settings.Default.EnableUDPClient)
@@ -827,7 +836,7 @@ namespace HolyLogger
                 return;
             }
             IPEndPoint RemoteIpEndPoint = new IPEndPoint(IPAddress.Any, 0);
-            byte[] received = Client.EndReceive(res, ref RemoteIpEndPoint);
+            byte[] received = udp.EndReceive(res, ref RemoteIpEndPoint);
             string data = Encoding.UTF8.GetString(received);
 
             _holyLogParser = new HolyLogParser();
@@ -850,6 +859,9 @@ namespace HolyLogger
                 }
             }
 
+            // Same again for the seconds spent waiting above: no hop onto a dispatcher that has
+            // begun shutting down.
+            if (_isShutdownCleanupDone || Dispatcher.HasShutdownStarted) return;
             this.Dispatcher.Invoke(() =>
             {
                 try
@@ -910,7 +922,7 @@ namespace HolyLogger
                         "Save Error", this);
                 }
             });
-            Client.BeginReceive(new AsyncCallback(StartUDPClient), null);
+            udp.BeginReceive(new AsyncCallback(StartUDPClient), null);
             }
             catch (ObjectDisposedException) { /* socket closed during shutdown ק expected */ }
             catch (Exception ex)
@@ -921,6 +933,15 @@ namespace HolyLogger
 
         private void StartN1MMUDPClient(IAsyncResult res)
         {
+            // Closing the window disposes this socket, and that wakes the receive that was still
+            // pending up one last time. Nothing below may run then: the field has already been set
+            // to null (NullReferenceException) and the dispatcher is on its way out
+            // (TaskCanceledException). Both were thrown on every single exit; under the debugger
+            // they stopped the program mid-close, so the window stayed on screen until Continue
+            // was pressed. Take one copy of the socket and work through that.
+            var udp = N1MMClient;
+            if (_isShutdownCleanupDone || udp == null) return;
+
             try
             {
             if (!Properties.Settings.Default.EnableN1MMUDPClient)
@@ -928,9 +949,12 @@ namespace HolyLogger
                 return;
             }
             IPEndPoint RemoteIpEndPoint = new IPEndPoint(IPAddress.Any, 0);
-            byte[] received = N1MMClient.EndReceive(res, ref RemoteIpEndPoint);
+            byte[] received = udp.EndReceive(res, ref RemoteIpEndPoint);
             string data = Encoding.UTF8.GetString(received);
 
+            // A datagram can land at the very moment the program is closing: don't hop onto a
+            // dispatcher that has begun shutting down.
+            if (_isShutdownCleanupDone || Dispatcher.HasShutdownStarted) return;
             this.Dispatcher.Invoke(() =>
             {
                 try
@@ -984,7 +1008,7 @@ namespace HolyLogger
                         "Save Error", this);
                 }
             });
-            N1MMClient.BeginReceive(new AsyncCallback(StartN1MMUDPClient), null);
+            udp.BeginReceive(new AsyncCallback(StartN1MMUDPClient), null);
             }
             catch (ObjectDisposedException) { /* socket closed during shutdown ק expected */ }
             catch (Exception ex)
@@ -1646,7 +1670,7 @@ namespace HolyLogger
             ShowHomeMap();
             Log.Step("loaded: home map drawn");
 
-            // Reflect the persisted suggestions on/off state on the Suggest (F4) toggle button.
+            // Reflect the persisted suggestions on/off state on the Suggest toggle button.
             if (BtnSuggestToggle != null)
                 BtnSuggestToggle.IsChecked = Properties.Settings.Default.CallsignSuggestionsEnabled;
 
@@ -3108,7 +3132,6 @@ namespace HolyLogger
             UpdateMessageButtonLabel(GetMessageButton(messageNumber), messageNumber, isCw: true);
 
             // The keyer shows these same four along its bottom row. Edited here, redrawn there.
-            if (cwKeyboard != null) cwKeyboard.RefreshSharedButtons();
         }
 
         // ONE EDITOR FOR EVERY STORED CW TEXT - the four Msg buttons here and the eight in the keyer.
@@ -3693,6 +3716,40 @@ namespace HolyLogger
             }
         }
 
+        // THE KEYER'S OWN TEXT, read straight from its setting so ESM works whether the keyer window
+        // is open or not. Buttons 1-4 are the ESM steps: CQ, exchange, TU, his own call.
+        private string GetKeyerText(int number)
+        {
+            if (number < 1) return string.Empty;
+
+            try
+            {
+                string json = Properties.Settings.Default.CwKeyerButtonsJson;
+                if (string.IsNullOrWhiteSpace(json)) return string.Empty;
+
+                var saved = Newtonsoft.Json.JsonConvert.DeserializeObject<string[]>(json);
+                if (saved == null || number > saved.Length) return string.Empty;
+
+                return saved[number - 1] ?? string.Empty;
+            }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); return string.Empty; }
+        }
+
+        // ESM's one way out to the radio. In CW it is the keyer's text - through the keyer window when
+        // it is open, so what went out shows up in its send line like everything else it keys. In SSB
+        // it is the radio's own recorded voice message, which only the four Msg buttons have.
+        private void SendEsmMessage(int number)
+        {
+            if (IsCwModeActive())
+            {
+                if (cwKeyboard != null) { cwKeyboard.PressButton(number - 1); return; }
+                TriggerCwTextMessage(number, GetKeyerText(number));
+                return;
+            }
+
+            TriggerVoiceMessage(number);
+        }
+
         /// <summary>Enter, with ESM on. True when ESM has dealt with the key.</summary>
         private bool TryHandleEsmEnter()
         {
@@ -3712,7 +3769,7 @@ namespace HolyLogger
                       : next == EsmExchangeMessage ? EsmStage.ExchangeSent
                       : EsmStage.Nothing;
 
-            TriggerVoiceMessage(next);
+            SendEsmMessage(next);
             RefreshEsmHint();
             return true;
         }
@@ -3738,12 +3795,12 @@ namespace HolyLogger
         // QSO logged after a message that was never keyed is a QSO the other station never made.
         private void SendEsmTuAndLog()
         {
-            string tu = GetCwMessageText(EsmTuMessage) ?? string.Empty;
+            string tu = GetKeyerText(EsmTuMessage) ?? string.Empty;
             bool cw = IsCwModeActive();
             string problem = cw ? DescribeCwMacroProblem(tu) : null;
 
             _esmStage = EsmStage.Nothing;
-            TriggerVoiceMessage(EsmTuMessage);
+            SendEsmMessage(EsmTuMessage);
 
             if (problem != null) return;            // refused: nothing sent, so nothing logged
             if (cw && CwMacroLogsQso(tu)) return;   // the text logged it itself
@@ -3903,43 +3960,16 @@ namespace HolyLogger
                     }
                 },
                 ShowCwTextEditDialog,
-                // Its first four buttons ARE the four Msg buttons - the same texts, shown twice.
+                // Only so a keyer opening for the first time can take a COPY of the four Msg texts into
+                // its own first four - see LoadButtonTexts. After that the two sets are apart.
                 GetCwMessageText,
-                (number, text) =>
-                {
-                    SetCwMessageText(number, text);
-                    UpdateMessageButtonLabel(GetMessageButton(number), number, isCw: true);
-                },
                 // A Yaesu has no character buffer: the keyer must let each memory finish playing
                 // before it writes the next one over the top of it.
                 IsYaesuKeyer(rigType),
 
-                // The WPM readout in its title bar: what to send when the wheel is turned, and what
-                // speeds this radio will accept.
-                //
-                // THE ANSWER IS NOT THROWN AWAY. It was, and that cost an evening: an operator set 30,
-                // the radio stayed where it was, and nothing anywhere said whether the command had even
-                // left the program. Every attempt is written to the log with the exact bytes, and a
-                // refusal is said out loud - once, because a wheel sends one of these per notch and a
-                // message box per notch is worse than the fault.
-                wpm =>
-                {
-                    string command = BuildCwSpeedCommand(rigType, wpm);
-                    if (command == null) return;
-
-                    bool went = TrySendOmniRigCustomCommand(command);
-                    Log.Warn("CW keyer speed " + wpm + " WPM to " + rigType + ": " + command
-                             + (went ? "  sent" : "  REFUSED by OmniRig"));
-                    if (went || _cwSpeedRefusalReported) return;
-
-                    _cwSpeedRefusalReported = true;
-                    HolyMessageBox.ShowWarning(
-                        "The keyer speed could not be sent to " + rigType + ".\n\n"
-                        + "The speed on the radio has not changed.\n\n"
-                        + "When CAT is working, the radio's name shows in green at the right of the "
-                        + "status bar. Anything else there means it is not.",
-                        "CW Keyer", this);
-                },
+                // The WPM readout in its title bar shows what speeds this radio will accept, so a
+                // number read back from it that could not be one is dropped rather than shown. The
+                // readout does not SET anything - the radio's own knob is the only control there is.
                 (out int low, out int high) => CwSpeedRange(rigType, out low, out high),
 
                 // What {LOG} and {WIPE} in a button's text do when that button is pressed.
@@ -3957,9 +3987,45 @@ namespace HolyLogger
                     + (string.IsNullOrEmpty(RigFileTrouble) ? string.Empty : "  " + RigFileTrouble)
                     + "  You can still write and edit the eight macros below - right-click one.");
 
-            cwKeyboard.Closed += (s, e) => cwKeyboard = null;
+            // The readout follows the radio's own knob from here on - see BuildCwSpeedReadCommand.
+            cwKeyboard.AskSpeed = AskRadioCwSpeed;
+
+            cwKeyboard.Closed += (s, e) =>
+            {
+                cwKeyboard = null;
+                UpdateActionKeyLabels();
+                TakeBackTheKeyboard();
+            };
             cwKeyboard.Show();
+            UpdateActionKeyLabels();
             RefreshEsmHint();   // its first four buttons show the ESM hint from the moment it opens
+        }
+
+        // ADD AND CLEAR SAY WHICH KEY PRESSES THEM, AND ONLY WHILE IT REALLY DOES. With the keyer
+        // open F1 and F9 are two of its twelve macros, so a button still reading "Add (F1)" would be
+        // telling the operator something that is no longer true - press F1 then and a CQ goes out.
+        // The keyer opens and closes with CW, so in SSB the two keys are always the operator's and
+        // the labels always name them.
+        private void UpdateActionKeyLabels()
+        {
+            bool keysAreOurs = cwKeyboard == null;
+
+            if (AddBtn != null) AddBtn.Content = keysAreOurs ? "Add (F1)" : "Add";
+            if (ClearBtnText != null) ClearBtnText.Text = keysAreOurs ? "Clear (F9)" : "Clear";
+        }
+
+        // THE KEYBOARD COMES BACK HERE WHEN THE KEYER GOES AWAY. Closing it with its own X left no
+        // window holding the keys at all, so Ctrl+K - the very key that opens it again - went nowhere
+        // and it took a click on the log before anything responded. An owned window closing is
+        // supposed to hand activation back to its owner; this one wears its own chrome and does not,
+        // so it is asked for outright. AFTER the close has finished, or there is nothing to activate.
+        private void TakeBackTheKeyboard()
+        {
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                try { Activate(); }
+                catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+            }), DispatcherPriority.Background);
         }
 
         private void CloseCwKeyboard()
@@ -3969,6 +4035,8 @@ namespace HolyLogger
             try { cwKeyboard.Close(); }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
             cwKeyboard = null;
+            UpdateActionKeyLabels();
+            TakeBackTheKeyboard();
         }
 
         // ONE CHUNK OF TYPING, not a whole message: no truncation to a message length and - for the KY
@@ -4049,6 +4117,18 @@ namespace HolyLogger
                 if (model.StartsWith(keyed, StringComparison.OrdinalIgnoreCase)) return true;
 
             return false;
+        }
+
+        // Under either spelling, the same as KeyedByKyCommand reads them: OmniRig's "Elecraft K4"
+        // or a bare "K4".
+        private static bool IsElecraftK4(string rigType)
+        {
+            string name = (rigType ?? string.Empty).Trim();
+            string model = name.StartsWith("Elecraft", StringComparison.OrdinalIgnoreCase)
+                         ? name.Substring("Elecraft".Length).Trim()
+                         : name;
+
+            return model.StartsWith("K4", StringComparison.OrdinalIgnoreCase);
         }
 
         // ── WHICH RADIOS CAN SEND CW FROM HERE, IN WORDS ────────────────────────────────────────
@@ -4139,11 +4219,11 @@ namespace HolyLogger
                 || IsYaesuKeyer(rigType);
         }
 
-        // ── SETTING THE RADIO'S KEYER SPEED ─────────────────────────────────────────────────────
+        // ── THE RADIO'S KEYER SPEED ─────────────────────────────────────────────────────────────
         //
-        // HolyLogger has never asked the radio how fast it is keying - it TIMED the keying and worked
-        // the speed out from that, which is an estimate of a number the radio knows exactly. Every
-        // maker has a command for it, quoted here from their own documents:
+        // HolyLogger used to TIME the keying and work the speed out from that, which is an estimate of
+        // a number the radio knows exactly. Every maker has a command for it - the same command reads
+        // it and sets it - quoted here from their own documents:
         //
         //   Kenwood TS-590S/SG PC Control Command Reference
         //     "KS  Sets and reads the Keying speed."   K S P1 P1 P1 ;   P1 004 ~ 060
@@ -4165,12 +4245,29 @@ namespace HolyLogger
         // with a value outside its range is its own business - better to send the nearest it accepts.
         // Said once a session. A wheel sends one command per notch, and a box per notch would be a
         // worse fault than the one it is reporting.
-        private bool _cwSpeedRefusalReported;
 
         private const int WpmKenwoodLow = 4,  WpmKenwoodHigh = 60;
         private const int WpmYaesuLow   = 4,  WpmYaesuHigh   = 60;
         private const int WpmElecraftLow = 8, WpmElecraftHigh = 50;
+
+        // THE K4 IS NOT THE K3, and its own reference says so:
+        //
+        //   Elecraft K4 Programmer's Reference, Rev. B12
+        //     "KS (Keyer Speed)  SET/RESP format: KSnnn; where nnn is the keyer speed, from 8 to
+        //      100 WPM."
+        //
+        // against the K3S/K3/KX3/KX2 reference, Rev. G5, which reads "nnn is 008-050 (8-50 WPM)".
+        // Fifty for a K4 would have thrown away every real speed above it as a misread.
+        private const int WpmElecraftK4High = 100;
         private const int WpmIcomLow    = 6,  WpmIcomHigh    = 48;
+
+        private static bool StartsWithAny(string name, params string[] prefixes)
+        {
+            foreach (string prefix in prefixes)
+                if (name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) return true;
+
+            return false;
+        }
 
         // What this radio will accept, so the keyer can hold its own box to the same range.
         internal static void CwSpeedRange(string rigType, out int low, out int high)
@@ -4181,51 +4278,153 @@ namespace HolyLogger
             if (GetIcomCivAddress(name) != null) { low = WpmIcomLow;   high = WpmIcomHigh;     return; }
             if (name.StartsWith("TS", StringComparison.OrdinalIgnoreCase))
             {
-                // THE TS-480 STARTS AT 10, and its brothers at 4. Its own reference says so -
-                // "KS  Sets and reads the CW electric keyer's keying speed ... 010 (min.) ~ 060 (max.)"
+                // THE TS-480 AND THE TS-2000 START AT 10, their brothers at 4. Their own documents
+                // say so:
+                //
+                //   PC Control Command Reference for the TS-480HX/SAT
+                //     "KS  Sets and reads the CW electric keyer's keying speed."  010 (min.) ~ 060 (max.)
+                //
+                //   TS-2000 Instruction Manual, B62-1221-50, PC Control Command Tables
+                //     "KS  Sets and reads the keying speed of the electric keyer."  010 (min.) ~ 060 (max.)
+                //
                 // against the TS-590S/SG, TS-890S and TS-990S, which all say 004 ~ 060. One number for
-                // "Kenwood" would have asked a TS-480 for a speed its manual does not offer.
-                low = name.StartsWith("TS-480", StringComparison.OrdinalIgnoreCase)
-                    || name.StartsWith("TS480", StringComparison.OrdinalIgnoreCase)
+                // "Kenwood" would have named a speed two of them do not offer.
+                low = StartsWithAny(name, "TS-480", "TS480", "TS-2000", "TS2000")
                     ? 10 : WpmKenwoodLow;
                 high = WpmKenwoodHigh;
                 return;
             }
-            if (KeyedByKyCommand(name))        { low = WpmElecraftLow; high = WpmElecraftHigh; return; }
+            if (KeyedByKyCommand(name))
+            {
+                low = WpmElecraftLow;
+                high = IsElecraftK4(name) ? WpmElecraftK4High : WpmElecraftHigh;
+                return;
+            }
 
             low = 0; high = 0;   // not a radio this program can key
         }
 
-        private static string BuildCwSpeedCommand(string rigType, int wpm)
+        // -- ASKING THE RADIO WHAT SPEED IT IS REALLY AT ----------------------------------------
+        //
+        // THE SPEED HAS TWO CONTROLS - the keyer's wheel and the radio's own knob - and the last one
+        // to speak wins. Until now only the program ever spoke, so a knob turned after the command had
+        // gone left the readout saying 22 while the radio keyed at 10, and nothing on the screen
+        // admitted it. The operator had no way of knowing which of the two numbers was true.
+        //
+        // THE SAME COMMAND THAT SETS IT READS IT. Icom's 14 0C is "send/READ keying speed" in every
+        // guide quoted above, and KS with nothing after it is the read form on Kenwood, Yaesu and
+        // Elecraft. OmniRig hands the answer back on its CustomReply event - it HAS one, contrary to
+        // what the CW keyer file used to say - so the readout can follow the knob instead of
+        // contradicting it. Tried against a live IC-7610 before it was written: the knob was on 10 and
+        // the radio answered level 23, which is 9.8 WPM.
+        private static string BuildCwSpeedReadCommand(string rigType, out int replyLength, out string replyEnd)
         {
+            replyLength = 0;
+            replyEnd = string.Empty;
+
             int low, high;
             CwSpeedRange(rigType, out low, out high);
             if (high == 0) return null;
 
-            if (wpm < low) wpm = low;
-            if (wpm > high) wpm = high;
-
-            // Icom: a level like any other, command 14 sub-command 0C, and the value is BCD in two
-            // bytes over the range the manual gives - 0 is 6 WPM and 255 is 48.
             string icom = GetIcomCivAddress(rigType);
             if (icom != null)
             {
-                // 14 0C on every Icom checked - IC-705, IC-7300, IC-7610 and IC-9700 all read
-                //   "0C  0000 ~ 0255  Send/read keying speed  (0000=6 WPM ~ 0255=48 WPM)"
-                // in their own guides. Worth saying how that was established: pdftotext's -layout mode
-                // interleaves the two columns of these tables, and reading 0C out of THAT gave a
-                // sub-command belonging to a different row. Read in reading order they agree.
-                int level = (int)Math.Round((wpm - WpmIcomLow) * 255.0 / (WpmIcomHigh - WpmIcomLow));
-                if (level < 0) level = 0;
-                if (level > 255) level = 255;
-
-                // 0..255 written as four BCD digits: 0255 becomes the bytes 02 55.
-                string digits = level.ToString("0000", CultureInfo.InvariantCulture);
-                return "FE FE " + icom + " E0 14 0C " + digits.Substring(0, 2) + " " + digits.Substring(2, 2) + " FD";
+                // SIXTEEN BYTES, because the radio says it twice: CI-V echoes the seven we sent and
+                // then answers with nine of its own. That is not a guess - OmniRig's own IC-7610 file
+                // reads the CW pitch with 14 09, the same shape of command, and asks for 16.
+                replyLength = 16;
+                return "FE FE " + icom + " E0 14 0C FD";
             }
 
-            // Kenwood, Yaesu and Elecraft all spell it the same way: KS and three digits.
-            return "KS" + wpm.ToString("000", CultureInfo.InvariantCulture) + ";";
+            // The set command is KSnnn; - the same word with no number after it is the question.
+            replyEnd = ";";
+            return "KS;";
+        }
+
+        // Asked while the CW keyer is open, and only while nothing is being sent: a question put on the
+        // wire in the middle of a message competes with the text going out on it.
+        private void AskRadioCwSpeed()
+        {
+            if (!IsCatLive()) return;
+
+            int replyLength;
+            string replyEnd;
+            string command = BuildCwSpeedReadCommand(NormalizeRigType(Rig != null ? Rig.RigType : null),
+                                                     out replyLength, out replyEnd);
+            if (command == null) return;
+
+            TrySendOmniRigCustomCommand(command, replyLength, replyEnd);
+        }
+
+        // Every custom command's answer comes through here, ours and any other. Anything that is not a
+        // keying speed is left alone: the reply is read for the one frame we asked about and dropped
+        // if it is not in there.
+        private void OmniRigEngine_CustomReply(int RigNumber, object Command, object Reply)
+        {
+            int wpm = CwSpeedFromReply(Reply);
+            if (wpm <= 0) return;
+
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                if (cwKeyboard != null) cwKeyboard.ShowSpeed(wpm);
+            }), DispatcherPriority.Background);
+        }
+
+        // OmniRig hands the reply over as a variant holding bytes, and how that arrives on this side is
+        // the marshaller's business - so both shapes are unpacked rather than one of them assumed.
+        private static byte[] ReplyBytes(object reply)
+        {
+            byte[] bytes = reply as byte[];
+            if (bytes != null) return bytes;
+
+            Array array = reply as Array;
+            if (array == null) return null;
+
+            bytes = new byte[array.Length];
+            try
+            {
+                for (int i = 0; i < array.Length; i++)
+                    bytes[i] = Convert.ToByte(array.GetValue(i), CultureInfo.InvariantCulture);
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); return null; }
+
+            return bytes;
+        }
+
+        private static int CwSpeedFromReply(object reply)
+        {
+            byte[] b = ReplyBytes(reply);
+            if (b == null || b.Length == 0) return 0;
+
+            // ICOM: FE FE E0 <rig> 14 0C d1 d2 FD, the level 0000-0255 written as four BCD digits.
+            //
+            // ADDRESSED TO US, which is what tells the answer apart from the echo of the question.
+            // Both frames carry 14 0C; only the answer has E0 - the controller - in the TO position.
+            // Reading the first 14 0C in the buffer would have read our own question back at us.
+            for (int i = 0; i + 8 < b.Length; i++)
+            {
+                if (b[i] != 0xFE || b[i + 1] != 0xFE || b[i + 2] != 0xE0) continue;
+                if (b[i + 4] != 0x14 || b[i + 5] != 0x0C || b[i + 8] != 0xFD) continue;
+
+                int level = (((b[i + 6] >> 4) * 10) + (b[i + 6] & 0x0F)) * 100
+                          + (((b[i + 7] >> 4) * 10) + (b[i + 7] & 0x0F));
+                if (level < 0 || level > 255) return 0;
+
+                // The maker's own scale, the same one BuildCwSpeedCommand writes with: 0 is 6 WPM and
+                // 255 is 48.
+                return (int)Math.Round(WpmIcomLow + level * (WpmIcomHigh - WpmIcomLow) / 255.0);
+            }
+
+            // KENWOOD, YAESU, ELECRAFT: KSnnn; in plain letters.
+            string text = Encoding.ASCII.GetString(b);
+            int at = text.IndexOf("KS", StringComparison.Ordinal);
+            if (at < 0 || at + 5 > text.Length) return 0;
+
+            int wpm;
+            if (!int.TryParse(text.Substring(at + 2, 3), NumberStyles.None, CultureInfo.InvariantCulture, out wpm))
+                return 0;
+
+            return wpm;
         }
 
         // ── YAESU: WRITE IT INTO A MEMORY, THEN PLAY THAT MEMORY ────────────────────────────────
@@ -4321,7 +4520,10 @@ namespace HolyLogger
             OpenCwKeyboard();
         }
 
-        private void TriggerCwTextMessage(int messageNumber)
+        // storedTextOverride: ESM sends the CW KEYER's twelve texts, not the four Msg texts - the two
+        // sets are apart now. Everything else about the send is identical, so it is one parameter here
+        // rather than a second copy of this method.
+        private void TriggerCwTextMessage(int messageNumber, string storedTextOverride = null)
         {
             string rigType = NormalizeRigType(Rig != null ? Rig.RigType : null);
 
@@ -4373,7 +4575,7 @@ namespace HolyLogger
                 }
             }
 
-            string storedText = GetCwMessageText(messageNumber);
+            string storedText = storedTextOverride ?? GetCwMessageText(messageNumber);
 
             if (string.IsNullOrWhiteSpace(storedText))
             {
@@ -5163,7 +5365,7 @@ namespace HolyLogger
                         (qso.DXCall ?? "This station") + " was worked " + howOld + ".\n\n" +
                         "A spot says a station is on frequency NOW, so only a contact from the last " +
                         SpotFreshnessMinutes + " minutes can be spotted from the log.\n\n" +
-                        "If you can hear it now, use Spot (F3) and give the frequency you hear it on.",
+                        "If you can hear it now, use Spot and give the frequency you hear it on.",
                         "Too old to spot", this);
                     return;
                 }
@@ -9119,6 +9321,7 @@ namespace HolyLogger
             {
                 OmniRigEngine.StatusChange -= OmniRigEngine_StatusChange;
                 OmniRigEngine.ParamsChange -= OmniRigEngine_ParamsChange;
+                OmniRigEngine.CustomReply -= OmniRigEngine_CustomReply;
                 Rig = null;
                 OmniRigEngine = null;
             }
@@ -12098,21 +12301,29 @@ namespace HolyLogger
         // Ignores auto-repeat for the F5-F8 message keys so a held key doesn't toggle CW on and off.
         private bool HandleGlobalFunctionKey(Key key, bool isRepeat)
         {
+            // THE KEYER TAKES ALL TWELVE WHILE IT IS OPEN. That is the set a contester's hands already
+            // know from N1MM, and it is why the keyer exists - so F1 is his CQ and not Add QSO for as
+            // long as the window is up. Close the keyer and every key below means what it always meant.
+            //
+            // NOTHING BECOMES UNREACHABLE. Add, Options, Spot, Suggest and Clear all have a button or a
+            // menu item of their own, Esc still clears the form, and inside a contest the QSO is logged
+            // by the {LOG} in the TU text or by Enter with ESM on.
+            if (cwKeyboard != null && key >= Key.F1 && key <= Key.F12)
+            {
+                if (!isRepeat) cwKeyboard.PressButton(key - Key.F1);
+                return true;
+            }
+
             if (key == Key.F1)
             {
                 AddBtn_Click(null, null);
                 return true;
             }
-            if (key == Key.F2)
-            {
-                OptionsMenuItemMenuItem_Click(null, null);
-                return true;
-            }
-            if (key == Key.F3)
-            {
-                SpotButton_Click(null, null);
-                return true;
-            }
+            // F2, F3 AND F4 ARE NOT SHORTCUTS ANY MORE. They went to Options, Spot and the callsign
+            // suggestions, and the CW keyer needs the whole run of twelve for its macros. Each of the
+            // three has a control of its own that never went anywhere - the Options menu item, the Spot
+            // button, the Suggest button - so nothing became unreachable; only the key is gone, and the
+            // labels no longer name one.
             if (key == Key.F9 || key == Key.Escape)
             {
                 // Esc belongs to whichever frequency editor the caret is sitting in: there it undoes the
@@ -12132,17 +12343,6 @@ namespace HolyLogger
                 ClearBtn_Click(null, null);
                 return true;
             }
-            if (key == Key.F4)
-            {
-                // Toggle the callsign suggestions dropdown on/off. The state is sticky (persisted)
-                // and only changes when F4 is pressed again. Ignore auto-repeat so holding the key
-                // doesn't flicker the state.
-                if (!isRepeat)
-                {
-                    ToggleCallsignSuggestionsEnabled();
-                }
-                return true;
-            }
             if (key >= Key.F5 && key <= Key.F8)
             {
                 if (!isRepeat)
@@ -12155,7 +12355,6 @@ namespace HolyLogger
             return false;
         }
 
-        // Flips the persisted callsign-suggestions on/off state (bound to F4).
         private void ToggleCallsignSuggestionsEnabled()
         {
             ApplyCallsignSuggestionsEnabled(!Properties.Settings.Default.CallsignSuggestionsEnabled);
@@ -16304,6 +16503,7 @@ namespace HolyLogger
                 EventsSubscribed = true;
                 OmniRigEngine.StatusChange += OmniRigEngine_StatusChange;
                 OmniRigEngine.ParamsChange += OmniRigEngine_ParamsChange;
+                OmniRigEngine.CustomReply += OmniRigEngine_CustomReply;
             }
         }
         private void UnsubscribeFromEvents()
@@ -16313,6 +16513,7 @@ namespace HolyLogger
                 EventsSubscribed = false;
                 OmniRigEngine.StatusChange -= OmniRigEngine_StatusChange;
                 OmniRigEngine.ParamsChange -= OmniRigEngine_ParamsChange;
+                OmniRigEngine.CustomReply -= OmniRigEngine_CustomReply;
             }
         }
 

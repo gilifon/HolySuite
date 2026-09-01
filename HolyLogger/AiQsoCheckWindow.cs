@@ -226,6 +226,12 @@ namespace HolyLogger
                 try { if (_running != null) _running.Cancel(); }
                 catch (Exception swallowed) { Log.Swallow(swallowed); }
             };
+
+            // Where the operator last put it, and how big he made it. This window is opened over and
+            // over - once per contact being checked - and it used to come back centred on its parent
+            // every single time, so a place found for it beside the log lasted one contact.
+            // AFTER the size is set above: Attach clamps a saved size to this window's own minimum.
+            WindowBounds.Attach(this, "AiQsoCheck");
         }
 
         private static string Subtitle(QSO q)

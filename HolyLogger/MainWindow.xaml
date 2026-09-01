@@ -805,7 +805,7 @@
                         </MenuItem.Icon>
                     </MenuItem>
                     <Separator />
-                    <MenuItem x:Name="OptionsMenuItem" Header="Options (F2)" ToolTip="Customize your Holylogger" Click="OptionsMenuItemMenuItem_Click">
+                    <MenuItem x:Name="OptionsMenuItem" Header="Options" ToolTip="Customize your Holylogger" Click="OptionsMenuItemMenuItem_Click">
                         <MenuItem.Icon>
                             <Image Source="Images/properties.png" Stretch="UniformToFill" Width="16" Height="16"/>
                         </MenuItem.Icon>
@@ -1307,12 +1307,12 @@
             <TextBlock Text="kHz" FontWeight="Bold" FontSize="13" Foreground="{DynamicResource KHzText}"
                        VerticalAlignment="Bottom" Margin="0,0,0,-2"/>
         </StackPanel>
-        <Button x:Name="Btn_Spot" HorizontalAlignment="Left" VerticalAlignment="Top" Grid.Row="1" Margin="580,47,0,0" Width="95" Height="32" Style="{StaticResource SpotButtonStyle}" Click="SpotButton_Click" ToolTip="Spot to DX Cluster (F3)" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" Padding="0">
+        <Button x:Name="Btn_Spot" HorizontalAlignment="Left" VerticalAlignment="Top" Grid.Row="1" Margin="580,47,0,0" Width="95" Height="32" Style="{StaticResource SpotButtonStyle}" Click="SpotButton_Click" ToolTip="Spot to DX Cluster" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" Padding="0">
             <Grid Width="95">
                 <Path Stroke="#E53935" StrokeThickness="1.6" Data="M7,3 C1,8 1,24 7,29" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
                 <Path Stroke="#E53935" StrokeThickness="1.6" Data="M11,3 C5,8 5,24 11,29" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,-2,0,0">
-                    <TextBlock Text="Spot (F3)" FontSize="15" FontWeight="Bold" HorizontalAlignment="Center" Margin="0,1,0,0"/>
+                    <TextBlock Text="Spot" FontSize="15" FontWeight="Bold" HorizontalAlignment="Center" Margin="0,1,0,0"/>
                 </StackPanel>
                 <Path Stroke="#E53935" StrokeThickness="1.6" Data="M86,3 C92,8 92,24 86,29"/>
                 <Path Stroke="#E53935" StrokeThickness="1.6" Data="M81,3 C88,8 88,24 81,29" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
@@ -1474,13 +1474,13 @@
         <TextBlock HorizontalAlignment="Left" Margin="12,82,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" ToolTip="The DX Station Callsign" TextAlignment="Left"><Run Text="DX" FontWeight="Bold" /><Run Text=" Callsign" /></TextBlock>
         <TextBox x:Name="TB_DXCallsign" HorizontalAlignment="Left" Height="28" Margin="101,87,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="130" CharacterCasing="Upper" Grid.Row="1" Text="" TextChanged="TB_DXCallsign_TextChanged" LostFocus="TB_DXCallsign_LostFocus" PreviewKeyDown="TB_DXCallsign_KeyDown" PreviewMouseLeftButtonDown="TB_DXCallsign_PreviewMouseLeftButtonDown" FontSize="16" MaxLength="15" TabIndex="8"/>
 
-        <!-- Suggest (F4) toggle: shows and controls the callsign-suggestions dropdown mode.
+        <!-- Suggest toggle: shows and controls the callsign-suggestions dropdown mode.
              Looks pressed INTO the screen when ON (IsChecked), raised OUT when OFF. -->
-        <ToggleButton x:Name="BtnSuggestToggle" Content="Suggest (F4)" Grid.Row="1"
+        <ToggleButton x:Name="BtnSuggestToggle" Content="Suggest" Grid.Row="1"
                       HorizontalAlignment="Left" VerticalAlignment="Top" Margin="12,101,0,0"
                       Width="78" Height="20" FontSize="12" FontWeight="Bold" Foreground="#1E2A36"
                       Focusable="False" Click="BtnSuggestToggle_Click"
-                      ToolTip="Show/hide the callsign suggestions dropdown (toggle with F4)">
+                      ToolTip="Show/hide the callsign suggestions dropdown">
             <ToggleButton.Template>
                 <ControlTemplate TargetType="ToggleButton">
                     <!-- Two-tone bevel for a real 3D look:
@@ -1704,7 +1704,7 @@
         <Button x:Name="AddBtn" Style="{StaticResource ActionButtonStyle}" Content="Add (F1)" HorizontalAlignment="Left" Margin="572,123,0,0" VerticalAlignment="Top" Width="95" Height="32" Grid.Row="1" Click="AddBtn_Click" FontSize="16" ToolTip="Save the current QSO data" TabIndex="14" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Padding="0" />
         <Button x:Name="ClearBtn" Style="{StaticResource ActionButtonStyle}" HorizontalAlignment="Left" Margin="572,84,0,0" VerticalAlignment="Top" Width="95" Height="32" Grid.Row="1" Click="ClearBtn_Click" FontSize="16" ToolTip="Clear the current QSO data" IsTabStop="False" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Padding="0">
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                <TextBlock Text="Clear (F9)" VerticalAlignment="Center"/>
+                <TextBlock x:Name="ClearBtnText" Text="Clear (F9)" VerticalAlignment="Center"/>
             </StackPanel>
         </Button>
         <!-- Undo icon for log-row "Set Radio to Freq" (independent of the cluster undo). Hidden when nothing to undo. -->

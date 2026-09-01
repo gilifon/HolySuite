@@ -790,5 +790,9 @@
     </Setting>
     <Setting Name="RadioPanelWindowTop" Type="System.Double" Scope="User">
       <Value Profile="(Default)">-1</Value>
-    </Setting>  </Settings>
+    </Setting>
+    <Setting Name="SwapCwSideband" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">False</Value>
+    </Setting>
+  </Settings>
 </SettingsFile>

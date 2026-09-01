@@ -320,11 +320,18 @@ namespace HolyLogger
         }
 
         private bool TrySendOmniRigCustomCommand(string command)
+            => TrySendOmniRigCustomCommand(command, 0, string.Empty);
+
+        // WITH AN ANSWER EXPECTED. Almost everything this program sends the radio is an order and
+        // there is nothing to read back, which is why the plain call above asks for no reply. A
+        // question is different: OmniRig has to be told how long the answer will be, or what
+        // character ends it, or it will not raise CustomReply with anything in it.
+        private bool TrySendOmniRigCustomCommand(string command, int replyLength, string replyEnd)
         {
             try
             {
                 byte[] rawCommand = ParseCustomCommand(command);
-                Rig.SendCustomCommand(rawCommand, 0, string.Empty);
+                Rig.SendCustomCommand(rawCommand, replyLength, replyEnd ?? string.Empty);
                 return true;
             }
             catch
@@ -1341,5 +1348,191 @@ namespace HolyLogger
 
             UpdateRadioPanel();
         }
+
+        // ---- Which of OmniRig's two CW modes is plain CW on THIS radio ----------------------
+        //
+        // OmniRig has no "CW". It has CW_U and CW_L, and WHICH ONE means CW normal is decided by
+        // the rig's own .ini file. HolyLogger always sent CW_U, and on an IC-7610 that .ini turns
+        // CW_U into the CI-V bytes for CW-R - so the CW button put the radio into reverse.
+        //
+        // It is NOT "Icom is the other way round". The split runs through Icom itself: in
+        // OmniRig's Rigs folder IC-7300 / IC-7610 / IC-705 have [pmCW_U] = 06 07 (CW-R), while
+        // the older IC-706 / 718 / 746 / 756 / 7800 have [pmCW_U] = 06 03 (CW normal). Deciding
+        // on the rig's NAME would fix the new Icoms and break the old ones.
+        //
+        // So we read the same file OmniRig reads. On a CI-V radio (the command starts FEFE) the
+        // mode byte is fixed by the protocol - 03 is CW and 07 is CW-R - whatever badge is on the
+        // front, which also catches the CI-V clones (Xiegu G90, X-6200) and correctly leaves the
+        // Ten-Tec CI-V rigs alone, whose CW_U really is CW. Everything else - the Kenwood, Yaesu
+        // and Elecraft ASCII commands, or a file we cannot read - keeps CW_U, which is right for
+        // all of them.
+        //
+        // The one thing the file cannot know is an Icom whose own menu has CW Normal Side changed
+        // from LSB to USB. That is what the "Swap CW and CW-R" box in Options is for.
+
+        // The .ini does not change while the program runs, and this is asked on every tune.
+        private readonly Dictionary<string, bool> _cwUpperIsNormalCache =
+            new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>
+        /// The OmniRig mode to send for plain "CW" on the radio that is connected right now.
+        /// </summary>
+        private int CwRigModeForConnectedRig()
+        {
+            bool upperIsNormal = CwUpperIsNormal(ConnectedRigName());
+
+            if (Properties.Settings.Default.SwapCwSideband)
+            {
+                upperIsNormal = !upperIsNormal;
+            }
+
+            return upperIsNormal ? PM_CW_U : PM_CW_L;
+        }
+
+        // True when OmniRig's CW_U is this radio's CW normal (the usual case), false when CW_U is
+        // its CW-R and plain CW therefore has to be sent as CW_L.
+        private bool CwUpperIsNormal(string rigType)
+        {
+            if (string.IsNullOrWhiteSpace(rigType))
+            {
+                return true;
+            }
+
+            bool cached;
+            lock (_cwUpperIsNormalCache)
+            {
+                if (_cwUpperIsNormalCache.TryGetValue(rigType, out cached))
+                {
+                    return cached;
+                }
+            }
+
+            bool upperIsNormal = ReadCwUpperIsNormalFromIni(rigType);
+
+            lock (_cwUpperIsNormalCache)
+            {
+                _cwUpperIsNormalCache[rigType] = upperIsNormal;
+            }
+
+            Log.Warn("CW mode for \"" + rigType + "\": OmniRig CW_" + (upperIsNormal ? "U" : "L")
+                     + " is CW normal on this radio, so that is what the CW button sends.");
+            return upperIsNormal;
+        }
+
+        private bool ReadCwUpperIsNormalFromIni(string rigType)
+        {
+            try
+            {
+                string folder = OmniRigRigsFolder();
+                if (folder == null)
+                {
+                    return true;
+                }
+
+                string path = Path.Combine(folder, rigType + ".ini");
+                if (!File.Exists(path))
+                {
+                    return true;
+                }
+
+                string command = ReadIniCommand(path, "pmCW_U");
+                if (command == null)
+                {
+                    return true;
+                }
+
+                int mode = CivModeByte(command);
+                if (mode < 0)
+                {
+                    return true;   // not a CI-V set-mode command, so leave CW_U alone
+                }
+
+                return mode != 0x07;   // 07 is CW-R, so CW normal is the other slot
+            }
+            catch (Exception e)
+            {
+                Log.Warn("Could not read the CW mode from the OmniRig .ini for \"" + rigType
+                         + "\": " + e.GetType().Name + ": " + e.Message);
+                return true;
+            }
+        }
+
+        // The first Command= line of a section, e.g. "FEFE94E0.06.07.FD" under [pmCW_U].
+        private static string ReadIniCommand(string path, string section)
+        {
+            bool inSection = false;
+
+            foreach (string raw in File.ReadLines(path))
+            {
+                string line = raw.Trim();
+                if (line.Length == 0 || line.StartsWith(";"))
+                {
+                    continue;
+                }
+
+                if (line.StartsWith("["))
+                {
+                    if (inSection)
+                    {
+                        return null;   // the section ended without a Command= line
+                    }
+
+                    inSection = string.Equals(line.Trim('[', ']').Trim(), section,
+                                              StringComparison.OrdinalIgnoreCase);
+                    continue;
+                }
+
+                if (inSection && line.StartsWith("Command", StringComparison.OrdinalIgnoreCase))
+                {
+                    int equals = line.IndexOf('=');
+                    if (equals > 0)
+                    {
+                        return line.Substring(equals + 1).Trim();
+                    }
+                }
+            }
+
+            return null;
+        }
+
+        // FEFE <to> <from> <command> ... FD, written in the .ini with dots wherever the author felt
+        // like one: "FEFE94E0.06.07.FD", "FEFE76E0.0603.FD" and "FEFE94E0.2600.07.FD" are all the
+        // same bytes once the dots are gone. Command 06 is "set mode" and the mode byte follows it;
+        // command 26 is "set mode, VFO and filter" and a VFO byte comes first. Returns -1 for
+        // anything else, including the (MD7;) style ASCII commands of the other makers.
+        private static int CivModeByte(string command)
+        {
+            string hex = (command ?? string.Empty).Replace(".", string.Empty)
+                                                  .Replace(" ", string.Empty)
+                                                  .Trim()
+                                                  .ToUpperInvariant();
+
+            foreach (char c in hex)
+            {
+                if (!Uri.IsHexDigit(c))
+                {
+                    return -1;
+                }
+            }
+
+            if (hex.Length < 12 || !hex.StartsWith("FEFE"))
+            {
+                return -1;
+            }
+
+            string civCommand = hex.Substring(8, 2);
+            int modeAt = civCommand == "06" ? 10
+                       : civCommand == "26" ? 12
+                       : -1;
+
+            if (modeAt < 0 || hex.Length < modeAt + 2)
+            {
+                return -1;
+            }
+
+            return Convert.ToInt32(hex.Substring(modeAt, 2), 16);
+        }
+
+
     }
 }

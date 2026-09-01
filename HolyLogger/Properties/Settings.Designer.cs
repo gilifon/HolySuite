@@ -3173,6 +3173,18 @@ namespace HolyLogger.Properties {
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool SwapCwSideband {
+            get {
+                return ((bool)(this["SwapCwSideband"]));
+            }
+            set {
+                this["SwapCwSideband"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
         public bool EsmSearchAndPounce {
             get {
                 return ((bool)(this["EsmSearchAndPounce"]));

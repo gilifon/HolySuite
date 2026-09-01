@@ -96,10 +96,15 @@ namespace HolyLogger
         // holds, rather than the 12 an Icom's buffer likes, so the pause comes four times less often.
         private readonly bool _waitForTxIdle;
 
-        // Tells the radio to key at this speed, and says what speeds it will accept. Null when the
-        // radio cannot be told - then the readout is not built at all.
-        private readonly Action<int> _setSpeed;
+        // What speeds this radio will accept. Null when the program knows nothing about it - then
+        // the readout is not built at all.
         private readonly SpeedRange _speedRange;
+
+        // Asks the radio what speed it is keying at; the answer comes back later, through ShowSpeed.
+        // SET AFTER THE WINDOW IS BUILT rather than passed in with the rest: the constructor already
+        // takes fourteen of these, and one more in the row would be one more thing to miscount.
+        internal Action AskSpeed { set { _askSpeed = value; } }
+        private Action _askSpeed;
 
         public delegate void SpeedRange(out int low, out int high);
 
@@ -127,12 +132,16 @@ namespace HolyLogger
         // the settings here, so the main window can redraw its own four faces when one is edited from
         // this side.
         private readonly Func<int, string> _getSharedText;
-        private readonly Action<int, string> _setSharedText;
 
-        private const int ButtonCount = 8;
+        // TWELVE, THE WAY A CONTESTER KNOWS THEM. They were eight, and the first four were the
+        // main window's Msg buttons shown a second time. That link is gone: the four on the main
+        // window are for ordinary working now, and everything a contest needs lives in here - twelve
+        // texts of this window's own, on F1 to F12, which is the set N1MM has taught everybody.
+        private const int ButtonCount = 12;
 
-        // Buttons 1..SharedButtons are the Msg buttons' texts; the rest are this window's own.
-        private const int SharedButtons = 4;
+        // The four ESM steps, and the order it expects them in: 1 the CQ, 2 the exchange, 3 the TU,
+        // 4 his own call for Search and Pounce. The other eight are the operator's to fill.
+        private const int EsmButtons = 4;
         private readonly Button[] _buttons = new Button[ButtonCount];
 
         // The window's stack, kept so the "this radio cannot be keyed" line can be put into it after
@@ -140,7 +149,7 @@ namespace HolyLogger
         private DockPanel _body;
 
         // TRUE WHEN THE RADIO IN FRONT OF HIM CANNOT BE KEYED AT ALL. The window still opens: its
-        // eight buttons are where his macros live, and writing them is worth doing with no radio on
+        // twelve buttons are where his macros live, and writing them is worth doing with no radio on
         // the desk, let alone with the wrong one. What it will not do is pretend to send.
         private bool _cannotKey;
         private readonly string[] _buttonTexts;
@@ -196,7 +205,7 @@ namespace HolyLogger
         private TextBlock _titleText;
         private int _shownWpm = -1;
 
-        // Working out whether every button can be sent means reading the entry form eight times over.
+        // Working out whether every button can be sent means reading the entry form twelve times over.
         // Four times a second is far oftener than a callsign is typed and far seldomer than the pump.
         private DateTime _availabilityAskedUtc = DateTime.MinValue;
         private static readonly TimeSpan AvailabilityEvery = TimeSpan.FromMilliseconds(250);
@@ -249,18 +258,6 @@ namespace HolyLogger
         // marks CW out from everything else on the screen, in any colour scheme.
         private static readonly Brush CwKeyBrush = MakeCwKeyBrush();
 
-        // The yellow a number wears while the pointer is on it - the same mark the frequency displays
-        // carry where the wheel does something. Fixed like the bar it sits on: that bar is one colour
-        // in every scheme, and the black number has to stay readable on it.
-        private static readonly Brush WheelZoneBrush = MakeWheelZoneBrush();
-
-        private static Brush MakeWheelZoneBrush()
-        {
-            var brush = new SolidColorBrush(Color.FromRgb(0xFF, 0xFF, 0x00));
-            brush.Freeze();
-            return brush;
-        }
-
         private static Brush MakeCwKeyBrush()
         {
             var brush = new SolidColorBrush(Color.FromRgb(0x7F, 0xFE, 0xFF));
@@ -279,13 +276,12 @@ namespace HolyLogger
                                 Func<bool> wpmMeasured, int maxChunk, Func<bool> isTransmitting,
                                 Func<string, string> expandMacros, Func<string, string> macroProblem,
                                 Action<double> learnWpm, Func<string, string, string> editText,
-                                Func<int, string> getSharedText, Action<int, string> setSharedText,
+                                Func<int, string> getSharedText,
                                 bool waitForTxIdle = false,
-                                Action<int> setSpeed = null, SpeedRange speedRange = null,
+                                SpeedRange speedRange = null,
                                 Action logQso = null, Action wipeForm = null)
         {
             _waitForTxIdle = waitForTxIdle;
-            _setSpeed = setSpeed;
             _speedRange = speedRange;
             _sendChunk = sendChunk;
             _stopSending = stopSending;
@@ -300,7 +296,6 @@ namespace HolyLogger
             _learnWpm = learnWpm;
             _editText = editText;
             _getSharedText = getSharedText;
-            _setSharedText = setSharedText;
             _buttonTexts = LoadButtonTexts();
 
             Title = "CW Keyer";
@@ -347,6 +342,19 @@ namespace HolyLogger
                 TextWrapping = TextWrapping.NoWrap
             };
             _box.PreviewKeyDown += Box_PreviewKeyDown;
+
+            // F1 TO F12 PRESS THE TWELVE BUTTONS, wherever the caret happens to be in this window.
+            // On the window rather than on the typing row so a button, the gear or the send line can
+            // hold the focus without the keys going quiet. Auto-repeat is ignored: a held F1 must not
+            // queue the CQ twenty times over.
+            PreviewKeyDown += (s2, e2) =>
+            {
+                if (e2.IsRepeat) return;
+                if (e2.Key < Key.F1 || e2.Key > Key.F12) return;
+
+                PressButton(e2.Key - Key.F1);
+                e2.Handled = true;
+            };
             _box.PreviewTextInput += Box_PreviewTextInput;
 
             // AND THE SAME RULE FOR PASTE. PreviewTextInput fires for typing and for nothing else, so
@@ -469,11 +477,17 @@ namespace HolyLogger
             // Where the operator put it is where it comes back. WindowBounds is the one that knows how
             // to bring a corner saved on a second screen back onto a screen that is still there.
             WindowBounds.Attach(this, "CwKeyboard");
+
+            // CLOSING IT STOPS THE RADIO, exactly as Escape does. The window going away used to leave
+            // the radio keying whatever it had already been handed, with nothing left on the screen
+            // saying so and no Escape to press. This catches every way out - the X, Ctrl+K, and the
+            // program closing it itself when the radio leaves CW.
+            Closing += (s2, e2) => StopEverything();
         }
 
         // ── A KEYER IN FRONT OF A RADIO IT CANNOT KEY ───────────────────────────────────────────
         //
-        // The window used to refuse to open at all on such a radio, which took his eight macros away
+        // The window used to refuse to open at all on such a radio, which took his twelve macros away
         // with it: the only place they can be written is here, and there is no reason a man should
         // need a keyable radio switched on to write "CQ CQ DE ...". So it opens, and says plainly
         // why nothing will go out - a window that merely looked dead would read as a fault.
@@ -581,6 +595,9 @@ namespace HolyLogger
 
         private void Pump_Tick(object sender, EventArgs e)
         {
+            AskRadioItsSpeed();
+            AdvanceKeyingClock();
+
             // Whatever the radio has finished keying leaves the typing row first, so the row always
             // shows what is still to come rather than what has just gone.
             RefreshTitle();
@@ -631,10 +648,9 @@ namespace HolyLogger
             // is the moment one word becomes two in the listener's ear. At the speed the radio has
             // been measured keying, that is a real number of seconds - and only a pause longer than
             // it is written into the record. A few milliseconds of overrun is not a word break.
-            double gapWpm = 20.0;
-            try { if (_currentWpm != null) gapWpm = _currentWpm(); }
-            catch (Exception swallowed) { Log.Swallow(swallowed); }
-            if (gapWpm < 5) gapWpm = 5;
+            // The radio's own speed where it gives one, and only otherwise the timed estimate this
+            // paragraph was written for - see KeyingWpm.
+            double gapWpm = KeyingWpm();
 
             double heardAsWordGap =
                 (CwSendMonitorWindow.WordGapUnits - CwSendMonitorWindow.LetterGapUnits) * 1.2 / gapWpm;
@@ -675,10 +691,9 @@ namespace HolyLogger
 
             _handedUpTo += take;
 
-            double wpm = 20.0;
-            try { if (_currentWpm != null) wpm = _currentWpm(); }
-            catch (Exception swallowed) { Log.Swallow(swallowed); }
-            if (wpm < 5) wpm = 5;
+            // How long this chunk will take the radio, at the speed the radio itself reports - and
+            // only at the timed estimate where it reports none.
+            double wpm = KeyingWpm();
 
             double seconds = CwSendMonitorWindow.ComputeTotalUnits(chunk) * 1.2 / wpm;
             DateTime from = _radioBusyUntil > DateTime.UtcNow ? _radioBusyUntil : DateTime.UtcNow;
@@ -722,6 +737,13 @@ namespace HolyLogger
         {
             if (_inFlight.Count == 0) return;
 
+            // NOT WHILE THERE IS MORE TO COME. Text sitting in the row that the radio has not been
+            // given yet means the operator has added to this transmission - a macro pressed or a word
+            // typed - and the quiet seconds that empty the row start again from the end of THAT.
+            // Without this the check below could beat the next hand-over by one tick and empty the row
+            // with the new text still standing on it.
+            if ((_box.Text ?? string.Empty).Length > _handedUpTo) return;
+
             WatchTransmitState();
 
             // THE RADIO SAYS WHEN IT HAS FINISHED - it is asked whether it is back in receive, and
@@ -761,6 +783,10 @@ namespace HolyLogger
                 _box.Text = text.Substring(drop);
                 _box.CaretIndex = Math.Max(0, caret - drop);
                 _handedUpTo = Math.Max(0, _handedUpTo - drop);
+
+                // The units of what just left go with it, or the sum would be measuring a row that is
+                // no longer there and everything still on screen would come up already keyed.
+                _unitsKeyed = Math.Max(0, _unitsKeyed - CwSendMonitorWindow.ComputeTotalUnits(text.Substring(0, drop)));
 
                 if (sent.Value) _openLine += " ";
                 _openLine += chunk;
@@ -864,6 +890,10 @@ namespace HolyLogger
                 _box.Text = text.Substring(drop);
                 _handedUpTo = Math.Max(0, _handedUpTo - drop);
 
+                // The units of what just left go with it, or the sum would be measuring a row that is
+                // no longer there and everything still on screen would come up already keyed.
+                _unitsKeyed = Math.Max(0, _unitsKeyed - CwSendMonitorWindow.ComputeTotalUnits(text.Substring(0, drop)));
+
                 if (sent.Value) _openLine += " ";
                 _openLine += chunk;
                 moved = true;
@@ -926,43 +956,92 @@ namespace HolyLogger
             }
         }
 
-        // How many characters of the send line the radio has had time to key. Never past what has
-        // actually been handed to it, however long it has been transmitting.
-        private int KeyedSoFar(string text)
-        {
-            if (text.Length == 0 || _handedUpTo <= 0) return 0;
-            if (!_txSeenThisSend || _txStartedUtc == DateTime.MinValue) return 0;
+        // -- HOW MUCH OF THE ROW HAS BEEN KEYED --------------------------------------------------
+        //
+        // WRITTEN FRESH on a fact this program did not have until today: the radio's OWN keying speed,
+        // asked of it rather than timed and guessed at (see the WPM readout on the bar). With the speed
+        // known exactly, how far the keying has got is a running sum - so many units of Morse per
+        // second - and the only thing that has to be right is WHEN to count.
+        //
+        // THE SUM ONLY RUNS WHILE THE RADIO IS ON AIR. That is the whole idea, and it is the one thing
+        // every earlier version got wrong. They measured from the moment a transmission began and
+        // divided the elapsed time by the speed, which counted every silence as keying - the gap between
+        // one chunk and the next, the gap between one button and the next - so the colour ran ahead of
+        // the radio and had to be patched wherever it showed. Silence adds nothing here, so there is
+        // nothing to patch.
+        //
+        // AND NEVER PAST WHAT THE RADIO HAS BEEN GIVEN. The sum is capped at the units of the text
+        // actually handed over, so a radio slower than it claims cannot colour in what it has not yet
+        // been sent.
+        private double _unitsKeyed;
+        private DateTime _keyClockUtc = DateTime.MinValue;
+        private bool _onAir;
+        private DateTime _onAirAskedUtc = DateTime.MinValue;
 
-            bool measured = false;
-            try { measured = _wpmMeasured != null && _wpmMeasured(); }
-            catch (Exception swallowed) { Log.Swallow(swallowed); }
-            if (!measured) return 0;
+        private void AdvanceKeyingClock()
+        {
+            DateTime now = DateTime.UtcNow;
+            DateTime since = _keyClockUtc == DateTime.MinValue ? now : _keyClockUtc;
+            _keyClockUtc = now;
+
+            if (_isTransmitting != null && now - _onAirAskedUtc >= TxAskEvery)
+            {
+                _onAirAskedUtc = now;
+                try { _onAir = _isTransmitting(); }
+                catch (Exception swallowed) { Log.Swallow(swallowed); _onAir = false; }
+            }
+
+            if (!_onAir) return;
+
+            double seconds = (now - since).TotalSeconds;
+            if (seconds <= 0) return;
+
+            _unitsKeyed += seconds * KeyingWpm() / 1.2;
+
+            double handed = CwSendMonitorWindow.ComputeTotalUnits(HandedText());
+            if (_unitsKeyed > handed) _unitsKeyed = handed;
+        }
+
+        // The radio's own number where it will give one - the readout on this bar IS its answer - and
+        // the timed estimate only for a radio that will not say.
+        private double KeyingWpm()
+        {
+            if (_wpm > 0) return _wpm;
 
             double wpm = 20.0;
             try { if (_currentWpm != null) wpm = _currentWpm(); }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
-            if (wpm < 5) wpm = 5;
 
-            // THE RADIO HAS STOPPED, so everything it was given HAS been keyed - there is nothing left
-            // to work out. Walking the clock for this case left the last character short: its timing
-            // includes the gap that follows it, and that gap is over once the radio drops, so the
-            // arithmetic never quite reached the end of the message.
-            if (_txStoppedUtc != DateTime.MaxValue) return Math.Min(_handedUpTo, text.Length);
+            return wpm < 5 ? 5 : wpm;
+        }
 
-            DateTime until = DateTime.UtcNow;
-            double elapsed = (until - _txStartedUtc).TotalSeconds;
-            if (elapsed <= 0) return 0;
-
-            double unitsDone = elapsed * wpm / 1.2;
+        // What of the row the radio has actually been handed. Everything after this is still ours.
+        private string HandedText()
+        {
+            string text = _box.Text ?? string.Empty;
             int limit = Math.Min(_handedUpTo, text.Length);
 
-            // The same running total the sending monitor walks, so the two agree character for
-            // character - and it counts the gaps BETWEEN letters rather than charging one to each.
+            return limit <= 0 ? string.Empty : text.Substring(0, limit);
+        }
+
+        // The units already keyed, read back as a number of characters. The same running total the
+        // sending monitor walks, so the two agree character for character - and it counts the gaps
+        // BETWEEN letters rather than charging one to each.
+        private int KeyedSoFar(string text)
+        {
+            if (text.Length == 0 || _handedUpTo <= 0) return 0;
+
+            int limit = Math.Min(_handedUpTo, text.Length);
             var cumulative = CwSendMonitorWindow.CumulativeUnits(text.Substring(0, limit));
 
+            // AS EACH CHARACTER STARTS, not when it has finished. Comparing against the END of a
+            // character meant the operator heard it go out and only then saw it turn blue - a whole
+            // character behind the radio, every character. What is measured now is the point the
+            // keying has REACHED, so the colour arrives with the sound instead of after it.
             for (int i = 0; i < limit; i++)
             {
-                if (cumulative[i] > unitsDone) return i;
+                double startsAt = i == 0 ? 0 : cumulative[i - 1];
+                if (startsAt > _unitsKeyed) return i;
             }
 
             return limit;
@@ -1056,7 +1135,7 @@ namespace HolyLogger
             // read 23, which reads as the program contradicting itself. Where the speed can be
             // COMMANDED the commanded number is the truth and the measurement has nothing to add, so
             // the title stays plain and the number lives in the readout he turns.
-            if (_setSpeed != null && _wpmText != null)
+            if (_wpmText != null)
             {
                 if (_shownWpm == -1) return;
                 _shownWpm = -1;
@@ -1149,6 +1228,7 @@ namespace HolyLogger
             _unitsThisSend = 0;
             _inFlight.Clear();
             _handedUpTo = 0;
+            _unitsKeyed = 0;
             _box.Text = string.Empty;
         }
 
@@ -1214,8 +1294,11 @@ namespace HolyLogger
         {
             var grid = new UniformGrid
             {
+                // TWO ROWS OF SIX. The window keeps the height it always had; what it costs is face
+                // width - six across the same 560 is about 85 pixels a button instead of 125, so a
+                // longer text runs into its ellipsis sooner. The tooltip still shows the whole thing.
                 Rows = 2,
-                Columns = 4,
+                Columns = 6,
                 Margin = new Thickness(7, 0, 7, 7)
             };
 
@@ -1265,10 +1348,10 @@ namespace HolyLogger
         // are the same four texts shown twice, so they light up together. 0 clears them all, which is
         // what arrives when ESM is off or has nothing to send.
         //
-        // Only the first four: buttons 5-8 are the keyer's own, and ESM knows nothing about them.
+        // Only the first four: buttons 5-12 are the operator's own, and ESM knows nothing about them.
         internal void ShowEsmNext(int messageNumber)
         {
-            for (int i = 0; i < SharedButtons && i < _buttons.Length; i++)
+            for (int i = 0; i < EsmButtons && i < _buttons.Length; i++)
             {
                 var button = _buttons[i];
                 if (button == null) continue;
@@ -1427,10 +1510,43 @@ namespace HolyLogger
             //
             // Unless the radio is still working through the last one: then this is the tail of the
             // same transmission and belongs on the same row.
-            FlushHandedText();
-            FinishLineNow();
+            // NOTHING LEAVES THIS ROW BEFORE IT HAS BEEN SENT. Flushing on every press was the fault:
+            // press a second button while the first was still going and the first went straight down
+            // into the record, filed as finished while the operator was still listening to it.
+            //
+            // Still busy means any of these: the radio is on air, it holds text it has not worked
+            // through yet, or the row still has text waiting to be handed over. In any of them this
+            // press is the tail of what is going out and joins the same row - which is also what puts
+            // the word gap in, above. When the radio has really finished, the press starts a row of
+            // its own as before.
+            //
+            // THIS COST THE COLOURING ONCE, and it is worth saying why it does not now. The old
+            // painter measured one burst from the moment the radio went on air, and the hand-off
+            // resets that watch whenever the radio drops between bursts - so a row left on screen
+            // across two bursts lost its colour entirely. The painter has since been rewritten to
+            // count units only while the radio is keying (see AdvanceKeyingClock); it never asks when
+            // the burst began, so a row may now span as many presses as the operator likes.
+            bool stillSending = _inFlight.Count > 0
+                             || (_box.Text ?? string.Empty).Length > 0
+                             || DateTime.UtcNow < _radioBusyUntil
+                             || _onAir;
 
-            _box.Text = (_box.Text ?? string.Empty) + text;
+            if (!stillSending)
+            {
+                FlushHandedText();
+                FinishLineNow();
+            }
+
+            // A WORD GAP BETWEEN ONE PRESS AND THE NEXT. The macro's own text is trimmed, so pressing
+            // the button twice while the radio is still keying the first one ran the two together, and
+            // "TU 73" followed by "CQ" went out as "TU 73CQ". The space goes IN FRONT of the new text
+            // rather than at the end of every macro: with nothing waiting there is nothing to separate,
+            // so a press on an idle keyer starts as immediately as it always did, and no transmission
+            // ends by keying a gap nobody is waiting for.
+            string pending = _box.Text ?? string.Empty;
+            if (pending.Length > 0 && !pending.EndsWith(" ", StringComparison.Ordinal)) pending += " ";
+
+            _box.Text = pending + text;
             _box.CaretIndex = _box.Text.Length;
             _box.Focus();
 
@@ -1447,11 +1563,8 @@ namespace HolyLogger
         {
             if (_editText == null) return;
 
-            // The first four say which F-key they are, because they ARE that message - the operator
-            // should not have to wonder whether he is editing the same text twice.
-            string title = index < SharedButtons
-                ? "Edit CW Text " + (index + 1) + " (F" + (index + 5) + ")"
-                : "Edit CW Keyer Text " + (index + 1);
+            // Named by the key that presses it, because that is how the operator thinks of it.
+            string title = "Edit CW Keyer Text " + (index + 1) + " (F" + (index + 1) + ")";
 
             string updated = _editText(title, _buttonTexts[index] ?? string.Empty);
             if (updated == null) return;
@@ -1461,16 +1574,15 @@ namespace HolyLogger
             RefreshButtonFace(index);
         }
 
-        // All eight in ONE setting, the way WindowBoundsJson holds every window's placement: a ninth
-        // button later costs nothing, and a profile that snapshots the settings takes them all along.
+        // All twelve in ONE setting, the way WindowBoundsJson holds every window's placement: a
+        // thirteenth button later costs nothing, and a profile that snapshots the settings takes them
+        // all along. A file written by an older build holds only eight, and the four it does not hold
+        // are filled in below.
         private string[] LoadButtonTexts()
         {
             var texts = new string[ButtonCount];
             for (int i = 0; i < ButtonCount; i++) texts[i] = string.Empty;
 
-            // The last four, in one setting of their own, the way WindowBoundsJson holds every
-            // window's placement. The first four slots are written empty and never read: those texts
-            // belong to the Msg buttons and are fetched below.
             try
             {
                 string json = Properties.Settings.Default.CwKeyerButtonsJson;
@@ -1479,7 +1591,7 @@ namespace HolyLogger
                     var saved = JsonConvert.DeserializeObject<string[]>(json);
                     if (saved != null)
                     {
-                        for (int i = SharedButtons; i < ButtonCount && i < saved.Length; i++)
+                        for (int i = 0; i < ButtonCount && i < saved.Length; i++)
                         {
                             texts[i] = saved[i] ?? string.Empty;
                         }
@@ -1488,33 +1600,51 @@ namespace HolyLogger
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
 
-            if (_getSharedText != null)
+            // ONCE, AND ONLY INTO EMPTY SLOTS. Until now the first four of these buttons WERE the main
+            // window's four Msg texts, and the keyer's own setting kept those four slots blank. Now that
+            // the two sets are apart, a keyer that opened blank would look as though it had thrown his
+            // CQ and his exchange away - so the first time it finds them empty it takes a copy of what
+            // the Msg buttons hold. Copy, not move: the four on the main window are untouched, and from
+            // this moment the two sets go their own ways.
+            if (_getSharedText != null && ButtonsAreEmpty(texts, EsmButtons))
             {
-                for (int i = 0; i < SharedButtons; i++)
+                bool copied = false;
+                for (int i = 0; i < EsmButtons; i++)
                 {
-                    try { texts[i] = _getSharedText(i + 1) ?? string.Empty; }
+                    try
+                    {
+                        texts[i] = _getSharedText(i + 1) ?? string.Empty;
+                        if (texts[i].Length > 0) copied = true;
+                    }
                     catch (Exception swallowed) { Log.Swallow(swallowed); }
                 }
+
+                if (copied) SaveAllButtonTexts(texts);
             }
 
             return texts;
         }
 
-        // The Msg buttons keep their own four; only the rest go in this window's setting.
+        private static bool ButtonsAreEmpty(string[] texts, int howMany)
+        {
+            for (int i = 0; i < howMany && i < texts.Length; i++)
+                if (!string.IsNullOrWhiteSpace(texts[i])) return false;
+
+            return true;
+        }
+
+        // All twelve are this window's own now - nothing here is written back to the Msg buttons.
         private void SaveButtonText(int index, string text)
         {
-            if (index < SharedButtons)
-            {
-                if (_setSharedText == null) return;
-                try { _setSharedText(index + 1, text); }
-                catch (Exception swallowed) { Log.Swallow(swallowed); }
-                return;
-            }
+            SaveAllButtonTexts(_buttonTexts);
+        }
 
+        private static void SaveAllButtonTexts(string[] texts)
+        {
             var own = new string[ButtonCount];
             for (int i = 0; i < ButtonCount; i++)
             {
-                own[i] = i < SharedButtons ? string.Empty : (_buttonTexts[i] ?? string.Empty);
+                own[i] = i < texts.Length ? (texts[i] ?? string.Empty) : string.Empty;
             }
 
             try
@@ -1525,18 +1655,13 @@ namespace HolyLogger
             catch (Exception swallowed) { Log.Swallow(swallowed); }
         }
 
-        // Called by the main window when one of the four Msg texts was edited over there, so the same
-        // four faces in here do not go on showing what they used to say.
-        internal void RefreshSharedButtons()
+        // PRESSED BY ITS F-KEY. F1 to F12 while this window is the one in front, and forwarded here
+        // from the main window while the keyer is open - see HandleGlobalFunctionKey. Nothing about
+        // the send is different from a mouse click on the same button.
+        internal void PressButton(int index)
         {
-            if (_getSharedText == null) return;
-
-            for (int i = 0; i < SharedButtons; i++)
-            {
-                try { _buttonTexts[i] = _getSharedText(i + 1) ?? string.Empty; }
-                catch (Exception swallowed) { Log.Swallow(swallowed); }
-                RefreshButtonFace(i);
-            }
+            if (index < 0 || index >= ButtonCount) return;
+            SendButton(index);
         }
 
         // Our own caption: the title, then the gear, then the X. The gear is the way in to anything
@@ -1823,6 +1948,12 @@ namespace HolyLogger
                 dialog.DialogResult = true;
             };
 
+            // WHERE HE LEFT IT, like every other window in the program. It opened centred on the
+            // keyer every time, which on a two-monitor desk means dragging it off the keyer again
+            // on every visit. CenterOwner still decides the FIRST one, before there is anything
+            // remembered.
+            WindowBounds.Attach(dialog, "CwKeyerSettings");
+
             dialog.ShowDialog();
             _box.Focus();
         }
@@ -1904,27 +2035,19 @@ namespace HolyLogger
             return line;
         }
 
-        // ── WPM ##, AND THE WHEEL OVER IT ───────────────────────────────────────────────────────
+        // -- WPM ##, READ FROM THE RADIO -------------------------------------------------------
         //
-        // The keyer used to TIME the keying and work the speed out from it - an estimate of a number
-        // the radio knows exactly, and one the operator could not change without reaching past the
-        // program to the radio's own menu. Every maker has a command for it, so it is set from here.
+        // DISPLAY ONLY, AND ON PURPOSE. The speed was settable from here with a wheel over the
+        // number, and it worked - but the radio's own knob overruled it the moment it was touched,
+        // and the knob resumes from ITS last number rather than from ours. Two controls for one
+        // setting, and no way for the operator to tell which of them had spoken last.
         //
-        // IN THE TITLE BAR, because a speed is changed in the middle of a QSO. Behind the gear it
-        // would be three clicks and a dialog, which is not a thing anybody does while sending.
+        // So the knob on the radio is the only control now, and this is the readout that says where
+        // the knob has left it. Nothing here is ever sent to the radio.
         //
-        // TURNED, NOT TYPED. A notch of the wheel over the number is one word a minute, which is how
-        // an operator thinks about it - a little faster, a little slower - and it needs no Enter and
-        // no undoing of a half-typed number.
-        //
-        // 5 TO 30, which is the range asked for: the speeds a man actually works at. The radios go
-        // wider - a Kenwood to 60 - and the wheel deliberately does not, because a notch that can
-        // reach 60 is a notch that can run away from him.
-        private const int WheelWpmLow = 5;
-        private const int WheelWpmHigh = 30;
+        // IN THE TITLE BAR, because it is a number glanced at in the middle of a QSO.
 
         private TextBlock _wpmText;
-        private Border _wpmNumberBox;
         private int _wpm;
 
         private UIElement BuildSpeedReadout()
@@ -1937,33 +2060,19 @@ namespace HolyLogger
                 VerticalAlignment = VerticalAlignment.Center
             };
 
-            // Nothing to show on a radio this program cannot tell.
-            if (_setSpeed == null || _speedRange == null) return holder;
+            // Nothing to show on a radio this program cannot ask.
+            if (_speedRange == null) return holder;
 
             int low, high;
             Limits(out low, out high);
             if (high == 0) return holder;
 
-            // THE SPEED IT LAST SENT, and it is SENT AGAIN as this window opens.
-            //
-            // The readout used to start at a made-up 20 while the radio was at 10, so the first thing
-            // the operator read was a number that was not true - and it stayed untrue until he
-            // happened to turn the wheel. There is no asking the radio: OmniRig's custom commands are
-            // send-only, so nothing can be read back.
-            //
-            // So the program states rather than guesses. It opens with the speed it last put on this
-            // radio, sends it, and from that moment the number on the bar is the speed the radio is
-            // keying at. (The radio's own knob can still overrule it afterwards - two controls for one
-            // setting, and the last one to speak wins. That is the radio's arrangement, not ours.)
-            int remembered = 20;
-            try { remembered = Properties.Settings.Default.CwKeyerWpm; }
-            catch (Exception swallowed) { Log.Swallow(swallowed); }
+            // TWO DASHES UNTIL THE RADIO HAS ANSWERED, which is a moment - the question goes out as
+            // the window opens. It used to start at a remembered number, and a remembered number is
+            // exactly the thing this readout exists to stop showing: it read 22 while the radio keyed
+            // at 10 and looked no different from the truth.
+            _wpm = 0;
 
-            _wpm = Math.Max(low, Math.Min(high, remembered <= 0 ? 20 : remembered));
-
-            // THE WORD AND THE NUMBER ARE TWO PIECES, because only one of them lights. The wheel is
-            // answered over the whole patch, but what it CHANGES is the number - so the yellow goes
-            // round the digits and nothing else.
             var wpmLabel = new TextBlock
             {
                 Text = "WPM",
@@ -1978,130 +2087,92 @@ namespace HolyLogger
                 FontSize = 16,
                 FontWeight = FontWeights.Bold,
                 Foreground = Brushes.Black,
-                VerticalAlignment = VerticalAlignment.Center
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(6, 0, 0, 0)
             };
             RefreshSpeedText();
 
-            _wpmNumberBox = new Border
-            {
-                Background = Brushes.Transparent,
-                Padding = new Thickness(3, 0, 3, 0),
-                Margin = new Thickness(3, 0, 0, 0),
-                VerticalAlignment = VerticalAlignment.Center,
-                Child = _wpmText
-            };
-
-            // THE ARROWS ARE THE WHOLE POINT OF SHOWING IT AS A NUMBER. A wheel over a piece of text
-            // is not something anybody expects, so it is said rather than left to be discovered - and
-            // said beside the number, which is the only place the wheel does anything.
-            var hint = new TextBlock
-            {
-                Text = "⇅",
-                FontSize = 15,
-                FontWeight = FontWeights.Bold,
-                Foreground = Brushes.DimGray,
-                VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(4, 0, 0, 0)
-            };
-
             var line = new StackPanel { Orientation = Orientation.Horizontal };
             line.Children.Add(wpmLabel);
-            line.Children.Add(_wpmNumberBox);
-            line.Children.Add(hint);
+            line.Children.Add(_wpmText);
 
-            // On the whole patch, so it answers wherever the pointer is when the question occurs to
-            // him. The second line was learned the hard way on an IC-7610: a speed set here really is
-            // the speed the radio keys at, but the radio's own knob resumes from ITS last number - so
-            // one nudge of it puts the radio back near where it was and throws away what was set from
-            // here. Nothing in the program can prevent that; the least it can do is say so before
-            // somebody else spends an evening on it.
-            // ScrollNS, the same cursor the frequency readouts and the cluster's Live Scale list
-            // wear: everywhere in this program that the wheel moves a number, the pointer says so the
-            // same way. It used to be SizeNS, which is the cursor for dragging an edge - close enough
-            // to be read as "drag me", which this is not.
-            holder.Cursor = System.Windows.Input.Cursors.ScrollNS;
-            holder.ToolTip = "The radio's keyer speed. Roll the wheel over it: "
-                           + low + " to " + high + " words a minute.\n\n"
-                           + "The radio's own speed knob works separately — whichever you turn "
-                           + "last wins.";
+            holder.ToolTip = "The radio's keyer speed, as the radio itself reports it."
+                           + Environment.NewLine + Environment.NewLine
+                           + "Change it with the speed knob on the radio.";
 
             holder.Child = line;
             System.Windows.Shell.WindowChrome.SetIsHitTestVisibleInChrome(holder, true);
 
-            holder.MouseWheel += (s2, e2) =>
-            {
-                Nudge(e2.Delta > 0 ? 1 : -1);
-                e2.Handled = true;
-            };
-
-            // AND IT SAYS SO BEFORE THE WHEEL IS ROLLED. The arrows say a wheel works here; the
-            // yellow says exactly what it works ON, over the whole patch the wheel is answered in.
-            holder.MouseEnter += (s2, e2) => _wpmNumberBox.Background = WheelZoneBrush;
-            holder.MouseLeave += (s2, e2) => _wpmNumberBox.Background = Brushes.Transparent;
-
-            // Sent once the window is up, not from here: the keyer is still being built and a command
-            // that fails would raise its message box over a half-drawn window.
-            Dispatcher.BeginInvoke(new Action(SendSpeed), DispatcherPriority.Loaded);
+            // ASKED THE MOMENT THE WINDOW IS UP, not on the first tick a second later: the operator
+            // opens this window and looks straight at the number.
+            Dispatcher.BeginInvoke(new Action(AskRadioItsSpeed), DispatcherPriority.Loaded);
 
             return holder;
         }
 
-        // His 5 to 50, held inside what the radio itself accepts - an Elecraft starts at 8 and an
-        // Icom stops at 48, and asking either for a speed its manual does not offer is asking for
-        // whatever it decides to do about it.
+        // What the radio itself will accept - an Elecraft starts at 8, an Icom stops at 48. A number
+        // outside it is a number that was misread, and is dropped rather than shown.
         private void Limits(out int low, out int high)
         {
-            int radioLow, radioHigh;
-            _speedRange(out radioLow, out radioHigh);
-
-            if (radioHigh == 0) { low = 0; high = 0; return; }
-
-            low = Math.Max(WheelWpmLow, radioLow);
-            high = Math.Min(WheelWpmHigh, radioHigh);
-        }
-
-        private void Nudge(int by)
-        {
-            int low, high;
-            Limits(out low, out high);
-            if (high == 0) return;
-
-            int wanted = _wpm + by;
-            if (wanted < low) wanted = low;
-            if (wanted > high) wanted = high;
-            if (wanted == _wpm) return;
-
-            _wpm = wanted;
-            RefreshSpeedText();
-            SendSpeed();
-        }
-
-        private void SendSpeed()
-        {
-            if (_setSpeed == null) return;
-
-            try { _setSpeed(_wpm); }
-            catch (Exception swallowed) { Log.Swallow(swallowed); }
-
-            // Kept for the next time this window opens, so it starts where he left it rather than at
-            // a number nobody chose.
-            try
-            {
-                Properties.Settings.Default.CwKeyerWpm = _wpm;
-                SettingsFlush.RequestSave();
-            }
-            catch (Exception swallowed) { Log.Swallow(swallowed); }
+            _speedRange(out low, out high);
         }
 
         private void RefreshSpeedText()
         {
-            if (_wpmText != null) _wpmText.Text = _wpm.ToString(CultureInfo.InvariantCulture);
+            if (_wpmText != null)
+                _wpmText.Text = _wpm > 0 ? _wpm.ToString(CultureInfo.InvariantCulture) : "--";
+        }
+
+        // -- THE NUMBER FOLLOWS THE RADIO ------------------------------------------------------
+        //
+        // The radio is ASKED, over and over, and what it answers is what stands in the readout. Turn
+        // the speed knob on the radio and the number here follows within a second.
+        //
+        // AND THE PROGRAM NEVER SETS IT, which is why asking is enough. Setting it from here did work
+        // - the radio keyed at the speed it was sent - but the number BEHIND THE KNOB stayed where it
+        // was, so the first nudge of the knob threw the sent speed away and went back to the radio's
+        // own. One control that the other silently undoes is worse than one control; so the knob is
+        // the control, and this window reports it.
+        //
+        // ONCE A SECOND, AND NOT WHILE ANYTHING IS BEING SENT. A question on the wire in the middle
+        // of a message is a question competing with the text for the same wire, and the text is the
+        // thing that must not stutter.
+        //
+        // AND IT STOPS ASKING A RADIO THAT WILL NOT ANSWER. Not every radio the program keys can
+        // be asked its speed - a maker that publishes no command for it has none, and there is no
+        // arguing with that. Those radios are keyed exactly as before and the readout simply stays
+        // at --, which is honest. What must not happen is a question every second for the whole
+        // evening on a wire the CW itself is using, so after ten unanswered tries it gives up.
+        private static readonly TimeSpan AskSpeedEvery = TimeSpan.FromSeconds(1);
+        private const int AskSpeedGiveUpAfter = 10;
+        private DateTime _speedAskedUtc = DateTime.MinValue;
+        private int _speedAsksUnanswered;
+
+        private void AskRadioItsSpeed()
+        {
+            if (_askSpeed == null || _wpmText == null) return;
+
+            if ((_box.Text ?? string.Empty).Length > 0 || _inFlight.Count > 0) return;
+            if (DateTime.UtcNow < _radioBusyUntil) return;
+            if (DateTime.UtcNow - _speedAskedUtc < AskSpeedEvery) return;
+            if (_speedAsksUnanswered >= AskSpeedGiveUpAfter) return;
+
+            _speedAskedUtc = DateTime.UtcNow;
+            _speedAsksUnanswered++;
+
+            try { _askSpeed(); }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
         }
 
         // The speed the radio is really at, shown without being sent back to it.
         internal void ShowSpeed(int wpm)
         {
-            if (_wpmText == null || wpm <= 0 || wpm == _wpm) return;
+            if (_wpmText == null || wpm <= 0) return;
+
+            // AN ANSWER OF ANY KIND MEANS THE RADIO IS TALKING, even one that says what the readout
+            // already shows - so the tries start counting from nothing again and the asking goes on.
+            _speedAsksUnanswered = 0;
+            if (wpm == _wpm) return;
 
             int low, high;
             Limits(out low, out high);
@@ -2122,6 +2193,7 @@ namespace HolyLogger
         {
             var keys = new[]
             {
+                new[] { "F1 to F12",    "Press the twelve buttons, 1 to 12, while this window is open - even when you are typing in the main window." },
                 new[] { "Ctrl+K",       "Closes this window. On the main window it opens it." },
                 new[] { "Escape",       "Stops the radio now and drops whatever has not gone out. What has already gone stays in the record." },
                 new[] { "Backspace",    "Takes back only what has not gone out yet." },

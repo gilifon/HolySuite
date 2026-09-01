@@ -30,8 +30,12 @@ namespace HolyLogger
         public AboutWindow(int callsignVersion = 0, int callsignCount = -1)
         {
             InitializeComponent();
-            Left = (System.Windows.SystemParameters.PrimaryScreenWidth - Width) / 2;
-            Top = (System.Windows.SystemParameters.PrimaryScreenHeight - Height) / 2;
+            // Where the operator last put it. This used to centre itself on the PRIMARY screen every
+            // time (SystemParameters.PrimaryScreenWidth/Height), so on a two-screen desk it jumped back
+            // to the first screen however often it was moved. WindowBounds measures the real monitors,
+            // so a position on the second screen is kept; with nothing saved yet the window centres
+            // itself (WindowStartupLocation in the XAML).
+            WindowBounds.Attach(this, "About");
             L_Version.Text = "Version " + Assembly.GetExecutingAssembly().GetName().Version.ToString();
             L_CallsignVersion.Text = "Callsigns Version: " + callsignVersion.ToString();
             L_CallsignCount.Text = callsignCount > 0
