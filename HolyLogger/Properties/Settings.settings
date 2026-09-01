@@ -761,6 +761,18 @@
     <Setting Name="CwKeyerWpm" Type="System.Int32" Scope="User">
       <Value Profile="(Default)">20</Value>
     </Setting>
+    <Setting Name="CwKeyerLabelsJson" Type="System.String" Scope="User">
+      <Value Profile="(Default)" />
+    </Setting>
+    <Setting Name="CwMsgLabelsJson" Type="System.String" Scope="User">
+      <Value Profile="(Default)" />
+    </Setting>
+    <Setting Name="CwKeyerButtonsSpJson" Type="System.String" Scope="User">
+      <Value Profile="(Default)" />
+    </Setting>
+    <Setting Name="CwKeyerBankSp" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">False</Value>
+    </Setting>
     <Setting Name="CwKeyerQrlText" Type="System.String" Scope="User">
       <Value Profile="(Default)">QRL?</Value>
     </Setting>

@@ -13115,19 +13115,48 @@ namespace HolyLogger
         }
 
         // Cancels a paste into any text box when the clipboard text contains non-English characters.
+        //
+        // A LINE BREAK IS NOT A FOREIGN LETTER. Tab, carriage return and line feed sit below space in
+        // the table, so the English test refused them - and a paste is all or nothing, which meant that
+        // copying a whole line from Notepad, a web page or a spreadsheet put NOTHING in the box and said
+        // nothing about why. Text is judged with those three taken out; a box that does not accept
+        // returns then gets the same text as one line, breaks and tabs turned into single spaces.
         private void GlobalTextBox_EnglishOnly_Pasting(object sender, DataObjectPastingEventArgs e)
         {
             if (e.DataObject.GetDataPresent(DataFormats.UnicodeText) || e.DataObject.GetDataPresent(DataFormats.Text))
             {
                 string text = (e.DataObject.GetData(DataFormats.UnicodeText) ?? e.DataObject.GetData(DataFormats.Text)) as string;
-                if (!IsEnglishOnly(text))
+                if (!IsEnglishOnly((text ?? string.Empty).Replace("\t", "").Replace("\r", "").Replace("\n", "")))
+                {
                     e.CancelCommand();
+                    return;
+                }
+
+                var box = sender as TextBox;
+                if (box != null && !box.AcceptsReturn && text != null && text.IndexOfAny(new[] { '\t', '\r', '\n' }) >= 0)
+                {
+                    e.DataObject = new DataObject(DataFormats.UnicodeText, OneLine(text));
+                }
             }
             else
             {
-                // Non-text payload (e.g. an image) — disallow.
+                // Non-text payload (e.g. an image) - disallow.
                 e.CancelCommand();
             }
+        }
+
+        // Pasted text as a single line: every run of breaks, tabs and spaces becomes one space.
+        private static string OneLine(string text)
+        {
+            var said = new StringBuilder();
+            bool gap = false;
+            foreach (char c in text ?? string.Empty)
+            {
+                if (c == '\t' || c == '\r' || c == '\n' || c == ' ') { gap = said.Length > 0; continue; }
+                if (gap) { said.Append(' '); gap = false; }
+                said.Append(c);
+            }
+            return said.ToString();
         }
 
         private void TB_Band_TextChanged(object sender, TextChangedEventArgs e)

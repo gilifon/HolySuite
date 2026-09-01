@@ -111,6 +111,11 @@ namespace HolyLogger
         internal Func<double> RadioFrequencyHz { set { _rxFrequencyHz = value; } }
         private Func<double> _rxFrequencyHz;
 
+        // Writes one of the main window's four Msg texts. Only the macro editor uses it - the keyer's
+        // own twelve stopped being those four when the two sets were separated.
+        internal Action<int, string> SetMsgText { set { _setSharedText = value; } }
+        private Action<int, string> _setSharedText;
+
         // -- ASK BEFORE YOU CLAIM A FREQUENCY -----------------------------------------------------
         //
         // A CQ on top of a QSO already in progress is the rudest thing a man can do on a band, and it
@@ -137,7 +142,7 @@ namespace HolyLogger
         // words are not ours to fix. Empty falls back to QRL? rather than asking with nothing at all.
         private const string QrlDefaultText = "QRL?";
 
-        private static string QrlText()
+        internal static string QrlText()
         {
             try
             {
@@ -149,7 +154,7 @@ namespace HolyLogger
         private double _cqFreqHz;
         private DateTime _cqSentUtc = DateTime.MinValue;
 
-        private static int QrlMinutes()
+        internal static int QrlMinutes()
         {
             try
             {
@@ -1642,12 +1647,93 @@ namespace HolyLogger
             return brush;
         }
 
+        // -- WHAT IS WRITTEN ON THE KEYCAP ---------------------------------------------------------
+        //
+        // The face used to be the first characters of the macro itself, which on a button this wide is
+        // "CQ CQ D..." - the operator recognises it, but only because he wrote it. So each button can
+        // carry a NAME of his own instead: CQ, TU, MY CALL, whatever he calls it in his head.
+        //
+        // ONE NAME FOR BOTH BANKS. The Run and S&P texts on a key are two versions of the same job -
+        // his exchange, his call - and a key whose name changed with the bank would be a key he had to
+        // read twice. Anyone who wants the macro on the face can simply type the macro as the name.
+        //
+        // NO NAME KEEPS THE OLD BEHAVIOUR: the macro, trimmed with an ellipsis, or the button's number
+        // when it is empty.
+        internal static string[] ReadLabels(string settingName, int count)
+        {
+            var labels = new string[count];
+            for (int i = 0; i < count; i++) labels[i] = string.Empty;
+
+            try
+            {
+                string json = (string)Properties.Settings.Default[settingName];
+                if (string.IsNullOrWhiteSpace(json))
+                {
+                    // A KEYCAP NAME ONLY FITS THE MACRO UNDER IT. The standard names are handed out on a
+                    // fresh installation - where the macros are the standard ones too - and never over an
+                    // operator's own texts, which would put "Exch" on a button that says something else.
+                    if (settingName == KeyerLabelsSetting && string.IsNullOrWhiteSpace(ReadBankJson(false)))
+                        for (int i = 0; i < count && i < StandardLabels.Length; i++) labels[i] = StandardLabels[i];
+
+                    return labels;
+                }
+
+                var saved = JsonConvert.DeserializeObject<string[]>(json);
+                if (saved == null) return labels;
+
+                for (int i = 0; i < count && i < saved.Length; i++) labels[i] = saved[i] ?? string.Empty;
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+            return labels;
+        }
+
+        internal static void SaveLabels(string settingName, string[] labels, int count)
+        {
+            var own = new string[count];
+            for (int i = 0; i < count; i++)
+                own[i] = labels != null && i < labels.Length ? (labels[i] ?? string.Empty) : string.Empty;
+
+            try
+            {
+                Properties.Settings.Default[settingName] = JsonConvert.SerializeObject(own);
+                Properties.Settings.Default.Save();
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        internal const string KeyerLabelsSetting = "CwKeyerLabelsJson";
+        internal const string MsgLabelsSetting = "CwMsgLabelsJson";
+
+        private string ButtonLabel(int index)
+        {
+            var labels = ReadLabels(KeyerLabelsSetting, ButtonCount);
+
+            return index >= 0 && index < labels.Length ? (labels[index] ?? string.Empty).Trim() : string.Empty;
+        }
+
         private void RefreshButtonFace(int index)
         {
             var button = _buttons[index];
             if (button == null) return;
 
             string text = _buttonTexts[index] ?? string.Empty;
+            string label = ButtonLabel(index);
+
+            if (label.Length > 0)
+            {
+                button.Content = new TextBlock
+                {
+                    Text = label,
+                    TextTrimming = TextTrimming.CharacterEllipsis,
+                    TextAlignment = TextAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+                button.SetResourceReference(ForegroundProperty,
+                                           text.Length == 0 ? "MutedTextBrush" : "TextBrush");
+                button.ToolTip = BuildButtonTooltip(index);
+                return;
+            }
 
             // AS MUCH OF IT AS THE BUTTON CAN HOLD, and an ellipsis where it runs out - not a fixed
             // eight characters, which cut "CQ CQ DE * * K" down to "CQ CQ DE" while there was still
@@ -1866,59 +1952,101 @@ namespace HolyLogger
         // thirteenth button later costs nothing, and a profile that snapshots the settings takes them
         // all along. A file written by an older build holds only eight, and the four it does not hold
         // are filled in below.
-        private string[] LoadButtonTexts()
+        // -- TWO BANKS OF TWELVE, RUN AND SEARCH AND POUNCE ---------------------------------------
+        //
+        // N1MM keeps two sets of texts and swaps them with the mode, because the two ways of operating
+        // want different things on the same keys: running, button 1 is your CQ; searching, there is no
+        // CQ to send at all and the key is better spent on something else. So the twelve faces change
+        // with the bar - click S&P and all twelve are his other set - and ESM reads whichever bank is
+        // showing.
+        //
+        // OFF KEEPS THE LAST ONE. The bar's Off is about the Enter key, not about which texts he wants
+        // in front of him, so switching ESM off leaves the bank where it was. A keyer that has never
+        // been switched shows Run.
+        internal static bool ShowingSpBank
+        {
+            get
+            {
+                try { return Properties.Settings.Default.CwKeyerBankSp; }
+                catch (Exception swallowed) { Log.Swallow(swallowed); return false; }
+            }
+        }
+
+        internal static string BankSettingName(bool sp)
+        {
+            return sp ? "CwKeyerButtonsSpJson" : "CwKeyerButtonsJson";
+        }
+
+        // WHAT THE BUTTONS HOLD BEFORE ANYBODY HAS WRITTEN ANYTHING. A new installation opens on the
+        // standard contest set instead of twelve empty buttons - the same texts the macro editor's
+        // button writes. NOTHING IS EVER OVERWRITTEN BY THIS: it applies only where the operator has
+        // saved nothing at all, so an upgrade keeps every text he wrote. Emptying a button and saving
+        // is a saved bank like any other, and it stays empty.
+        internal static string[] LoadBank(bool sp)
         {
             var texts = new string[ButtonCount];
             for (int i = 0; i < ButtonCount; i++) texts[i] = string.Empty;
 
             try
             {
-                string json = Properties.Settings.Default.CwKeyerButtonsJson;
-                if (!string.IsNullOrWhiteSpace(json))
+                string json = ReadBankJson(sp);
+                if (string.IsNullOrWhiteSpace(json))
                 {
-                    var saved = JsonConvert.DeserializeObject<string[]>(json);
-                    if (saved != null)
-                    {
-                        for (int i = 0; i < ButtonCount && i < saved.Length; i++)
-                        {
-                            texts[i] = saved[i] ?? string.Empty;
-                        }
-                    }
+                    string[] standard = sp ? StandardSpTexts : StandardTexts;
+                    for (int i = 0; i < ButtonCount && i < standard.Length; i++) texts[i] = standard[i];
+                    return texts;
                 }
+
+                var saved = JsonConvert.DeserializeObject<string[]>(json);
+                if (saved == null) return texts;
+
+                for (int i = 0; i < ButtonCount && i < saved.Length; i++) texts[i] = saved[i] ?? string.Empty;
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
 
-            // ONCE, AND ONLY INTO EMPTY SLOTS. Until now the first four of these buttons WERE the main
-            // window's four Msg texts, and the keyer's own setting kept those four slots blank. Now that
-            // the two sets are apart, a keyer that opened blank would look as though it had thrown his
-            // CQ and his exchange away - so the first time it finds them empty it takes a copy of what
-            // the Msg buttons hold. Copy, not move: the four on the main window are untouched, and from
-            // this moment the two sets go their own ways.
-            if (_getSharedText != null && ButtonsAreEmpty(texts, EsmButtons))
+            return texts;
+        }
+
+        internal static string ReadBankJson(bool sp)
+        {
+            try { return (string)Properties.Settings.Default[BankSettingName(sp)]; }
+            catch (Exception swallowed) { Log.Swallow(swallowed); return string.Empty; }
+        }
+
+        private string[] LoadButtonTexts()
+        {
+            bool nothingSaved = string.IsNullOrWhiteSpace(ReadBankJson(ShowingSpBank));
+            string[] texts = LoadBank(ShowingSpBank);       // his own, or the standard set
+
+            // ONCE, AND ONLY WHERE HE HAS SAVED NOTHING. Until now the first four of these buttons WERE
+            // the main window's four Msg texts, and the keyer's own setting kept those four slots blank.
+            // Now that the two sets are apart, a keyer that opened without them would look as though it
+            // had thrown his CQ and his exchange away - so the first time it finds nothing saved it takes
+            // a copy of what the Msg buttons hold, and HIS four win over the standard four. Copy, not
+            // move: the four on the main window are untouched, and from here the two sets go their own
+            // ways.
+            if (nothingSaved && !ShowingSpBank && _getSharedText != null)
             {
+                var his = new string[EsmButtons];
                 bool copied = false;
                 for (int i = 0; i < EsmButtons; i++)
                 {
                     try
                     {
-                        texts[i] = _getSharedText(i + 1) ?? string.Empty;
-                        if (texts[i].Length > 0) copied = true;
+                        his[i] = _getSharedText(i + 1) ?? string.Empty;
+                        if (his[i].Length > 0) copied = true;
                     }
-                    catch (Exception swallowed) { Log.Swallow(swallowed); }
+                    catch (Exception swallowed) { Log.Swallow(swallowed); his[i] = string.Empty; }
                 }
 
-                if (copied) SaveAllButtonTexts(texts);
+                if (copied)
+                {
+                    for (int i = 0; i < EsmButtons && i < texts.Length; i++) texts[i] = his[i];
+                    SaveAllButtonTexts(texts);
+                }
             }
 
             return texts;
-        }
-
-        private static bool ButtonsAreEmpty(string[] texts, int howMany)
-        {
-            for (int i = 0; i < howMany && i < texts.Length; i++)
-                if (!string.IsNullOrWhiteSpace(texts[i])) return false;
-
-            return true;
         }
 
         // All twelve are this window's own now - nothing here is written back to the Msg buttons.
@@ -1929,15 +2057,20 @@ namespace HolyLogger
 
         private static void SaveAllButtonTexts(string[] texts)
         {
+            SaveBank(texts, ShowingSpBank);
+        }
+
+        internal static void SaveBank(string[] texts, bool sp)
+        {
             var own = new string[ButtonCount];
             for (int i = 0; i < ButtonCount; i++)
             {
-                own[i] = i < texts.Length ? (texts[i] ?? string.Empty) : string.Empty;
+                own[i] = texts != null && i < texts.Length ? (texts[i] ?? string.Empty) : string.Empty;
             }
 
             try
             {
-                Properties.Settings.Default.CwKeyerButtonsJson = JsonConvert.SerializeObject(own);
+                Properties.Settings.Default[BankSettingName(sp)] = JsonConvert.SerializeObject(own);
                 Properties.Settings.Default.Save();
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
@@ -2050,6 +2183,10 @@ namespace HolyLogger
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
 
+            // AND THE TWELVE FACES ARE HIS OTHER SET. Off is about the Enter key and leaves the bank
+            // alone; Run and S&P each bring their own texts up.
+            if (on) ShowBank(searchAndPounce);
+
             // RUN AND S&P ARE TYPE. They are contest working: the macros do the talking, Enter walks
             // the QSO from the callsign box, and there is no long sentence to compose. Holding the line
             // back for an Enter that belongs to the other window would only be a trap, so choosing
@@ -2058,6 +2195,32 @@ namespace HolyLogger
 
             RefreshEsmChoice();
             _box.Focus();
+        }
+
+        internal void ShowBank(bool sp)
+        {
+            if (ShowingSpBank == sp) return;
+
+            try
+            {
+                Properties.Settings.Default.CwKeyerBankSp = sp;
+                Properties.Settings.Default.Save();
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+            ReloadButtonTexts();
+        }
+
+        // The faces come back from the setting - after a bank change, and after the editor has written
+        // to it.
+        internal void ReloadButtonTexts()
+        {
+            var texts = LoadButtonTexts();
+            for (int i = 0; i < ButtonCount && i < texts.Length; i++)
+            {
+                _buttonTexts[i] = texts[i];
+                RefreshButtonFace(i);
+            }
         }
 
         // Also called from the main window: Ctrl+M switches ESM off and on from over there, and this bar
@@ -2326,96 +2489,27 @@ namespace HolyLogger
             secondsRow.Children.Add(secondsBox);
             secondsRow.Children.Add(secondsUnit);
 
-            var qrlBox = new TextBox
+            // THE TWO WAYS OUT OF THIS WINDOW, ON THE FIRST LINE AND HARD RIGHT: the macros, and the
+            // list of radios that can be keyed. Both are reasons a man opens this window, and at the
+            // bottom - under a page of help - they were the last things he found.
+            var topRight = new StackPanel
             {
-                Text = QrlMinutes().ToString(CultureInfo.InvariantCulture),
-                FontSize = 16,
-                Width = 70,
-                Padding = new Thickness(4, 2, 4, 2),
-                VerticalContentAlignment = VerticalAlignment.Center
+                HorizontalAlignment = HorizontalAlignment.Right,
+                Margin = new Thickness(20, 0, 24, 0)
             };
-
-            var qrlTextBox = new TextBox
-            {
-                Text = QrlText(),
-                FontSize = 16,
-                Width = 110,
-                Padding = new Thickness(4, 2, 4, 2),
-                CharacterCasing = CharacterCasing.Upper,
-                VerticalContentAlignment = VerticalAlignment.Center
-            };
-
-            var qrlTextLabel = new TextBlock
-            {
-                Text = "Ask the frequency is free with",
-                FontSize = 16,
-                VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(0, 0, 10, 0)
-            };
-            qrlTextLabel.SetResourceReference(TextBlock.ForegroundProperty, "TextBrush");
-
-            var qrlTextNote = new TextBlock
-            {
-                Text = "Recommended: QRL?",
-                FontSize = 16,
-                FontWeight = FontWeights.Bold,
-                VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(12, 0, 0, 0)
-            };
-            qrlTextNote.SetResourceReference(TextBlock.ForegroundProperty, "MutedTextBrush");
-
-            var qrlTextRow = new DockPanel { LastChildFill = false, Margin = new Thickness(0, 18, 0, 0) };
-            DockPanel.SetDock(qrlTextLabel, Dock.Left);
-            DockPanel.SetDock(qrlTextBox, Dock.Left);
-            DockPanel.SetDock(qrlTextNote, Dock.Left);
-            qrlTextRow.Children.Add(qrlTextLabel);
-            qrlTextRow.Children.Add(qrlTextBox);
-            qrlTextRow.Children.Add(qrlTextNote);
-
-            var qrlLabel = new TextBlock
-            {
-                Text = "Ask it if the CQ button has not been used for",
-                FontSize = 16,
-                VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(0, 0, 10, 0)
-            };
-            qrlLabel.SetResourceReference(TextBlock.ForegroundProperty, "TextBrush");
-
-            var qrlUnit = new TextBlock
-            {
-                Text = "Minutes",
-                FontSize = 16,
-                VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(10, 0, 0, 0)
-            };
-            qrlUnit.SetResourceReference(TextBlock.ForegroundProperty, "TextBrush");
-
-            var qrlHint = new TextBlock
-            {
-                Text = "The CQ button asks instead of calling, whenever the radio has moved off the "
-                     + "frequency it last called on - or has sat on it this long without calling. 0 never "
-                     + "asks on time alone.",
-                FontSize = 16,
-                TextWrapping = TextWrapping.Wrap,
-                Margin = new Thickness(0, 10, 0, 0)
-            };
-            qrlHint.SetResourceReference(TextBlock.ForegroundProperty, "MutedTextBrush");
-
-            var qrlRow = new DockPanel { LastChildFill = false, Margin = new Thickness(0, 18, 0, 0) };
-            DockPanel.SetDock(qrlLabel, Dock.Left);
-            DockPanel.SetDock(qrlBox, Dock.Left);
-            DockPanel.SetDock(qrlUnit, Dock.Left);
-            qrlRow.Children.Add(qrlLabel);
-            qrlRow.Children.Add(qrlBox);
-            qrlRow.Children.Add(qrlUnit);
+            topRight.Children.Add(BuildMacroEditorButton());
+            topRight.Children.Add(BuildRadioLink());
+            DockPanel.SetDock(topRight, Dock.Right);
+            secondsRow.Children.Add(topRight);
 
             var okBtn = new Button { Content = "OK", FontSize = 16, Width = 90, Height = 32, IsDefault = true };
             var cancelBtn = new Button { Content = "Cancel", FontSize = 16, Width = 90, Height = 32, IsCancel = true, Margin = new Thickness(10, 0, 0, 0) };
 
+            // In the MIDDLE, under the settings they close - the same as the macro editor's pair.
             var buttons = new StackPanel
             {
                 Orientation = Orientation.Horizontal,
-                HorizontalAlignment = HorizontalAlignment.Right,
+                HorizontalAlignment = HorizontalAlignment.Center,
                 Margin = new Thickness(0, 18, 0, 0)
             };
             buttons.Children.Add(okBtn);
@@ -2424,13 +2518,8 @@ namespace HolyLogger
             var stack = new StackPanel { Margin = new Thickness(16) };
             stack.Children.Add(secondsRow);
             stack.Children.Add(secondsHint);
-            stack.Children.Add(qrlTextRow);
-            stack.Children.Add(qrlRow);
-            stack.Children.Add(qrlHint);
             stack.Children.Add(row);
             stack.Children.Add(BuildHelp());
-            stack.Children.Add(BuildStandardTextsButton());
-            stack.Children.Add(BuildRadioLink());
             stack.Children.Add(buttons);
 
             var dialog = new Window
@@ -2480,15 +2569,6 @@ namespace HolyLogger
                     return;
                 }
 
-                if (!int.TryParse((qrlBox.Text ?? string.Empty).Trim(), out int qrlMinutes) || qrlMinutes < 0)
-                {
-                    HolyMessageBox.ShowWarning("Type a whole number of minutes, or 0 to never ask on time alone.",
-                                               "CW Keyer Settings", dialog);
-                    return;
-                }
-
-                Properties.Settings.Default.CwKeyerQrlText = (qrlTextBox.Text ?? string.Empty).Trim();
-                Properties.Settings.Default.CwKeyerQrlMinutes = qrlMinutes;
                 Properties.Settings.Default.CwKeyboardHistoryRows = rows;
                 Properties.Settings.Default.CwKeyboardBreakSeconds = seconds;
                 try { Properties.Settings.Default.Save(); }
@@ -2507,18 +2587,12 @@ namespace HolyLogger
             _box.Focus();
         }
 
-        // ── THE WAY TO THE LIST, NOT THE LIST ───────────────────────────────────
-        //
-        // Which radios can be keyed is a REFERENCE: nothing on it is chosen or changed, and a page of
-        // it in the middle of a settings dialog is a page standing between a man and the two boxes he
-        // came to alter. It lives under Help now, and this is the door to it - here, because this is
-        // where he is standing when the question occurs to him.
-        // THE STANDARD SET, in one press. The eight texts most CW contesters use, written with the
-        // macros so they fill themselves in - and in the order ESM expects: 1 is the CQ, 2 the
-        // exchange, 3 the TU, 4 your own callsign. A new installation starts with the first four
-        // already set to these; this is here for everybody else, whose buttons were filled in long
-        // before the macros existed.
-        private static readonly string[] StandardTexts =
+        // THE STANDARD SET. The eight texts most CW contesters use, written with the macros so they
+        // fill themselves in - and in the order ESM expects: 1 is the CQ, 2 the exchange, 3 the TU,
+        // 4 your own callsign. A new installation starts with the first four already set to these;
+        // they are here for everybody else, whose buttons were filled in long before the macros
+        // existed. The button that writes them is in the macro editor, where the macros are.
+        internal static readonly string[] StandardTexts =
         {
             "CQ TEST {MYCALL} {MYCALL} TEST",
             "{CALL} {SENTRST} {EXCH}",
@@ -2530,49 +2604,88 @@ namespace HolyLogger
             "QSO B4"
         };
 
-        private UIElement BuildStandardTextsButton()
+        // THE SAME SET, SEARCH-AND-POUNCE. One key is different and it is the first: in Run, F1 calls
+        // CQ; hunting, he has found somebody else calling and what he sends is his own callsign. The
+        // rest is what he says once the other man comes back, which is the same either way.
+        internal static readonly string[] StandardSpTexts =
+        {
+            "{MYCALL}",
+            "{SENTRST} {EXCH}",
+            "TU {MYCALL} {LOG}",
+            "{MYCALL}",
+            "{CALL}",
+            "AGN?",
+            "NR?",
+            "QSO B4"
+        };
+
+        // WHAT IS WRITTEN ON THE KEYCAP. Without these the button face shows the macro itself - which
+        // is honest, but "CQ TEST {MYCALL} {MYCALL} TEST" in a small button is a wall of text, and in a
+        // contest the eye wants one word.
+        internal static readonly string[] StandardLabels =
+        {
+            "CQ",
+            "Exch",
+            "TU",
+            "My Call",
+            "His Call",
+            "AGN?",
+            "NR?",
+            "QSO B4"
+        };
+
+        // THE WAY TO ALL TWENTY-EIGHT. Right-clicking a button still edits that one text, which is what
+        // a man does mid-contest; this is for sitting down with the whole set. Loud on purpose - white
+        // on the blue the Log Fixer uses for the thing a window is FOR - because it is the reason most
+        // operators open this window at all.
+        private UIElement BuildMacroEditorButton()
         {
             var button = new Button
             {
-                Content = "Use the standard contest texts",
+                Content = "Edit all the macros",
                 FontSize = 16,
-                Padding = new Thickness(12, 4, 12, 4),
-                HorizontalAlignment = HorizontalAlignment.Left,
-                Margin = new Thickness(0, 18, 0, 0),
-                ToolTip = "Writes the eight texts most CW contesters use into all eight buttons."
+                FontWeight = FontWeights.Bold,
+                Foreground = Brushes.White,
+                Background = new SolidColorBrush(Color.FromRgb(0x15, 0x65, 0xC0)),
+                BorderBrush = new SolidColorBrush(Color.FromRgb(0x0D, 0x47, 0xA1)),
+                BorderThickness = new Thickness(1),
+                Padding = new Thickness(16, 6, 16, 6),
+                HorizontalAlignment = HorizontalAlignment.Right,
+                VerticalAlignment = VerticalAlignment.Center,
+                Cursor = System.Windows.Input.Cursors.Hand,
+                ToolTip = "The twelve keyer buttons in both banks, and the four Msg buttons, in one table."
             };
 
-            button.Click += (s, e) =>
-            {
-                // IT OVERWRITES ALL EIGHT, so it asks first, and it says what it is about to write.
-                // Anything the operator wrote himself is gone after this, and there is no undo for it.
-                var said = new StringBuilder();
-                said.Append("This writes the standard contest texts into ALL EIGHT buttons.\n\n");
-                said.Append("Whatever they hold now is replaced, and it cannot be undone.\n\n");
-                for (int i = 0; i < StandardTexts.Length; i++)
-                {
-                    said.Append(i + 1).Append(".  ").Append(StandardTexts[i]).Append('\n');
-                }
-                said.Append("\nTxt 1 is the CQ, Txt 2 the exchange, Txt 3 the TU, Txt 4 your own callsign - ");
-                said.Append("which is the order ESM sends them in.");
-
-                if (!HolyMessageBox.ShowConfirm(said.ToString(), "CW Keyer", HolyMsgType.Warning, this, 620,
-                                                "Write them", "Leave mine")) return;
-
-                for (int i = 0; i < ButtonCount && i < StandardTexts.Length; i++)
-                {
-                    _buttonTexts[i] = StandardTexts[i];
-                    SaveButtonText(i, StandardTexts[i]);
-                    RefreshButtonFace(i);
-                }
-            };
+            button.Click += (s, e) => ShowMacroEditor();
 
             return button;
         }
 
+        private void ShowMacroEditor()
+        {
+            if (_getSharedText == null || _setSharedText == null) return;
+
+            var editor = new CwMacroEditorWindow(this, _getSharedText, _setSharedText);
+            if (editor.ShowDialog() != true) return;
+
+            // The faces follow what he wrote, whichever bank is showing.
+            ReloadButtonTexts();
+        }
+
+        // ── THE WAY TO THE LIST, NOT THE LIST ───────────────────────────────────
+        //
+        // Which radios can be keyed is a REFERENCE: nothing on it is chosen or changed, and a page of
+        // it in the middle of a settings dialog is a page standing between a man and the two boxes he
+        // came to alter. It lives under Help now, and this is the door to it - here, because this is
+        // where he is standing when the question occurs to him.
         private UIElement BuildRadioLink()
         {
-            var line = new TextBlock { Margin = new Thickness(0, 14, 0, 0), FontSize = 16 };
+            var line = new TextBlock
+            {
+                Margin = new Thickness(0, 8, 0, 0),
+                FontSize = 16,
+                HorizontalAlignment = HorizontalAlignment.Right
+            };
 
             var hyper = new System.Windows.Documents.Hyperlink(
                             new System.Windows.Documents.Run("Which radios can send CW"));

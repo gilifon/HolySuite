@@ -3040,6 +3040,54 @@ namespace HolyLogger.Properties {
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string CwKeyerLabelsJson {
+            get {
+                return ((string)(this["CwKeyerLabelsJson"]));
+            }
+            set {
+                this["CwKeyerLabelsJson"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string CwMsgLabelsJson {
+            get {
+                return ((string)(this["CwMsgLabelsJson"]));
+            }
+            set {
+                this["CwMsgLabelsJson"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string CwKeyerButtonsSpJson {
+            get {
+                return ((string)(this["CwKeyerButtonsSpJson"]));
+            }
+            set {
+                this["CwKeyerButtonsSpJson"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool CwKeyerBankSp {
+            get {
+                return ((bool)(this["CwKeyerBankSp"]));
+            }
+            set {
+                this["CwKeyerBankSp"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("QRL?")]
         public string CwKeyerQrlText {
             get {
