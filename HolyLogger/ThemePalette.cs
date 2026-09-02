@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 
 namespace HolyLogger
@@ -94,6 +94,10 @@ namespace HolyLogger
             // ---- Accent + stateful highlights -----------------------------------------------------
             { "AccentBrush",      new[] { "#1565C0", "#3B82F6", "#4C8DFF" } }, // primary accent (blue)
             { "ContestNameBrush", new[] { "#1565C0", "#22D3EE", "#22D3EE" } }, // status-bar contest name: bright cyan reads far better on dark status bars than the plain accent blue
+            // The word "Contest" in the Activity list. Green, because it is the one line there that is
+            // not an activity and does not get logged - it opens an explanation instead. Dark green on
+            // the light scheme; a light green on the dark ones, where a dark green would disappear.
+            { "ContestWordBrush", new[] { "#1B5E20", "#4ADE80", "#4ADE80" } },
             { "Danger",           new[] { "#BB3300", "#F0846E", "#F0846E" } }, // errors / missing / warnings (red)
             { "SelectionBg",      new[] { "#3399FF", "#2C4C7A", "#2F5490" } }, // selected row/cell, menu hover
             { "RowHoverBg",       new[] { "#90CAF9", "#26456B", "#2A4A78" } }, // cluster: map-hovered spot
@@ -162,6 +166,7 @@ namespace HolyLogger
             new TokenInfo("InputBorder",      "Borders and accents", "Input frame",   "The frame around text boxes you type into."),
             new TokenInfo("AccentBrush",      "Borders and accents", "Accent",        "Headings, links and emphasized labels (the blue)."),
             new TokenInfo("ContestNameBrush", "Borders and accents", "Contest name",  "The active contest's name in the status bar."),
+            new TokenInfo("ContestWordBrush", "Borders and accents", "Contest word",  "The word \"Contest\" in the Activity list on the main window."),
             new TokenInfo("Danger",           "Borders and accents", "Errors and warnings", "Error text and warning markers (the red)."),
         };
     }

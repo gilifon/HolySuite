@@ -566,6 +566,8 @@ namespace HolyLogger
             Loaded += (s, e) => { _box.Focus(); LockMinimumHeight(); LockMinimumWidth(); };
 
             _pump = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(50) };
+            UseBigTooltips(this);
+
             _pump.Tick += Pump_Tick;
             _pump.Start();
 
@@ -1585,7 +1587,7 @@ namespace HolyLogger
                     Style = Application.Current.Resources["MsgButtonCwStyle"] as Style,
                     FontSize = 16,
                     FontFamily = typeface,
-                    Height = 34,
+                    Height = 35,
                     Margin = new Thickness(3),
                     Padding = new Thickness(2, 0, 2, 0),
 
@@ -1712,6 +1714,16 @@ namespace HolyLogger
             return index >= 0 && index < labels.Length ? (labels[index] ?? string.Empty).Trim() : string.Empty;
         }
 
+        // TWO LINES ON EVERY KEYCAP: what it holds, and the key that presses it.
+        //
+        // The F-key was nowhere on the face. It was in the help page and in the tooltip, which is to
+        // say it was learnt once and then guessed at - and a man reaching for the CQ mid-QSO should
+        // not be counting along the row to work out whether it is F5 or F6. It goes UNDER the name,
+        // smaller and greyer: the name is what he reads, the key is what he checks.
+        //
+        // SMALLER THAN SIXTEEN, and deliberately - it is a caption on a key, not text to read, and the
+        // thing above it is the sixteen. Making both sixteen would need a keycap half as tall again
+        // and there are twelve of them.
         private void RefreshButtonFace(int index)
         {
             var button = _buttons[index];
@@ -1720,43 +1732,62 @@ namespace HolyLogger
             string text = _buttonTexts[index] ?? string.Empty;
             string label = ButtonLabel(index);
 
-            if (label.Length > 0)
+            // His own name for the key where he has given one; otherwise as much of the macro as the
+            // button can hold, with an ellipsis where it runs out. Nothing at all when the key is empty:
+            // the F-key underneath already says which one it is, so a number here would be it twice.
+            string top = label.Length > 0 ? label : text;
+
+            var face = new StackPanel
             {
-                button.Content = new TextBlock
+                Orientation = Orientation.Vertical,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+
+            if (top.Length > 0)
+            {
+                face.Children.Add(new TextBlock
                 {
-                    Text = label,
+                    Text = top,
+                    FontSize = 16,
                     TextTrimming = TextTrimming.CharacterEllipsis,
                     TextAlignment = TextAlignment.Center,
-                    VerticalAlignment = VerticalAlignment.Center
-                };
-                button.SetResourceReference(ForegroundProperty,
-                                           text.Length == 0 ? "MutedTextBrush" : "TextBrush");
-                button.ToolTip = BuildButtonTooltip(index);
-                return;
+                    HorizontalAlignment = HorizontalAlignment.Center,
+
+                    // The two lines sit closer than their line heights put them: up two here, down one
+                    // on the key below, so they read as one label with its key under it.
+                    Margin = new Thickness(0, -3, 0, 0)
+                });
             }
 
-            // AS MUCH OF IT AS THE BUTTON CAN HOLD, and an ellipsis where it runs out - not a fixed
-            // eight characters, which cut "CQ CQ DE * * K" down to "CQ CQ DE" while there was still
-            // room beside it. Drag the window wider and more of every message comes into view.
-            if (text.Length == 0)
+            var key = new TextBlock
             {
-                button.Content = (index + 1).ToString();
-                button.SetResourceReference(ForegroundProperty, "MutedTextBrush");
-            }
-            else
-            {
-                button.Content = new TextBlock
-                {
-                    Text = text,
-                    TextTrimming = TextTrimming.CharacterEllipsis,
-                    TextAlignment = TextAlignment.Center,
-                    VerticalAlignment = VerticalAlignment.Center
-                };
-                button.SetResourceReference(ForegroundProperty, "TextBrush");
-            }
+                Text = "F" + (index + 1),
+                FontSize = 13,
+                TextAlignment = TextAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                Margin = new Thickness(0, -3, 0, 0),
+                Foreground = FKeyBrush
+            };
+            face.Children.Add(key);
+
+            button.Content = face;
+            button.SetResourceReference(ForegroundProperty,
+                                       text.Length == 0 ? "MutedTextBrush" : "TextBrush");
 
             // Something has to be here for ToolTipOpening to fire at all; the real one is built there.
             button.ToolTip = BuildButtonTooltip(index);
+        }
+
+        // Grey enough to sit under the name without competing with it, dark enough to be read on the
+        // cyan keycap. Fixed like the keycap itself, which is one colour in every scheme.
+        private static readonly Brush FKeyBrush = MakeFKeyBrush();
+
+        private static Brush MakeFKeyBrush()
+        {
+            var brush = new SolidColorBrush(Color.FromRgb(0x44, 0x44, 0x44));
+            brush.Freeze();
+            return brush;
         }
 
         // WHAT IT HOLDS, AND WHAT THAT WOULD SEND. The two are the same line for a plain message and
@@ -1982,6 +2013,37 @@ namespace HolyLogger
         // button writes. NOTHING IS EVER OVERWRITTEN BY THIS: it applies only where the operator has
         // saved nothing at all, so an upgrade keeps every text he wrote. Emptying a button and saving
         // is a saved bank like any other, and it stays empty.
+        // -- TOOLTIPS AT SIXTEEN, LIKE EVERYTHING ELSE --------------------------------------------
+        //
+        // Nothing in this program is written smaller than sixteen, and a tooltip is not an exception -
+        // it is the one piece of text an operator reads because he could not work something out, which
+        // is the worst moment to make him squint. WPF gives a tooltip the system's own size, about
+        // eleven, so every window that wants ours has to say so.
+        //
+        // A STYLE ON THE WINDOW, not a setting on each one: the tooltips here are plain strings, and a
+        // string has nowhere to carry a font size. This catches them all, including the ones added
+        // later by somebody who never read this.
+        internal static void UseBigTooltips(FrameworkElement target)
+        {
+            if (target == null) return;
+
+            try
+            {
+                var style = new Style(typeof(ToolTip));
+                style.Setters.Add(new Setter(Control.FontSizeProperty, 16.0));
+                style.Setters.Add(new Setter(FrameworkElement.MaxWidthProperty, 460.0));
+
+                // BLACK, NOT THE SYSTEM GREY. A tooltip is read once, quickly, by somebody who is
+                // already unsure - grey on the pale panel is the wrong moment to be tasteful. Fixed
+                // rather than a theme brush, because the panel behind a tooltip is the system's own
+                // pale colour in every scheme, and a light theme brush would vanish into it.
+                style.Setters.Add(new Setter(Control.ForegroundProperty, Brushes.Black));
+
+                target.Resources[typeof(ToolTip)] = style;
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
         internal static string[] LoadBank(bool sp)
         {
             var texts = new string[ButtonCount];
@@ -2550,6 +2612,7 @@ namespace HolyLogger
                 }
             };
             dialog.SetResourceReference(BackgroundProperty, "WindowBg");
+            UseBigTooltips(dialog);
 
             okBtn.Click += (s, e) =>
             {
@@ -2642,7 +2705,7 @@ namespace HolyLogger
         {
             var button = new Button
             {
-                Content = "Edit all the macros",
+                Content = "Macros Editor",
                 FontSize = 16,
                 FontWeight = FontWeights.Bold,
                 Foreground = Brushes.White,

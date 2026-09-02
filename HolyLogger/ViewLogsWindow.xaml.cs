@@ -16,6 +16,12 @@ namespace HolyLogger
         private readonly DataAccess _dal;
         private readonly string _filterCallsign;   // when set, list only logs whose identity callsign matches
 
+        // CONTEST LOGS ONLY. Set when this window is opened from the Activity list's Contest line by
+        // somebody who says he already has a contest log: showing him his forty general logs as well
+        // makes him hunt for the one he came for. Unlike the callsign filter above, this one is NOT
+        // dropped when it matches nothing - the caller has already checked there is something to show.
+        private readonly bool _contestOnly;
+
         // One grid row.
         public class Row
         {
@@ -40,13 +46,14 @@ namespace HolyLogger
             public string Operator { get; set; }
         }
 
-        public ViewLogsWindow(MainWindow main, DataAccess dal, string filterCallsign = null)
+        public ViewLogsWindow(MainWindow main, DataAccess dal, string filterCallsign = null, bool contestOnly = false)
         {
             InitializeComponent();
             WindowBounds.Attach(this, "ViewLogs");   // remember position + size
             _main = main;
             _dal = dal;
             _filterCallsign = (filterCallsign ?? string.Empty).Trim();
+            _contestOnly = contestOnly;
 
             // Columns are Auto-width (they size to their own content), and the window is
             // SizeToContent="Width" so it grows to fit -- but it must never grow past the screen's
@@ -60,6 +67,8 @@ namespace HolyLogger
             // (logs for other callsigns are irrelevant here and would confuse) and explain the view.
             if (_filterCallsign.Length > 0)
                 Title = "Logs for " + _filterCallsign;
+            else if (_contestOnly)
+                Title = "Your contest logs";
 
             LoadLogs();   // sets the hint line, which depends on whether the callsign has any log
         }
@@ -87,6 +96,10 @@ namespace HolyLogger
             // for a callsign that usually has NO log yet - that is why the guard opened it - so filtering
             // left an empty table and a man looking at a blank window, unable to see the logs he does
             // have. Every log is shown instead, and the line at the bottom says the callsign has none.
+            // A log is a contest log when it names an event; everything else is a general log.
+            if (_contestOnly)
+                logs = logs.Where(l => !string.IsNullOrEmpty(l.EventType));
+
             bool filterFoundNothing = false;
             if (_filterCallsign.Length > 0)
             {
@@ -163,7 +176,9 @@ namespace HolyLogger
 
             if (_filterCallsign.Length == 0)
             {
-                Hint.Text = "Select a log, then Open / Rename / Delete / Export.  Double-click to Activate and Open it.";
+                Hint.Text = _contestOnly
+                    ? "Only your contest logs are shown. Select one and Activate & Open it."
+                    : "Select a log, then Open / Rename / Delete / Export.  Double-click to Activate and Open it.";
                 return;
             }
 

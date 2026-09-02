@@ -38,13 +38,20 @@
             </StackPanel>
         </GroupBox>
 
-        <CheckBox x:Name="CBX_EnableUDPClient" Content="Enable UDP Client" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.EnableUDPClient, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16" Margin="0,370,0,0" Click="HasChanged_Click"/>
-        <Label x:Name="label" Content="Port" HorizontalAlignment="Left" Margin="199,364,0,0" VerticalAlignment="Top" FontSize="16"/>
-        <TextBox x:Name="textBox" HorizontalAlignment="Left" Height="23" Margin="243,368,0,0" TextWrapping="Wrap" Text="{Binding Default.UDPPort, Mode=TwoWay, Source={StaticResource Settings}}" VerticalAlignment="Top" Width="112" FontSize="16" PreviewTextInput="PreviewTextInputHandler" DataObject.Pasting="PastingHandler" MaxLength="5" />
-
-        <CheckBox x:Name="CBX_EnableN1MMUDPClient" Content="N1MM+ UDP Client" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.EnableN1MMUDPClient, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16" Margin="0,395,0,0" Click="HasChanged_Click"/>
-        <Label x:Name="label2" Content="Port" HorizontalAlignment="Left" Margin="199,389,0,0" VerticalAlignment="Top" FontSize="16"/>
-        <TextBox x:Name="textBox2" HorizontalAlignment="Left" Height="23" Margin="243,394,0,0" TextWrapping="Wrap" Text="{Binding Default.N1MMUDPPort, Mode=TwoWay, Source={StaticResource Settings}}" VerticalAlignment="Top" Width="112" FontSize="16" PreviewTextInput="PreviewTextInputHandler" DataObject.Pasting="PastingHandler" MaxLength="5" />
+        <!-- UDP PORTS. Two fixed ports used to sit here - one that logged a contact sent by another
+             program, one that followed N1MM+'s radio - and there was no way to add a third. They are
+             now lines in a table the operator writes himself (UdpPortsWindow), which is also where the
+             port numbers are kept. -->
+        <!-- Orange, the same keycap Try Again wears on the main form: this page is a wall of tick
+             boxes, and the one button on it that opens a table of its own was reading as part of the
+             wall. Width and Height are set here because the keycap template lays its content out
+             itself and ignores Padding; 120 keeps the key clear of the sentence beside it at 130. -->
+        <Button x:Name="BTN_UdpPorts" Content="UDP Ports" Style="{StaticResource OrangeActionButtonStyle}"
+                HorizontalAlignment="Left" VerticalAlignment="Top" Width="120" Height="32"
+                Margin="0,368,0,0" FontSize="16" Click="BTN_UdpPorts_Click"/>
+        <TextBlock HorizontalAlignment="Left" VerticalAlignment="Top" Margin="130,373,0,0" FontSize="16"
+                   Foreground="Gray" TextWrapping="Wrap" Width="450"
+                   Text="Send or receive information from other software."/>
 
         <!-- HolyCluster spot listener: catches the WSJT-X-format UDP datagram HolyCluster sends when
              you select a spot (the same one it sends to Log4OM) and fills the DX callsign. -->

@@ -67,6 +67,15 @@
                     MinWidth="110" Height="38" FontSize="17" Padding="14,0"
                     IsDefault="True" Margin="0,0,10,0"
                     Click="YesBtn_Click"/>
+            <!-- A THIRD ANSWER, shown only when a caller names it. Some questions have two useful
+                 answers and neither of them is "no": "make me a new contest log" and "open the one I
+                 already have" are both yes, and offering only the first sends everybody who already
+                 has a log looking for a menu. Collapsed by default, so every existing Yes/No dialog in
+                 the program is untouched. -->
+            <Button x:Name="ExtraBtn"
+                    MinWidth="110" Height="38" FontSize="17" Padding="14,0"
+                    Margin="0,0,10,0" Visibility="Collapsed"
+                    Click="ExtraBtn_Click"/>
             <Button x:Name="NoBtn" Content="No"
                     MinWidth="110" Height="38" FontSize="17" Padding="14,0"
                     IsCancel="True"

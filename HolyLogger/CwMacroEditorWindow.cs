@@ -59,6 +59,7 @@ namespace HolyLogger
             Width = 860;
             MinWidth = 720;
             SetResourceReference(BackgroundProperty, "WindowBg");
+            CwKeyboardWindow.UseBigTooltips(this);
 
             var stack = new StackPanel { Margin = new Thickness(16) };
             stack.Children.Add(BuildKeyerTable());
@@ -113,7 +114,24 @@ namespace HolyLogger
             return block;
         }
 
-        private static TextBox Cell(string text, int column, int row)
+        // AS LONG AS THE KEYCAP, AND NO LONGER, for the name columns. A macro is as long as it needs
+        // to be and is trimmed with an ellipsis on the face - it is read in the tooltip. A NAME that
+        // does not fit is a name he cannot read at a glance, which is the only reason it exists.
+        //
+        // The numbers come from the keycaps: the keyer's are about 85 points wide at sixteen point,
+        // which is ten characters of this font; the four on the main window are 44 at eleven point,
+        // which is seven. Both are the width at the window's own size - drag the keyer wider and the
+        // name still fits, it just no longer fills the key.
+        private const int KeyerNameLength = 10;
+        private const int MsgNameLength = 7;
+
+        // AND THE SAME CEILING ON EVERY MACRO, the four and the twelve alike. Fifty is what one of
+        // these boxes shows without scrolling, and it is past what any radio takes in one go anyway -
+        // an Icom's CW command holds thirty characters, a Kenwood's twenty-four - so a message longer
+        // than this is one the keyer has to break up regardless.
+        private const int MacroLength = 50;
+
+        private static TextBox Cell(string text, int column, int row, int maxLength = 0)
         {
             var box = new TextBox
             {
@@ -121,12 +139,46 @@ namespace HolyLogger
                 FontSize = 16,
                 Margin = new Thickness(0, 0, 10, 4),
                 Padding = new Thickness(4, 2, 4, 2),
+                MaxLength = maxLength,
                 VerticalContentAlignment = VerticalAlignment.Center
             };
             Grid.SetColumn(box, column);
             Grid.SetRow(box, row);
 
             return box;
+        }
+
+        // The hint sits BEHIND the box and takes no mouse, so clicking where it is puts the caret in the
+        // box as though it were not there. It goes when anything is typed and comes back when the box is
+        // emptied again - which is how he clears a name he no longer wants.
+        private static UIElement WithPlaceholder(TextBox box, string placeholder)
+        {
+            var hint = new TextBlock
+            {
+                Text = placeholder,
+                FontSize = 16,
+                Margin = new Thickness(6, 0, 0, 0),
+                VerticalAlignment = VerticalAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Left,
+                IsHitTestVisible = false,
+                Foreground = Brushes.Gray
+            };
+
+            TextChangedEventHandler show = (s2, e2) =>
+                hint.Visibility = string.IsNullOrEmpty(box.Text) ? Visibility.Visible : Visibility.Collapsed;
+            box.TextChanged += show;
+            show(box, null);
+
+            var cell = new Grid();
+            Grid.SetColumn(cell, Grid.GetColumn(box));
+            Grid.SetRow(cell, Grid.GetRow(box));
+            Grid.SetColumn(box, 0);
+            Grid.SetRow(box, 0);
+
+            cell.Children.Add(box);
+            cell.Children.Add(hint);
+
+            return cell;
         }
 
         private static TextBlock SectionTitle(string text, string note, Thickness margin)
@@ -168,9 +220,9 @@ namespace HolyLogger
                 int row = i + 1;
                 grid.Children.Add(KeyName("F" + (i + 1), row));
 
-                _labels[i] = Cell(labels[i], 1, row);
-                _run[i] = Cell(run[i], 2, row);
-                _sp[i] = Cell(sp[i], 3, row);
+                _labels[i] = Cell(labels[i], 1, row, KeyerNameLength);
+                _run[i] = Cell(run[i], 2, row, MacroLength);
+                _sp[i] = Cell(sp[i], 3, row, MacroLength);
 
                 grid.Children.Add(_labels[i]);
                 grid.Children.Add(_run[i]);
@@ -196,6 +248,12 @@ namespace HolyLogger
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(150) });
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
 
+            // A FOURTH COLUMN THAT HOLDS NOTHING, so this macro box is the width of ONE of the keyer's
+            // two above it rather than the width of both. A text these four can hold is a text the
+            // twelve can hold; a box twice as wide invites one that is not, and says the four take
+            // something longer, which they do not.
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
             for (int r = 0; r <= MsgButtons; r++) grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
             grid.Children.Add(Heading("Key", 0, 0));
@@ -211,10 +269,14 @@ namespace HolyLogger
                 try { if (_getMsgText != null) text = _getMsgText(i + 1) ?? string.Empty; }
                 catch (Exception swallowed) { Log.Swallow(swallowed); }
 
-                _msgLabels[i] = Cell(labels[i], 1, row);
-                _msgTexts[i] = Cell(text, 2, row);
+                _msgLabels[i] = Cell(labels[i], 1, row, MsgNameLength);
+                _msgTexts[i] = Cell(text, 2, row, MacroLength);
 
-                grid.Children.Add(_msgLabels[i]);
+                // WHAT THE KEY SAYS TODAY, greyed out behind an empty box. These four have a name of
+                // their own only if he gives them one; with none they fall back to Txt 1 to Txt 4 in CW
+                // and Msg1 to Msg4 in SSB. An empty box beside a button plainly reading "Txt 1" looks
+                // like the editor has lost something, and that is exactly how it was reported.
+                grid.Children.Add(WithPlaceholder(_msgLabels[i], "Txt " + (i + 1)));
                 grid.Children.Add(_msgTexts[i]);
             }
 
@@ -404,16 +466,21 @@ namespace HolyLogger
             CwKeyboardWindow.SaveBank(run, false);
             CwKeyboardWindow.SaveBank(sp, true);
 
+            // THE NAMES ARE WRITTEN FIRST, and this is not tidiness. Handing a text to the main window
+            // makes it redraw that button's face, and the face reads the name out of the setting - so
+            // saving the names afterwards left every one of the four showing the name it had BEFORE the
+            // editor was opened, which is exactly what the operator reported.
             var msgLabels = new string[MsgButtons];
             for (int i = 0; i < MsgButtons; i++)
-            {
                 msgLabels[i] = (_msgLabels[i].Text ?? string.Empty).Trim();
 
+            CwKeyboardWindow.SaveLabels(CwKeyboardWindow.MsgLabelsSetting, msgLabels, MsgButtons);
+
+            for (int i = 0; i < MsgButtons; i++)
+            {
                 try { if (_setMsgText != null) _setMsgText(i + 1, (_msgTexts[i].Text ?? string.Empty).Trim()); }
                 catch (Exception swallowed) { Log.Swallow(swallowed); }
             }
-
-            CwKeyboardWindow.SaveLabels(CwKeyboardWindow.MsgLabelsSetting, msgLabels, MsgButtons);
 
             try
             {

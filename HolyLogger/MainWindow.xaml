@@ -1864,11 +1864,18 @@
                 <ComboBox.ItemTemplate>
                     <DataTemplate>
                         <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="{Binding Key}" FontSize="16" FontWeight="Bold" MinWidth="72"
+                            <TextBlock x:Name="ProgramName" Text="{Binding Key}" FontSize="16" FontWeight="Bold" MinWidth="72"
                                        Foreground="{DynamicResource TextBrush}"/>
                             <TextBlock Text="{Binding Value}" FontSize="16" Margin="8,0,0,0"
                                        Foreground="{DynamicResource AccentBrush}"/>
                         </StackPanel>
+                        <DataTemplate.Triggers>
+                            <!-- Contest is the one line here that is not a program. Green says so before
+                                 it is pressed, so it does not read as one more award to tick. -->
+                            <DataTrigger Binding="{Binding Key}" Value="Contest">
+                                <Setter TargetName="ProgramName" Property="Foreground" Value="{DynamicResource ContestWordBrush}"/>
+                            </DataTrigger>
+                        </DataTemplate.Triggers>
                     </DataTemplate>
                 </ComboBox.ItemTemplate>
             </ComboBox>

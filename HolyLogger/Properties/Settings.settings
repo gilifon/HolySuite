@@ -245,6 +245,9 @@
     <Setting Name="ChannelsJson" Type="System.String" Scope="User">
       <Value Profile="(Default)" />
     </Setting>
+    <Setting Name="UdpPortsJson" Type="System.String" Scope="User">
+      <Value Profile="(Default)" />
+    </Setting>
     <Setting Name="LotwConfirmedEntities" Type="System.String" Scope="User">
       <Value Profile="(Default)" />
     </Setting>

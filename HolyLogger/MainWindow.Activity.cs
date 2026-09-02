@@ -186,10 +186,28 @@ namespace HolyLogger
 
             // A blank line at the top, because the box now keeps what it holds: without a way to choose
             // NOTHING, the only way back out of a program would be to select all of it and delete it.
-            var list = new List<KeyValuePair<string, string>> { new KeyValuePair<string, string>("", "No Activity was selected") };
+            // CONTEST IS ON THE LIST, AND IT IS NOT AN ACTIVITY.
+            // Second line, under the blank: the blank is the way OUT of a programme and is used far
+            // more often, so it keeps the top.
+            // Operators read "Activity" as "the thing I am taking part in", saw no contest on the list,
+            // and logged a contest without ever making a contest log - so the exchange had nowhere to
+            // go. The word they were looking for is now where they look for it, and choosing it says
+            // where a contest really starts. Nothing is ever logged from this line: the box goes
+            // straight back to what it held before (ActivitySig_SelectionChanged).
+            var list = new List<KeyValuePair<string, string>>
+            {
+                new KeyValuePair<string, string>("", "No Activity was selected"),
+                new KeyValuePair<string, string>(ContestListEntry, "in a contest? read this")
+            };
             list.AddRange(OtherActivityWindow.Known);
             CB_ActivitySig.ItemsSource = list;
             CB_ActivitySig.Text = (Properties.Settings.Default.LastActivityProgram ?? "").Trim();
+
+            // Wired AFTER the text above is put in, so filling the box is not mistaken for the operator
+            // choosing something.
+            CB_ActivitySig.DropDownOpened += ActivitySig_DropDownOpened;
+            CB_ActivitySig.SelectionChanged += ActivitySig_SelectionChanged;
+
             ShowActivitySigMeaning();
         }
 
@@ -199,6 +217,10 @@ namespace HolyLogger
             try
             {
                 string now = (CB_ActivitySig.Text ?? "").Trim();
+                // The Contest line is a signpost, not a program. It sits in the box for the instant it
+                // takes to put the old value back, and remembering it would bring it back at the next
+                // start as though it had been chosen.
+                if (string.Equals(now, ContestListEntry, StringComparison.OrdinalIgnoreCase)) return;
                 if (string.Equals(Properties.Settings.Default.LastActivityProgram, now, StringComparison.Ordinal)) return;
                 Properties.Settings.Default.LastActivityProgram = now;
                 SettingsFlush.RequestSave();
@@ -244,6 +266,107 @@ namespace HolyLogger
             else if (Btn_UndoMain != null && Btn_UndoMain.Visibility == Visibility.Visible) stopAt = 542;
 
             TB_ActivitySigHint.MaxWidth = stopAt - hintLeft - gap;
+        }
+
+        // THE ONE LINE ON THE LIST THAT IS NOT A PROGRAM.
+        private const string ContestListEntry = "Contest";
+
+        // What the box held before the list was opened, so choosing Contest can put it back. Taken when
+        // the list opens rather than from the selection's RemovedItems: the box is editable, and a typed
+        // value has no item to be removed.
+        private string activitySigBeforeDropDown = "";
+
+        // Set while the old value is being put back, so that put-back is not read as a fresh choice.
+        private bool explainingContest;
+
+        private void ActivitySig_DropDownOpened(object sender, EventArgs e)
+        {
+            activitySigBeforeDropDown = (CB_ActivitySig.Text ?? "").Trim();
+        }
+
+        // Choosing Contest EXPLAINS; it does not select. The word is on the list because that is where
+        // people look for it, and what it does is send them to the one place a contest actually starts.
+        private void ActivitySig_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (explainingContest) return;
+
+            // THE ITEM THAT WAS JUST PICKED, not the box's text. On an editable ComboBox the text is
+            // still the OLD value while SelectionChanged is being raised - the box is written a moment
+            // later - so asking the box what it holds here answers about the value being replaced.
+            if (e == null || e.AddedItems == null || e.AddedItems.Count == 0) return;
+            if (!(e.AddedItems[0] is KeyValuePair<string, string>)) return;
+            var picked = (KeyValuePair<string, string>)e.AddedItems[0];
+            if (!string.Equals(picked.Key, ContestListEntry, StringComparison.OrdinalIgnoreCase)) return;
+
+            explainingContest = true;
+            string putBack = activitySigBeforeDropDown;
+
+            // AFTER the drop-down has finished closing itself. Putting the old text back from inside the
+            // selection that is still being raised leaves the ComboBox arguing with itself over which
+            // value is current, and the window would open with the list still on screen over it.
+            Dispatcher.BeginInvoke(new Action(delegate
+            {
+                try
+                {
+                    CB_ActivitySig.SelectedItem = null;
+                    CB_ActivitySig.Text = putBack;
+                    ShowActivitySigMeaning();
+                    ExplainContestLog();
+                }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
+                finally { explainingContest = false; }
+            }), System.Windows.Threading.DispatcherPriority.Input);
+        }
+
+        // Where a contest really starts - and the two buttons that start it, not a description of one.
+        // The yellow key is the Log Manager's own "Create New Contest Log", the same colours and the
+        // same job. Beside it, in green, the answer for somebody who made that log yesterday: opening
+        // the Log Manager on the list of logs he already has. Without it the window spoke only to
+        // operators with no contest log at all, and everybody else was left looking for a menu.
+        private void ExplainContestLog()
+        {
+            int answer = HolyMessageBox.ShowChoice(
+                "This list is for activity programs - castles, mills, lighthouses. A contest is not one of them."
+                + Environment.NewLine + Environment.NewLine
+                + "A contest needs a log of its own. Make a new one with the yellow button, or open a contest log you already have with the green one."
+                + Environment.NewLine + Environment.NewLine
+                + "The contest name then shows at the top of this window, and the exchange boxes appear.",
+                "Working a contest?", HolyMsgType.Info, this,
+                "Create New Contest Log", "Select existing Log", "Not now",
+                // The Log Manager button's own three colours (ViewLogsWindow.xaml).
+                "#FFC107", "#1A1A1A", "#1565C0",
+                // The dark green the word "Contest" wears in the list this window was opened from.
+                "#1B5E20", "#FFFFFF", "#1565C0");
+
+            if (answer == 1) CreateNewContestLog(this);
+            else if (answer == 2) OpenExistingContestLog();
+        }
+
+        // "I already have one" - so show him HIS CONTEST LOGS and nothing else. And if there are none,
+        // say so rather than opening a window filtered down to an empty table, which reads as a fault
+        // in the program. The offer to make one is repeated there because it is the only thing left to
+        // do: a message that says "you have none" and stops is a dead end.
+        private void OpenExistingContestLog()
+        {
+            int contestLogs = 0;
+            try
+            {
+                foreach (var log in dal.GetLogs())
+                    if (!string.IsNullOrEmpty(log.EventType)) contestLogs++;
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+            if (contestLogs > 0) { OpenLogManager(null, true); return; }
+
+            bool make = HolyMessageBox.ShowConfirm(
+                "There is no contest log here yet - every log you have is a general one."
+                + Environment.NewLine + Environment.NewLine
+                + "Make one now and pick your contest?",
+                "No contest log", HolyMsgType.Info, this, 0,
+                "Create New Contest Log", "Not now",
+                "#FFC107", "#1A1A1A", "#1565C0");
+
+            if (make) CreateNewContestLog(this);
         }
 
         private void ActivitySig_TextChanged(object sender, TextChangedEventArgs e)

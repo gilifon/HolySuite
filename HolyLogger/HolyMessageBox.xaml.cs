@@ -22,6 +22,11 @@ namespace HolyLogger
 
         public bool Confirmed { get; private set; }
 
+        // WHICH of up to three buttons was pressed: 1 = the Yes button, 2 = the extra button, 0 = No,
+        // Escape, or the X. Confirmed stays exactly what it always was - true only for Yes - so no
+        // caller that asks a plain question has to know this exists.
+        public int Choice { get; private set; }
+
         // **BOLD** in a message becomes bold on screen. Menu paths and button names have to stand out
         // from the sentence around them - "select Tools > Log Workshop and press Log Verifier" is three
         // things to find in a program, buried in prose - and a message box that takes only a flat
@@ -323,8 +328,9 @@ namespace HolyLogger
         }
 
         private void OkBtn_Click(object sender, RoutedEventArgs e) => Close();
-        private void YesBtn_Click(object sender, RoutedEventArgs e) { Confirmed = true; Close(); }
-        private void NoBtn_Click(object sender, RoutedEventArgs e) { Confirmed = false; Close(); }
+        private void YesBtn_Click(object sender, RoutedEventArgs e) { Confirmed = true; Choice = 1; Close(); }
+        private void ExtraBtn_Click(object sender, RoutedEventArgs e) { Confirmed = false; Choice = 2; Close(); }
+        private void NoBtn_Click(object sender, RoutedEventArgs e) { Confirmed = false; Choice = 0; Close(); }
 
         // ── Static helpers ────────────────────────────────────────────────
 
@@ -342,18 +348,82 @@ namespace HolyLogger
         // is not a question, and answering a statement with "Yes" reads as a mistake in the program.
         // So the two words can be named per dialog. Left unnamed they are Yes and No, which is what
         // every other confirm in the program already asks.
+        //
+        // yesLooksLikeButton: the Yes button PAINTED AS A BUTTON THE READER ALREADY KNOWS. A message
+        // that says "press the yellow Create New Contest Log button" is asking somebody to go and find
+        // a button; showing that same yellow button here, doing that same thing, is not asking anything.
+        // The three colours are the button's own, passed in by the caller so this dialog does not have
+        // to know about any particular window's palette.
         public static bool ShowConfirm(string message, string title = "HolyLogger",
             HolyMsgType type = HolyMsgType.Warning, Window owner = null, double width = 0,
-            string yesText = null, string noText = null)
+            string yesText = null, string noText = null,
+            string yesBackground = null, string yesForeground = null, string yesBorder = null)
         {
             var dlg = new HolyMessageBox(message, title, type, owner, confirm: true, width);
 
             if (!string.IsNullOrWhiteSpace(yesText)) dlg.YesBtn.Content = yesText;
             if (!string.IsNullOrWhiteSpace(noText)) dlg.NoBtn.Content = noText;
+
+            PaintButton(dlg.YesBtn, yesBackground, yesForeground, yesBorder);
             dlg.FitWidthToButtons();   // the words just set may need more room than the text did
 
             dlg.ShowDialog();
             return dlg.Confirmed;
+        }
+
+        // A button wearing another button's colours. Named as strings ("#FFC107") so a caller can hand
+        // over the exact three values that are written in its own XAML, and this dialog never has to
+        // know about anybody's palette. Nothing happens when no background is named.
+        private static void PaintButton(System.Windows.Controls.Button b, string background, string foreground, string border)
+        {
+            if (b == null || string.IsNullOrWhiteSpace(background)) return;
+
+            var conv = new System.Windows.Media.BrushConverter();
+            b.Background = (System.Windows.Media.Brush)conv.ConvertFromString(background);
+            b.FontWeight = FontWeights.Bold;
+            if (!string.IsNullOrWhiteSpace(foreground))
+                b.Foreground = (System.Windows.Media.Brush)conv.ConvertFromString(foreground);
+            if (!string.IsNullOrWhiteSpace(border))
+            {
+                b.BorderBrush = (System.Windows.Media.Brush)conv.ConvertFromString(border);
+                b.BorderThickness = new Thickness(1.5);
+            }
+        }
+
+        // THREE ANSWERS. Returns 1 for the first button, 2 for the middle one, 0 for the last one and
+        // for Escape or the X - so "did they say no" is still one comparison, and the two positive
+        // answers are told apart by number rather than by a second dialog.
+        public static int ShowChoice(string message, string title, HolyMsgType type, Window owner,
+            string yesText, string extraText, string noText,
+            string yesBackground = null, string yesForeground = null, string yesBorder = null,
+            string extraBackground = null, string extraForeground = null, string extraBorder = null,
+            double width = 0)
+        {
+            var dlg = new HolyMessageBox(message, title, type, owner, confirm: true, width);
+
+            if (!string.IsNullOrWhiteSpace(yesText)) dlg.YesBtn.Content = yesText;
+            if (!string.IsNullOrWhiteSpace(noText)) dlg.NoBtn.Content = noText;
+            if (!string.IsNullOrWhiteSpace(extraText))
+            {
+                dlg.ExtraBtn.Content = extraText;
+                dlg.ExtraBtn.Visibility = Visibility.Visible;
+            }
+
+            PaintButton(dlg.YesBtn, yesBackground, yesForeground, yesBorder);
+            PaintButton(dlg.ExtraBtn, extraBackground, extraForeground, extraBorder);
+
+            // LEFT, AND LINED UP WITH THE TEXT - not centred, and not against the window's edge either.
+            // Two buttons centred under a paragraph read as a pair belonging to it; three of different
+            // widths centred read as a row that was dropped in and left where it fell. Putting the row
+            // in the text's own column starts it on the same left edge every line above it starts on,
+            // which is the line the eye is already following down the window.
+            System.Windows.Controls.Grid.SetColumn(dlg.ConfirmPanel, 1);
+            System.Windows.Controls.Grid.SetColumnSpan(dlg.ConfirmPanel, 1);
+            dlg.ConfirmPanel.HorizontalAlignment = HorizontalAlignment.Left;
+
+            dlg.FitWidthToButtons();
+            dlg.ShowDialog();
+            return dlg.Choice;
         }
 
         // True when the caller named a width itself. Its number is a deliberate choice about one
@@ -430,8 +500,19 @@ namespace HolyLogger
                 YesBtn.Measure(free);
                 NoBtn.Measure(free);
 
-                // The 10 between the buttons, the 24 of margin each side, and a little air.
+                // The 10 between the buttons, the 24 of margin each side, and a little air. The third
+                // button counts only when it is showing - and then so does the second 10px gap.
                 double needed = YesBtn.DesiredSize.Width + NoBtn.DesiredSize.Width + 10 + 24 + 24 + 16;
+                if (ExtraBtn != null && ExtraBtn.Visibility == Visibility.Visible)
+                {
+                    ExtraBtn.Measure(free);
+                    needed += ExtraBtn.DesiredSize.Width + 10;
+                }
+
+                // The buttons moved into the text's column give up the 56 the icon column takes, so the
+                // window has to be that much wider for the same row of words to fit.
+                if (ConfirmPanel != null && System.Windows.Controls.Grid.GetColumn(ConfirmPanel) == 1)
+                    needed += 56;
                 if (needed <= Width) return;
 
                 double room = Math.Max(460, SystemParameters.WorkArea.Width - 80);

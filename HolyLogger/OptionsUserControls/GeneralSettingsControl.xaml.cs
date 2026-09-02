@@ -227,6 +227,18 @@ namespace HolyLogger.OptionsUserControls
             HasChanged = true;
         }
 
+        // The UDP Ports table. Its own Save button writes the list; the sockets are opened or closed to
+        // match when the Options window closes (MainWindow calls ApplyUdpListeners then), so nothing has
+        // to be flagged as changed here.
+        private void BTN_UdpPorts_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                new UdpPortsWindow(Window.GetWindow(this)).ShowDialog();
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
         private static bool IsValidPort(string text)
         {
             int x;

@@ -386,9 +386,6 @@ namespace HolyLogger
         BitmapImage lock_path = new BitmapImage(new Uri("pack://application:,,,/Images/lock.png"));
         BitmapImage unlock_path = new BitmapImage(new Uri("pack://application:,,,/Images/unlock.png"));
 
-        public static UdpClient Client;
-        public static UdpClient N1MMClient;
-
         // Static compiled regex for N1MM+ UDP parsing (performance optimization)
         private static readonly Regex N1MMTxFreqRegex = new Regex(@"<TXFreq>(.*)?<", RegexOptions.IgnoreCase | RegexOptions.Compiled);
         private static readonly Regex N1MMModeRegex = new Regex(@"<Mode>(.*)?<", RegexOptions.IgnoreCase | RegexOptions.Compiled);
@@ -494,43 +491,9 @@ namespace HolyLogger
             Log.Step("ctor: LoTW user list");
             CheckLotwUpdateFireAndForget();
 
-            if (Properties.Settings.Default.EnableUDPClient)
-            {
-                try
-                {
-                    Client = new UdpClient(Properties.Settings.Default.UDPPort);//2333 / 2237
-                    Client.BeginReceive(new AsyncCallback(StartUDPClient), null);
-                }
-                catch
-                {
-                    HolyMessageBox.ShowWarning(
-                        "Failed to open UDP port " + Properties.Settings.Default.UDPPort + ".\n\n"
-                        + "Another program is probably already using it.\n\n"
-                        + "The listener has been switched off. Pick a different port in "
-                        + "Options → General, or close the other program.",
-                    "UDP Client", this);
-                    Properties.Settings.Default.EnableUDPClient = false;
-                }
-            }
-
-            if (Properties.Settings.Default.EnableN1MMUDPClient)
-            {
-                try
-                {
-                    N1MMClient = new UdpClient(Properties.Settings.Default.N1MMUDPPort);//12060
-                    N1MMClient.BeginReceive(new AsyncCallback(StartN1MMUDPClient), null);
-                }
-                catch
-                {
-                    HolyMessageBox.ShowWarning(
-                        "Failed to open N1MM+ UDP port " + Properties.Settings.Default.N1MMUDPPort + ".\n\n"
-                        + "Another program is probably already using it.\n\n"
-                        + "The listener has been switched off. Pick a different port in "
-                        + "Options → General, or close the other program.",
-                    "N1MM+ UDP Client", this);
-                    Properties.Settings.Default.EnableN1MMUDPClient = false;
-                }
-            }
+            // Every UDP port the operator listed in Options > General > UDP Ports (see
+            // MainWindow.Udp.cs). This replaced the two fixed ports that used to be wired in here.
+            ApplyUdpListeners();
 
             ApplyHolyClusterListener();
             Log.Step("ctor: HolyCluster listener");
@@ -815,205 +778,6 @@ namespace HolyLogger
             {
                 Properties.Settings.Default.DoNothing = false;
                 try { Properties.Settings.Default.Save(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
-            }
-        }
-
-        private async void StartUDPClient(IAsyncResult res)
-        {
-            // Closing the window disposes this socket, and that wakes the receive that was still
-            // pending up one last time. Nothing below may run then: the field has already been set
-            // to null (NullReferenceException) and the dispatcher is on its way out
-            // (TaskCanceledException). Both were thrown on every single exit; under the debugger
-            // they stopped the program mid-close, so the window stayed on screen until Continue
-            // was pressed. Take one copy of the socket and work through that.
-            var udp = Client;
-            if (_isShutdownCleanupDone || udp == null) return;
-
-            try
-            {
-            if (!Properties.Settings.Default.EnableUDPClient)
-            {
-                return;
-            }
-            IPEndPoint RemoteIpEndPoint = new IPEndPoint(IPAddress.Any, 0);
-            byte[] received = udp.EndReceive(res, ref RemoteIpEndPoint);
-            string data = Encoding.UTF8.GetString(received);
-
-            _holyLogParser = new HolyLogParser();
-            QSO qso = _holyLogParser.ParseRawQSO(data);
-
-            // Perform QRZ lookup outside Dispatcher to avoid blocking UI and ensure proper exception handling
-            string qrzName = string.Empty;
-            string qrzGrid = string.Empty;
-            if (string.IsNullOrWhiteSpace(qso.Name) && isNetworkAvailable)
-            {
-                try
-                {
-                    var result = await GetQrzForCall(qso.DXCall);
-                    qrzName = result.Name;
-                    qrzGrid = result.Grid;
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"QRZ lookup failed for {qso.DXCall}: {ex.Message}");
-                }
-            }
-
-            // Same again for the seconds spent waiting above: no hop onto a dispatcher that has
-            // begun shutting down.
-            if (_isShutdownCleanupDone || Dispatcher.HasShutdownStarted) return;
-            this.Dispatcher.Invoke(() =>
-            {
-                try
-                {
-                    bool isValid = false;
-                    if (!string.IsNullOrWhiteSpace(qrzName))
-                    {
-                        qso.Name = qrzName;
-                    }
-                    if (!string.IsNullOrWhiteSpace(qrzGrid))
-                    {
-                        qso.DXLocator = qrzGrid;
-                    }
-                    qso.MyCall = string.IsNullOrWhiteSpace(qso.MyCall) ? TB_MyCallsign.Text : qso.MyCall;
-                    qso.Operator = string.IsNullOrWhiteSpace(qso.Operator) ? TB_Operator.Text : qso.Operator;
-                    if (Properties.Settings.Default.IsOverrideOperator)
-                    {
-                        qso.Operator = TB_Operator.Text;
-                    }
-
-                    qso.Comment = string.IsNullOrWhiteSpace(qso.Comment) ? TB_Comment.Text : qso.Comment;
-                    qso.STX = string.IsNullOrWhiteSpace(qso.STX) ? TB_MyHolyland.Text : qso.STX;
-
-                    lock (_syncLock)
-                    {
-                        if (!string.IsNullOrWhiteSpace(qso.Freq))
-                        {
-                            qso.Band = HolyLogParser.convertFreqToBand(qso.Freq);
-                        }
-                        if (!string.IsNullOrWhiteSpace(qso.MyCall) && !string.IsNullOrWhiteSpace(qso.Band) && !string.IsNullOrWhiteSpace(qso.Mode) && !string.IsNullOrWhiteSpace(qso.DXCall))
-                        {
-                            QSO q = dal.Insert(qso);
-                            Qsos.Insert(0, q);
-                            Properties.Settings.Default.RecentQSOCounter++;
-                            isValid = true;
-                            CopyLoggedQsoToTargetLog(q);
-                        }
-                    }
-                    if (QSODataGrid.Items != null && QSODataGrid.Items.Count > 0)
-                        QSODataGrid.ScrollIntoView(QSODataGrid.Items[0]);
-
-                    if (isValid && Properties.Settings.Default.isAllowLiveLog && isRemoteServerLiveLog)
-                    {
-                        UploadProgress = "100%";
-                        ToggleUploadProgress(Visibility.Visible);
-                        Task<string> response = UploadLogToIARC(new Progress<int>(percent => UploadProgress = percent.ToString() + "%"), new ObservableCollection<QSO> { qso });
-                    }
-                    UpdateNumOfQSOs();
-                    RestoreDataContext();
-                }
-                catch (Exception ex)
-                {
-                    HolyMessageBox.ShowError(
-                        "A contact sent by another program was NOT saved.\n\n"
-                        + ex.Message + "\n\n"
-                        + "That program still has it in its own log — you can add it here by hand.\n"
-                        + HolyMessageBox.WhatToDo(ex.Message, null),
-                        "Save Error", this);
-                }
-            });
-            udp.BeginReceive(new AsyncCallback(StartUDPClient), null);
-            }
-            catch (ObjectDisposedException) { /* socket closed during shutdown ק expected */ }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine("StartUDPClient error: " + ex.Message);
-            }
-        }
-
-        private void StartN1MMUDPClient(IAsyncResult res)
-        {
-            // Closing the window disposes this socket, and that wakes the receive that was still
-            // pending up one last time. Nothing below may run then: the field has already been set
-            // to null (NullReferenceException) and the dispatcher is on its way out
-            // (TaskCanceledException). Both were thrown on every single exit; under the debugger
-            // they stopped the program mid-close, so the window stayed on screen until Continue
-            // was pressed. Take one copy of the socket and work through that.
-            var udp = N1MMClient;
-            if (_isShutdownCleanupDone || udp == null) return;
-
-            try
-            {
-            if (!Properties.Settings.Default.EnableN1MMUDPClient)
-            {
-                return;
-            }
-            IPEndPoint RemoteIpEndPoint = new IPEndPoint(IPAddress.Any, 0);
-            byte[] received = udp.EndReceive(res, ref RemoteIpEndPoint);
-            string data = Encoding.UTF8.GetString(received);
-
-            // A datagram can land at the very moment the program is closing: don't hop onto a
-            // dispatcher that has begun shutting down.
-            if (_isShutdownCleanupDone || Dispatcher.HasShutdownStarted) return;
-            this.Dispatcher.Invoke(() =>
-            {
-                try
-                {
-                    Match match = N1MMTxFreqRegex.Match(data);
-                    if (match.Success)
-                    {
-                        string freq_str = Regex.Split(data, @"<TXFreq>(.*)?<", RegexOptions.IgnoreCase)[1].Trim().ToUpper();
-                        double freq = 0;
-                        if (double.TryParse(freq_str,out freq))
-                        {
-                            // N1MM+ sends TXFreq in units of 10 Hz (e.g. 352211 = 3.52210 MHz). TB_Frequency
-                            // holds MHz everywhere else (CAT / cluster setters and convertFreqToBand), so
-                            // convert 10-Hz -> MHz (÷100000). The old ÷100 produced kHz, which the MHz box
-                            // showed ~1000× too high.
-                            double freqMhz = freq / 100000.0;
-                            TB_Frequency.Text = freqMhz.ToString("0.0#####", System.Globalization.CultureInfo.InvariantCulture);
-                        }
-                    }
-
-                    match = N1MMModeRegex.Match(data);
-                    if (match.Success)
-                    {
-                        string mode = Regex.Split(data, @"<Mode>(.*)?<", RegexOptions.IgnoreCase)[1].Trim().ToUpper();
-                        if (mode == "SSB" || mode == "LSB" || mode == "USB") mode = "SSB";
-                        if (mode == "RTTY" || mode == "RTTY-R" || mode == "RTTY-L" || mode == "AFSK" || mode == "AFSK-R" || mode == "AFSK-L") mode = "DIGI";
-                        bool item_found = false;
-                        foreach (ComboBoxItem item in CB_Mode.Items)
-                        {
-                            if ((string)item.Content == mode)
-                            {
-                                CB_Mode.Text = (string)item.Content;
-                                CB_Mode.SelectedItem = item;                                
-                                item_found = true;
-                                break;
-                            }
-                        }
-                        if (!item_found)
-                        {
-                            CB_Mode.SelectedIndex = 0;
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    HolyMessageBox.ShowError(
-                        "A contact sent by another program was NOT saved.\n\n"
-                        + ex.Message + "\n\n"
-                        + "That program still has it in its own log — you can add it here by hand.\n"
-                        + HolyMessageBox.WhatToDo(ex.Message, null),
-                        "Save Error", this);
-                }
-            });
-            udp.BeginReceive(new AsyncCallback(StartN1MMUDPClient), null);
-            }
-            catch (ObjectDisposedException) { /* socket closed during shutdown ק expected */ }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine("StartN1MMUDPClient error: " + ex.Message);
             }
         }
 
@@ -4043,6 +3807,31 @@ namespace HolyLogger
 
             if (AddBtn != null) AddBtn.Content = keysAreOurs ? "Add (F1)" : "Add";
             if (ClearBtnText != null) ClearBtnText.Text = keysAreOurs ? "Clear (F9)" : "Clear";
+
+            // AND THE SAME FOR THE FOUR MSG KEYS. They carry F5 to F8 under their names, and while the
+            // keyer is open those four keys are its own macros - the same key printed on two windows
+            // meaning two different things is exactly what the operator asked about. The line is emptied
+            // rather than removed, so the buttons do not change size as the keyer comes and goes.
+            ShowMessageKeyName(Btn_Msg1, keysAreOurs ? "F5" : string.Empty);
+            ShowMessageKeyName(Btn_Msg2, keysAreOurs ? "F6" : string.Empty);
+            ShowMessageKeyName(Btn_Msg3, keysAreOurs ? "F7" : string.Empty);
+            ShowMessageKeyName(Btn_Msg4, keysAreOurs ? "F8" : string.Empty);
+        }
+
+        private static void ShowMessageKeyName(Button button, string keyName)
+        {
+            var panel = button != null ? button.Content as StackPanel : null;
+            if (panel == null || panel.Children.Count < 2) return;
+
+            if (!(panel.Children[1] is TextBlock keyLine)) return;
+
+            // COLLAPSED, NOT EMPTIED. An empty line still takes its height, which left the name sitting
+            // in the top half of the button with a gap under it. Out of the layout altogether, the name
+            // has the whole keycap and centres itself in it - and the button is the same size either
+            // way, because its height is fixed in the XAML.
+            bool showing = !string.IsNullOrEmpty(keyName);
+            keyLine.Text = keyName;
+            keyLine.Visibility = showing ? Visibility.Visible : Visibility.Collapsed;
         }
 
         // THE KEYBOARD COMES BACK HERE WHEN THE KEYER GOES AWAY. Closing it with its own X left no
@@ -9293,28 +9082,8 @@ namespace HolyLogger
             // Dispose CallsignUploader to unsubscribe from NetworkChange events
             try { _callsignUploader?.Dispose(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
 
-            // Close and dispose UDP clients
-            try 
-            { 
-                if (Client != null)
-                {
-                    Client.Close();
-                    Client.Dispose();
-                    Client = null;
-                }
-            } 
-            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
-
-            try
-            {
-                if (N1MMClient != null)
-                {
-                    N1MMClient.Close();
-                    N1MMClient.Dispose();
-                    N1MMClient = null;
-                }
-            }
-            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+            // Close and dispose the UDP listeners (one per port in the UDP Ports table)
+            try { CloseUdpListeners(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
 
             try
             {
@@ -10455,64 +10224,9 @@ namespace HolyLogger
                 // A band frequency was edited: the open panel rebuilds its buttons around the new one.
                 ReloadRadioPanelPresets();
             }
-            if (Properties.Settings.Default.EnableUDPClient)
-            {
-                try
-                {
-                    if (Client == null)
-                    {
-                        Client = new UdpClient(Properties.Settings.Default.UDPPort);//2333 / 2237
-                        Client.BeginReceive(new AsyncCallback(StartUDPClient), null);
-                    }
-                }
-                catch
-                {
-                    HolyMessageBox.ShowWarning(
-                        "Failed to open UDP port " + Properties.Settings.Default.UDPPort + ".\n\n"
-                        + "Another program is probably already using it.\n\n"
-                        + "The listener has been switched off. Pick a different port in "
-                        + "Options → General, or close the other program.",
-                    "UDP Client", this);
-                    Properties.Settings.Default.EnableUDPClient = false;
-                }
-            }
-            else
-            {
-                if (Client != null)
-                {
-                    Client.Close();
-                    Client = null;
-                }
-            }
-            if (Properties.Settings.Default.EnableN1MMUDPClient)
-            {
-                try
-                {
-                    if (N1MMClient == null)
-                    {
-                        N1MMClient = new UdpClient(Properties.Settings.Default.N1MMUDPPort);//2333 / 2237
-                        N1MMClient.BeginReceive(new AsyncCallback(StartN1MMUDPClient), null);
-                    }
-                }
-                catch
-                {
-                    HolyMessageBox.ShowWarning(
-                        "Failed to open N1MM+ UDP port " + Properties.Settings.Default.N1MMUDPPort + ".\n\n"
-                        + "Another program is probably already using it.\n\n"
-                        + "The listener has been switched off. Pick a different port in "
-                        + "Options → General, or close the other program.",
-                    "N1MM+ UDP Client", this);
-                    Properties.Settings.Default.EnableN1MMUDPClient = false;
-                }
-            }
-            else
-            {
-                if (N1MMClient != null)
-                {
-                    N1MMClient.Close();
-                    N1MMClient = null;
-                }
-            }
+            // Open, close or move the UDP listeners to match the UDP Ports table, which the
+            // operator may have just changed (see MainWindow.Udp.cs).
+            ApplyUdpListeners();
 
             // Open/close the HolyCluster listener to match the (possibly just-changed) setting/port.
             ApplyHolyClusterListener();
@@ -12700,9 +12414,9 @@ namespace HolyLogger
 
         // Opens the Log Manager (same as File -> View Logs). When filterCallsign is given (the callsign-
         // change flow), the list shows only logs for that callsign.
-        private void OpenLogManager(string filterCallsign = null)
+        private void OpenLogManager(string filterCallsign = null, bool contestOnly = false)
         {
-            var win = new ViewLogsWindow(this, dal, filterCallsign) { Owner = this };
+            var win = new ViewLogsWindow(this, dal, filterCallsign, contestOnly) { Owner = this };
             win.ShowDialog();
         }
 
