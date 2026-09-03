@@ -722,6 +722,12 @@
     <Setting Name="ClusterAlertCallsigns" Type="System.String" Scope="User">
       <Value Profile="(Default)" />
     </Setting>
+    <Setting Name="ClusterAlertCallSoundOn" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">True</Value>
+    </Setting>
+    <Setting Name="ClusterAlertCallSound" Type="System.String" Scope="User">
+      <Value Profile="(Default)">Exclamation</Value>
+    </Setting>
     <Setting Name="ClusterAlertsWindowLeft" Type="System.Double" Scope="User">
       <Value Profile="(Default)">NaN</Value>
     </Setting>

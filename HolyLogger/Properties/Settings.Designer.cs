@@ -2885,6 +2885,30 @@ namespace HolyLogger.Properties {
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool ClusterAlertCallSoundOn {
+            get {
+                return ((bool)(this["ClusterAlertCallSoundOn"]));
+            }
+            set {
+                this["ClusterAlertCallSoundOn"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("Exclamation")]
+        public string ClusterAlertCallSound {
+            get {
+                return ((string)(this["ClusterAlertCallSound"]));
+            }
+            set {
+                this["ClusterAlertCallSound"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("NaN")]
         public double ClusterAlertsWindowLeft {
             get {

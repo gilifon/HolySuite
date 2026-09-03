@@ -795,6 +795,10 @@ namespace HolyLogger
             }
         }
 
+        // True once the main window has been painted for the first time. The cluster window waits for
+        // it, so the program itself is on the screen before its small window is.
+        private bool _mainWindowPainted;
+
         private void NormalizeEnterKeyBehaviorSettings()
         {
             bool addQsoWithEnter = Properties.Settings.Default.AddQSOWithEnter;
@@ -1447,8 +1451,11 @@ namespace HolyLogger
             SyncCallsignToActiveLog();   // startup: box shows the active log's callsign (no stray lock)
             Log.Step("loaded: callsign synced");
 
+            // The cluster's window waits for this (see HandleClusterActiveChanged).
+            ContentRendered += (sPainted, ePainted) => _mainWindowPainted = true;
+
             ApplyClusterWindowSetting();
-            Log.Step("loaded: CLUSTER WINDOW opened");
+            Log.Step("loaded: cluster connected (its window waits for the paint)");
 
             _stickyWindow = new StickyWindow(this);
             Log.Step("loaded: sticky window");
@@ -11198,6 +11205,11 @@ namespace HolyLogger
         }
 
         private string GetFlagPathFromCountryName(string countryName)
+            => FlagPathFromCountryName(countryName);
+
+        // The same lookup with no window behind it: nothing here reads anything but the static
+        // name -> ISO map, so the Alerts list can ask it too.
+        internal static string FlagPathFromCountryName(string countryName)
         {
             if (string.IsNullOrWhiteSpace(countryName))
             {

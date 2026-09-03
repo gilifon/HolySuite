@@ -179,7 +179,7 @@ namespace HolyLogger
         // Layout constants for the cluster window floating overlay panels
         const double ClusterOffScreenPosition = -400;
         const double ClusterHeaderCanvasHeight = 92;
-        const double ClusterAlertsBellGap = 4;   // gap between the "Latest" toggle and the Alerts bell below it
+        const double ClusterAlertsBellGap = 14;  // gap between the "Latest" toggle and the Alerts bell below it
         const double ClusterTableTopGap = 10;
         const double ClusterShowBandsPanelWidth = 115;
         // Fixed half-width used to center the active-band indicator under the Freq column.
@@ -1420,10 +1420,13 @@ namespace HolyLogger
             clusterColumnKeys[modeColumn] = "Mode";
             clusterColumnKeys[commentColumn] = "Comment";
 
+            // THE ORDER A NEW INSTALLATION STARTS WITH. ClusterColumnOrder is empty until the operator
+            // drags a column, so this list is what everybody sees on their first run - Country before
+            // Spotter, which is the order this station settled on (user, 2026-09-03).
             spotsGrid.Columns.Add(dxColumn);
             spotsGrid.Columns.Add(flagColumn);
-            spotsGrid.Columns.Add(spotterColumn);
             spotsGrid.Columns.Add(countryColumn);
+            spotsGrid.Columns.Add(spotterColumn);
             spotsGrid.Columns.Add(freqColumn);
             spotsGrid.Columns.Add(utcColumn);
             spotsGrid.Columns.Add(modeColumn);
@@ -5080,6 +5083,32 @@ namespace HolyLogger
             RefreshClusterVisibleSpots();
         }
 
+        // What country a typed callsign belongs to, and the flag that goes with it. The Alerts window
+        // asks this of every callsign written into its list; it is the same question, answered the same
+        // way, as the one asked of every spot that arrives (see the spot builder).
+        internal static void ResolveCallsignCountry(string callsign, out string country, out string flagPath)
+        {
+            country = string.Empty;
+            flagPath = null;
+            try
+            {
+                string call = (callsign ?? string.Empty).Trim();
+                if (call.Length == 0) return;
+
+                var dxcc = CountryLookup.Shared.Resolve(call);
+                country = dxcc != null ? dxcc.Name : string.Empty;
+
+                // HALF A CALLSIGN HAS NO COUNTRY YET. The resolver answers "Unknown" for anything it
+                // cannot place, and a box that reads "Unknown" while a man is still typing tells him he
+                // has made a mistake when he has not. Nothing is shown until there is something to show.
+                if (string.Equals(country, "Unknown", StringComparison.OrdinalIgnoreCase))
+                    country = string.Empty;
+
+                flagPath = FlagPathFromCountryName(country);
+            }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
         // The bell under "Latest". One window only — clicking the bell again brings it forward.
         private void OpenClusterAlertsWindow()
         {
@@ -5095,25 +5124,29 @@ namespace HolyLogger
 
         // A spot for a watched callsign. Unlike the other two alerts this one asks nothing about band or
         // mode: the operator named the station, so where it turns up is not a reason to stay quiet. The
-        // clock still applies — the same "Last N min" window the table shows — and so does the
-        // new-country sound switch in Cluster Settings, which is the master switch for the ring.
+        // clock still applies — the same "Last N min" window the table shows.
+        //
+        // ITS OWN SWITCH AND ITS OWN SOUND (user, 2026-09-03). It used to follow the new-country switch,
+        // which tied two unrelated things together: a man who does not want to be told about new
+        // countries was also silently deprived of the alerts he had typed in himself. They are separate
+        // settings now, and the Alerts sound is a different one, so the ear can tell them apart.
         private bool ClusterSpotQualifiesForAlertCallsignAlert(ClusterSpotViewItem item)
         {
             if (item == null || !item.IsAlertCallsign) return false;
-            if (!Properties.Settings.Default.ClusterNewCountrySoundOn) return false;
+            if (!Properties.Settings.Default.ClusterAlertCallSoundOn) return false;
             if (!ClusterSpotArrivedWhileConnected(item)) return false;
 
             return item.UnixTime > 0 &&
                    item.UnixTime >= DateTimeOffset.UtcNow.ToUnixTimeSeconds() - (clusterLastMinutesFilterValue * 60L);
         }
 
-        // Same sound as a new country, and its own three-second throttle so a burst rings once.
+        // Its own sound, and its own three-second throttle so a burst rings once.
         private void PlayAlertCallsignAlert()
         {
             var now = DateTime.UtcNow;
             if ((now - _lastAlertCallsignAlertUtc).TotalSeconds < 3) return;
             _lastAlertCallsignAlertUtc = now;
-            PlayClusterAlertSound(Properties.Settings.Default.ClusterNewCountrySound);
+            PlayClusterAlertSound(Properties.Settings.Default.ClusterAlertCallSound);
         }
 
         // Plays the alert sound named in Options → General. A *.wav name plays from C:\Windows\Media,
@@ -5263,10 +5296,35 @@ namespace HolyLogger
                 StartClusterConnectionAsync();
                 Log.Step("cluster: websocket connection started");
 
-                // Open window only if Visible is checked
+                // Open window only if Visible is checked - and AFTER the main window has been painted.
+                //
+                // THE SMALL WINDOW USED TO ARRIVE FIRST. This runs from the main window's Loaded, which
+                // is over before that window has been drawn even once; the cluster is small and paints
+                // in a moment, so it stood on the screen a second and a half ahead of the program it
+                // belongs to (measured 2026-09-03: cluster shown +5.9s, main window painted +7.5s).
+                // The operator saw the cluster appear out of nothing and then waited for the log.
+                //
+                // The CONNECTION is not held back - only the window. Spots keep arriving for the map
+                // and for the alert sounds exactly as before.
                 if (Properties.Settings.Default.ShowClusterWindowOption && clusterWindow == null)
                 {
-                    GenerateNewClusterWindow();
+                    if (_mainWindowPainted)
+                    {
+                        GenerateNewClusterWindow();
+                    }
+                    else
+                    {
+                        EventHandler openWhenPainted = null;
+                        openWhenPainted = (s, e) =>
+                        {
+                            ContentRendered -= openWhenPainted;
+                            if (Properties.Settings.Default.ClusterActive &&
+                                Properties.Settings.Default.ShowClusterWindowOption &&
+                                clusterWindow == null)
+                                GenerateNewClusterWindow();
+                        };
+                        ContentRendered += openWhenPainted;
+                    }
                 }
             }
         }

@@ -52,6 +52,10 @@ namespace HolyLogger
                 CB_NewCountrySound.SelectedItem = PickSound(sounds, s.ClusterNewCountrySound);
                 CBX_NewCountrySound.IsChecked = s.ClusterNewCountrySoundOn;
 
+                CB_AlertCallSound.ItemsSource = new List<string>(sounds);
+                CB_AlertCallSound.SelectedItem = PickSound(sounds, s.ClusterAlertCallSound);
+                CBX_AlertCallSound.IsChecked = s.ClusterAlertCallSoundOn;
+
                 CB_UnconfirmedSound.ItemsSource = new List<string>(sounds);
                 CB_UnconfirmedSound.SelectedItem = PickSound(sounds, s.ClusterUnconfirmedSound);
                 CBX_UnconfirmedSound.IsChecked = s.ClusterUnconfirmedSoundOn;
@@ -152,6 +156,11 @@ namespace HolyLogger
                 s.ClusterNewCountrySoundOn = CBX_NewCountrySound.IsChecked == true;
                 Save(s);
             }
+            else if (sender == CBX_AlertCallSound)
+            {
+                s.ClusterAlertCallSoundOn = CBX_AlertCallSound.IsChecked == true;
+                Save(s);
+            }
             else if (sender == CBX_UnconfirmedSound)
             {
                 s.ClusterUnconfirmedSoundOn = CBX_UnconfirmedSound.IsChecked == true;
@@ -165,6 +174,16 @@ namespace HolyLogger
             if (CB_NewCountrySound.SelectedItem is string name)
             {
                 Properties.Settings.Default.ClusterNewCountrySound = name;
+                Save(Properties.Settings.Default);
+            }
+        }
+
+        private void CB_AlertCallSound_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_loading) return;
+            if (CB_AlertCallSound.SelectedItem is string name)
+            {
+                Properties.Settings.Default.ClusterAlertCallSound = name;
                 Save(Properties.Settings.Default);
             }
         }
@@ -185,6 +204,9 @@ namespace HolyLogger
 
         private void BTN_TestUnconfirmed_Click(object sender, RoutedEventArgs e)
             => MainWindow.PlayClusterAlertSound(CB_UnconfirmedSound.SelectedItem as string);
+
+        private void BTN_TestAlertCall_Click(object sender, RoutedEventArgs e)
+            => MainWindow.PlayClusterAlertSound(CB_AlertCallSound.SelectedItem as string);
 
         // "Sounds" link: jump straight to Options > General, where the app-wide output device lives.
         private void SoundsLink_Click(object sender, RoutedEventArgs e)
