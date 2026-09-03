@@ -1729,6 +1729,7 @@ namespace HolyLogger
             this.Dispatcher.Invoke(() =>
             {
                 UpdateTitleClock();
+                PaintCqMessageButton();
                 // Keep the QSO Date/Time pickers ticking with UTC. Two things stop them: a QSO being
                 // edited (state != New), which must not have the clock typed over it, and the status
                 // bar's Time toggle set to Manual.
@@ -2949,7 +2950,13 @@ namespace HolyLogger
         // afterwards - their own face redrawn.
         private void ShowCwMessageEditDialog(int messageNumber)
         {
-            string updated = ShowCwTextEditDialog("Edit CW Text " + messageNumber + " (F" + (messageNumber + 4) + ")",
+            // BUTTON 1 IS THE CQ, AND IT HOLDS TWO TEXTS - the call itself and the question that goes
+            // out instead of it on a frequency this program has not called on. So it gets the same
+            // editor the keyer's first button gets, with both boxes on it; the other three hold one
+            // text and get the plain one.
+            string updated = messageNumber == 1
+                           ? EditCqMessageText()
+                           : ShowCwTextEditDialog("Edit CW Text " + messageNumber + " (F" + (messageNumber + 4) + ")",
                                                   GetCwMessageText(messageNumber));
             if (updated == null) return;
 
@@ -3994,6 +4001,10 @@ namespace HolyLogger
                     + (string.IsNullOrEmpty(RigFileTrouble) ? string.Empty : "  " + RigFileTrouble)
                     + "  You can still write and edit the eight macros below - right-click one.");
 
+            // ONE OR THE OTHER. The lite keyer leaves the bar while this window is open: two places
+            // to type CW into, both feeding one radio, is two half-sent messages.
+            if (cwLiteKeyer != null) cwLiteKeyer.KeyerWindowOpen = true;
+
             // The readout follows the radio's own knob from here on - see BuildCwSpeedReadCommand.
             cwKeyboard.AskSpeed = AskRadioCwSpeed;
 
@@ -4027,21 +4038,16 @@ namespace HolyLogger
 
             // Where the radio is listening, so the CQ button can tell a frequency it has already called
             // on from one it has only just arrived at - see ShouldAskQrl.
-            cwKeyboard.RadioFrequencyHz = () =>
-            {
-                try
-                {
-                    if (!IsCatLive()) return 0;
-                    return Rig.GetRxFrequency();
-                }
-                catch (System.Exception swallowed) { Log.Swallow(swallowed); return 0; }
-            };
+            cwKeyboard.RadioFrequencyHz = RxFrequencyHz;
 
             cwKeyboard.Closed += (s, e) =>
             {
                 cwKeyboard = null;
                 UpdateActionKeyLabels();
                 TakeBackTheKeyboard();
+
+                // And the one line comes back to the bar - see CanTypeCwOnTheBar.
+                if (cwLiteKeyer != null) cwLiteKeyer.KeyerWindowOpen = false;
             };
             cwKeyboard.Show();
             UpdateActionKeyLabels();
@@ -4428,6 +4434,81 @@ namespace HolyLogger
             TrySendOmniRigCustomCommand(command, replyLength, replyEnd);
         }
 
+        // -- THE LITE KEYER ON THE MENU ROW ------------------------------------------------------
+        //
+        // The window is the full keyer; this is the one line. It is on the bar only while that window
+        // is closed and only while this radio can actually be keyed in CW - see CwLiteKeyer, which
+        // holds the typing and the tinting. Everything below is the radio end of it, and it is the
+        // same radio end the keyer window uses.
+        private CwLiteKeyer cwLiteKeyer;
+
+        private void BuildCwLiteKeyer()
+        {
+            if (cwLiteKeyer != null || CwLiteKeyerHost == null) return;
+
+            cwLiteKeyer = new CwLiteKeyer(
+                SendCwChunkToRadio,
+                StopCwOnRadio,
+                () => Rig != null && Rig.Tx == (OmniRig.RigParamX)PM_TX,
+                () => CwChunkSizeFor(NormalizeRigType(Rig != null ? Rig.RigType : null)),
+                () => IsYaesuKeyer(NormalizeRigType(Rig != null ? Rig.RigType : null)),
+                CanTypeCwOnTheBar,
+                AskRadioCwSpeed);
+
+            // The wheel over its WPM number sets the radio, the same wheel the keyer window carries -
+            // see SetRadioCwSpeed. The rig is read at the moment it is turned, not now.
+            cwLiteKeyer.SetSpeed = wpm => SetRadioCwSpeed(NormalizeRigType(Rig != null ? Rig.RigType : null), wpm);
+            cwLiteKeyer.SpeedRange = (out int low, out int high) =>
+                CwSpeedRange(NormalizeRigType(Rig != null ? Rig.RigType : null), out low, out high);
+
+            CwLiteKeyerHost.Content = cwLiteKeyer;
+            cwLiteKeyer.KeyerWindowOpen = cwKeyboard != null;
+        }
+
+        // THE RIG IS ASKED EACH TIME, not once when the strip was built: the operator can change
+        // radios, or turn CAT off and on, without this line ever leaving the bar.
+        private bool SendCwChunkToRadio(string chunk)
+        {
+            string rigType = NormalizeRigType(Rig != null ? Rig.RigType : null);
+
+            // A Yaesu takes two: the text into a memory, then the memory played.
+            string[] pair = BuildYaesuCwCommands(rigType, chunk);
+            if (pair != null)
+            {
+                foreach (string one in pair)
+                    if (!TrySendOmniRigCustomCommand(one)) return false;
+                return true;
+            }
+
+            string command = BuildCwChunkCommand(rigType, chunk);
+            return command != null && TrySendOmniRigCustomCommand(command);
+        }
+
+        private void StopCwOnRadio()
+        {
+            string stop = BuildCwStopCommand(NormalizeRigType(Rig != null ? Rig.RigType : null));
+            if (!string.IsNullOrWhiteSpace(stop)) TrySendOmniRigCustomCommand(stop);
+        }
+
+        // NOT OFFERED WHERE IT CANNOT WORK. A line to type CW into is worth nothing with the radio in
+        // SSB, with CAT off, or on a radio no maker's command will key - and a control that looks
+        // ready and does nothing is worse than no control. It is off the bar in all of those, and off
+        // it while the keyer window is open, which does the same job in a bigger space.
+        private bool CanTypeCwOnTheBar()
+        {
+            if (!Properties.Settings.Default.EnableOmniRigCAT) return false;
+            if (OmniRigEngine == null || Rig == null) return false;
+            if (Rig.Status != OmniRig.RigStatusX.ST_ONLINE) return false;
+            if (!IsCwModeActive()) return false;
+
+            // NOT WHILE THE PROGRAM IS STILL OPENING. The keyer window comes up by itself for a radio
+            // already in CW, and it cannot do that until the main window is up - so a strip shown
+            // before then is a strip shown for a second and then taken away again.
+            if (!_startupWindowsReady) return false;
+
+            return CanKeyCw(NormalizeRigType(Rig.RigType));
+        }
+
         // -- AND SETTING IT, FROM THE WHEEL OVER THE READOUT -------------------------------------
         //
         // THE WHEEL IS BACK, and it is the asking above that makes it safe. It was taken off because
@@ -4524,6 +4605,7 @@ namespace HolyLogger
             Dispatcher.BeginInvoke(new Action(() =>
             {
                 if (cwKeyboard != null) cwKeyboard.ShowSpeed(wpm);
+                if (cwLiteKeyer != null) cwLiteKeyer.ShowSpeed(wpm);
 
                 // AND THE MONITOR, WHILE IT IS RUNNING. The speed knob can be turned in the middle of a
                 // message; the keyer bar followed it and the monitor did not, so its cursor went on at
@@ -4741,6 +4823,13 @@ namespace HolyLogger
 
             string storedText = storedTextOverride ?? GetCwMessageText(messageNumber);
 
+            // BUTTON 1 IS THE CQ - see PaintCqMessageButton. Everything below this line treats the
+            // question as any other text: it is expanded, sent and monitored the same way. Not for
+            // ESM's texts, which are the keyer's own twelve and carry their own first button.
+            bool isCqButton = messageNumber == 1 && storedTextOverride == null;
+            if (isCqButton && CwKeyboardWindow.ShouldAskQrl(RxFrequencyHz()))
+                storedText = CwKeyboardWindow.QrlText();
+
             if (string.IsNullOrWhiteSpace(storedText))
             {
                 HolyMessageBox.ShowWarning("CW text " + messageNumber + " is empty. Right-click the button to edit it.", "CW Text", this);
@@ -4796,6 +4885,11 @@ namespace HolyLogger
                 activeVoiceMessageNumber = null;
                 pendingVoiceMessageDeadlineUtc = DateTime.UtcNow.AddSeconds(30);
 
+                // ONLY NOW, WITH SOMETHING REALLY GOING OUT. Marked any earlier, an empty button or a
+                // macro that could not be filled in would count as having called on this frequency,
+                // and the question would then be skipped where it was most needed.
+                if (isCqButton) CwKeyboardWindow.RememberCq(RxFrequencyHz());
+
                 ShowCwSendMonitor(cwText);
                 RunCwMacroActions(logsQso, wipesForm);
                 return;
@@ -4828,6 +4922,8 @@ namespace HolyLogger
             pendingVoiceMessageNumber = messageNumber;
             activeVoiceMessageNumber = null;
             pendingVoiceMessageDeadlineUtc = DateTime.UtcNow.AddSeconds(30);
+
+            if (isCqButton) CwKeyboardWindow.RememberCq(RxFrequencyHz());
 
             ShowCwSendMonitor(cwText);
             RunCwMacroActions(logsQso, wipesForm);
@@ -5257,6 +5353,99 @@ namespace HolyLogger
             Style cwStyle  = (Style)FindResource("MsgButtonCwStyle");
             Style ssbStyle = (Style)FindResource("MsgButtonStyle");
             button.Style = isCw ? cwStyle : ssbStyle;
+        }
+
+        // -- THE CQ BUTTON AND ITS QUESTION ------------------------------------------------------
+        //
+        // THE SAME RULE THE KEYER'S FIRST BUTTON WORKS BY, on the first of the four Msg buttons: a CQ
+        // on top of a QSO already in progress is the rudest thing a man can do on a band, and it is
+        // almost always an accident - he tunes away, comes back to something that looks empty, and
+        // presses the button out of habit. So on a frequency this program has not called on, the first
+        // press asks whether it is free; the second calls CQ.
+        //
+        // The rule itself, the question's own words and how long a quiet frequency stays his are all in
+        // CwKeyboardWindow, and the mark - where and when the CQ last went out - is shared between the
+        // two buttons: it is one CQ on one radio, wherever it was pressed from.
+        private string EditCqMessageText()
+        {
+            string qrl = CwKeyboardWindow.QrlText();
+
+            string extra;
+            string result = ShowCwTextEditDialog(
+                "Edit CW Text 1 (F5)", GetCwMessageText(1),
+                "Calls CQ",
+                "Asks whether the frequency is free",
+                "Sent instead of the CQ when the radio has moved off the frequency it last called "
+                + "on, or has sat on it too long without calling. Recommended: QRL?",
+                qrl,
+                "What the button sends once the frequency has been asked about.",
+                out extra);
+
+            if (result == null) return null;
+
+            // The question is one setting for the whole program - the keyer's first button asks with
+            // the same words - so it is saved whichever editor was used to change it.
+            try
+            {
+                Properties.Settings.Default.CwKeyerQrlText = (extra ?? string.Empty).Trim();
+                Properties.Settings.Default.Save();
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+            return result;
+        }
+
+        // Where the radio is listening, so the CQ button can tell a frequency it has already called on
+        // from one it has only just arrived at.
+        private double RxFrequencyHz()
+        {
+            try
+            {
+                if (!IsCatLive()) return 0;
+                return Rig.GetRxFrequency();
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); return 0; }
+        }
+
+        // AND IT SAYS SO BEFORE IT IS PRESSED. The button turns red while the next press would ask
+        // rather than call - the same red the keyer paints its own first button - so the operator is
+        // never surprised by a question going out when he meant to call.
+        //
+        // ASKED ONCE A SECOND, on the clock's own tick: it is a question that leaves the program for
+        // the radio's frequency, and the answer cannot change faster than a hand can turn the dial.
+        private static readonly System.Windows.Media.Brush QrlWarningBrush = MakeQrlWarningBrush();
+
+        private static System.Windows.Media.Brush MakeQrlWarningBrush()
+        {
+            var brush = new System.Windows.Media.SolidColorBrush(
+                System.Windows.Media.Color.FromRgb(0xFF, 0x6E, 0x6E));
+            brush.Freeze();
+            return brush;
+        }
+
+        // Only in CW. In voice the four buttons play audio files and there is no CQ among them.
+        private bool ShouldAskQrlNow()
+        {
+            return IsCwModeActive() && CwKeyboardWindow.ShouldAskQrl(RxFrequencyHz());
+        }
+
+        private void PaintCqMessageButton()
+        {
+            var button = Btn_Msg1;
+            if (button == null) return;
+
+            // The colour is put on by the one painter that owns it; this only asks it to look again,
+            // because the answer can change with the dial and nothing else would tell it.
+            UpdateVoiceMessageButtonHighlight(button, 1);
+
+            if (ShouldAskQrlNow())
+            {
+                button.ToolTip = "This frequency has not been called on. Pressing this sends "
+                               + CwKeyboardWindow.QrlText() + " instead, to ask whether it is free.";
+                return;
+            }
+
+            button.ClearValue(ToolTipProperty);
         }
 
         private bool IsCwModeActive()
@@ -7646,6 +7835,13 @@ namespace HolyLogger
 
             UpdateMessageButtonLabels();
 
+            // THE SAME MOMENTS THE CW BUTTONS ARE JUDGED AT, and AFTER the keyer window above has been
+            // opened or closed - never before it. Judged first, the strip appeared on the bar and was
+            // taken off again a moment later by the very same pass, which is what the operator saw at
+            // startup: a line that flashed up and vanished.
+            BuildCwLiteKeyer();
+            if (cwLiteKeyer != null) cwLiteKeyer.Refresh();
+
             // The radio arriving or going away changes whether ESM can send at all, and with it which
             // button - if any - should be lit.
             RefreshEsmHint();
@@ -7693,6 +7889,15 @@ namespace HolyLogger
                 else if (isEsmNext)
                 {
                     button.Background = EsmNextBrush;
+                }
+                else if (messageNumber == 1 && ShouldAskQrlNow())
+                {
+                    // AND THE CQ'S OWN WARNING LIVES HERE TOO, not in a painter of its own. It had one,
+                    // and the two fought: this one clears the colour every time it runs, so the button
+                    // went red on the clock's tick and back to its keycap cyan the moment anything
+                    // refreshed the row - a button changing colour by itself with nobody touching
+                    // anything. One painter owns the background now, and this is it.
+                    button.Background = QrlWarningBrush;
                 }
                 else
                 {

@@ -1,4 +1,49 @@
-﻿== 8.9.3 ==
+﻿== 8.9.4 ==
+
+New
+- CW keyer: twelve buttons in two banks of six, pressed by F1 to F12, with your own
+  names on the keycaps.
+- One editor for every CW text, opened from the keyer, with a standard set installed
+  to start from.
+- The CQ button asks first. On a frequency you have not called on it sends QRL?, and
+  the next press calls CQ. It sits red while it will ask. This works on the keyer's
+  first button and on the first of the four Msg buttons.
+- WPM in the keyer's title bar, read from the radio itself. Roll the mouse wheel over
+  it to change the speed.
+- Lite CW keyer on the menu bar: one line to type CW into without opening the keyer
+  window. It is there while that window is closed, and it has its own WPM and wheel.
+- Enter Sends Message: Off, Run and S&P on the keyer's title bar, and a choice of
+  typing straight onto the air or holding the line for Enter.
+- The keyer's typing line no longer runs off the side. What the radio has finished
+  with drops into the record below it.
+- Cluster alerts: a watch list of callsigns. A spot on the list rings, is pinned to
+  the top of the list and wears a purple frame.
+- Right-click a spot and choose Copy to Alert to put that callsign on the list.
+- The alerts have a sound of their own.
+- A callsign that is not shaped like a callsign is now warned about, and can still be
+  logged.
+- Help > Which radios can send CW now covers the voice messages too. Every line was
+  read from the maker's own manual.
+- Log Fixer writes down what it changed, and can put it back.
+- Activity list: Contest is a yellow key with a line under it, and Activate & Open Log
+  is a green button.
+- Tooltips: eight words to a line, and one colour in every scheme.
+
+Fixed
+- A UDP port could go deaf after a single failure and stay deaf until the program was
+  restarted.
+- Compact asks again when the FILE has grown, not only when the empty space has. A log
+  declined once was never asked about again, however big it got.
+- A message window could be measured wrongly on a scaled screen, so the text did not
+  fit the window it was given.
+
+Faster
+- Startup: the LoTW list and the UDP sockets no longer hold up the window, and the
+  splash gives back about three quarters of a second.
+- The CW keyer redrew its typing line twenty times a second with nothing being sent.
+  It redraws only when something has moved.
+
+== 8.9.3 ==
 
 New
 - Log Fixer asks first: All, Never checked, Already checked and fixed, Already

@@ -994,6 +994,10 @@
                     </Rectangle.OpacityMask>
                 </Rectangle>
             </Border>
+            <!-- The lite CW keyer: one line to type CW into, on the bar itself. Filled in code
+                 (CwLiteKeyer) and empty - taking no room at all - whenever the radio cannot be keyed
+                 or the full CW Keyer window is open. -->
+            <ContentControl x:Name="CwLiteKeyerHost" VerticalAlignment="Center" Margin="6,0,0,0"/>
             </StackPanel>
 
                 <!-- UTC clock, centred over the map (the map spans x=677..right-6 in the row below). -->

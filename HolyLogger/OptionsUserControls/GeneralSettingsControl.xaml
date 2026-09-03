@@ -66,7 +66,7 @@
              width stops it at 580, where every group box on this page ends. -->
         <TextBlock HorizontalAlignment="Left" VerticalAlignment="Top" Margin="200,373,0,0" FontSize="16"
                    Foreground="Gray" TextWrapping="Wrap" Width="380"
-                   Text="Send or receive information from other software."/>
+                   Text="Receive information from other software."/>
 
         <!-- Audio Alerts: both sound options plus a single shared output-device picker, so alerts can
              go to the speakers instead of a USB radio codec. Left-justified with the checkboxes. -->

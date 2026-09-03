@@ -156,8 +156,16 @@ namespace HolyLogger
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); return QrlDefaultText; }
         }
-        private double _cqFreqHz;
-        private DateTime _cqSentUtc = DateTime.MinValue;
+        // ONE MARK FOR THE WHOLE PROGRAM, not one per window. The CQ can now be sent from two places -
+        // this window's first button and the main window's first Msg button - and they are the same
+        // CQ on the same radio. Kept apart, a CQ called from one of them left the other still
+        // believing the frequency had never been called on, and it asked QRL? over a frequency its
+        // owner had been calling on for the last ten minutes.
+        //
+        // Static, and nothing is written to disk: a program that has just started has not asked
+        // anybody anything.
+        private static double _cqFreqHz;
+        private static DateTime _cqSentUtc = DateTime.MinValue;
 
         internal static int QrlMinutes()
         {
@@ -177,6 +185,13 @@ namespace HolyLogger
             try { now = _rxFrequencyHz(); }
             catch (Exception swallowed) { Log.Swallow(swallowed); return false; }
 
+            return ShouldAskQrl(now);
+        }
+
+        // The same rule, asked by the main window about its own first Msg button - it has the
+        // frequency to hand and needs no callback to fetch it.
+        internal static bool ShouldAskQrl(double now)
+        {
             if (now <= 0) return false;
 
             // Never called from here at all.
@@ -193,12 +208,22 @@ namespace HolyLogger
 
         private void RememberCqFrequency()
         {
-            _cqSentUtc = DateTime.UtcNow;
+            if (_rxFrequencyHz == null) { RememberCq(0); return; }
 
-            if (_rxFrequencyHz == null) return;
-
-            try { _cqFreqHz = _rxFrequencyHz(); }
+            double hz = 0;
+            try { hz = _rxFrequencyHz(); }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+            RememberCq(hz);
+        }
+
+        // CALLED WHERE SOMETHING REALLY WENT OUT, from either place the CQ can be sent. A frequency of
+        // nought still counts as having called: the time is what stops the question being asked twice
+        // in a row on a radio whose frequency cannot be read.
+        internal static void RememberCq(double hz)
+        {
+            _cqSentUtc = DateTime.UtcNow;
+            if (hz > 0) _cqFreqHz = hz;
         }
 
         public delegate void SpeedRange(out int low, out int high);
@@ -1305,12 +1330,20 @@ namespace HolyLogger
         // thing. Drawn rather than fetched - five shapes, and no licence to carry.
         private static UIElement BuildStraightKeyIcon()
         {
+            return BuildStraightKeyIcon(false, new Thickness(10, 0, 0, 0));
+        }
+
+        // THE SAME KEY IN TWO PLACES: this window's title bar and the lite keyer on the main window's
+        // menu row. Black on the cyan title bar, which is one colour in every scheme; on the menu row
+        // there is no such promise, so it takes the theme's own text colour and stays visible in both.
+        internal static UIElement BuildStraightKeyIcon(bool themed, Thickness margin)
+        {
             var canvas = new Canvas { Width = 24, Height = 24 };
 
-            canvas.Children.Add(Piece(2, 18.5, 20, 3, 1.2));      // base
-            canvas.Children.Add(Piece(15.2, 11, 2.6, 7.5, 0));    // upright at the back
-            canvas.Children.Add(Piece(4.5, 10.4, 14, 2.4, 1.2));  // lever arm
-            canvas.Children.Add(Piece(6.6, 12.8, 1.8, 5.7, 0));   // contact post under the knob
+            canvas.Children.Add(Piece(2, 18.5, 20, 3, 1.2, themed));      // base
+            canvas.Children.Add(Piece(15.2, 11, 2.6, 7.5, 0, themed));    // upright at the back
+            canvas.Children.Add(Piece(4.5, 10.4, 14, 2.4, 1.2, themed));  // lever arm
+            canvas.Children.Add(Piece(6.6, 12.8, 1.8, 5.7, 0, themed));   // contact post under the knob
 
             var knob = new System.Windows.Shapes.Ellipse
             {
@@ -1318,6 +1351,7 @@ namespace HolyLogger
                 Height = 5,
                 Fill = Brushes.Black
             };
+            if (themed) knob.SetResourceReference(System.Windows.Shapes.Shape.FillProperty, "TextBrush");
             Canvas.SetLeft(knob, 3.6);
             Canvas.SetTop(knob, 6.2);
             canvas.Children.Add(knob);
@@ -1326,13 +1360,13 @@ namespace HolyLogger
             {
                 Width = 18,
                 Height = 18,
-                Margin = new Thickness(10, 0, 0, 0),
+                Margin = margin,
                 VerticalAlignment = VerticalAlignment.Center,
                 Child = canvas
             };
         }
 
-        private static System.Windows.Shapes.Rectangle Piece(double left, double top, double width, double height, double radius)
+        private static System.Windows.Shapes.Rectangle Piece(double left, double top, double width, double height, double radius, bool themed = false)
         {
             var piece = new System.Windows.Shapes.Rectangle
             {
@@ -1342,6 +1376,7 @@ namespace HolyLogger
                 RadiusY = radius,
                 Fill = Brushes.Black
             };
+            if (themed) piece.SetResourceReference(System.Windows.Shapes.Shape.FillProperty, "TextBrush");
             Canvas.SetLeft(piece, left);
             Canvas.SetTop(piece, top);
             return piece;
@@ -2974,10 +3009,9 @@ namespace HolyLogger
             };
             RefreshSpeedText();
 
-            // THE WORD AND THE NUMBER ARE TWO PIECES, because only one of them lights. The wheel is
-            // answered over the whole patch, but what it CHANGES is the number - so the yellow goes
-            // round the digits and nothing else. The margin keeps the two together: "WPM 26" reads as
-            // one thing, not as a caption and a number that happen to be near each other.
+            // THE WORD AND THE NUMBER ARE TWO PIECES only so the number can be redrawn on its own as
+            // the speed changes. The margin keeps the two together: "WPM 26" reads as one thing, not
+            // as a caption and a number that happen to be near each other.
             _wpmNumberBox = new Border
             {
                 Background = Brushes.Transparent,
@@ -3028,8 +3062,9 @@ namespace HolyLogger
                 e2.Handled = true;
             };
 
-            // AND IT SAYS SO BEFORE THE WHEEL IS ROLLED. The arrows say a wheel works here; the
-            // yellow says exactly what it works ON, over the whole patch the wheel is answered in.
+            // AND IT SAYS SO BEFORE THE WHEEL IS ROLLED. The yellow marks the number, because the
+            // number is what changes; the pointer marks the whole patch, because anywhere on it - the
+            // word, the number, the arrows - answers the wheel. Nobody has to aim at the digits.
             holder.MouseEnter += (s2, e2) => _wpmNumberBox.Background = WheelZoneBrush;
             holder.MouseLeave += (s2, e2) => _wpmNumberBox.Background = Brushes.Transparent;
 
