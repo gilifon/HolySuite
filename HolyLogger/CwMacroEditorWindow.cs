@@ -27,7 +27,10 @@ namespace HolyLogger
     /// </summary>
     internal class CwMacroEditorWindow : Window
     {
-        private const int KeyerButtons = 12;
+        // TAKEN FROM THE KEYER, not written out again. Two copies of the same twelve meant that
+        // changing one of them made this window throw as it opened - the arrays it fills come
+        // from the keyer and are the keyer's length.
+        private const int KeyerButtons = CwKeyboardWindow.ButtonCount;
         private const int MsgButtons = 4;
 
         private readonly TextBox[] _labels = new TextBox[KeyerButtons];

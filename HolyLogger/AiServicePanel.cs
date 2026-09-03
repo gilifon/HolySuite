@@ -386,8 +386,8 @@ namespace HolyLogger
             // and put back LAST, after the box has done its own tidying up.
             string typed = box.Text;
             FillModels(box, service, live);
-            box.Dispatcher.BeginInvoke(new Action(() => box.Text = typed),
-                                       System.Windows.Threading.DispatcherPriority.Input);
+            _ = box.Dispatcher.BeginInvoke(new Action(() => box.Text = typed),
+                                           System.Windows.Threading.DispatcherPriority.Input);
         }
 
         private void ShowModelBox(AiService service)

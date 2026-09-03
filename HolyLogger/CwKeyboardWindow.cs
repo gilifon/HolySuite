@@ -227,7 +227,7 @@ namespace HolyLogger
         // main window's Msg buttons shown a second time. That link is gone: the four on the main
         // window are for ordinary working now, and everything a contest needs lives in here - twelve
         // texts of this window's own, on F1 to F12, which is the set N1MM has taught everybody.
-        private const int ButtonCount = 12;
+        internal const int ButtonCount = 12;   // the macro editor builds its table from this one
 
         // The four ESM steps, and the order it expects them in: 1 the CQ, 2 the exchange, 3 the TU,
         // 4 his own call for Search and Pounce. The other eight are the operator's to fill.
@@ -291,6 +291,8 @@ namespace HolyLogger
         // Draws the send line in its two colours; see where it is built for why the box itself does
         // not draw at all.
         private TextBlock _sendOverlay;
+        private string _paintedText;        // what the send line was last drawn from - see RepaintSendLine
+        private int _paintedKeyed = -1;
 
         private TextBlock _titleText;
         private int _shownWpm = -1;
@@ -1147,6 +1149,18 @@ namespace HolyLogger
             string text = _box.Text ?? string.Empty;
             int keyed = KeyedSoFar(text);
 
+            // NOTHING HAS MOVED, SO NOTHING IS REDRAWN. This ran twenty times a second for as long as
+            // the window was open - clearing the line and building its words again with nothing typed
+            // and nothing being keyed - and every one of those made WPF measure and paint the whole
+            // window. The two things the line is made of are the text and how much of it has been
+            // keyed; while both stand still, so does the line.
+            //
+            // A colour change does not need us: the unsent half holds a DynamicResource, so it follows
+            // the theme wherever the paint below happened to leave it.
+            if (text == _paintedText && keyed == _paintedKeyed) return;
+            _paintedText = text;
+            _paintedKeyed = keyed;
+
             _sendOverlay.Inlines.Clear();
 
             if (keyed > 0)
@@ -1484,6 +1498,17 @@ namespace HolyLogger
             _releasedUpTo = 0;
             _unitsKeyed = 0;
             _box.Text = string.Empty;
+
+            // AND THE TRANSMIT CLOCK, which used to be left standing. Stopping mid-message leaves the
+            // radio recorded as still keying, and nothing polls it again while the keyer sits idle
+            // (FinishLineIfSilent gives up before the poll when there is no open line). So the NEXT
+            // message was timed from the moment the ABANDONED one started - its own units over
+            // seconds that included all the dead time between - and the speed came out too slow.
+            // Above five words a minute that wrong answer is accepted, and it drags the learned speed
+            // down and marks it as measured.
+            _txSeenThisSend = false;
+            _txStoppedUtc = DateTime.MaxValue;
+            _txStartedUtc = DateTime.MinValue;
         }
 
         // How many rows of sent text are on show. Read from the setting every time rather than kept in
@@ -1869,7 +1894,6 @@ namespace HolyLogger
             bool isCqButton = index == 0;
             bool askingQrl = isCqButton && ShouldAskQrl();
             if (askingQrl) stored = QrlText();
-            if (isCqButton) RememberCqFrequency();
 
             if (stored.Trim().Length == 0)
             {
@@ -1944,6 +1968,12 @@ namespace HolyLogger
             // across two bursts lost its colour entirely. The painter has since been rewritten to
             // count units only while the radio is keying (see AdvanceKeyingClock); it never asks when
             // the burst began, so a row may now span as many presses as the operator likes.
+            // ONLY NOW, WITH SOMETHING REALLY GOING OUT. This used to run at the top, before the
+            // checks below it - so a CQ button that was empty, or whose macro could not be filled in,
+            // still marked the frequency as called on, and the QRL? was then skipped on a frequency
+            // he had never called on.
+            if (isCqButton) RememberCqFrequency();
+
             bool stillSending = _inFlight.Count > 0
                              || (_box.Text ?? string.Empty).Length > 0
                              || DateTime.UtcNow < _radioBusyUntil

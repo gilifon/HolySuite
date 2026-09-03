@@ -532,7 +532,10 @@ namespace HolyLogger
                 new System.Windows.Media.Typeface(MessageText.FontFamily, MessageText.FontStyle,
                                                   FontWeights.Bold, MessageText.FontStretch),
                 MessageText.FontSize,
-                System.Windows.Media.Brushes.Black);
+                System.Windows.Media.Brushes.Black,
+                // Without this the text is measured as if the screen were at 100%. On a scaled
+                // display the height came back wrong, so the "does it fit" test below was too.
+                VisualTreeHelper.GetDpi(this).PixelsPerDip);
             drawn.MaxTextWidth = Math.Max(50, windowWidth - SideFurniture);
             return drawn.Height;
         }

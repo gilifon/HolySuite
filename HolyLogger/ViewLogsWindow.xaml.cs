@@ -648,6 +648,18 @@ namespace HolyLogger
                 return;
             }
 
+            // SHAPED LIKE A CALLSIGN? The same test the entry form and the Alerts list use, and like
+            // them it only WARNS: a real callsign this program has never met is still his to type, and
+            // the one thing that must not happen is the log refusing a call that is genuinely his.
+            if (!CallsignIdentity.LooksLikeCallsign(call)
+                && !HolyMessageBox.ShowConfirm(
+                        "\"" + call + "\" is not shaped like a callsign.\n\nUse it anyway?",
+                        "Callsigns", HolyMsgType.Warning, this))
+            {
+                _add.Focus();
+                return;
+            }
+
             // Already here: nothing to add. Make it the current one instead - that is the only thing
             // pressing Add could have meant.
             if (_dal.LogAcceptsCallsign(_logId, call))

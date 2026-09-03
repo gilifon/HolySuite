@@ -2767,6 +2767,16 @@ Environment.NewLine +
                     cc.Parameters.Add(new SQLiteParameter(null, id));
                     cc.ExecuteNonQuery();
                 }
+                // What the Log Fixer wrote down about these contacts goes with them. Before the QSOs
+                // themselves, because afterwards there is nothing left to name them by. A single-QSO
+                // delete does this through ForgetFixHistory; a whole log did not, and left its rows
+                // behind for ever in a file that is backed up and compacted.
+                using (var df = new SQLiteCommand(
+                    "DELETE FROM [qso_fix] WHERE [qso_id] IN (SELECT Id FROM qso WHERE log_id = ?)", con))
+                {
+                    df.Parameters.Add(new SQLiteParameter(null, id));
+                    df.ExecuteNonQuery();
+                }
                 using (var dq = new SQLiteCommand("DELETE FROM qso WHERE log_id = ?", con))
                 {
                     dq.Parameters.Add(new SQLiteParameter(null, id));

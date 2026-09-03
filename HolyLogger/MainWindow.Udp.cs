@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Globalization;
@@ -46,6 +46,7 @@ namespace HolyLogger
             public UdpClient Client;
             public string Name;
             public int Port;
+            public int FailuresInARow;   // see UdpReceive: a port that only ever fails is let go
         }
 
         private readonly List<UdpListener> _udpListeners = new List<UdpListener>();
@@ -156,6 +157,7 @@ namespace HolyLogger
             {
                 IPEndPoint remote = new IPEndPoint(IPAddress.Any, 0);
                 byte[] received = udp.EndReceive(res, ref remote);
+                listener.FailuresInARow = 0;
 
                 await HandleUdpDatagram(received);
 
@@ -166,7 +168,28 @@ namespace HolyLogger
             catch (ObjectDisposedException) { /* socket closed during shutdown - expected */ }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine("UdpReceive error: " + ex.Message);
+                // IT USED TO STOP LISTENING HERE, FOR GOOD, AND SAY NOTHING. The line that asks for the
+                // next datagram is on the way out of a CLEAN receive only, so a single failure - and
+                // Windows reports a refused datagram as an error on the NEXT receive - left the port
+                // dead until the program was restarted. The news went to the debugger, which nobody
+                // running the installed build ever sees: the operator simply found that the other
+                // program had stopped feeding him.
+                Log.Swallow(ex);
+
+                if (_isShutdownCleanupDone || listener == null || listener.Client == null) return;
+
+                // A socket that only ever fails is not worth spinning on. Ten in a row and the port is
+                // left closed - with a line in the log saying so, which is the part that was missing.
+                if (++listener.FailuresInARow > 10)
+                {
+                    Log.Swallow(new Exception(
+                        "UDP port " + listener.Port + " (" + listener.Name + ") stopped listening after "
+                        + "ten errors in a row. Close and reopen the port in Tools to try again."));
+                    return;
+                }
+
+                try { listener.Client.BeginReceive(new AsyncCallback(UdpReceive), listener); }
+                catch (Exception again) { Log.Swallow(again); }
             }
         }
 
@@ -330,7 +353,19 @@ namespace HolyLogger
                     {
                         UploadProgress = "100%";
                         ToggleUploadProgress(Visibility.Visible);
-                        Task<string> response = UploadLogToIARC(new Progress<int>(percent => UploadProgress = percent.ToString() + "%"), new ObservableCollection<QSO> { qso });
+
+                        // OFF THIS THREAD, AND SOMEBODY WATCHES IT. Started here, the request resolved
+                        // the proxy on the window's thread; and the Task was dropped on the floor, so a
+                        // failed upload said nothing at all and the progress box just shown stayed on
+                        // the screen for the rest of the session.
+                        var progress = new Progress<int>(percent => UploadProgress = percent.ToString() + "%");
+                        var one = new ObservableCollection<QSO> { qso };
+                        Task.Run(async () => await UploadLogToIARC(progress, one))
+                            .ContinueWith(t =>
+                            {
+                                if (t.IsFaulted && t.Exception != null) Log.Swallow(t.Exception.GetBaseException());
+                                ToggleUploadProgress(Visibility.Hidden);
+                            }, TaskScheduler.FromCurrentSynchronizationContext());
                     }
                     UpdateNumOfQSOs();
                     RestoreDataContext();

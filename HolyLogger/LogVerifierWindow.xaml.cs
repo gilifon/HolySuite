@@ -2417,7 +2417,6 @@ namespace HolyLogger
         // boxes and no green button: there is nothing on this screen to answer.
         public void ShowList(string headline)
         {
-            _listOnly = true;
             _findings.Clear();
             _rows.Clear();
             _rowByQso.Clear();
@@ -2550,10 +2549,6 @@ namespace HolyLogger
             ShowAnswerColumns(false);
             UpdateRevertButton();
         }
-
-        // True while the window is a list of settled contacts rather than a check. Nothing writes,
-        // nothing rescans, and the scan is never started at all.
-        private bool _listOnly;
 
         private List<string> BuildRows(List<Finding> found)
         {
@@ -4235,8 +4230,8 @@ namespace HolyLogger
                 // Queued rather than called: this one is still inside its own finally, and starting
                 // the next before that has finished would meet its own half-cleared state.
                 if (startAgain && IsLoaded)
-                    Dispatcher.BeginInvoke(new Action(() => Btn_Ai_Click(this, null)),
-                                           System.Windows.Threading.DispatcherPriority.Background);
+                    _ = Dispatcher.BeginInvoke(new Action(() => Btn_Ai_Click(this, null)),
+                                               System.Windows.Threading.DispatcherPriority.Background);
                 // The ticks may have moved under it: every row the AI gave to the log has just lost
                 // its own, so the count on the Fix button is no longer the one it was showing.
                 UpdateFixButton();
