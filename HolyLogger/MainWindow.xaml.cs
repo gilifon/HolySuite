@@ -2326,9 +2326,31 @@ namespace HolyLogger
             }
         }
 
-        // Resolves which Log is active at startup. On the first run of the multi-log version (no logs
-        // exist yet), the user is forced to create the Main Log and choose what happens to any existing
-        // QSOs. Returns false only if the user dismissed the mandatory setup dialog (app then shuts down).
+        // Resolves which Log is active at startup.
+        //
+        // WHO IS ASKED TO CREATE A LOG, AND WHO IS NEVER ASKED.
+        //
+        // The setup window was written for one moment in this program's history: HolyLogger used to
+        // hold ONE log with no name, and when it learned to hold many, the QSOs already in the
+        // database belonged to no log. Those operators are asked to name their log and told what will
+        // happen to the contacts they already have. That is the whole purpose of the window.
+        //
+        // AN OPERATOR WHO IS ALREADY ON A MULTI-LOG VERSION MUST NEVER SEE IT. His log is in the
+        // database and the program's job is to open it, not to ask him anything. He saw it anyway,
+        // once, and it was as bad as it sounds: the installer up to 8.9.0 owned a logDB.db in the
+        // operator's own data folder, so updating deleted his log; the program made an empty database,
+        // counted no logs in it, and could not tell him from a man who had never run it. He was asked
+        // to create his first log with nine thousand contacts apparently gone.
+        //
+        // So the count of logs is no longer the whole question. Three cases:
+        //
+        //   QSOs with no log      - the single-log database. Ask: this is what the window is for.
+        //   Nothing, but a backup - an operator whose log has been lost. DataAccess has already put
+        //                           it back (see PutTheLogBackIfItHasGone); if even that failed, make
+        //                           him a log and let him in. He is not asked, and he is not stopped.
+        //   Nothing at all        - a new operator on a new machine. Ask.
+        //
+        // Returns false only if the user dismissed the mandatory setup dialog (app then shuts down).
         private bool EnsureActiveLog()
         {
             if (dal == null) return false;
@@ -2337,6 +2359,21 @@ namespace HolyLogger
                 if (dal.GetLogCount() == 0)
                 {
                     int existing = dal.CountUnassignedQSOs();
+
+                    // A USER OF HOLYLOGGER IS NOT ASKED TO START AGAIN. Nothing in the database and a
+                    // Backups folder that says he has been running this program for months: he is
+                    // given a log and the program comes up, which is what he wanted when he opened it.
+                    // The name is his callsign's, so the log he lands in is recognisably his.
+                    if (existing == 0 && dal.HasBeenUsedBefore)
+                    {
+                        string mine = (Properties.Settings.Default.my_callsign ?? string.Empty).Trim();
+                        long madeId = dal.CreateLog(mine.Length > 0 ? mine : "Main Log", "");
+                        dal.ActiveLogId = madeId;
+                        Log.Warn("The database held no logs on a machine that has used HolyLogger "
+                                 + "before. A log was created rather than asking the operator to "
+                                 + "start again.");
+                        return true;
+                    }
 
                     // The startup splash is Topmost and would hide this mandatory dialog behind it
                     // (the splash only closes once the main window has rendered, which happens after

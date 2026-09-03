@@ -172,7 +172,14 @@ namespace HolyLogger
                 // way, so even a backup of an already-corrupted-by-us session is impossible.
                 BackupDatabaseDaily();
 
+                // AND IF THE LOG IS NOT THERE AT ALL, IT IS PUT BACK BEFORE ANYTHING ELSE HAPPENS.
+                PutTheLogBackIfItHasGone();
+
                 OpenWithRetry();
+
+                // The same again for a log that is present but empty - see the note on the method.
+                PutTheLogBackIfItIsEmpty();
+
                 BackupBeforeLogsMigration();   // one-time safety copy before the logs-schema upgrade
                 UpdateSchema();
 
@@ -187,6 +194,155 @@ namespace HolyLogger
                 throw new Exception("Failed to connect to DB: " + e.Message);
             }
             
+        }
+
+        // -- THE LOG COMES BACK BY ITSELF --------------------------------------------------------
+        //
+        // WHAT HAPPENED. Every installer up to 8.9.0 laid an empty logDB.db into
+        // %LOCALAPPDATA%\4Z1KD\HolyLogger - the folder the operator's own log lives in - and
+        // Windows Installer therefore owned that file. Installing a newer version uninstalls the old
+        // one first, and an uninstall deletes the files it installed. So the update deleted the log:
+        // nine thousand contacts on the machine of the operator who reported it. HolyLogger then
+        // found no database, made an empty one, counted no logs in it, and could not tell him from a
+        // man who had never run the program - so it asked him to create his first log. He was left
+        // believing his logging life had gone.
+        //
+        // The installer stopped shipping that file in August, but every operator still on an older
+        // version carries the fault with him: it fires on the day he updates.
+        //
+        // WHAT HAPPENS NOW. The daily backups are HolyLogger's own and no installer has ever touched
+        // them. If the database is missing, or is there and holds nothing, the newest backup that has
+        // QSOs in it is copied back into place before the program has finished starting.
+        //
+        // AND IT IS DONE WITHOUT ASKING. A man whose log has just been deleted wants his log; a
+        // question at that moment tells him something is wrong and leaves him to guess the answer.
+        // It is written to holylogger.log, where it belongs, and the Backups window is there for
+        // anyone who wants to choose a different day himself.
+        //
+        // A GENUINELY NEW OPERATOR IS UNTOUCHED. He has no Backups folder, so nothing is found and
+        // nothing is done, and he gets the first-log window exactly as before.
+        private void PutTheLogBackIfItHasGone()
+        {
+            try
+            {
+                if (File.Exists(dbPath)) return;
+
+                string backup = NewestBackupWithQsos();
+                if (backup == null) return;
+
+                File.Copy(backup, dbPath);
+                Log.Warn("The log database was missing. " + Path.GetFileName(backup)
+                         + " was put back in its place automatically.");
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        // THE OTHER SHAPE OF THE SAME FAULT: the file is there and there is nothing in it. That is
+        // what an installer REPLACING the database rather than deleting it leaves behind - the empty
+        // 13 KB one it used to ship - and it looks to the program exactly like a new install.
+        //
+        // BOTH COUNTS HAVE TO BE NOUGHT. A man who has deliberately deleted his last log still has
+        // his QSOs, and an empty log he made himself this morning is not a fault. Only a database
+        // with no logs AND no contacts in it is one nobody could have meant to have.
+        private void PutTheLogBackIfItIsEmpty()
+        {
+            try
+            {
+                if (con == null) return;
+                if (CountOrMinusOne(con, "logs") != 0) return;
+                if (CountOrMinusOne(con, "qso") != 0) return;
+
+                string backup = NewestBackupWithQsos();
+                if (backup == null) return;
+
+                // The file cannot be replaced under an open connection.
+                try { con.Dispose(); } catch (Exception swallowed) { Log.Swallow(swallowed); }
+                con = null;
+
+                File.Copy(backup, dbPath, true);
+                Log.Warn("The log database held no logs and no QSOs. " + Path.GetFileName(backup)
+                         + " was put back in its place automatically.");
+
+                OpenWithRetry();
+            }
+            catch (Exception swallowed)
+            {
+                Log.Swallow(swallowed);
+
+                // Whatever went wrong, the program must still have a database to work with.
+                if (con == null) OpenWithRetry();
+            }
+        }
+
+        // HAS THIS MACHINE RUN HOLYLOGGER BEFORE? A backup is proof that it has: they are made on the
+        // program's own start, one a day, and no installer has ever owned or touched them. So a
+        // database with nothing in it and a Backups folder with something in it is not a new
+        // operator - it is an old one whose file has just been lost.
+        public bool HasBeenUsedBefore
+        {
+            get
+            {
+                try
+                {
+                    string dir = BackupsFolder;
+                    if (!Directory.Exists(dir)) return false;
+
+                    return Directory.GetFiles(dir, "logDB-????-??-??.db").Length > 0
+                        || Directory.GetFiles(dir, "logDB.db.pre-*.bak").Length > 0;
+                }
+                catch (Exception swallowed) { Log.Swallow(swallowed); return false; }
+            }
+        }
+
+        // The newest daily backup that actually holds contacts. Newest first, and the first one with
+        // QSOs in it wins: a backup taken the morning after the log was lost holds nothing, and
+        // putting THAT back would be no better than the empty file it replaced.
+        private string NewestBackupWithQsos()
+        {
+            try
+            {
+                string dir = BackupsFolder;
+                if (!Directory.Exists(dir)) return null;
+
+                var candidates = Directory.GetFiles(dir, "logDB-????-??-??.db")
+                                          .Concat(Directory.GetFiles(dir, "logDB.db.pre-*.bak"))
+                                          .OrderByDescending(f => File.GetLastWriteTimeUtc(f))
+                                          .ToList();
+
+                foreach (string file in candidates)
+                {
+                    if (QsosIn(file) > 0) return file;
+                }
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+            return null;
+        }
+
+        // Opened read-only, so a backup this cannot make sense of is passed over rather than changed.
+        private static int QsosIn(string file)
+        {
+            try
+            {
+                using (var probe = new SQLiteConnection(@"DataSource = " + file + @";Version=3;Read Only=True"))
+                {
+                    probe.Open();
+                    return CountOrMinusOne(probe, "qso");
+                }
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); return -1; }
+        }
+
+        // -1 for "the question could not be asked" - a table that is not there, a file that is not a
+        // database - which is never mistaken for the nought that means "empty".
+        private static int CountOrMinusOne(SQLiteConnection connection, string table)
+        {
+            try
+            {
+                using (var cmd = new SQLiteCommand("SELECT count(*) FROM " + table, connection))
+                    return Convert.ToInt32(cmd.ExecuteScalar());
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); return -1; }
         }
 
         // "HAS ANYTHING THAT MOVES A CALLSIGN BEEN WRITTEN?"
