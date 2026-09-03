@@ -11919,9 +11919,19 @@ namespace HolyLogger
         // answering in the middle of a contact because it decided to tidy up is worse than a large
         // file. So it asks, once, and only when there is enough to be worth the half minute.
         //
-        // AND IT DOES NOT NAG. "Not now" is remembered as the amount of empty space it was said about;
-        // the question only comes back when there is 100 MB more than there was then. Say no today and
-        // the answer holds until the log has grown enough for the question to be a different one.
+        // AND IT DOES NOT NAG. "Not now" is remembered, and the question only comes back when it has
+        // become a DIFFERENT question - another 100 MB of empty space, or another 100 MB of file.
+        //
+        // The second of those was missing, and it is the one that mattered. As new QSOs fill the pages
+        // deleted ones left behind, the empty space FALLS while the file goes on growing - so a log
+        // that was declined once was never asked about again, however big it got. Measured on this
+        // operator's log (2026-09-03): declined at 143 MB empty, and a fortnight later 111 MB empty in
+        // a 400 MB file - a quarter of it wasted, with the question silent for good.
+        //
+        // Asking merely because the waste is a large SHARE of the file was the obvious answer and it is
+        // wrong: the share does not change from one morning to the next, so it would put the same
+        // question every single start, which is precisely what "not now" was meant to stop. The share
+        // is told to the operator instead, in the question itself.
         private void OfferToCompactDatabase()
         {
             try
@@ -11933,20 +11943,26 @@ namespace HolyLogger
                 long free = dal.DatabaseFreeBytes;
                 if (free < WorthIt) return;
 
-                long declinedAt;
-                long.TryParse(dal.GetDbState(CompactDeclinedKey), NumberStyles.Integer,
-                              CultureInfo.InvariantCulture, out declinedAt);
-                if (declinedAt > 0 && free < declinedAt + WorthIt) return;
+                long fileBytes = dal.DatabaseFileBytes;
+
+                long declinedFree, declinedFile;
+                ReadCompactDecline(fileBytes, out declinedFree, out declinedFile);
+                if (declinedFree > 0 &&
+                    free < declinedFree + WorthIt &&
+                    fileBytes < declinedFile + WorthIt) return;
 
                 // Never over a dialog that is already asking something.
                 if (System.Windows.Interop.ComponentDispatcher.IsThreadModal) return;
 
-                string file = (dal.DatabaseFileBytes / 1048576.0).ToString("0");
+                string file = (fileBytes / 1048576.0).ToString("0");
                 string empty = (free / 1048576.0).ToString("0");
+                string share = fileBytes > 0
+                    ? (100.0 * free / fileBytes).ToString("0")
+                    : "0";
 
                 bool now = HolyMessageBox.ShowConfirm(
-                    "Your log file is " + file + " MB, and about " + empty + " MB of it is empty space "
-                    + "left behind by QSOs that were deleted.\n\n"
+                    "Your log file is " + file + " MB, and about " + empty + " MB of it - " + share
+                    + " out of every 100 - is empty space left behind by QSOs that were deleted.\n\n"
                     + "Compacting gives that space back, so the log opens from a smaller file. Nothing "
                     + "is deleted and no QSO is changed.\n\n"
                     + "It takes about half a minute, and HolyLogger cannot use the log while it runs. "
@@ -11956,7 +11972,10 @@ namespace HolyLogger
 
                 if (!now)
                 {
-                    dal.SetDbState(CompactDeclinedKey, free.ToString(CultureInfo.InvariantCulture));
+                    // Both numbers, so either one growing by 100 MB makes it a different question.
+                    dal.SetDbState(CompactDeclinedKey,
+                                   free.ToString(CultureInfo.InvariantCulture) + "|"
+                                   + fileBytes.ToString(CultureInfo.InvariantCulture));
                     return;
                 }
 
@@ -11964,6 +11983,27 @@ namespace HolyLogger
                 dal.SetDbState(CompactDeclinedKey, string.Empty);
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        // THE REMEMBERED "NOT NOW": the empty space and the file size it was said about, kept as
+        // "free|file". A log written by an older build holds the empty space alone; for those the file
+        // size is taken as it is today, so installing this build never turns into an extra question.
+        private void ReadCompactDecline(long fileNow, out long declinedFree, out long declinedFile)
+        {
+            declinedFree = 0;
+            declinedFile = fileNow;
+
+            string saved = dal.GetDbState(CompactDeclinedKey) ?? string.Empty;
+            if (saved.Length == 0) return;
+
+            string[] parts = saved.Split('|');
+            long.TryParse(parts[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out declinedFree);
+
+            long savedFile;
+            if (parts.Length > 1 &&
+                long.TryParse(parts[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out savedFile) &&
+                savedFile > 0)
+                declinedFile = savedFile;
         }
 
         // Gives back the empty space a deleted QSO leaves behind in the log file. Never automatic:
