@@ -58,7 +58,11 @@ namespace HolyLogger
             }
             catch (System.Exception swallowed) { Log.Swallow(swallowed); }
         }
-        private SplashWindow _splash;
+        // Written on the splash's own thread, read on the main one (and the other way round for the
+        // close request), so both are volatile: the main thread no longer waits for the splash, and
+        // these two are what keep the two threads in step. See StartSplashOnItsOwnThread.
+        private volatile SplashWindow _splash;
+        private volatile bool _splashCloseRequested;
         private DispatcherTimer _splashCloseTimer;
         private Window _realMainWindow;
         private bool _mainWindowRendered;
@@ -158,6 +162,11 @@ namespace HolyLogger
 
         private void Application_Startup(object sender, StartupEventArgs e)
         {
+            // FOUR SECONDS OF THE START ARE NOT TIMED BY ANYTHING (measured 2026-09-03): before the
+            // splash, between the splash and the window, at the end of the window's constructor, and
+            // between the last startup job and the picture appearing. These marks are the clock in
+            // those stretches. They only write lines to the log - nothing else changes.
+            Log.Step("app: .NET is up, our first line runs");
             RemoveMinimiseFromTaskbarlessWindows();
 
             // Last-chance handling. Every unhandled exception lands in holylogger.log with a stack
@@ -192,9 +201,11 @@ namespace HolyLogger
             // factory defaults; tell the operator rather than letting the setup silently change.
             try { MissingProfileAtStartup = ProfileManager.ApplyActiveProfileAtStartup(); }
             catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+            Log.Step("app: profile applied");
 
             // Apply the saved Light/Dark theme before the main window loads.
             try { ThemeManager.ApplyFromSettings(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+            Log.Step("app: settings read + colours applied");
 
             // Make every window's native title bar/border follow the theme too (not just the
             // DynamicResource-themed client area), applying to the main window and every dialog
@@ -255,6 +266,7 @@ namespace HolyLogger
             // Keep app alive while splash is shown before the real main window is tracked.
             ShutdownMode = ShutdownMode.OnLastWindowClose;
 
+            Log.Step("app: single copy checked + browser mode set");
             Log.Warn("STARTUP " + Log.SinceLaunch() + "  app: showing the splash");
             StartSplashOnItsOwnThread();
             Mouse.OverrideCursor = Cursors.Wait;
@@ -266,6 +278,10 @@ namespace HolyLogger
             _splashCloseTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(200) };
             _splashCloseTimer.Tick += SplashCloseTimer_Tick;
             _splashCloseTimer.Start();
+
+            // From here WPF builds the main window by itself (StartupUri), so the next mark - the first
+            // line of its constructor - measures how long that takes.
+            Log.Step("app: our startup work done, WPF now builds the window");
         }
 
         // THE SPLASH GETS A THREAD OF ITS OWN, and it has to.
@@ -285,8 +301,6 @@ namespace HolyLogger
 
         private void StartSplashOnItsOwnThread()
         {
-            var showing = new System.Threading.ManualResetEventSlim(false);
-
             _splashThread = new System.Threading.Thread(() =>
             {
                 try
@@ -295,7 +309,22 @@ namespace HolyLogger
                     _splash.Show();
                 }
                 catch (Exception ex) { Log.Warn("Splash could not be shown: " + ex); }
-                finally { showing.Set(); }
+
+                // ASKED TO CLOSE BEFORE IT EXISTED. Nobody waits for this window any more, so on a
+                // fast start CloseSplash can run while this thread is still building it - and it
+                // would find nothing to close, leaving the splash on the screen for ever. So the
+                // request is honoured here instead, and this thread ends without a message loop.
+                if (_splashCloseRequested)
+                {
+                    var early = _splash;
+                    _splash = null;
+                    if (early != null)
+                    {
+                        try { early.Close(); }
+                        catch (Exception swallowed) { Log.Swallow(swallowed); }
+                    }
+                    return;
+                }
 
                 // Its own message loop: this is what makes the animation and the seconds tick while the
                 // main thread is busy. It ends when CloseSplash shuts this dispatcher down.
@@ -305,9 +334,13 @@ namespace HolyLogger
             _splashThread.IsBackground = true;   // never keeps the program alive on its own
             _splashThread.Start();
 
-            // Waited for, so the splash is up before the loading starts - but only briefly. A splash is
-            // never worth holding the program for.
-            showing.Wait(2000);
+            // NOT WAITED FOR (2026-09-03). It used to wait here until the splash was on the screen,
+            // and that cost 670 ms of the start, measured: making a WPF window on a brand-new thread
+            // means loading its XAML and drawing it once, and the program stood still through all of
+            // it. The splash comes up by itself a moment later, while the loading is already under
+            // way - which is the whole point of giving it a thread. The only thing the wait protected
+            // against is a start so quick that the splash is asked to close before it exists, and
+            // _splashCloseRequested above handles that case properly instead.
         }
 
         private void HookMainWindowForSplashClose()
@@ -386,6 +419,10 @@ namespace HolyLogger
 
             // Closed on the thread that owns it, and that thread's loop ended with it - anything else
             // throws "the calling thread cannot access this object".
+            // Says "close as soon as you exist" for the case where the splash thread has not got
+            // that far yet (see StartSplashOnItsOwnThread).
+            _splashCloseRequested = true;
+
             var splash = _splash;
             _splash = null;
             if (splash != null)

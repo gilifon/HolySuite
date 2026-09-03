@@ -759,6 +759,20 @@ namespace HolyLogger
 
             NewDXCCTimer.Interval = 2500;    // or whatever you need it to be
             NewDXCCTimer.Tick += NewDXCCTimer_Tick;
+
+            // The real end of the constructor. The mark above it ("QRZ login + extra windows") is NOT
+            // the last one - the timer window, the copy support, the column layout, the matrix and the
+            // azimuth all run after it, and until now nothing timed them.
+            Log.Step("ctor: END - the window is built");
+        }
+
+        // Between the constructor ending and Loaded firing, WPF creates the real window and lays it
+        // out. This mark is the moment the native window exists, so that stretch is no longer one
+        // unexplained lump.
+        protected override void OnSourceInitialized(EventArgs e)
+        {
+            base.OnSourceInitialized(e);
+            Log.Step("window: the real window now exists (WPF)");
         }
 
         private void NormalizeEnterKeyBehaviorSettings()
@@ -1467,6 +1481,12 @@ namespace HolyLogger
             // Initialize RST fields based on the selected mode after window is fully loaded
             ResetRstForMode();
             Log.Step("loaded: END of the startup work");
+
+            // The last second of the start is WPF measuring, arranging and drawing everything for the
+            // first time. This mark lands when the layout pass is finished; "main window: painted"
+            // lands when the picture is actually on the glass, so the two split that second in half.
+            Dispatcher.BeginInvoke(new Action(() => Log.Step("after the work: everything laid out")),
+                                   System.Windows.Threading.DispatcherPriority.Loaded);
 
             // One-time, skippable offer to set an off-machine backup folder. Deferred to ApplicationIdle
             // so it appears only after the startup splash has closed (the splash is Topmost and would
