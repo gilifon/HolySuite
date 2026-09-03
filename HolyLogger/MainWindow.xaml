@@ -1863,17 +1863,42 @@
                       ToolTip="Any other program - castles, mills, lighthouses. Pick one or type its short name.">
                 <ComboBox.ItemTemplate>
                     <DataTemplate>
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock x:Name="ProgramName" Text="{Binding Key}" FontSize="16" FontWeight="Bold" MinWidth="72"
-                                       Foreground="{DynamicResource TextBrush}"/>
-                            <TextBlock Text="{Binding Value}" FontSize="16" Margin="8,0,0,0"
-                                       Foreground="{DynamicResource AccentBrush}"/>
-                        </StackPanel>
+                        <!-- RowFrame carries the black rule under the Contest line. The negative side
+                             margins cancel the item's own 6px padding so the rule runs the full width
+                             of the list rather than stopping short of both edges. -->
+                        <!-- The bottom margin cancels the item's own 3px bottom padding as well, so the
+                             rule lands exactly on the lower edge of the blue a highlighted row paints,
+                             rather than floating below it. -->
+                        <Border x:Name="RowFrame" BorderBrush="Black" BorderThickness="0"
+                                Margin="-6,0,-6,-3" Padding="6,1,6,6" HorizontalAlignment="Stretch">
+                            <StackPanel Orientation="Horizontal">
+                                <!-- KeyCap is nothing at all on an ordinary line: transparent, no border,
+                                     no padding, and it holds the 72px width the names line up on. It
+                                     becomes the yellow key on the Contest line. -->
+                                <Border x:Name="KeyCap" Background="Transparent" BorderBrush="Transparent"
+                                        BorderThickness="1" CornerRadius="4" Padding="0" MinWidth="72"
+                                        VerticalAlignment="Center">
+                                    <TextBlock x:Name="ProgramName" Text="{Binding Key}" FontSize="16" FontWeight="Bold"
+                                               HorizontalAlignment="Left"
+                                               Foreground="{DynamicResource TextBrush}"/>
+                                </Border>
+                                <TextBlock Text="{Binding Value}" FontSize="16" Margin="8,0,0,0"
+                                           VerticalAlignment="Center"
+                                           Foreground="{DynamicResource AccentBrush}"/>
+                            </StackPanel>
+                        </Border>
                         <DataTemplate.Triggers>
-                            <!-- Contest is the one line here that is not a program. Green says so before
-                                 it is pressed, so it does not read as one more award to tick. -->
+                            <!-- CONTEST IS THE ONE LINE HERE THAT IS NOT A PROGRAM. Green said so; now it
+                                 is a yellow key as well - the same EditFieldBg yellow the frequency box
+                                 wears while it is being edited - with a black rule under it dividing it
+                                 from the awards below. It is a door out of this list, not an entry in it. -->
                             <DataTrigger Binding="{Binding Key}" Value="Contest">
                                 <Setter TargetName="ProgramName" Property="Foreground" Value="{DynamicResource ContestWordBrush}"/>
+                                <Setter TargetName="ProgramName" Property="HorizontalAlignment" Value="Center"/>
+                                <Setter TargetName="KeyCap" Property="Background" Value="{DynamicResource EditFieldBg}"/>
+                                <Setter TargetName="KeyCap" Property="BorderBrush" Value="#C9A900"/>
+                                <Setter TargetName="KeyCap" Property="Padding" Value="8,1,8,1"/>
+                                <Setter TargetName="RowFrame" Property="BorderThickness" Value="0,0,0,1.5"/>
                             </DataTrigger>
                         </DataTemplate.Triggers>
                     </DataTemplate>

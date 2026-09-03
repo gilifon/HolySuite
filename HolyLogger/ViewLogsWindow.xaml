@@ -87,7 +87,12 @@
                 <Button x:Name="Btn_Callsigns" Content="Callsigns" Height="34" Padding="9,0" FontSize="16"
                         Margin="28,0,8,0" Click="Btn_Callsigns_Click"
                         ToolTip="The station callsigns this log holds QSOs under: which one it is for now, and add another"/>
+                <!-- THE ONE BUTTON IN THIS ROW THAT DOES SOMETHING TO THE PROGRAM. Callsigns, Rename and
+                     the exports work on a log; this one changes which log the whole program is writing
+                     into, so it wears the dark green key the program's other "do it" buttons wear -
+                     white on dark green, and grey when no log is picked. -->
                 <Button x:Name="Btn_Open" Content="Activate &amp; Open Log" Height="34" Padding="9,0" FontSize="16" FontWeight="Bold"
+                        Style="{StaticResource GoActionButtonStyle}"
                         IsEnabled="False" Click="Btn_Open_Click"/>
             </StackPanel>
             <!-- Row 2: rename / delete / copy settings on the left; the export pair right-aligned so
