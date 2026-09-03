@@ -241,15 +241,21 @@ namespace HolyLogger
         // what an installer REPLACING the database rather than deleting it leaves behind - the empty
         // 13 KB one it used to ship - and it looks to the program exactly like a new install.
         //
-        // BOTH COUNTS HAVE TO BE NOUGHT. A man who has deliberately deleted his last log still has
-        // his QSOs, and an empty log he made himself this morning is not a fault. Only a database
-        // with no logs AND no contacts in it is one nobody could have meant to have.
+        // NOT A CONTACT IN THE WHOLE DATABASE is the test, and the logs are not counted at all. It
+        // used to want both at nought, and that missed the very operator this was written for: the
+        // one who had already been asked to create a log and had done it. His database then holds one
+        // empty log, which is not nought, and his nine thousand contacts sat in the Backups folder
+        // with nothing coming to fetch them.
+        //
+        // A LOG WITH NO QSOS IN IT IS NOT ENOUGH ON ITS OWN. The database has to hold no contacts
+        // anywhere, this machine must have run HolyLogger before, and there must be a backup with
+        // real contacts in it. An operator with two logs who empties one still has the other's QSOs,
+        // so nothing happens to him; a new operator has no backups, so nothing happens to him either.
         private void PutTheLogBackIfItIsEmpty()
         {
             try
             {
                 if (con == null) return;
-                if (CountOrMinusOne(con, "logs") != 0) return;
                 if (CountOrMinusOne(con, "qso") != 0) return;
 
                 string backup = NewestBackupWithQsos();
