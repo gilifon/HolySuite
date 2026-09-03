@@ -12613,24 +12613,28 @@ namespace HolyLogger
 
                     if (CompareVersions(CurrentVersion, responseFromServer))
                     {
-                        // WHAT IS IN IT, BEFORE HE DECIDES. "There is a new version" asks an operator
-                        // to install something without telling him what it does - and the one time he
-                        // most wants to know is while the question is on screen. Everything between
-                        // the version he is running and the one on offer, so a run of releases he
-                        // skipped is not reduced to the last of them.
-                        string newVersion = (responseFromServer ?? "").Trim();
-                        string notesFile = await ReleaseNotes.FetchAsync();
-                        string notes = ReleaseNotes.Since(notesFile, CurrentVersion);
-
+                        // A SHORT QUESTION, AND THE NEWS BEHIND A BUTTON.
+                        //
+                        // The release notes used to be printed inside this question - everything
+                        // between the version he was running and the one on offer - so that he could
+                        // see what he was installing before he decided. On paper that is right; on
+                        // screen it was not. An operator still on 8.9.0 was handed a message box of
+                        // 277 lines to answer yes or no to, and a question that long stops being read.
+                        //
+                        // So the question is two lines, and "Show me what is new" opens the same
+                        // scrolling window Help > What's New opens. Reading it brings the question
+                        // straight back, so the news costs him nothing and he still ends on yes or no.
+                        //
                         // BOTH NUMBERS, SIDE BY SIDE. "There is a new version" leaves the operator to
                         // remember which one he is running before he can tell whether it matters to
                         // him - and the one place he cannot go and look is here, with the question on
                         // screen in front of him.
-                        string ask = "There is a new version"
-                                   + (newVersion.Length > 0 ? " — " + newVersion : "") + ".\n"
+                        string newVersion = (responseFromServer ?? "").Trim();
+
+                        string ask = "New version is"
+                                   + (newVersion.Length > 0 ? " " + newVersion : "")
+                                   + ", would you like to upgrade?\n"
                                    + "Your version is: " + (CurrentVersion ?? "").Trim() + ".";
-                        if (!string.IsNullOrWhiteSpace(notes))
-                            ask += "\n\n" + notes.Trim();
 
                         // AND WHAT HAPPENS NEXT, SAID BEFORE IT HAPPENS.
                         //
@@ -12642,10 +12646,38 @@ namespace HolyLogger
                              + "It does NOT start again by itself — open it from your desktop or the "
                              + "Start menu once the update has finished.";
 
-                        ask += "\n\nDo you want to install?";
+                        // FETCHED ONLY IF HE ASKS FOR IT, and only once however many times he asks:
+                        // the question must not sit waiting on GitHub before it can be shown.
+                        string notesFile = null;
+                        bool upgrade = false;
 
-                        if (HolyMessageBox.ShowConfirm(ask, "New updates are available", HolyMsgType.Info, this,
-                                                       string.IsNullOrWhiteSpace(notes) ? 0 : 620))
+                        while (true)
+                        {
+                            int answer = HolyMessageBox.ShowChoice(
+                                ask, "New updates are available", HolyMsgType.Info, this,
+                                "Yes", "Show me what is new", "No");
+
+                            if (answer != 2) { upgrade = answer == 1; break; }
+
+                            if (notesFile == null) notesFile = await ReleaseNotes.FetchAsync() ?? string.Empty;
+
+                            // EVERYTHING HE HAS NOT SEEN, not merely the newest one: a man who skipped
+                            // three releases is looking at all three of them here.
+                            string notes = ReleaseNotes.Since(notesFile, CurrentVersion);
+
+                            if (string.IsNullOrWhiteSpace(notes))
+                            {
+                                HolyMessageBox.Show(
+                                    "The list of changes could not be fetched. Check your internet "
+                                    + "connection, or read it later under Help > What's New.",
+                                    "What's New", HolyMsgType.Info, this);
+                                continue;
+                            }
+
+                            WhatsNewWindow.ShowIfAny(this, newVersion, notes.Trim());
+                        }
+
+                        if (upgrade)
                         {
                             try
                             {
