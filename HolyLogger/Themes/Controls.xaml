@@ -1,5 +1,6 @@
 ﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:local="clr-namespace:HolyLogger">
     <!-- APP-WIDE control theming. Merged once in App.xaml so EVERY window/dialog picks these up
          automatically. All colors reference theme tokens (DynamicResource) that ThemeManager sets
          on Application.Resources, so switching mode re-colors the whole app live. Light-mode token
@@ -387,10 +388,38 @@
          No x:Key: an unkeyed style on a type is the default for that type everywhere.
          Black rather than a theme brush: the panel behind a tooltip is the system's own pale
          colour in every scheme, and a light theme foreground would vanish into it. -->
+    <local:ToolTipEightWordsConverter x:Key="ToolTipEightWords"/>
+
     <Style TargetType="ToolTip">
         <Setter Property="FontSize" Value="16"/>
-        <Setter Property="Foreground" Value="Black"/>
+        <!-- ONE COLOUR FOR EVERY TOOLTIP, from the palette (View > Color Scheme > Customize Colors):
+             pale yellow behind black text, the same in every scheme. It used to take the system's own
+             panel colour, which is why the foreground had to be nailed to black by hand. -->
+        <Setter Property="Background" Value="{DynamicResource TooltipBg}"/>
+        <Setter Property="Foreground" Value="{DynamicResource TooltipText}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="Padding" Value="8,5"/>
         <Setter Property="MaxWidth" Value="460"/>
+        <!-- AND IT WRAPS. MaxWidth alone only CUT a long tooltip off at 460; the sentence still ran as
+             one line and its end was lost. Text tooltips are drawn through a wrapping TextBlock now,
+             so a long one folds onto two or three readable lines. A tooltip built out of elements
+             rather than text keeps its own layout - see ToolTipTextTemplateSelector. -->
+        <Setter Property="ContentTemplateSelector">
+            <Setter.Value>
+                <local:ToolTipTextTemplateSelector>
+                    <local:ToolTipTextTemplateSelector.TextTemplate>
+                        <DataTemplate>
+                            <!-- Eight words to a line, whatever the width (see ToolTipEightWordsConverter).
+                                 TextWrapping stays on underneath it as a floor: a line of eight very long
+                                 words still cannot run off the edge. -->
+                            <TextBlock Text="{Binding Converter={StaticResource ToolTipEightWords}}"
+                                       TextWrapping="Wrap"/>
+                        </DataTemplate>
+                    </local:ToolTipTextTemplateSelector.TextTemplate>
+                </local:ToolTipTextTemplateSelector>
+            </Setter.Value>
+        </Setter>
     </Style>
 
     <Style x:Key="CaptionButtonStyle" TargetType="Button">

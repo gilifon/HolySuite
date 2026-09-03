@@ -175,4 +175,58 @@ namespace HolyLogger
         }
 
     }
+
+    // ── EIGHT WORDS TO A LINE ─────────────────────────────────────────────────────────────────
+    // Wrapping at a WIDTH is not the same thing as a readable line. 460 pixels of 16-point text is
+    // ten or eleven words, and a tooltip written in ten-word lines is read like a paragraph in a book
+    // - which is not how anybody reads a note that popped up under the pointer. Eight words is the
+    // line he asked for, and eight words is what this makes, whatever the width happens to be.
+    //
+    // Line breaks the text already has are kept: a tooltip written as two short paragraphs stays two
+    // short paragraphs, and only the lines longer than eight words are folded.
+    public sealed class ToolTipEightWordsConverter : System.Windows.Data.IValueConverter
+    {
+        internal const int WordsPerLine = 8;
+
+        public object Convert(object value, System.Type targetType, object parameter, System.Globalization.CultureInfo culture)
+        {
+            string s = value as string;
+            if (string.IsNullOrEmpty(s)) return value;
+
+            var lines = new System.Collections.Generic.List<string>();
+            foreach (string line in s.Replace("\r\n", "\n").Split('\n'))
+            {
+                string[] words = line.Split(new[] { ' ', '\t' }, System.StringSplitOptions.RemoveEmptyEntries);
+                if (words.Length == 0) { lines.Add(string.Empty); continue; }   // a blank line between paragraphs
+                for (int i = 0; i < words.Length; i += WordsPerLine)
+                    lines.Add(string.Join(" ", words, i, System.Math.Min(WordsPerLine, words.Length - i)));
+            }
+            return string.Join(System.Environment.NewLine, lines);
+        }
+
+        public object ConvertBack(object value, System.Type targetType, object parameter, System.Globalization.CultureInfo culture)
+        {
+            return value;   // tooltips are never typed into
+        }
+    }
+
+    // ── TOOLTIPS THAT WRAP ────────────────────────────────────────────────────────────────────
+    // A tooltip written as a plain string is drawn by WPF as ONE LINE, however long it is: a sentence
+    // of twenty words ran clean across the screen. A MaxWidth on its own does not cure that - it only
+    // CUTS the line off at that width, losing the end of it.
+    //
+    // The cure is a wrapping TextBlock, and it belongs in the app-wide ToolTip style so every tooltip
+    // in the program gets it without anybody having to remember. But a tooltip's content is not always
+    // a string: a few are built from TextBlocks and StackPanels, and handing THOSE to a "Text={Binding}"
+    // template would print the name of the type. So the template is chosen by what the content is -
+    // text gets the wrapping one, anything else is left exactly as it was.
+    public sealed class ToolTipTextTemplateSelector : System.Windows.Controls.DataTemplateSelector
+    {
+        public System.Windows.DataTemplate TextTemplate { get; set; }
+
+        public override System.Windows.DataTemplate SelectTemplate(object item, System.Windows.DependencyObject container)
+        {
+            return item is string ? TextTemplate : null;
+        }
+    }
 }

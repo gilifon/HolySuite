@@ -103,6 +103,11 @@ namespace HolyLogger
             { "RowHoverBg",       new[] { "#90CAF9", "#26456B", "#2A4A78" } }, // cluster: map-hovered spot
             { "RowOnFreqBg",      new[] { "#90EE90", "#1E4A2A", "#1E4A2A" } }, // cluster: on-frequency spot
             { "RowLotwBg",        new[] { "#FFF176", "#4A4416", "#4A4416" } }, // cluster: LoTW user spot (yellow)
+            // THE TOOLTIP, ONE COLOUR FOR ALL OF THEM. The same pale yellow in every scheme, on purpose:
+            // a tooltip is a note stuck on top of the program, not part of it, and it is read once by
+            // somebody who is already unsure. Change these two and every tooltip in HolyLogger follows.
+            { "TooltipBg",        new[] { "#FFFBD0", "#FFFBD0", "#FFFBD0" } }, // tooltip panel (pale yellow)
+            { "TooltipText",      new[] { "#000000", "#000000", "#000000" } }, // tooltip text (black)
             { "FilterRowBg",      new[] { "#C8F0D0", "#1E4030", "#1E4030" } }, // QSO grid: filtered-match row
             { "FilterRowAltBg",   new[] { "#A8D8B4", "#183328", "#183328" } }, // QSO grid: filtered-match alt row
             // The same pale blue a selected row has always had in the Log Workshop, so a ticked row looks
@@ -155,6 +160,8 @@ namespace HolyLogger
             new TokenInfo("RowHoverBg",       "Tables", "Cluster: map-hovered spot",  "Cluster row highlighted while hovering its dot on the map."),
             new TokenInfo("RowOnFreqBg",      "Tables", "Cluster: on-frequency spot", "Cluster row whose frequency matches your radio."),
             new TokenInfo("RowLotwBg",        "Tables", "Cluster: LoTW user spot",    "Cluster row whose DX callsign uploads to Logbook of The World (LoTW)."),
+            new TokenInfo("TooltipBg",        "Surfaces", "Tooltips",                  "Background of every tooltip in the program."),
+            new TokenInfo("TooltipText",      "Text",     "Tooltip text",              "Text colour of every tooltip in the program."),
 
             new TokenInfo("TitleBarBg",       "Window chrome", "Title bar",              "Background of the title bar on the main window and the Cluster window. Dialog title bars also follow it on Windows 11."),
 

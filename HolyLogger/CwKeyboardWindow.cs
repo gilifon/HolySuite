@@ -2109,12 +2109,25 @@ namespace HolyLogger
                 var style = new Style(typeof(ToolTip));
                 style.Setters.Add(new Setter(Control.FontSizeProperty, 16.0));
                 style.Setters.Add(new Setter(FrameworkElement.MaxWidthProperty, 460.0));
+                style.Setters.Add(new Setter(Control.BackgroundProperty, new DynamicResourceExtension("TooltipBg")));
+                style.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(8, 5, 8, 5)));
 
-                // BLACK, NOT THE SYSTEM GREY. A tooltip is read once, quickly, by somebody who is
-                // already unsure - grey on the pale panel is the wrong moment to be tasteful. Fixed
-                // rather than a theme brush, because the panel behind a tooltip is the system's own
-                // pale colour in every scheme, and a light theme brush would vanish into it.
-                style.Setters.Add(new Setter(Control.ForegroundProperty, Brushes.Black));
+                // AND IT WRAPS, like the app-wide style in Themes/Controls.xaml: a MaxWidth on its own
+                // only CUTS a long tooltip off at 460 instead of folding it onto a second line.
+                var wrap = new DataTemplate();
+                var wrapText = new FrameworkElementFactory(typeof(TextBlock));
+                wrapText.SetBinding(TextBlock.TextProperty,
+                                    new System.Windows.Data.Binding { Converter = new ToolTipEightWordsConverter() });
+                wrapText.SetValue(TextBlock.TextWrappingProperty, TextWrapping.Wrap);
+                wrap.VisualTree = wrapText;
+                style.Setters.Add(new Setter(ContentControl.ContentTemplateSelectorProperty,
+                                             new ToolTipTextTemplateSelector { TextTemplate = wrap }));
+
+                // THE PALETTE'S TOOLTIP COLOURS, the same two the app-wide style uses: pale yellow
+                // behind black text, changeable in View > Color Scheme > Customize Colors. It used to
+                // be nailed to black here because the panel behind a tooltip was the system's own
+                // colour; now the panel is ours too, so both come from the same place.
+                style.Setters.Add(new Setter(Control.ForegroundProperty, new DynamicResourceExtension("TooltipText")));
 
                 target.Resources[typeof(ToolTip)] = style;
             }
