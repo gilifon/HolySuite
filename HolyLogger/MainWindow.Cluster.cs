@@ -995,9 +995,13 @@ namespace HolyLogger
             return undoButton;
         }
 
-        // The Alerts bell, sitting under the "Latest" toggle. Drawn as vector paths rather than a
-        // bitmap or an icon-font glyph: it stays sharp at every DPI and its red is set in one place.
-        private Button BuildClusterAlertsButton()
+        // THE ALERTS BELL, drawn once and used wherever the alerts are offered - the button under the
+        // "Latest" toggle, and the "Copy to Alert" line on a spot's right-click card. Vector paths
+        // rather than a bitmap or an icon-font glyph: sharp at every DPI, and one red in one place.
+        //
+        // A NEW ONE EVERY TIME, not a shared instance: a WPF element belongs to one parent only, so a
+        // single bell could hang in one place at a time.
+        internal static FrameworkElement MakeAlertBell(double size)
         {
             var red = new SolidColorBrush(Color.FromRgb(0xD9, 0x3B, 0x3B));
             red.Freeze();
@@ -1035,6 +1039,12 @@ namespace HolyLogger
                 });
             }
 
+            return new Viewbox { Width = size, Height = size, Stretch = Stretch.Uniform, Child = art };
+        }
+
+        // The Alerts bell as a button, sitting under the "Latest" toggle.
+        private Button BuildClusterAlertsButton()
+        {
             var btn = new Button
             {
                 Width = 30,
@@ -1045,7 +1055,7 @@ namespace HolyLogger
                 Padding = new Thickness(0),
                 Cursor = Cursors.Hand,
                 ToolTip = "Alerts: the callsigns you are waiting for. A spot for one of them rings, goes to the top row, and is framed in purple.",
-                Content = new Viewbox { Width = 22, Height = 22, Stretch = Stretch.Uniform, Child = art }
+                Content = MakeAlertBell(22)
             };
             // Opt out of the app-wide themed Button style, whose padding would squeeze the icon — the
             // undo icon just above it does the same.
@@ -5551,7 +5561,41 @@ namespace HolyLogger
             tryAgain.Click += (s, args) => CopySpotIntoTryAgain(spot);
             menu.Items.Add(tryAgain);
 
+            // AND STRAIGHT ONTO THE ALERTS LIST. Typing a callsign into the Alerts window is the long
+            // way round when the station is already under the pointer. The row is framed in purple the
+            // moment this is pressed, which is the answer that it worked.
+            var toAlerts = new MenuItem
+            {
+                Header = "Copy to Alert",
+                // Blue, not the Try Again green: a different list, said with a different colour. Its
+                // words sit at the left, under the callsign on the title line, and its mark is the
+                // alerts bell itself rather than an arrow.
+                Style = (Style)FindResource("HolyCtxItemAlert"),
+                Icon = MakeAlertBell(20),
+                ToolTip = "Put this callsign on the Alerts list, so a spot for it rings and stands out"
+            };
+            toAlerts.Click += (s, args) => AddCallsignToClusterAlerts(spot.DXCallsign);
+            menu.Items.Add(toAlerts);
+
             return menu;
+        }
+
+        // One callsign onto the watch list, from wherever it is offered. Already on it -> nothing
+        // happens and nothing is said: the row is framed in purple either way, which is the answer.
+        internal void AddCallsignToClusterAlerts(string callsign)
+        {
+            string call = (callsign ?? string.Empty).Trim().ToUpperInvariant();
+            if (call.Length == 0) return;
+
+            var list = GetClusterAlertCallsigns();
+            if (!list.Any(c => string.Equals(c, call, StringComparison.OrdinalIgnoreCase)))
+                list.Add(call);
+
+            SetClusterAlertCallsigns(list);   // saves, re-marks every spot, refreshes the table
+
+            // The Alerts window, if it is open, is showing a list that has just changed under it.
+            if (clusterAlertsWindow != null)
+                clusterAlertsWindow.ReloadFromSettings();
         }
 
         // One coloured word of the menu's title line.

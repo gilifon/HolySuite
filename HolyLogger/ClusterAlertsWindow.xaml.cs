@@ -69,6 +69,22 @@ namespace HolyLogger
             Loaded += (a, b) => StartTypingOnTheEmptyLine();
         }
 
+        // The list changed somewhere else while this window was open - "Copy to Alert" on a cluster
+        // spot, for instance - so the grid is filled again from what was saved.
+        internal void ReloadFromSettings()
+        {
+            _loading = true;
+            try
+            {
+                _calls.Clear();
+                if (_main != null)
+                    foreach (string call in _main.GetClusterAlertCallsigns())
+                        Add(new AlertCall { Call = call });
+                EnsureTrailingEmptyLine();
+            }
+            finally { _loading = false; }
+        }
+
         // A LINE IS ALWAYS WAITING AT THE BOTTOM, the same way the Favorite Channels window keeps one.
         // WPF's own "new item placeholder" is not enough: the moment it is typed into it BECOMES the
         // row being written, and nothing is left below it - which reads as "there is no way to add

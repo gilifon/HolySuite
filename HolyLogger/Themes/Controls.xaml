@@ -190,7 +190,7 @@
                 <ControlTemplate TargetType="ContextMenu">
                     <!-- Padding 3 and an 8px corner: the card is small and every edge it does not need
                          is width the operator has to read across. -->
-                    <Border Background="#E8F5E9" BorderBrush="#2E7D32" BorderThickness="1.5" CornerRadius="8" Padding="3" SnapsToDevicePixels="True">
+                    <Border Background="#E8F5E9" BorderBrush="#2E7D32" BorderThickness="2" CornerRadius="8" Padding="3" SnapsToDevicePixels="True">
                         <Border.Effect>
                             <DropShadowEffect BlurRadius="14" ShadowDepth="2" Opacity="0.35" Color="#666666"/>
                         </Border.Effect>
@@ -289,6 +289,45 @@
         <Setter Property="Margin" Value="1,1"/>
         <Setter Property="Cursor" Value="Hand"/>
         <Setter Property="Template" Value="{StaticResource HolyCtxItemGoTemplate}"/>
+    </Style>
+
+    <!-- THE SAME KEY IN BLUE, for "Copy to Alert" on a cluster spot. Green is the Try Again colour and
+         it belongs to that list; the alerts are a different thing and say so with a different colour.
+         The words sit at the LEFT, lined up with the callsign on the title line above them, and the
+         mark on the right is the alerts bell rather than an arrow - the same bell that opens the list. -->
+    <ControlTemplate x:Key="HolyCtxItemAlertTemplate" TargetType="MenuItem">
+        <Border x:Name="KeyOuter" CornerRadius="5" Background="#1565C0" SnapsToDevicePixels="True" Padding="0,0,0,2">
+            <Border x:Name="bd" CornerRadius="5" Background="#BBDEFB" BorderBrush="#1565C0"
+                    BorderThickness="1" SnapsToDevicePixels="True" Padding="{TemplateBinding Padding}">
+                <!-- The words at the LEFT and the bell at the RIGHT EDGE, which is where the green
+                     button's arrow ends up: that one centres a shorter group inside a card whose width
+                     is set by the longest line, so its arrow sits out at the end. Stretching the header
+                     column puts this bell in the same place instead of leaving it tucked against the
+                     words. -->
+                <Grid HorizontalAlignment="Stretch">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <ContentPresenter Grid.Column="0" ContentSource="Header"
+                                      HorizontalAlignment="Left" VerticalAlignment="Center"/>
+                    <ContentPresenter Grid.Column="1" ContentSource="Icon"
+                                      HorizontalAlignment="Right" VerticalAlignment="Center" Margin="8,0,0,0"/>
+                </Grid>
+            </Border>
+        </Border>
+        <ControlTemplate.Triggers>
+            <Trigger Property="IsHighlighted" Value="True">
+                <Setter TargetName="bd" Property="Background" Value="#0D47A1"/>
+                <Setter Property="Foreground" Value="White"/>
+            </Trigger>
+            <Trigger Property="IsPressed" Value="True">
+                <Setter TargetName="KeyOuter" Property="Padding" Value="0,2,0,0"/>
+            </Trigger>
+        </ControlTemplate.Triggers>
+    </ControlTemplate>
+    <Style x:Key="HolyCtxItemAlert" TargetType="MenuItem" BasedOn="{StaticResource HolyCtxItemGo}">
+        <Setter Property="Template" Value="{StaticResource HolyCtxItemAlertTemplate}"/>
     </Style>
 
     <!-- THE TITLE LINE OF A CARD - and the reason this style has to exist at all.
