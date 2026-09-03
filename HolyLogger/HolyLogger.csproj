@@ -324,6 +324,9 @@
     <Compile Include="ClusterSettingsWindow.xaml.cs">
       <DependentUpon>ClusterSettingsWindow.xaml</DependentUpon>
     </Compile>
+    <Compile Include="ClusterAlertsWindow.xaml.cs">
+      <DependentUpon>ClusterAlertsWindow.xaml</DependentUpon>
+    </Compile>
     <Compile Include="TryAgainWindow.xaml.cs">
       <DependentUpon>TryAgainWindow.xaml</DependentUpon>
     </Compile>
@@ -624,6 +627,10 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="ClusterSettingsWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="ClusterAlertsWindow.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

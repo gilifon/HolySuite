@@ -31,8 +31,16 @@ namespace HolyLogger
             public string FreqKhz
             {
                 get => _freqKhz;
-                set { if (_freqKhz != value) { _freqKhz = value; Raise(nameof(FreqKhz)); Raise(nameof(FreqBrush)); Raise(nameof(IsFilled)); } }
+                set { if (_freqKhz != value) { _freqKhz = value; Raise(nameof(FreqKhz)); Raise(nameof(FreqBrush)); Raise(nameof(HasFrequency)); Raise(nameof(IsFilled)); } }
             }
+
+            // EVERY ROW CARRIES THE SHAPE 0000.000, including the blank one waiting at the bottom, so
+            // there is always a set of digits to click on and roll the wheel over. That means "empty"
+            // can no longer be read off the text: a frequency of zero is a row that has none yet.
+            [JsonIgnore]
+            public bool HasFrequency => double.TryParse((FreqKhz ?? string.Empty).Trim(),
+                                                        NumberStyles.Float, CultureInfo.InvariantCulture,
+                                                        out double khz) && khz > 0;
 
             private string _mode = "";
             public string Mode
@@ -45,7 +53,7 @@ namespace HolyLogger
             // click/double-click tune; text cursor on an empty row for typing). Not persisted.
             [JsonIgnore]
             public bool IsFilled => !string.IsNullOrWhiteSpace(Name)
-                                 || !string.IsNullOrWhiteSpace(FreqKhz)
+                                 || HasFrequency
                                  || !string.IsNullOrWhiteSpace(Mode);
 
             private void Raise(string prop) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(prop));
@@ -92,6 +100,9 @@ namespace HolyLogger
 
             foreach (var ch in LoadChannels())
             {
+                // Channels saved before the column had a fixed shape (e.g. "7130") are brought up to
+                // it here, so every row reads the same way the moment the window opens.
+                ch.FreqKhz = FormatKhz(ch.FreqKhz);
                 HookChannel(ch);
                 _channels.Add(ch);
             }
@@ -115,17 +126,299 @@ namespace HolyLogger
             Closing += (s, e) => SaveChannels();
         }
 
-        // Restrict the frequency cell's editor to digits and a single decimal point.
+        // == THE FREQUENCY CELL =====================================================================
+        //
+        // IT IS THE MAIN WINDOW'S MANUAL-MODE FREQUENCY BOX, IN MINIATURE. A plain cell meant typing the
+        // whole number every time, which is what made it awkward, so this cell is worked the way that box
+        // is worked: the number is always in the shape 0000.000, the set of digits under the pointer
+        // wears the EditFieldBg yellow, a click takes that whole set so the next keystroke replaces it,
+        // and a wheel notch moves it - 1 kHz over the kHz digits, 0.1 kHz over the Hz digits, the same
+        // rule FrequencyWheel gives the LED and the Radio Control Panel.
+        //
+        // The shape the frequency is always kept in: four kHz digits at least, the point, three Hz
+        // digits. A row with no frequency yet reads 0000.000 rather than being blank, so there is always
+        // something to click on and roll the wheel over.
+        private const string BlankKhz = "0000.000";
+
+        // Text into the shape. Anything that will not parse, or parses to zero, is a row with no
+        // frequency - and a row with no frequency still shows the shape.
+        private static string FormatKhz(string text)
+        {
+            return double.TryParse((text ?? string.Empty).Trim(), NumberStyles.Float,
+                                   CultureInfo.InvariantCulture, out double khz) && khz > 0
+                ? khz.ToString("0000.000", CultureInfo.InvariantCulture)
+                : BlankKhz;
+        }
+
+        // Restrict the frequency box to digits, a single decimal point, and no more than three decimals.
+        // The test is made on what the box WOULD hold after the keystroke, so it also refuses a point
+        // typed into the middle of a number that already has one, and a fourth Hz digit typed anywhere
+        // in the fraction.
         private void FreqBox_PreviewTextInput(object sender, TextCompositionEventArgs e)
         {
             var tb = sender as System.Windows.Controls.TextBox;
-            foreach (char c in e.Text)
+            if (tb == null) { e.Handled = true; return; }
+
+            string text = tb.Text ?? string.Empty;
+            int start = Math.Min(tb.SelectionStart, text.Length);
+            int length = Math.Min(tb.SelectionLength, text.Length - start);
+            string after = text.Substring(0, start) + e.Text + text.Substring(start + length);
+
+            e.Handled = !System.Text.RegularExpressions.Regex.IsMatch(after, @"^[0-9]*\.?[0-9]{0,3}$");
+        }
+
+        private void FreqBox_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            var tb = sender as System.Windows.Controls.TextBox;
+            if (tb == null) return;
+
+            if (e.Key == Key.Enter)
             {
-                if (char.IsDigit(c)) continue;
-                if (c == '.' && tb != null && !tb.Text.Contains(".")) continue;
+                // Enter finishes the number, without waiting for the focus to leave the cell.
+                ReshapeFreqBox(tb);
+                tb.SelectAll();
                 e.Handled = true;
                 return;
             }
+
+            if (e.Key != Key.Back && e.Key != Key.Delete) return;
+
+            // THE DECIMAL POINT IS PART OF THE SHAPE, NOT PART OF THE NUMBER. Delete it and the two sets
+            // of digits run together, with no line for the pointer, the click or the wheel to read.
+            string text = tb.Text ?? string.Empty;
+            if (text.IndexOf('.') < 0) return;
+
+            bool oneCharacter = tb.SelectionLength == 0;
+            int start = tb.SelectionStart;
+            int length = tb.SelectionLength;
+            if (oneCharacter)
+            {
+                if (e.Key == Key.Back) { if (start == 0) return; start--; }
+                else if (start >= text.Length) return;
+                length = 1;
+            }
+            if (start < 0 || start > text.Length) return;
+            if (start + length > text.Length) length = text.Length - start;
+            if (text.Remove(start, length).IndexOf('.') >= 0) return;   // the point survives: carry on
+
+            // Backspacing onto the point alone does nothing - it steps over it rather than swallowing the
+            // number. Wiping a stretch that takes the point in means "clear this frequency", so the cell
+            // goes back to the blank shape.
+            if (!oneCharacter)
+            {
+                tb.Text = BlankKhz;
+                tb.SelectAll();
+            }
+            e.Handled = true;
+        }
+
+        // ---- which set of digits the pointer is on -------------------------------------------------
+
+        // Where the pointer was last seen inside a frequency box, and which box that was. Kept because
+        // the digits move under a still mouse: a wheel notch rewrites the number and the band has to be
+        // redrawn over what is now standing there.
+        private System.Windows.Controls.TextBox _zoneBox;
+        private double? _zoneX;
+
+        // The band lives in the same cell Grid as the box, behind it.
+        private static System.Windows.Shapes.Rectangle ZoneMarkOf(System.Windows.Controls.TextBox tb)
+        {
+            var grid = tb == null ? null : tb.Parent as System.Windows.Controls.Grid;
+            return grid == null
+                ? null
+                : grid.Children.OfType<System.Windows.Shapes.Rectangle>().FirstOrDefault();
+        }
+
+        // True when x stands right of the decimal point - the Hz digits.
+        private static bool IsFractionSide(System.Windows.Controls.TextBox tb, double x)
+        {
+            string text = tb == null ? string.Empty : (tb.Text ?? string.Empty);
+            int dot = text.IndexOf('.');
+            if (dot < 0) return false;
+
+            try { return x > tb.GetRectFromCharacterIndex(dot).Right; }
+            catch (Exception swallowed) { Log.Swallow(swallowed); return false; }
+        }
+
+        // The band under the set of digits the pointer is on. Measured from the characters as they are
+        // actually drawn, the same way the main window measures its own - a proportional font puts the
+        // point in a different place for every length of number.
+        private void ShowFreqZone()
+        {
+            var tb = _zoneBox;
+            var mark = ZoneMarkOf(tb);
+            if (mark == null) return;
+
+            try
+            {
+                string text = tb.Text ?? string.Empty;
+                if (_zoneX == null || text.Length == 0)
+                {
+                    mark.Visibility = Visibility.Collapsed;
+                    return;
+                }
+
+                // The text may have been set a moment ago, in this same call stack: without this the
+                // character rectangles are still the ones of the frequency before last.
+                tb.UpdateLayout();
+
+                Rect first = tb.GetRectFromCharacterIndex(0);
+                Rect last = tb.GetRectFromCharacterIndex(text.Length - 1, true);
+                if (first.IsEmpty || last.IsEmpty)
+                {
+                    mark.Visibility = Visibility.Collapsed;
+                    return;
+                }
+
+                // No point typed means one set for the whole box, so the whole number lights rather than
+                // half of a division that is not there.
+                int dot = text.IndexOf('.');
+                double? split = dot < 0 ? (double?)null : tb.GetRectFromCharacterIndex(dot).Right;
+                bool fraction = split != null && _zoneX.Value > split.Value;
+
+                double left = fraction ? split.Value : first.Left;
+                double right = split == null ? last.Right : (fraction ? last.Right : split.Value);
+                if (right - left <= 0)
+                {
+                    mark.Visibility = Visibility.Collapsed;
+                    return;
+                }
+
+                mark.Margin = new Thickness(left, 0, 0, 0);
+                mark.Width = right - left;
+                mark.Visibility = Visibility.Visible;
+            }
+            catch (Exception swallowed)
+            {
+                Log.Swallow(swallowed);
+                mark.Visibility = Visibility.Collapsed;
+            }
+        }
+
+        private static void HideFreqZone(System.Windows.Controls.TextBox tb)
+        {
+            var mark = ZoneMarkOf(tb);
+            if (mark != null) mark.Visibility = Visibility.Collapsed;
+        }
+
+        private void FreqBox_MouseMove(object sender, MouseEventArgs e)
+        {
+            var tb = sender as System.Windows.Controls.TextBox;
+            if (tb == null) return;
+
+            if (!ReferenceEquals(_zoneBox, tb)) HideFreqZone(_zoneBox);   // the row the pointer just left
+            _zoneBox = tb;
+            _zoneX = e.GetPosition(tb).X;
+            ShowFreqZone();
+        }
+
+        private void FreqBox_MouseLeave(object sender, MouseEventArgs e)
+        {
+            HideFreqZone(sender as System.Windows.Controls.TextBox);
+            if (ReferenceEquals(_zoneBox, sender)) { _zoneBox = null; _zoneX = null; }
+        }
+
+        // The number changed under the pointer - typed, or moved by the wheel - so the band is redrawn
+        // over what is standing there now.
+        private void FreqBox_TextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e)
+        {
+            if (ReferenceEquals(_zoneBox, sender)) ShowFreqZone();
+        }
+
+        // ---- clicking, typing and rolling ----------------------------------------------------------
+
+        // A CLICK TAKES THE WHOLE SET OF DIGITS IT LANDED ON - all of the kHz, or all of the Hz - so the
+        // next keystroke replaces that set instead of being squeezed in between two of its digits.
+        private void FreqBox_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            var tb = sender as System.Windows.Controls.TextBox;
+            if (tb == null || e.ClickCount != 1) return;   // a double-click belongs to the tune, not here
+
+            double x = e.GetPosition(tb).X;
+
+            // NOT handled, and deferred: the click still has to reach the row for the selection, and the
+            // text box has to finish placing its own caret. The set is taken after both have happened.
+            tb.Dispatcher.BeginInvoke(new Action(() => SelectGroupAt(tb, x)),
+                                      System.Windows.Threading.DispatcherPriority.Input);
+        }
+
+        private static void SelectGroupAt(System.Windows.Controls.TextBox tb, double x)
+        {
+            try
+            {
+                string text = tb.Text ?? string.Empty;
+                int dot = text.IndexOf('.');
+                if (dot < 0) { tb.SelectAll(); return; }
+
+                if (IsFractionSide(tb, x)) tb.Select(dot + 1, text.Length - dot - 1);
+                else tb.Select(0, dot);
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        // One notch of the wheel moves the set of digits under the pointer, exactly as it does on the
+        // main window's frequency box: FrequencyWheel decides what a notch is worth and tidies the first
+        // one onto a round step.
+        private readonly FrequencyWheel _wheel = new FrequencyWheel();
+
+        private void FreqBox_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
+        {
+            var tb = sender as System.Windows.Controls.TextBox;
+            if (tb == null) return;
+
+            double x = e.GetPosition(tb).X;
+            double step = IsFractionSide(tb, x) ? 0.1 : 1.0;
+
+            double.TryParse((tb.Text ?? string.Empty).Trim(), NumberStyles.Float,
+                            CultureInfo.InvariantCulture, out double khz);
+
+            // FrequencyWheel will not start from zero - there is no such radio frequency - so a row still
+            // reading 0000.000 takes its first notch here. NO BAND EDGES ARE PASSED: a channel is a
+            // number in a list, not a radio inside a band, and clamping would refuse the entry being made.
+            double? target = khz > 0
+                ? _wheel.Next(khz, e.Delta, step)
+                : (e.Delta > 0 ? step : (double?)null);
+            if (target == null) return;
+
+            e.Handled = true;   // the number is being tuned: this notch is ours, not the grid's scroller's
+
+            tb.Text = target.Value.ToString("0000.000", CultureInfo.InvariantCulture);
+
+            _zoneBox = tb;
+            _zoneX = x;
+            ShowFreqZone();   // the digits just moved under the pointer; the band moves with them
+        }
+
+        private void FreqBox_GotFocus(object sender, RoutedEventArgs e)
+        {
+            // The cell holds a live text box, so a click can land inside it without the grid being told
+            // which row that was. Say so here, or Delete and the double-click tune act on another row.
+            var tb = sender as System.Windows.Controls.TextBox;
+            if (tb != null && tb.DataContext is RadioChannel ch)
+                ChannelsGrid.SelectedItem = ch;
+        }
+
+        private void FreqBox_LostFocus(object sender, RoutedEventArgs e)
+        {
+            ReshapeFreqBox(sender as System.Windows.Controls.TextBox);
+        }
+
+        // Put the number back in shape. The BOX's text is what is written, not the channel's: the column
+        // pushes every keystroke to the channel, so writing the box writes both.
+        private static void ReshapeFreqBox(System.Windows.Controls.TextBox tb)
+        {
+            if (tb == null) return;
+            string formatted = FormatKhz(tb.Text);
+            if (!string.Equals(tb.Text, formatted, StringComparison.Ordinal))
+                tb.Text = formatted;
+        }
+
+        // Every channel's frequency into the shape, for the moments the boxes are not asked themselves -
+        // OK and the save, either of which can happen with a half-typed number still under the caret.
+        private void ReshapeAllFreqs()
+        {
+            foreach (var ch in _channels)
+                ch.FreqKhz = FormatKhz(ch.FreqKhz);
         }
 
         private void ChannelsGrid_PreviewMouseDoubleClick(object sender, MouseButtonEventArgs e)
@@ -151,7 +444,7 @@ namespace HolyLogger
             bool freqOk = double.TryParse((ch.FreqKhz ?? string.Empty).Trim(),
                                           NumberStyles.Float, CultureInfo.InvariantCulture, out double khz) && khz > 0;
             var missing = new List<string>();
-            if (!freqOk) missing.Add("Frequency");
+            if (!freqOk) missing.Add("Frequency");   // 0000.000 is a row not yet given one
             if (string.IsNullOrWhiteSpace(ch.Mode)) missing.Add("Mode");
             if (missing.Count > 0)
             {
@@ -174,17 +467,6 @@ namespace HolyLogger
             // Applied -- close so the action feels complete (otherwise, when the channel's frequency is
             // already the current one, nothing visibly happens).
             Close();
-        }
-
-        // When a frequency cell commits (tab/enter/click away), push the new text to the item right
-        // away. That fires FreqBrush's change notification at cell-commit time, so the band color
-        // appears the moment focus leaves the cell -- without waiting for the whole row to commit.
-        private void ChannelsGrid_CellEditEnding(object sender, System.Windows.Controls.DataGridCellEditEndingEventArgs e)
-        {
-            if (e.EditAction != System.Windows.Controls.DataGridEditAction.Commit) return;
-            if (e.Column != FreqColumn) return;
-            if (e.Row?.Item is RadioChannel ch && e.EditingElement is System.Windows.Controls.TextBox tb)
-                ch.FreqKhz = (tb.Text ?? string.Empty).Trim();
         }
 
         // The moment the Mode cell becomes current (e.g. tabbing out of Frequency), enter edit mode so
@@ -227,7 +509,7 @@ namespace HolyLogger
         {
             if (_channels.Count == 0 || _channels[_channels.Count - 1].IsFilled)
             {
-                var blank = new RadioChannel();
+                var blank = new RadioChannel { FreqKhz = BlankKhz };
                 HookChannel(blank);
                 _channels.Add(blank);
             }
@@ -262,20 +544,22 @@ namespace HolyLogger
             ChannelsGrid.CommitEdit(System.Windows.Controls.DataGridEditingUnit.Cell, true);
             ChannelsGrid.CommitEdit(System.Windows.Controls.DataGridEditingUnit.Row, true);
 
+            ReshapeAllFreqs();
+
             var problems = new List<string>();
             int rowNum = 0;
             foreach (var ch in _channels)
             {
                 rowNum++;
                 bool anyFilled = !string.IsNullOrWhiteSpace(ch.Name)
-                              || !string.IsNullOrWhiteSpace(ch.FreqKhz)
+                              || ch.HasFrequency
                               || !string.IsNullOrWhiteSpace(ch.Mode);
                 if (!anyFilled)
                     continue;   // an empty row, not a half-filled one
 
                 var missing = new List<string>();
                 if (string.IsNullOrWhiteSpace(ch.Name)) missing.Add("Name");
-                if (string.IsNullOrWhiteSpace(ch.FreqKhz)) missing.Add("Frequency");
+                if (!ch.HasFrequency) missing.Add("Frequency");
                 if (string.IsNullOrWhiteSpace(ch.Mode)) missing.Add("Mode");
                 if (missing.Count == 0)
                     continue;
@@ -339,9 +623,11 @@ namespace HolyLogger
         {
             try
             {
-                // Drop wholly-empty rows (e.g. an abandoned new-row entry).
+                // Drop wholly-empty rows (e.g. an abandoned new-row entry). A row still reading
+                // 0000.000 has no frequency, however un-blank the cell looks.
+                ReshapeAllFreqs();
                 var toSave = _channels
-                    .Where(c => !(string.IsNullOrWhiteSpace(c.Name) && string.IsNullOrWhiteSpace(c.FreqKhz)))
+                    .Where(c => !(string.IsNullOrWhiteSpace(c.Name) && !c.HasFrequency))
                     .ToList();
                 Properties.Settings.Default.ChannelsJson = JsonConvert.SerializeObject(toSave);
                 Properties.Settings.Default.Save();

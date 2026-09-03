@@ -145,6 +145,11 @@ namespace HolyLogger
             Grid.SetColumn(box, column);
             Grid.SetRow(box, row);
 
+            // A MACRO CELL IS HELD TO WHAT A KEYER CAN SEND, exactly as the single-text editor holds
+            // its box - typing filtered, a paste cleaned rather than refused. A name is not: it is
+            // written on the keycap and never goes near the radio, so it can say whatever he likes.
+            if (maxLength == MacroLength) MainWindow.CwMacroText.Guard(box);
+
             return box;
         }
 

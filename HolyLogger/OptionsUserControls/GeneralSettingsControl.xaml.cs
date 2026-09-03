@@ -57,9 +57,77 @@ namespace HolyLogger.OptionsUserControls
             }
         }
 
+        // WHAT OMNIRIG IS ACTUALLY SET TO, beside the rig it applies to. The number is read out of
+        // OmniRig's own file - it owns that file and we never write to it - and shown only when it is
+        // worse than the 500 ms everything in this program is comfortable with. At 500 or better there
+        // is nothing to say and the line stays out of the way.
+        // Straight to OmniRig's own settings window - the only place the number can be changed, since
+        // OmniRig owns that file and has it open. Coming back here re-reads it.
+        private void OmniRigOpenBtn_Click(object sender, System.Windows.RoutedEventArgs e)
+        {
+            try
+            {
+                var main = System.Windows.Application.Current != null
+                         ? System.Windows.Application.Current.MainWindow as MainWindow
+                         : null;
+
+                if (main == null) return;
+
+                main.OpenOmniRigSettings();
+                ShowOmniRigPollInterval();   // he may have just changed it
+            }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        private void ShowOmniRigPollInterval()
+        {
+            try
+            {
+                if (OmniRigPollNote == null) return;
+
+                int pollMs = MainWindow.ReadOmniRigPollMsFromFile(Properties.Settings.Default.SelectedOmniRig2);
+
+                // NOTHING TO READ. A fresh install with OmniRig never opened, or its file somewhere
+                // else - saying "0 ms" would be worse than saying nothing.
+                if (pollMs <= 0) return;
+
+                bool good = pollMs <= 500;
+
+                // THE NUMBER IS SHOWN EITHER WAY, so he can see the program knows it and has looked.
+                // Green and upright when there is nothing to do; red and italic when there is - and the
+                // number itself in bold, because it is the one word in the sentence he is looking for.
+                OmniRigPollNote.Inlines.Clear();
+                OmniRigPollNote.Inlines.Add(
+                    new System.Windows.Documents.Run("Your OmniRig asks the radio every "));
+                OmniRigPollNote.Inlines.Add(new System.Windows.Documents.Run(pollMs + " ms")
+                {
+                    FontWeight = System.Windows.FontWeights.Bold
+                });
+                OmniRigPollNote.Inlines.Add(new System.Windows.Documents.Run(good
+                    ? ". That is fine - nothing to change. You may go faster if you like, but not below "
+                      + "100 ms."
+                    : ". Everything here follows the radio that slowly - the frequency most of all. Set "
+                      + "\"Poll int., ms\" to 500 or less, and not below 100 ms."));
+
+                OmniRigPollNote.FontStyle = good
+                    ? System.Windows.FontStyles.Normal
+                    : System.Windows.FontStyles.Italic;
+
+                OmniRigPollNote.Foreground = new System.Windows.Media.SolidColorBrush(
+                    good ? System.Windows.Media.Color.FromRgb(0x1B, 0x5E, 0x20)
+                         : System.Windows.Media.Color.FromRgb(0xC6, 0x28, 0x28));
+
+                OmniRigPollNote.Visibility = System.Windows.Visibility.Visible;
+                if (OmniRigOpenBtn != null) OmniRigOpenBtn.Visibility = System.Windows.Visibility.Visible;
+            }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
         public GeneralSettingsControl()
         {
             InitializeComponent();
+
+            ShowOmniRigPollInterval();
 
             // The cluster alert sounds (new-country / Unconfirmed spot) moved to the Cluster window's
             // gear; only the app-wide output device is configured here.

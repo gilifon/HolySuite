@@ -75,20 +75,35 @@ namespace HolyLogger
         // an upgrade that is never opened keeps working exactly as it did.
         public static List<UdpPortEntry> Load()
         {
+            var rows = new List<UdpPortEntry>();
+            bool hadSavedTable = false;
             try
             {
                 string json = Properties.Settings.Default.UdpPortsJson;
                 if (!string.IsNullOrWhiteSpace(json))
-                    return JsonConvert.DeserializeObject<List<UdpPortEntry>>(json) ?? new List<UdpPortEntry>();
+                {
+                    rows = JsonConvert.DeserializeObject<List<UdpPortEntry>>(json) ?? new List<UdpPortEntry>();
+                    hadSavedTable = true;
+                }
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
 
             var s = Properties.Settings.Default;
-            return new List<UdpPortEntry>
+
+            if (!hadSavedTable)
             {
-                new UdpPortEntry { IsOn = s.EnableUDPClient,     Name = "Other software", Port = s.UDPPort.ToString(CultureInfo.InvariantCulture) },
-                new UdpPortEntry { IsOn = s.EnableN1MMUDPClient, Name = "N1MM+",          Port = s.N1MMUDPPort.ToString(CultureInfo.InvariantCulture) },
-            };
+                rows.Add(new UdpPortEntry { IsOn = s.EnableUDPClient,     Name = "Other software", Port = s.UDPPort.ToString(CultureInfo.InvariantCulture) });
+                rows.Add(new UdpPortEntry { IsOn = s.EnableN1MMUDPClient, Name = "N1MM+",          Port = s.N1MMUDPPort.ToString(CultureInfo.InvariantCulture) });
+            }
+
+            // The HolyCluster port had its own box on the Options page and joined this table later, so
+            // it is brought over even for an operator who had already saved a table without it. Save()
+            // sets the old port to 0, which is what says "already brought over" - so a line he then
+            // deletes stays deleted instead of reappearing at every start.
+            if (s.HolyClusterUDPPort > 0)
+                rows.Add(new UdpPortEntry { IsOn = s.EnableHolyClusterUDP, Name = "HolyCluster", Port = s.HolyClusterUDPPort.ToString(CultureInfo.InvariantCulture) });
+
+            return rows;
         }
 
         // Writes the table. Wholly empty rows (the blank one at the bottom, or an abandoned entry)
@@ -99,6 +114,12 @@ namespace HolyLogger
             {
                 var toSave = (rows ?? Enumerable.Empty<UdpPortEntry>()).Where(r => r != null && r.IsFilled).ToList();
                 Properties.Settings.Default.UdpPortsJson = JsonConvert.SerializeObject(toSave);
+
+                // The HolyCluster port now lives in this table like any other line. Zeroing the old
+                // setting is what stops Load() from adding it a second time (see the note there).
+                Properties.Settings.Default.HolyClusterUDPPort = 0;
+                Properties.Settings.Default.EnableHolyClusterUDP = false;
+
                 Properties.Settings.Default.Save();
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); }

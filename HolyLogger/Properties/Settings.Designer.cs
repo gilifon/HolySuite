@@ -2873,6 +2873,66 @@ namespace HolyLogger.Properties {
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string ClusterAlertCallsigns {
+            get {
+                return ((string)(this["ClusterAlertCallsigns"]));
+            }
+            set {
+                this["ClusterAlertCallsigns"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("NaN")]
+        public double ClusterAlertsWindowLeft {
+            get {
+                return ((double)(this["ClusterAlertsWindowLeft"]));
+            }
+            set {
+                this["ClusterAlertsWindowLeft"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("NaN")]
+        public double ClusterAlertsWindowTop {
+            get {
+                return ((double)(this["ClusterAlertsWindowTop"]));
+            }
+            set {
+                this["ClusterAlertsWindowTop"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("NaN")]
+        public double ClusterAlertsWindowWidth {
+            get {
+                return ((double)(this["ClusterAlertsWindowWidth"]));
+            }
+            set {
+                this["ClusterAlertsWindowWidth"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("NaN")]
+        public double ClusterAlertsWindowHeight {
+            get {
+                return ((double)(this["ClusterAlertsWindowHeight"]));
+            }
+            set {
+                this["ClusterAlertsWindowHeight"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("False")]
         public bool ClusterLatestPerCallsign {
             get {
@@ -3047,6 +3107,30 @@ namespace HolyLogger.Properties {
             }
             set {
                 this["CwKeyerWpm"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool OpenCwKeyerOnCw {
+            get {
+                return ((bool)(this["OpenCwKeyerOnCw"]));
+            }
+            set {
+                this["OpenCwKeyerOnCw"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool OmniRigPollNagOff {
+            get {
+                return ((bool)(this["OmniRigPollNagOff"]));
+            }
+            set {
+                this["OmniRigPollNagOff"] = value;
             }
         }
 

@@ -381,6 +381,18 @@
         </Setter>
     </Style>
 
+    <!-- EVERY TOOLTIP IN THE PROGRAM, at the size everything else is written in. WPF gives a
+         tooltip the system's own font - about eleven, and grey - which is the one piece of text a
+         man reads BECAUSE he could not work something out, so it is the worst place to be small.
+         No x:Key: an unkeyed style on a type is the default for that type everywhere.
+         Black rather than a theme brush: the panel behind a tooltip is the system's own pale
+         colour in every scheme, and a light theme foreground would vanish into it. -->
+    <Style TargetType="ToolTip">
+        <Setter Property="FontSize" Value="16"/>
+        <Setter Property="Foreground" Value="Black"/>
+        <Setter Property="MaxWidth" Value="460"/>
+    </Style>
+
     <Style x:Key="CaptionButtonStyle" TargetType="Button">
         <Setter Property="Width" Value="42"/>
         <Setter Property="Height" Value="32"/>

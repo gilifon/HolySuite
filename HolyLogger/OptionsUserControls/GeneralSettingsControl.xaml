@@ -17,6 +17,19 @@
 
         <CheckBox x:Name="CBX_EnableOmniRigCAT" Content="Enable Omni-Rig CAT" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.EnableOmniRigCAT, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16" Margin="0,126,0,0" Click="CBX_EnableOmniRigCAT_Changed"/>
 
+        <!-- WHAT OMNIRIG IS SET TO, read out of its own file when this page opens. Everything the
+             program knows about the radio arrives on that poll, so a slow one is felt everywhere -
+             the frequency box lagging the dial most of all. Red and italic because it is a fault to
+             put right, and it says nothing at all when the setting is already 500 or better. -->
+        <TextBlock x:Name="OmniRigPollNote" HorizontalAlignment="Left" VerticalAlignment="Top"
+                   Margin="212,155,0,0" FontSize="16" FontStyle="Italic" Foreground="#C62828"
+                   TextWrapping="Wrap" Width="368" Visibility="Collapsed"/>
+
+        <!-- One press to the place the number is changed, beside the sentence that names it. -->
+        <Button x:Name="OmniRigOpenBtn" Content="Set OmniRig" Style="{StaticResource GoActionButtonStyle}"
+                HorizontalAlignment="Left" VerticalAlignment="Top" Margin="452,215,0,0" FontSize="16"
+                Height="32" Width="128" Visibility="Collapsed" Click="OmniRigOpenBtn_Click"/>
+
         <!-- Left edge lines up with the word "Enable" (checkbox text starts after the ~20px glyph).
              Narrow: a rig name is short (~15 chars), so ~half the old width is plenty. -->
         <GroupBox x:Name="groupBox" Header="Select Rig" Height="90" Margin="20,151,0,0" HorizontalAlignment="Left" VerticalAlignment="Top" Width="180" FontSize="16">
@@ -46,30 +59,18 @@
              boxes, and the one button on it that opens a table of its own was reading as part of the
              wall. Width and Height are set here because the keycap template lays its content out
              itself and ignores Padding; 120 keeps the key clear of the sentence beside it at 130. -->
-        <Button x:Name="BTN_UdpPorts" Content="UDP Ports" Style="{StaticResource OrangeActionButtonStyle}"
-                HorizontalAlignment="Left" VerticalAlignment="Top" Width="120" Height="32"
+        <Button x:Name="BTN_UdpPorts" Content="UDP Ports Manager" Style="{StaticResource OrangeActionButtonStyle}"
+                HorizontalAlignment="Left" VerticalAlignment="Top" Width="190" Height="32"
                 Margin="0,368,0,0" FontSize="16" Click="BTN_UdpPorts_Click"/>
-        <TextBlock HorizontalAlignment="Left" VerticalAlignment="Top" Margin="130,373,0,0" FontSize="16"
-                   Foreground="Gray" TextWrapping="Wrap" Width="450"
+        <!-- The button grew with its longer label, so the sentence beside it starts further right; the
+             width stops it at 580, where every group box on this page ends. -->
+        <TextBlock HorizontalAlignment="Left" VerticalAlignment="Top" Margin="200,373,0,0" FontSize="16"
+                   Foreground="Gray" TextWrapping="Wrap" Width="380"
                    Text="Send or receive information from other software."/>
-
-        <!-- HolyCluster spot listener: catches the WSJT-X-format UDP datagram HolyCluster sends when
-             you select a spot (the same one it sends to Log4OM) and fills the DX callsign. -->
-        <GroupBox Header="HolyCluster" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,425,0,0" Width="580" FontSize="16">
-            <StackPanel Margin="4,4,4,4">
-                <CheckBox x:Name="CBX_EnableHolyClusterUDP" Content="Fill DX callsign from HolyCluster spots" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.EnableHolyClusterUDP, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16" Click="HasChanged_Click"/>
-                <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                    <Label Content="Port" VerticalAlignment="Center" FontSize="16" Padding="0"/>
-                    <TextBox x:Name="TB_HolyClusterUDPPort" Width="80" Height="23" Margin="8,0,0,0" VerticalAlignment="Center" Text="{Binding Default.HolyClusterUDPPort, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16" PreviewTextInput="PreviewTextInputHandler" DataObject.Pasting="PastingHandler" MaxLength="5"/>
-                </StackPanel>
-                <TextBlock TextWrapping="Wrap" Margin="0,6,0,0" FontSize="16" Foreground="Gray"
-                           Text="Set this to the UDP port HolyCluster sends on (its default is 2237). When you select a station in HolyCluster it sends the callsign here and it is placed in the DX Callsign field. If CAT is not connected, the spot's frequency is filled in too."/>
-            </StackPanel>
-        </GroupBox>
 
         <!-- Audio Alerts: both sound options plus a single shared output-device picker, so alerts can
              go to the speakers instead of a USB radio codec. Left-justified with the checkboxes. -->
-        <GroupBox Header="Audio Alerts" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,601,0,0" Width="580" FontSize="16">
+        <GroupBox Header="Audio Alerts" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,425,0,0" Width="580" FontSize="16">
             <StackPanel Margin="4,4,4,4">
                 <!-- Beep when typing -->
                 <CheckBox x:Name="CBX_NonEnglishKeyBeep" HorizontalAlignment="Left" IsChecked="{Binding Default.NonEnglishKeyBeep, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16" Margin="0,2,0,0" Click="HasChanged_Click">

@@ -648,11 +648,18 @@ namespace HolyLogger
             return ".,?/@=+-".IndexOf(c) >= 0;
         }
 
+        // AND IT SAYS SO. A character a keyer cannot send used to be swallowed without a sound, which
+        // on a row that shows what is going on air looks like the window has stopped taking input.
+        // The same beep the callsign box makes for a keyboard left in the wrong language.
         private void Box_PreviewTextInput(object sender, TextCompositionEventArgs e)
         {
             foreach (char c in e.Text)
             {
-                if (!IsSendable(c)) { e.Handled = true; return; }
+                if (IsSendable(c)) continue;
+
+                e.Handled = true;
+                MainWindow.BeepRefusedKey();
+                return;
             }
         }
 
@@ -1799,6 +1806,21 @@ namespace HolyLogger
             if (text.Length == 0) return "Empty - right-click to give it some text";
 
             var lines = new StringBuilder();
+
+            // WHAT THE NEXT PRESS WILL DO COMES FIRST, and while the CQ button is red that is not what
+            // it holds. This is rebuilt every time the tooltip opens, so it used to talk the operator
+            // through a CQ that the press was not going to send - the red says something is different
+            // and this is the place that says what. The text below it is still the one right-click
+            // edits: the question is the program's, the CQ is his.
+            if (index == 0 && _qrlNext)
+            {
+                lines.Append("Sends ").Append(QrlText())
+                     .Append(" - this frequency has not been called on yet.")
+                     .Append(Environment.NewLine)
+                     .Append("Press it again after that to call CQ with the text below.")
+                     .Append(Environment.NewLine).Append(Environment.NewLine);
+            }
+
             lines.Append(text);
 
             string problem = _macroProblem != null ? _macroProblem(text) : null;
@@ -1966,6 +1988,16 @@ namespace HolyLogger
 
         private void EditButton(int index)
         {
+            // THE CQ BUTTON HAS TWO TEXTS AND IS EDITED AS TWO. Every other key sends the one thing it
+            // holds; this one sends the question instead whenever the frequency has not been called on,
+            // and the operator meets that far less often than he meets the CQ itself. A single box
+            // showing only the CQ told him nothing about the other half of his own button.
+            if (index == 0)
+            {
+                EditCqButton();
+                return;
+            }
+
             if (_editText == null) return;
 
             // Named by the key that presses it, because that is how the operator thinks of it.
@@ -1978,6 +2010,51 @@ namespace HolyLogger
             SaveButtonText(index, updated);
             RefreshButtonFace(index);
         }
+
+        // Both of the CQ button's texts, in the order it uses them: the question first, because that
+        // is what the next press sends whenever the button is red, and the call under it.
+        //
+        // IN THE ORDINARY EDITOR, not a window of its own. That window carries the preview of what a
+        // text would put on air and the whole list of macro marks, and a man writing his CQ wants
+        // those whichever of the two boxes he is in. A second window with neither would have been a
+        // poorer place to write a message than the one every other button opens.
+        private void EditCqButton()
+        {
+            if (_editTwoTexts == null)
+            {
+                // No way to show two: fall back to the one that matters most often.
+                if (_editText == null) return;
+
+                string only = _editText("Edit CW Keyer Text 1 (F1)", _buttonTexts[0] ?? string.Empty);
+                if (only == null) return;
+
+                _buttonTexts[0] = only;
+                SaveButtonText(0, only);
+                RefreshButtonFace(0);
+                return;
+            }
+
+            string qrl = QrlText();
+            string cq = _editTwoTexts("Edit CW Keyer Text 1 (F1)", _buttonTexts[0] ?? string.Empty, ref qrl);
+            if (cq == null) return;
+
+            // The question is one setting for the whole program; the call belongs to the bank showing.
+            try
+            {
+                Properties.Settings.Default.CwKeyerQrlText = (qrl ?? string.Empty).Trim();
+                Properties.Settings.Default.Save();
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+            _buttonTexts[0] = cq;
+            SaveButtonText(0, cq);
+            RefreshButtonFace(0);
+        }
+
+        internal delegate string TwoTextEditor(string title, string mainText, ref string extraText);
+
+        internal TwoTextEditor EditTwoTexts { set { _editTwoTexts = value; } }
+        private TwoTextEditor _editTwoTexts;
 
         // All twelve in ONE setting, the way WindowBoundsJson holds every window's placement: a
         // thirteenth button later costs nothing, and a profile that snapshots the settings takes them

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Globalization;
 using System.Net;
 using System.Net.Sockets;
@@ -7,11 +7,14 @@ using System.Windows;
 
 namespace HolyLogger
 {
-    // HolyCluster spot listener.
+    // HolyCluster spot reader.
     //
     // HolyCluster's CAT server, when you select (highlight) a spot, sends a WSJT-X-format UDP
     // "Status" message to 127.0.0.1:<port> — the very same datagram it sends to Log4OM so the
-    // logger can pre-fill the DX callsign. We open a UDP socket on that port and catch it:
+    // logger can pre-fill the DX callsign. The socket is no longer opened here: HolyCluster is one
+    // line in the UDP Ports Manager like every other program, and MainWindow.Udp.cs hands a Status
+    // datagram arriving on ANY of those ports to the two methods below. What is done with it is
+    // unchanged:
     //   - the DX callsign always goes into TB_DXCallsign (a fresh spot replaces whatever was there),
     //     via .Text so the normal callbook-lookup / suggestions pipeline runs as if it were typed;
     //   - the frequency is filled ONLY when CAT is not driving the radio. When OmniRig is online the
@@ -23,8 +26,6 @@ namespace HolyLogger
     // 0xFFFFFFFF denotes a null string.
     public partial class MainWindow
     {
-        public static UdpClient HolyClusterClient;
-
         private const uint WsjtxMagic = 0xADBCCBDA;
         private const uint WsjtxStatusType = 1;
 
@@ -52,118 +53,6 @@ namespace HolyLogger
         // When the selection arrived, so the hold above can be given up if the radio never reaches that
         // frequency at all (see SuspensionTimeoutSeconds in MainWindow.Cluster.cs).
         private DateTime _holyClusterSelectedAtUtc = DateTime.UtcNow;
-
-        // Open or close the listener to match the current setting. Safe to call repeatedly (startup,
-        // and whenever the options are applied). Any existing listener is torn down first, so a changed
-        // port takes effect immediately on Apply.
-        private void ApplyHolyClusterListener()
-        {
-            if (HolyClusterClient != null)
-            {
-                try { HolyClusterClient.Close(); } catch (Exception swallowed) { Log.Swallow(swallowed); }
-                HolyClusterClient = null;
-            }
-
-            if (!Properties.Settings.Default.EnableHolyClusterUDP) return;
-
-            // Fresh listener: forget the last spot so re-enabling lets the same station fill again.
-            _lastHolyClusterSpotKey = null;
-
-            try
-            {
-                HolyClusterClient = new UdpClient(Properties.Settings.Default.HolyClusterUDPPort);
-                HolyClusterClient.BeginReceive(new AsyncCallback(StartHolyClusterUDPClient), null);
-            }
-            catch (Exception ex)
-            {
-                // The port is nearly always busy because something else has it - another copy of
-                // HolyLogger, or HolyCluster itself. Recorded, because until now this failed in
-                // silence and the operator was left wondering why spots never arrived.
-                Log.Warn("HolyCluster UDP port " + Properties.Settings.Default.HolyClusterUDPPort
-                         + " could not be opened: " + ex.Message + " - listener switched off.");
-
-                Properties.Settings.Default.EnableHolyClusterUDP = false;
-                HolyClusterClient = null;
-
-                WarnHolyClusterPortBusy();
-            }
-        }
-
-        // THE WARNING WAITS FOR THE WINDOW. This method is called from MainWindow's CONSTRUCTOR as well
-        // as from Options, and a dialog raised before the window has ever been shown took the whole
-        // program down: WPF refuses to give a dialog an owner that was never shown, the exception
-        // escaped the constructor, and HolyLogger died on the splash screen with the port merely busy.
-        // From Options the window is up and the warning is immediate, as it always was.
-        private void WarnHolyClusterPortBusy()
-        {
-            string text = "The HolyCluster UDP port " + Properties.Settings.Default.HolyClusterUDPPort
-                        + " could not be opened — another program is probably using it.\n\n"
-                        + "The HolyCluster listener has been switched off. You can turn it back on, or "
-                        + "choose a different port, in Options.";
-
-            if (!IsLoaded)
-            {
-                Dispatcher.BeginInvoke(new Action(() =>
-                {
-                    try { HolyMessageBox.ShowWarning(text, "HolyCluster Listener", this); }
-                    catch (Exception swallowed) { Log.Swallow(swallowed); }
-                }), System.Windows.Threading.DispatcherPriority.ApplicationIdle);
-                return;
-            }
-
-            try { HolyMessageBox.ShowWarning(text, "HolyCluster Listener", this); }
-            catch (Exception swallowed) { Log.Swallow(swallowed); }
-        }
-
-        private void StartHolyClusterUDPClient(IAsyncResult res)
-        {
-            if (HolyClusterClient == null) return;
-
-            byte[] datagram;
-            IPEndPoint remote = new IPEndPoint(IPAddress.Any, 0);
-            try
-            {
-                datagram = HolyClusterClient.EndReceive(res, ref remote);
-            }
-            catch (ObjectDisposedException) { return; }   // socket closed (shutdown / disabled / port change)
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine("HolyCluster UDP receive error: " + ex.Message);
-                return;
-            }
-
-            // Parse + apply, but never let a malformed packet kill the receive loop.
-            try
-            {
-                if (Properties.Settings.Default.EnableHolyClusterUDP
-                    && TryParseWsjtxStatus(datagram, out string dxCall, out double freqMhz))
-                {
-                    // Act only when the highlighted station changes; ignore identical re-sends so an
-                    // F9 clear isn't undone by HolyCluster reaffirming the same selection.
-                    string key = dxCall + "|" + freqMhz.ToString("0.0###", CultureInfo.InvariantCulture);
-                    if (key != _lastHolyClusterSpotKey)
-                    {
-                        _lastHolyClusterSpotKey = key;
-                        this.Dispatcher.Invoke(() => ApplyHolyClusterSpot(dxCall, freqMhz));
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine("HolyCluster UDP parse error: " + ex.Message);
-            }
-
-            // Re-arm for the next datagram (unless the client was torn down meanwhile).
-            try
-            {
-                HolyClusterClient?.BeginReceive(new AsyncCallback(StartHolyClusterUDPClient), null);
-            }
-            catch (ObjectDisposedException) { /* closed during teardown - expected */ }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine("HolyCluster UDP re-arm error: " + ex.Message);
-            }
-        }
 
         // Runs on the UI thread. Fills the DX callsign always; the frequency only when CAT is not live.
         private void ApplyHolyClusterSpot(string dxCall, double freqMhz)

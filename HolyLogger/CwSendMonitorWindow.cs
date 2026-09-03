@@ -282,6 +282,8 @@ namespace HolyLogger
             if (_finished || _running) return;
             _running = true;
             _startUtc = DateTime.UtcNow;
+            _lastTickUtc = _startUtc;
+            _unitsDone = 0;
             _blinkTimer.Start();
             _advanceTimer.Start();
         }
@@ -291,6 +293,16 @@ namespace HolyLogger
         {
             _wpm = wpm < 5 ? 5 : (wpm > 80 ? 80 : wpm);
             _wpmLabel.Text = "~" + Math.Round(_wpm) + " WPM";
+        }
+
+        /// <summary>
+        /// True once the cursor has reached the end of the text - every unit of it counted at the
+        /// speed the radio reports. The owner uses it to know that a reported return to receive IS
+        /// the end of the message rather than a break-in gap: those happen while units remain.
+        /// </summary>
+        internal bool TextDone
+        {
+            get { return _totalUnits > 0 && _unitsDone >= _totalUnits; }
         }
 
         /// <summary>Transmission ended normally: close the window immediately, no delay.</summary>
@@ -313,13 +325,26 @@ namespace HolyLogger
             try { Close(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
         }
 
+        // UNITS ARE ADDED UP AS THEY GO, not worked out afresh from the start time each tick. The
+        // operator can turn the radio's speed knob in the middle of a message - the keyer reads it and
+        // this window is told - and dividing the WHOLE elapsed time by the NEW speed would re-price
+        // everything already sent and jump the cursor. What has been keyed has been keyed; only what
+        // comes after it moves at the new speed.
+        private double _unitsDone;
+        private DateTime _lastTickUtc = DateTime.MinValue;
+
         private void AdvanceTimer_Tick(object sender, EventArgs e)
         {
             if (_finished || _totalUnits <= 0) return;
 
-            double elapsedSeconds = (DateTime.UtcNow - _startUtc).TotalSeconds;
-            double unitSeconds = 1.2 / _wpm;
-            double elapsedUnits = elapsedSeconds / unitSeconds;
+            DateTime now = DateTime.UtcNow;
+            DateTime since = _lastTickUtc == DateTime.MinValue ? now : _lastTickUtc;
+            _lastTickUtc = now;
+
+            double seconds = (now - since).TotalSeconds;
+            if (seconds > 0) _unitsDone += seconds * _wpm / 1.2;
+
+            double elapsedUnits = _unitsDone;
 
             int idx = 0;
             while (idx < _text.Length && _cumulativeUnits[idx] <= elapsedUnits)

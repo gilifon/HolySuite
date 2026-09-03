@@ -494,9 +494,7 @@ namespace HolyLogger
             // Every UDP port the operator listed in Options > General > UDP Ports (see
             // MainWindow.Udp.cs). This replaced the two fixed ports that used to be wired in here.
             ApplyUdpListeners();
-
-            ApplyHolyClusterListener();
-            Log.Step("ctor: HolyCluster listener");
+            Log.Step("ctor: UDP listeners");
 
             // The program must not wait on the internet in order to appear. Windows' own answer - is any
             // adapter up - costs nothing and sends nothing, so it is what the program believes for the
@@ -2905,8 +2903,125 @@ namespace HolyLogger
         // ONE EDITOR FOR EVERY STORED CW TEXT - the four Msg buttons here and the eight in the keyer.
         // It hands back the new text, or null when the operator cancelled; what to do with the text
         // afterwards is the caller's business, and that is the only part that differed between them.
+        // THE ONE LIST OF WHAT MAY GO IN A MACRO, kept where both editors can reach it. It used to be a
+        // const inside the single-text dialog, so the table in the Macros Editor - written later - had
+        // no rule at all and would take Hebrew, curly quotes, anything: stored happily, then dropped
+        // character by character on the way to the radio, leaving the keyer to say "nothing to send"
+        // about a button with text plainly written on it.
+        internal static class CwMacroText
+        {
+            // The keyable characters, plus the macro marks. * and ! are never keyed - they are replaced
+            // by a callsign before anything reaches the radio - but they have to be typeable.
+            internal const string Allowed = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 .,?/@=+-*!#${}";
+
+            internal static bool Accepts(string text)
+            {
+                if (string.IsNullOrEmpty(text)) return true;
+
+                foreach (char c in text.ToUpperInvariant())
+                    if (Allowed.IndexOf(c) < 0) return false;
+
+                return true;
+            }
+
+            internal static string Clean(string text)
+            {
+                if (string.IsNullOrEmpty(text)) return string.Empty;
+
+                var kept = new StringBuilder(text.Length);
+                foreach (char c in text.ToUpperInvariant())
+                    if (Allowed.IndexOf(c) >= 0) kept.Append(c);
+
+                return kept.ToString();
+            }
+
+            // Typing and pasting held to the same rule - a paste is CLEANED rather than refused, so what
+            // can be keyed goes in and the rest is left behind.
+            internal static void Guard(TextBox box)
+            {
+                if (box == null) return;
+
+                box.PreviewTextInput += (s, e) =>
+                {
+                    if (Accepts(e.Text)) return;
+
+                    e.Handled = true;
+                    BeepRefusedKey();
+                };
+
+                DataObject.AddPastingHandler(box, (s, e) =>
+                {
+                    string pasted = e.DataObject.GetDataPresent(DataFormats.UnicodeText)
+                                  ? e.DataObject.GetData(DataFormats.UnicodeText) as string
+                                  : null;
+
+                    if (pasted == null) { e.CancelCommand(); return; }
+
+                    string clean = Clean(pasted);
+                    if (clean.Length == pasted.Length) return;
+
+                    e.CancelCommand();
+                    BeepRefusedKey();
+
+                    var target = s as TextBox;
+                    if (target == null || clean.Length == 0) return;
+
+                    int at = target.SelectionStart;
+                    target.Text = target.Text.Remove(at, target.SelectionLength).Insert(at, clean);
+                    target.SelectionStart = at + clean.Length;
+                    target.SelectionLength = 0;
+                });
+            }
+        }
+
+        private static TextBlock CwEditHeading(string text)
+        {
+            var block = new TextBlock
+            {
+                Text = text ?? string.Empty,
+                FontSize = 16,
+                FontWeight = FontWeights.Bold,
+                Margin = new Thickness(0, 0, 0, 4)
+            };
+            block.SetResourceReference(TextBlock.ForegroundProperty, "TextBrush");
+
+            return block;
+        }
+
+        private static TextBlock CwEditHint(string text)
+        {
+            var block = new TextBlock
+            {
+                Text = text ?? string.Empty,
+                FontSize = 16,
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(0, 4, 0, 0)
+            };
+            block.SetResourceReference(TextBlock.ForegroundProperty, "MutedTextBrush");
+
+            return block;
+        }
+
         internal string ShowCwTextEditDialog(string title, string currentText)
         {
+            string ignored;
+            return ShowCwTextEditDialog(title, currentText, null, null, null, null, null, out ignored);
+        }
+
+        // ONE EDITOR, WITH ROOM FOR A SECOND TEXT. The CQ button holds two - the call, and the question
+        // it asks instead on a frequency it has not called on - and they are edited together or the
+        // operator only ever meets half his own button. Everything else about the window is unchanged:
+        // the same typing rules, the same preview of what would go on air, and the same list of macro
+        // marks underneath, which is the reason to extend this window rather than build another.
+        //
+        // The extra box is ABOVE the main one, in the order the button uses them.
+        internal string ShowCwTextEditDialog(string title, string currentText,
+                                             string mainHeading,
+                                             string extraHeading, string extraHint, string extraText,
+                                             string mainHint,
+                                             out string extraResult)
+        {
+            extraResult = extraText;
             Window dialog = new Window
             {
                 Title = title,
@@ -2959,7 +3074,7 @@ namespace HolyLogger
             };
 
             // The one list of what may be typed OR pasted here, so the two can never drift.
-            const string validChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 .,?/@=+-*!#${}";
+            const string validChars = CwMacroText.Allowed;
 
             // Add validation for CW-valid characters only
             tb.PreviewTextInput += (s, e) =>
@@ -3010,27 +3125,40 @@ namespace HolyLogger
             Grid.SetColumnSpan(tb, 3);
             grid.Children.Add(tb);
 
+            // THE PAIR SITS IN THE MIDDLE, Save on the left, the way the rest of the program's windows
+            // put them. They were pinned to the two outside corners of the window, which on a box this
+            // wide left them a hand's width apart with nothing between them.
             Button btnSave = new Button
             {
                 Content = "Save",
-                Width = 70,
-                Height = 28,
+                FontSize = 16,
+                Width = 90,
+                Height = 32,
+                Margin = new Thickness(0, 0, 10, 0),
                 IsDefault = true
             };
-            Grid.SetRow(btnSave, 6);
-            Grid.SetColumn(btnSave, 2);
-            grid.Children.Add(btnSave);
 
             Button btnCancel = new Button
             {
                 Content = "Cancel",
-                Width = 70,
-                Height = 28,
+                FontSize = 16,
+                Width = 90,
+                Height = 32,
                 IsCancel = true
             };
-            Grid.SetRow(btnCancel, 6);
-            Grid.SetColumn(btnCancel, 0);
-            grid.Children.Add(btnCancel);
+
+            var buttonRow = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                HorizontalAlignment = HorizontalAlignment.Center
+            };
+            buttonRow.Children.Add(btnSave);
+            buttonRow.Children.Add(btnCancel);
+
+            Grid.SetRow(buttonRow, 6);
+            Grid.SetColumn(buttonRow, 0);
+            Grid.SetColumnSpan(buttonRow, 3);
+            grid.Children.Add(buttonRow);
 
             // WHAT WOULD GO ON AIR, worked out again on every keystroke. A macro is only ever as good
             // as what is behind it, and until now the only way to find out was to press the button.
@@ -3063,14 +3191,58 @@ namespace HolyLogger
             Grid.SetColumnSpan(marks, 3);
             grid.Children.Add(marks);
 
-            dialog.Content = grid;
+            // Nothing extra asked for: the window is exactly what it always was.
+            TextBox extraBox = null;
+
+            if (string.IsNullOrEmpty(extraHeading))
+            {
+                dialog.Content = grid;
+            }
+            else
+            {
+                // A QUESTION, NOT A MESSAGE. QRL? is four characters and a bare ? is one; a box the width
+                // of the window invited something neither of them is. Ten characters is as much as any
+                // form of the question takes, and the box is only as wide as that.
+                extraBox = new TextBox
+                {
+                    Text = extraText ?? string.Empty,
+                    FontSize = 16,
+                    Height = 28,
+                    Width = 120,
+                    HorizontalAlignment = HorizontalAlignment.Left,
+                    VerticalContentAlignment = VerticalAlignment.Center,
+                    Padding = new Thickness(4, 0, 4, 0),
+                    CharacterCasing = CharacterCasing.Upper,
+                    MaxLength = 10
+                };
+
+                var above = new StackPanel { Margin = new Thickness(10, 10, 10, 0) };
+                above.Children.Add(CwEditHeading(extraHeading));
+                above.Children.Add(extraBox);
+                if (!string.IsNullOrEmpty(extraHint)) above.Children.Add(CwEditHint(extraHint));
+
+                var mainTitle = new StackPanel { Margin = new Thickness(10, 18, 10, 0) };
+                mainTitle.Children.Add(CwEditHeading(mainHeading));
+                if (!string.IsNullOrEmpty(mainHint)) mainTitle.Children.Add(CwEditHint(mainHint));
+
+                var both = new StackPanel();
+                both.Children.Add(above);
+                both.Children.Add(mainTitle);
+                both.Children.Add(grid);
+
+                dialog.Content = both;
+            }
 
             btnSave.Click += (s, e) => { dialog.DialogResult = true; };
             btnCancel.Click += (s, e) => { dialog.DialogResult = false; };
 
             tb.SelectAll();
             tb.Focus();
-            return dialog.ShowDialog() == true ? tb.Text.Trim() : null;
+
+            if (dialog.ShowDialog() != true) return null;
+
+            if (extraBox != null) extraResult = (extraBox.Text ?? string.Empty).Trim();
+            return tb.Text.Trim();
         }
 
         // WHAT MAY BE PUT IN A MESSAGE, listed where the message is written. Both spellings of each
@@ -3766,6 +3938,24 @@ namespace HolyLogger
             // The readout follows the radio's own knob from here on - see BuildCwSpeedReadCommand.
             cwKeyboard.AskSpeed = AskRadioCwSpeed;
 
+            // The CQ button holds two texts and is edited as two - see EditCqButton.
+            cwKeyboard.EditTwoTexts = (string title, string mainText, ref string extraText) =>
+            {
+                string extra;
+                string result = ShowCwTextEditDialog(
+                    title, mainText,
+                    "Calls CQ",
+                    "Asks whether the frequency is free",
+                    "Sent instead of the CQ when the radio has moved off the frequency it last called "
+                    + "on, or has sat on it too long without calling. Recommended: QRL?",
+                    extraText,
+                    "What the button sends once the frequency has been asked about.",
+                    out extra);
+
+                extraText = extra;
+                return result;
+            };
+
             // The macro editor writes the four Msg texts as well as the keyer's own twelve.
             cwKeyboard.SetMsgText = (number, text) =>
             {
@@ -4179,14 +4369,35 @@ namespace HolyLogger
         // Every custom command's answer comes through here, ours and any other. Anything that is not a
         // keying speed is left alone: the reply is read for the one frame we asked about and dropped
         // if it is not in there.
+        // WHAT THE RADIO LAST SAID ITS KEYER SPEED WAS. The keyer window has always used this; the
+        // sending monitor did not, and ran its cursor on the speed TIMED from the last transmission
+        // instead - so the two disagreed on screen and the cursor arrived early or late. The radio's
+        // own number is the truth wherever there is one; the timed estimate is for radios that will
+        // not answer.
+        private int cwRadioWpm;
+
+        private double CwWpmNow()
+        {
+            return cwRadioWpm > 0 ? cwRadioWpm : cwLearnedWpm;
+        }
+
         private void OmniRigEngine_CustomReply(int RigNumber, object Command, object Reply)
         {
             int wpm = CwSpeedFromReply(Reply);
             if (wpm <= 0) return;
 
+            cwRadioWpm = wpm;
+
             Dispatcher.BeginInvoke(new Action(() =>
             {
                 if (cwKeyboard != null) cwKeyboard.ShowSpeed(wpm);
+
+                // AND THE MONITOR, WHILE IT IS RUNNING. The speed knob can be turned in the middle of a
+                // message; the keyer bar followed it and the monitor did not, so its cursor went on at
+                // the speed the radio had when the message started and stopped matching what was on the
+                // air. It counts units as they go (see AdvanceTimer_Tick), so a new speed changes what
+                // is still to come and leaves what has been sent where it is.
+                if (cwSendMonitor != null) cwSendMonitor.UpdateWpm(wpm);
             }), DispatcherPriority.Background);
         }
 
@@ -4506,7 +4717,12 @@ namespace HolyLogger
                 cwMonitorTotalUnits = CwSendMonitorWindow.ComputeTotalUnits(cwText);
                 cwMonitorCursorStarted = false;
 
-                cwSendMonitor = new CwSendMonitorWindow(cwText, cwLearnedWpm, "CW Sending");
+                // Asked again here because the keyer window may not be open, and it is the keyer that
+                // normally keeps this number fresh. The answer arrives while the message is going out,
+                // in time for the cursor's own speed to be set below on the next one.
+                AskRadioCwSpeed();
+
+                cwSendMonitor = new CwSendMonitorWindow(cwText, CwWpmNow(), "CW Sending");
                 cwSendMonitor.Owner = this;
                 cwSendMonitor.Closed += (s, e) =>
                 {
@@ -4525,14 +4741,30 @@ namespace HolyLogger
 
         // Called when the radio reports it has actually started transmitting. Starts the cursor and
         // records the real start time so we can learn the radio's true WPM when TX ends.
+        // TOO SOON TO BE OVER. The radio's transmit flag is not a message boundary: with full break-in
+        // it drops between characters, and the monitor - which closed the moment it saw the flag go
+        // down - shut itself in the middle of the message and left the operator watching nothing while
+        // the rest went out. So the flag is not believed until the text COULD have been sent, worked
+        // out at a speed no station on earth exceeds. The keyer window has had this all along; the four
+        // Msg buttons never did.
+        private const double FastestPlausibleWpm = 60.0;
+        private DateTime cwMonitorEarliestDoneUtc = DateTime.MinValue;
+
+        // When the radio was first seen off air in THIS message. MinValue while it is keying.
+        private DateTime cwTxOffSinceUtc = DateTime.MinValue;
+
         private void OnCwTransmitStarted()
         {
             cwMonitorStartUtc = DateTime.UtcNow;
+            cwTxOffSinceUtc = DateTime.MinValue;
+            cwMonitorEarliestDoneUtc = cwMonitorTotalUnits > 0
+                ? DateTime.UtcNow.AddSeconds(cwMonitorTotalUnits * 1.2 / FastestPlausibleWpm)
+                : DateTime.MinValue;
 
             if (cwSendMonitor != null && !cwMonitorCursorStarted)
             {
                 cwMonitorCursorStarted = true;
-                cwSendMonitor.UpdateWpm(cwLearnedWpm);
+                cwSendMonitor.UpdateWpm(CwWpmNow());
                 cwSendMonitor.StartCursor();
             }
         }
@@ -7092,6 +7324,7 @@ namespace HolyLogger
                 {
                     activeVoiceMessageNumber = pendingVoiceMessageNumber;
                     pendingVoiceMessageNumber = null;
+                    cwTxOffSinceUtc = DateTime.MinValue;
                     OnCwTransmitStarted();
                 }
                 else if (DateTime.UtcNow >= pendingVoiceMessageDeadlineUtc)
@@ -7102,7 +7335,43 @@ namespace HolyLogger
             }
             else if (activeVoiceMessageNumber.HasValue && !txOn)
             {
+                // TOO SOON TO BE OVER, at a speed no station exceeds.
+                if (DateTime.UtcNow < cwMonitorEarliestDoneUtc) return;
+
+                // AND THE SILENCE HAS TO LAST. With full break-in the radio is off air between every
+                // character, so "not transmitting" on its own means nothing - the first gap past the
+                // earliest-finish time closed the window with half the message still to go. The end of a
+                // message is a silence LONGER THAN A WORD GAP, which is seven units at the speed being
+                // sent, and it is given half as long again on top for the transmit flag's own lateness.
+                // THE TEXT IS ALL COUNTED OUT: this is the end, and there is nothing to wait for. A
+                // break-in gap can only happen while there are units still to send, so once the cursor
+                // has reached the end of the message a radio reporting receive has finished it. The
+                // wait below is only for the case where the counting is behind the radio.
+                bool textDone = cwSendMonitor != null && cwSendMonitor.TextDone;
+
+                if (!textDone)
+                {
+                    if (cwTxOffSinceUtc == DateTime.MinValue)
+                    {
+                        cwTxOffSinceUtc = DateTime.UtcNow;
+                        return;
+                    }
+                }
+
+                // JUST LONG ENOUGH TO KNOW IT IS OVER, and not a moment more - this window closes when
+                // the sending stops. A word gap and a half at the speed being sent is longer than any
+                // silence inside a message and shorter than anything the eye reads as a delay: about
+                // six tenths of a second at twenty words a minute. The keyer's own "clear the line"
+                // seconds are deliberately NOT used here - that is about a line staying readable, and
+                // this window has nothing to keep readable once the message has gone.
+                double wpm = CwWpmNow();
+                if (wpm < 5) wpm = 5;
+                double wordGapSeconds = CwSendMonitorWindow.WordGapUnits * 1.2 / wpm;
+
+                if (!textDone && DateTime.UtcNow - cwTxOffSinceUtc < TimeSpan.FromSeconds(wordGapSeconds * 1.5)) return;
+
                 activeVoiceMessageNumber = null;
+                cwTxOffSinceUtc = DateTime.MinValue;
                 OnCwTransmitEnded();
             }
 
@@ -7231,7 +7500,14 @@ namespace HolyLogger
             }
             else if (!_cwKeyboardWasWanted && IsLoaded && _startupWindowsReady)
             {
-                OpenCwKeyboard(true);
+                // ONLY THE OPENING IS HIS TO REFUSE. A man who does not want a window appearing at him
+                // every time the radio goes into CW turns this off, and then the keyer comes up when he
+                // asks for it and not before - Ctrl+K and the View menu are untouched either way.
+                //
+                // The state still moves, so switching it back on does not open the keyer retrospectively
+                // for a mode change that happened while it was off: the next time he comes INTO CW is the
+                // next time it opens.
+                if (Properties.Settings.Default.OpenCwKeyerOnCw) OpenCwKeyboard(true);
                 _cwKeyboardWasWanted = true;
             }
 
@@ -9085,17 +9361,6 @@ namespace HolyLogger
             // Close and dispose the UDP listeners (one per port in the UDP Ports table)
             try { CloseUdpListeners(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
 
-            try
-            {
-                if (HolyClusterClient != null)
-                {
-                    HolyClusterClient.Close();
-                    HolyClusterClient.Dispose();
-                    HolyClusterClient = null;
-                }
-            }
-            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
-
             // Close cluster WebSocket
             try { CloseClusterWebSocket(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
 
@@ -10228,9 +10493,6 @@ namespace HolyLogger
             // operator may have just changed (see MainWindow.Udp.cs).
             ApplyUdpListeners();
 
-            // Open/close the HolyCluster listener to match the (possibly just-changed) setting/port.
-            ApplyHolyClusterListener();
-
             NetworkFlagItem.Visibility = Properties.Settings.Default.ShowNetworkFlag ? Visibility.Visible : Visibility.Collapsed;
             // Lock via IsReadOnly (not IsEnabled) so the field keeps full opacity — a disabled TextBox
             // dims to ~56%, which washed out the lock-blue background and greyed the text.
@@ -11012,6 +11274,40 @@ namespace HolyLogger
             // Worked, but not yet confirmed on LoTW — drives the cluster's "Unconfirmed" legend counter.
             public bool IsUnconfirmedCountry { get; set; }
 
+            private bool _isAlertCallsign;
+            // On the Alerts watch list (the bell under "Latest"): a callsign the operator typed in
+            // himself. Such a spot is sorted to the top of the table, framed in purple, and rings on
+            // arrival — and it is shown even on a band or mode the table is filtering out.
+            public bool IsAlertCallsign
+            {
+                get => _isAlertCallsign;
+                set
+                {
+                    if (_isAlertCallsign != value)
+                    {
+                        _isAlertCallsign = value;
+                        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsAlertCallsign)));
+                        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(RowBorderBrush)));
+                        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(RowBorderThickness)));
+                    }
+                }
+            }
+
+            // The frame around a watch-list row: a vivid purple, the same in every scheme like the blue
+            // table frame - it is a mark on the spot, not part of the colour scheme. The row itself is
+            // NOT tinted (user, 2026-09-03): the frame alone does the marking.
+            static readonly Brush AlertRowBorderBrush = MakeFrozenBrush(Color.FromRgb(0xAA, 0x00, 0xFF));
+
+            static Brush MakeFrozenBrush(Color c)
+            {
+                var b = new SolidColorBrush(c);
+                b.Freeze();
+                return b;
+            }
+
+            public Brush RowBorderBrush => IsAlertCallsign ? AlertRowBorderBrush : Brushes.Transparent;
+            public Thickness RowBorderThickness => IsAlertCallsign ? new Thickness(2) : new Thickness(0);
+
             private bool _isOnFrequency;
             public bool IsOnFrequency
             {
@@ -11123,10 +11419,7 @@ namespace HolyLogger
                     {
                         return ThemeManager.Brush("RowOnFreqBg"); // on-frequency green, theme-aware
                     }
-                    else
-                    {
-                        return Brushes.Transparent; // normal: shows the grid's themed background
-                    }
+                    return Brushes.Transparent; // normal: shows the grid's themed background
                 }
             }
 
@@ -12814,18 +13107,37 @@ namespace HolyLogger
             if (!IsEnglishOnly(e.Text))
             {
                 e.Handled = true;
-
-                if (Properties.Settings.Default.NonEnglishKeyBeep)
-                {
-                    var now = DateTime.UtcNow;
-                    if ((now - _lastNonEnglishBeepUtc).TotalMilliseconds > 200)
-                    {
-                        _lastNonEnglishBeepUtc = now;
-                        // Route to the user's chosen device (e.g. speakers) so it doesn't go into a USB codec.
-                        PlayClusterAlertSound("Beep", Properties.Settings.Default.SoundOutputDevice);
-                    }
-                }
+                BeepRefusedKey();
             }
+        }
+
+        // THE SAME BEEP FOR EVERY REFUSED KEY, wherever it was refused. It was written for a keyboard
+        // left in Hebrew, but a character blocked for any other reason is just as silent and looks just
+        // as much like a broken field - a % or a ; in a CW macro, which no keyer can send. Static so
+        // the macro editor and the keyer's own line can reach it; they are not this window.
+        internal static void BeepRefusedKey()
+        {
+            var main = Application.Current != null ? Application.Current.MainWindow as MainWindow : null;
+            if (main == null) return;
+
+            main.PlayRefusedKeyBeep();
+        }
+
+        private void PlayRefusedKeyBeep()
+        {
+            try
+            {
+                if (!Properties.Settings.Default.NonEnglishKeyBeep) return;
+
+                var now = DateTime.UtcNow;
+                if ((now - _lastNonEnglishBeepUtc).TotalMilliseconds <= 200) return;
+
+                _lastNonEnglishBeepUtc = now;
+
+                // Route to the user's chosen device (e.g. speakers) so it doesn't go into a USB codec.
+                PlayClusterAlertSound("Beep", Properties.Settings.Default.SoundOutputDevice);
+            }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
         }
 
         // Cancels a paste into any text box when the clipboard text contains non-English characters.
@@ -14726,9 +15038,12 @@ namespace HolyLogger
             LB_DXCallsignSuggestions.ItemsSource = matches;
             LB_DXCallsignSuggestions.SelectedIndex = matches.Count > 0 ? 0 : -1;
 
-            CallsignSuggestionsPopup.IsOpen = matches.Count > 0 && Properties.Settings.Default.ShowCallsignDropdown;
+            // ONE SWITCH FOR THE DROPDOWN, and it is the Suggest button on the main window. There used
+            // to be a second in Options doing the same job, so a man could turn it on at the button and
+            // have nothing happen because the other one was off.
+            CallsignSuggestionsPopup.IsOpen = matches.Count > 0 && Properties.Settings.Default.CallsignSuggestionsEnabled;
 
-            if (!Properties.Settings.Default.ShowCallsignDropdown && hasWildcard)
+            if (!Properties.Settings.Default.CallsignSuggestionsEnabled && hasWildcard)
             {
                 var tt = new ToolTip
                 {

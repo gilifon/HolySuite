@@ -85,6 +85,23 @@ namespace HolyLogger
                 System.Windows.Threading.DispatcherPriority.Background);
         }
 
+        // The ? button. Says what a program can send and what HolyLogger does with it - including
+        // HolyCluster, which is a line in this table like any other program now.
+        private void BtnWhat_Click(object sender, RoutedEventArgs e)
+        {
+            // No hand-made line breaks inside a paragraph: the box wraps to the width it is given, and
+            // a break of ours would then wrap a second time. Measured at 700 with the msgsize harness -
+            // 700 x 506, nothing scrolls, so every word is on screen.
+            HolyMessageBox.Show(
+                "HolyLogger listens on every port you tick here.\n\n"
+                + "You do not have to say what a program sends. HolyLogger reads what arrives:\n\n"
+                + "•  A contact — from WSJT-X, JTDX, MSHV, N1MM+, or any program that sends it as ADIF. It is stored in your log.\n\n"
+                + "•  N1MM+'s radio — its frequency and mode go into the entry boxes.\n\n"
+                + "•  A selected spot — from HolyCluster (it usually sends on port 2237). The callsign goes into the DX Callsign field, and the frequency too when CAT is not connected.\n\n"
+                + "Give each program its own line, with the port that program sends on. A contact you already have is not stored twice, whichever port it came in on.",
+                "UDP Ports Manager", HolyMsgType.Info, this, 700);
+        }
+
         // DELETE REMOVES THE LINE.
         //
         // The DataGrid's own Delete key (CanUserDeleteRows) did nothing here, so the key is taken
@@ -146,7 +163,7 @@ namespace HolyLogger
                 HolyMessageBox.ShowWarning(
                     "These lines cannot be saved:\n\n" + string.Join("\n", problems) +
                     "\n\nFix them, or click a line and press Delete to remove it.",
-                    "UDP Ports", this);
+                    "UDP Ports Manager", this);
                 return;   // keep the window open so they can be fixed
             }
 

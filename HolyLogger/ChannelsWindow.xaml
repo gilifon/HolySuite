@@ -2,7 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
-        Title="My Favorite Channels" Height="430" Width="300" MinHeight="260" MinWidth="227"
+        Title="My Favorite Channels" Height="455" Width="300" MinHeight="285" MinWidth="227"
         WindowStartupLocation="CenterOwner"
         WindowStyle="None" ResizeMode="CanResize" StateChanged="Window_StateChanged"
         Icon="Images/crown.png"
@@ -55,7 +55,7 @@
 
         <TextBlock Grid.Row="0" FontSize="16" TextWrapping="Wrap" Margin="0,0,0,8"
                    Foreground="{DynamicResource MutedTextBrush}"
-                   Text="Double-click a channel to set the radio to its frequency and mode. Click a cell to edit."/>
+                   Text="Double-click a channel to set the radio to it. Click a set of digits to type over it, or roll the wheel over them."/>
 
         <DataGrid x:Name="ChannelsGrid" Grid.Row="1" AutoGenerateColumns="False"
                   CanUserAddRows="False" CanUserDeleteRows="True" CanUserReorderColumns="False"
@@ -64,7 +64,6 @@
                   Background="{DynamicResource GridRowBg}" Foreground="{DynamicResource TextBrush}"
                   RowBackground="{DynamicResource GridRowBg}" AlternatingRowBackground="{DynamicResource GridAltRowBg}"
                   PreviewMouseDoubleClick="ChannelsGrid_PreviewMouseDoubleClick"
-                  CellEditEnding="ChannelsGrid_CellEditEnding"
                   CurrentCellChanged="ChannelsGrid_CurrentCellChanged">
             <DataGrid.Resources>
                 <!-- Scoped to this grid: a very light blue selection so band-colored frequency text
@@ -100,28 +99,50 @@
                      when the cell commits. That makes IsFilled flip as soon as you start typing, so the
                      next blank row opens immediately instead of waiting until the row (Mode) is done. -->
                 <DataGridTextColumn Header="Name" Binding="{Binding Name, UpdateSourceTrigger=PropertyChanged}" Width="*"/>
-                <!-- Text column (native tab-to-type editing). The band color also updates live, since
-                     each keystroke pushes the value and fires FreqBrush's change notification. -->
-                <DataGridTextColumn x:Name="FreqColumn" Binding="{Binding FreqKhz, UpdateSourceTrigger=PropertyChanged}" Width="*">
-                    <DataGridTextColumn.Header>
+                <!-- THE FREQUENCY CELL IS THE MAIN WINDOW'S MANUAL-MODE FREQUENCY BOX, in miniature.
+                     Typing a whole frequency into a plain cell was the awkward part, so the cell is
+                     worked the way that box is: every row carries the fixed shape 0000.000, the set of
+                     digits under the pointer wears the EditFieldBg yellow, a click takes that whole set
+                     so the next keystroke replaces it, and a wheel notch moves it - 1 kHz over the kHz
+                     digits, 0.1 kHz over the Hz digits.
+                     Three layers, exactly like that box: the band underneath, and a text box over it
+                     with no background of its own so the band shows through. The box is live in every
+                     row rather than appearing on edit - there is no edit mode to enter, which is what
+                     made it awkward to type into.
+                     Auto width: the column is as wide as the number and its header need, no wider. -->
+                <DataGridTemplateColumn x:Name="FreqColumn" Width="Auto">
+                    <DataGridTemplateColumn.Header>
                         <!-- Unit on its own line, smaller and bold, so the column name reads cleanly. -->
                         <TextBlock TextAlignment="Center" LineStackingStrategy="BlockLineHeight" LineHeight="15"><Run Text="Frequency"/><LineBreak/><Run Text="(kHz)" FontSize="10" FontWeight="Bold"/></TextBlock>
-                    </DataGridTextColumn.Header>
-                    <DataGridTextColumn.ElementStyle>
-                        <Style TargetType="TextBlock">
-                            <Setter Property="HorizontalAlignment" Value="Center"/>
-                            <!-- Colored by band, matching the cluster's Freq column. -->
-                            <Setter Property="Foreground" Value="{Binding FreqBrush}"/>
-                            <Setter Property="FontWeight" Value="Bold"/>
-                        </Style>
-                    </DataGridTextColumn.ElementStyle>
-                    <DataGridTextColumn.EditingElementStyle>
-                        <Style TargetType="TextBox">
-                            <Setter Property="HorizontalContentAlignment" Value="Center"/>
-                            <EventSetter Event="PreviewTextInput" Handler="FreqBox_PreviewTextInput"/>
-                        </Style>
-                    </DataGridTextColumn.EditingElementStyle>
-                </DataGridTextColumn>
+                    </DataGridTemplateColumn.Header>
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <Grid Background="Transparent">
+                                <!-- Placed and sized in code, off the same measurement the wheel's own
+                                     step is read from, so what is lit is exactly what would move. -->
+                                <Rectangle Fill="{DynamicResource EditFieldBg}" HorizontalAlignment="Left"
+                                           Width="0" Visibility="Collapsed" IsHitTestVisible="False"/>
+                                <!-- UpdateSourceTrigger=PropertyChanged: the channel is updated on every
+                                     KEYSTROKE, so IsFilled flips and the band color follows as you type. -->
+                                <TextBox Text="{Binding FreqKhz, UpdateSourceTrigger=PropertyChanged}"
+                                         Background="Transparent" BorderThickness="0" Padding="4,0"
+                                         FontSize="16" FontWeight="Bold" MaxLength="12"
+                                         Foreground="{Binding FreqBrush}" CaretBrush="{Binding FreqBrush}"
+                                         SelectionBrush="{DynamicResource EditFieldBg}" SelectionOpacity="1"
+                                         SelectionTextBrush="Black"
+                                         HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                                         Cursor="ScrollNS"
+                                         PreviewTextInput="FreqBox_PreviewTextInput"
+                                         PreviewKeyDown="FreqBox_PreviewKeyDown"
+                                         PreviewMouseWheel="FreqBox_PreviewMouseWheel"
+                                         PreviewMouseLeftButtonDown="FreqBox_PreviewMouseLeftButtonDown"
+                                         MouseMove="FreqBox_MouseMove" MouseLeave="FreqBox_MouseLeave"
+                                         TextChanged="FreqBox_TextChanged"
+                                         GotFocus="FreqBox_GotFocus" LostFocus="FreqBox_LostFocus"/>
+                            </Grid>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
                 <DataGridComboBoxColumn x:Name="ModeColumn" Header="Mode" SelectedItemBinding="{Binding Mode}" Width="*">
                     <DataGridComboBoxColumn.ElementStyle>
                         <Style TargetType="ComboBox">

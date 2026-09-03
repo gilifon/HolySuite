@@ -365,6 +365,12 @@ namespace HolyLogger
         /// there, and HolyLogger already listens to those, so the new radio takes effect straight away
         /// with nothing to restart.
         /// </summary>
+        // The same door from the options page, which has just told him what the poll interval is.
+        internal void OpenOmniRigSettings()
+        {
+            OpenOmniRigMenuItem_Click(null, null);
+        }
+
         private void OpenOmniRigMenuItem_Click(object sender, RoutedEventArgs e)
         {
             // The window belongs to the OmniRig engine, so there has to be one. If CAT has never been
@@ -377,6 +383,12 @@ namespace HolyLogger
             try
             {
                 OmniRigEngine.DialogVisible = true;
+
+                // HE HAS JUST BEEN IN THERE, so the poll interval may be a different number now -
+                // whether he came here from our own advice or on his own. The one-a-session check is
+                // armed again so the next time the radio reports in, what is read is what he has just
+                // set. It says nothing at 500 or better, so a man who has just fixed it hears nothing.
+                _pollIntervalChecked = false;
             }
             catch (Exception ex)
             {
@@ -522,6 +534,180 @@ namespace HolyLogger
             Rig = null;
             UpdateStatus();
         }
+        // -- HOW OFTEN OMNIRIG ASKS THE RADIO ------------------------------------------------------
+        //
+        // Everything this program knows about the radio arrives on OmniRig's poll: the frequency as the
+        // knob is turned, the mode, the band, and whether it is transmitting. OmniRig asks every
+        // "Poll int., ms" - five hundred by default - and at three thousand the frequency box crawls a
+        // dial's turn behind the radio and the CW windows hold their text three seconds after the last
+        // dit. Nothing this program does can make up for it.
+        //
+        // SAID ONCE, WITH THE WAY TO FIX IT. OmniRig owns the file and has it open, so we do not write
+        // to it - the message opens OmniRig's own settings instead, where one number is changed. And it
+        // can be switched off for good by a man who has his reasons.
+        private const int RecommendedPollMs = 500;
+        private bool _pollIntervalChecked;
+
+        private void CheckOmniRigPollInterval()
+        {
+            if (_pollIntervalChecked) return;
+            _pollIntervalChecked = true;
+
+            try
+            {
+                if (Properties.Settings.Default.OmniRigPollNagOff) return;
+
+                int pollMs = ReadOmniRigPollMs();
+                if (pollMs <= RecommendedPollMs) return;
+
+                Dispatcher.BeginInvoke(new Action(() => ShowPollIntervalAdvice(pollMs)),
+                                       System.Windows.Threading.DispatcherPriority.Background);
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        // Straight out of OmniRig's own settings file, for the rig this program is using. Returns 0 when
+        // there is nothing to read - a fresh install, a file somewhere else - and then nothing is said.
+        private int ReadOmniRigPollMs()
+        {
+            return ReadOmniRigPollMsFromFile(Properties.Settings.Default.SelectedOmniRig2);
+        }
+
+        // IT DOES NOT NEED OMNIRIG TO BE RUNNING. The number lives in OmniRig's settings file, which is
+        // there whether the program is up or not - so the options page can show it with CAT switched
+        // off, before a radio has ever been connected.
+        internal static int ReadOmniRigPollMsFromFile(bool rig2)
+        {
+            try
+            {
+                string path = System.IO.Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                    "Afreet", "Products", "OmniRig", "OmniRig.ini");
+
+                if (!System.IO.File.Exists(path)) return 0;
+
+                string wanted = rig2 ? "[RIG2]" : "[RIG1]";
+                bool inSection = false;
+
+                foreach (string raw in System.IO.File.ReadAllLines(path))
+                {
+                    string line = (raw ?? string.Empty).Trim();
+                    if (line.Length == 0) continue;
+
+                    if (line.StartsWith("[", StringComparison.Ordinal))
+                    {
+                        inSection = string.Equals(line, wanted, StringComparison.OrdinalIgnoreCase);
+                        continue;
+                    }
+
+                    if (!inSection) continue;
+                    if (!line.StartsWith("PollMs", StringComparison.OrdinalIgnoreCase)) continue;
+
+                    int at = line.IndexOf('=');
+                    if (at < 0) return 0;
+
+                    int ms;
+                    return int.TryParse(line.Substring(at + 1).Trim(), out ms) ? ms : 0;
+                }
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+            return 0;
+        }
+
+        private void ShowPollIntervalAdvice(int pollMs)
+        {
+            var said = new System.Text.StringBuilder();
+            said.Append("OmniRig is asking your radio for its state every ").Append(pollMs)
+                .Append(" milliseconds.").Append(Environment.NewLine).Append(Environment.NewLine);
+            said.Append("Everything HolyLogger shows about the radio arrives on that: the frequency ")
+                .Append("as you turn the dial, the mode, the band, and whether it is transmitting. ")
+                .Append("At ").Append(pollMs).Append(" ms all of it is up to ")
+                .Append((pollMs / 1000.0).ToString("0.#", CultureInfo.InvariantCulture))
+                .Append(" seconds behind the radio.").Append(Environment.NewLine).Append(Environment.NewLine);
+            said.Append("We recommend 500 ms or less. It is the \"Poll int., ms\" box in OmniRig's own ")
+                .Append("settings.").Append(Environment.NewLine).Append(Environment.NewLine);
+            said.Append("Faster than that is fine and makes the radio follow more closely - but not ")
+                .Append("below 100 ms, which is as fast as OmniRig is meant to be driven and starts ")
+                .Append("crowding out the commands we send the radio.");
+
+            var choice = ShowThreeWay(said.ToString(), "OmniRig polling",
+                                      "Open OmniRig", "Not now", "Do not show this again");
+
+            if (choice == 2)
+            {
+                try
+                {
+                    Properties.Settings.Default.OmniRigPollNagOff = true;
+                    Properties.Settings.Default.Save();
+                }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
+                return;
+            }
+
+            if (choice == 0) OpenOmniRigMenuItem_Click(null, null);
+        }
+
+        // Three buttons and no checkbox: a checkbox on a message somebody sees once is a thing to read
+        // AND a thing to tick, where the three answers he might give are the three buttons themselves.
+        private int ShowThreeWay(string message, string title, string first, string second, string third)
+        {
+            int answer = 1;
+
+            var text = new TextBlock
+            {
+                Text = message,
+                FontSize = 16,
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(0, 0, 0, 18)
+            };
+            text.SetResourceReference(TextBlock.ForegroundProperty, "TextBrush");
+
+            var row = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                HorizontalAlignment = HorizontalAlignment.Center
+            };
+
+            var stack = new StackPanel { Margin = new Thickness(16) };
+            stack.Children.Add(text);
+            stack.Children.Add(row);
+
+            var dialog = new Window
+            {
+                Title = title,
+                Width = 620,
+                SizeToContent = SizeToContent.Height,
+                ResizeMode = ResizeMode.NoResize,
+                ShowInTaskbar = false,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                Owner = this,
+                Icon = Icon,
+                Content = stack
+            };
+            dialog.SetResourceReference(BackgroundProperty, "WindowBg");
+
+            string[] words = { first, second, third };
+            for (int i = 0; i < words.Length; i++)
+            {
+                int mine = i;
+                var button = new Button
+                {
+                    Content = words[i],
+                    FontSize = 16,
+                    Height = 32,
+                    MinWidth = 110,
+                    Padding = new Thickness(14, 0, 14, 0),
+                    Margin = new Thickness(i == 0 ? 0 : 10, 0, 0, 0)
+                };
+                button.Click += (s, e) => { answer = mine; dialog.DialogResult = true; };
+                row.Children.Add(button);
+            }
+
+            dialog.ShowDialog();
+            return answer;
+        }
+
         private void SelectRig()
         {
             ForgetWriteableParams();   // another rig, another set of writeable parameters
@@ -584,6 +770,10 @@ namespace HolyLogger
         {
             ForgetWriteableParams();   // a rig that just came online may answer differently
             QueueShowRigParams();
+
+            // The first time a radio actually answers is the moment to look at how often OmniRig is
+            // asking it - see CheckOmniRigPollInterval. Once a session, and nothing is said at 500.
+            if (IsCatLive()) CheckOmniRigPollInterval();
         }
 
         private void QueueShowRigParams()

@@ -719,6 +719,21 @@
     <Setting Name="ClusterNewCountrySound" Type="System.String" Scope="User">
       <Value Profile="(Default)">Chime</Value>
     </Setting>
+    <Setting Name="ClusterAlertCallsigns" Type="System.String" Scope="User">
+      <Value Profile="(Default)" />
+    </Setting>
+    <Setting Name="ClusterAlertsWindowLeft" Type="System.Double" Scope="User">
+      <Value Profile="(Default)">NaN</Value>
+    </Setting>
+    <Setting Name="ClusterAlertsWindowTop" Type="System.Double" Scope="User">
+      <Value Profile="(Default)">NaN</Value>
+    </Setting>
+    <Setting Name="ClusterAlertsWindowWidth" Type="System.Double" Scope="User">
+      <Value Profile="(Default)">NaN</Value>
+    </Setting>
+    <Setting Name="ClusterAlertsWindowHeight" Type="System.Double" Scope="User">
+      <Value Profile="(Default)">NaN</Value>
+    </Setting>
     <Setting Name="ClusterLatestPerCallsign" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">False</Value>
     </Setting>
@@ -763,6 +778,12 @@
     </Setting>
     <Setting Name="CwKeyerWpm" Type="System.Int32" Scope="User">
       <Value Profile="(Default)">20</Value>
+    </Setting>
+    <Setting Name="OpenCwKeyerOnCw" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">True</Value>
+    </Setting>
+    <Setting Name="OmniRigPollNagOff" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">False</Value>
     </Setting>
     <Setting Name="CwKeyerLabelsJson" Type="System.String" Scope="User">
       <Value Profile="(Default)" />

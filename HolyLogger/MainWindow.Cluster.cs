@@ -129,6 +129,17 @@ namespace HolyLogger
         // (collapsing repeated spots of the same station); off shows every spot in the time window.
         bool clusterLatestPerCallsignOn = Properties.Settings.Default.ClusterLatestPerCallsign;
         Button clusterLatestBtn = null;
+
+        // ── Alerts: the watch list ────────────────────────────────────────────────────────────────
+        // Callsigns the operator typed into the Alerts window (the bell under "Latest"). A spot for one
+        // of them rings, goes to the top row, and is framed in purple - and it reaches the table even
+        // when its band or mode is filtered out, because a watch that only works on the band you are
+        // already showing is no watch at all.
+        HashSet<string> _clusterAlertCalls = null;                 // identity bases, upper case; built on demand
+        StackPanel clusterAlertStrip = null;                        // pinned lines above the table (see BuildClusterAlertStrip)
+        Button clusterAlertsBtn = null;                            // the bell button on the header canvas
+        ClusterAlertsWindow clusterAlertsWindow = null;            // single instance
+        DateTime _lastAlertCallsignAlertUtc = DateTime.MinValue;   // throttles the watch-list alert sound
         FrameworkElement clusterCenterLine = null;    // overlay that hosts the reference line (fills the table area)
         Grid clusterCenterLineBand = null;            // the movable strip (line + readout) positioned at the rows-area center
         TextBlock clusterCenterLineFreqText = null;   // live VFO frequency shown on the line
@@ -168,6 +179,7 @@ namespace HolyLogger
         // Layout constants for the cluster window floating overlay panels
         const double ClusterOffScreenPosition = -400;
         const double ClusterHeaderCanvasHeight = 92;
+        const double ClusterAlertsBellGap = 4;   // gap between the "Latest" toggle and the Alerts bell below it
         const double ClusterTableTopGap = 10;
         const double ClusterShowBandsPanelWidth = 115;
         // Fixed half-width used to center the active-band indicator under the Freq column.
@@ -537,6 +549,13 @@ namespace HolyLogger
                 headerCanvas.Children.Add(clusterModeSelectorPanel);
             }
 
+            // The Alerts bell rides the canvas like the other floating controls, so hanging it under the
+            // "Latest" toggle costs the header block no height and moves nothing in the legend.
+            clusterAlertsBtn = BuildClusterAlertsButton();
+            Canvas.SetTop(clusterAlertsBtn, 0);
+            Canvas.SetLeft(clusterAlertsBtn, ClusterOffScreenPosition);
+            headerCanvas.Children.Add(clusterAlertsBtn);
+
             var layoutGrid = new Grid { Margin = new Thickness(12, 8, 4, 12) };
             // Default text in the whole cluster window follows the theme (band/mode labels, legend,
             // counts). Colored/explicit text overrides it. Resource reference => live toggle.
@@ -860,6 +879,8 @@ namespace HolyLogger
             clusterLastMinutesFilterPanel = null;
             clusterBandSelectorPanel = null;
             clusterModeSelectorPanel = null;
+            clusterAlertsBtn = null;
+            clusterAlertStrip = null;
             clusterBandSpotCountTexts.Clear();
             clusterLastMinutesComboBox = null;
             clusterBandFilterAllBtn = null;
@@ -974,6 +995,133 @@ namespace HolyLogger
             return undoButton;
         }
 
+        // The Alerts bell, sitting under the "Latest" toggle. Drawn as vector paths rather than a
+        // bitmap or an icon-font glyph: it stays sharp at every DPI and its red is set in one place.
+        private Button BuildClusterAlertsButton()
+        {
+            var red = new SolidColorBrush(Color.FromRgb(0xD9, 0x3B, 0x3B));
+            red.Freeze();
+
+            var art = new Canvas { Width = 24, Height = 24 };
+
+            // Bell: knob, dome and flared lip in one shape, with the clapper below it.
+            art.Children.Add(new System.Windows.Shapes.Path
+            {
+                Fill = red,
+                Data = Geometry.Parse("M 12 2.1 C 13.05 2.1 13.75 2.9 13.75 3.85 L 13.75 4.5 C 16.65 5.35 18.6 7.95 18.6 11.0 L 18.6 15.5 C 18.6 16.3 19.0 16.6 19.6 17.0 C 20.35 17.5 20.3 18.35 19.35 18.35 L 4.65 18.35 C 3.7 18.35 3.65 17.5 4.4 17.0 C 5.0 16.6 5.4 16.3 5.4 15.5 L 5.4 11.0 C 5.4 7.95 7.35 5.35 10.25 4.5 L 10.25 3.85 C 10.25 2.9 10.95 2.1 12 2.1 Z")
+            });
+            art.Children.Add(new System.Windows.Shapes.Path
+            {
+                Fill = red,
+                Data = Geometry.Parse("M 9.7 18.75 A 2.3 2.3 0 0 0 14.3 18.75 Z")
+            });
+
+            // Two ringing arcs on each side.
+            foreach (string arc in new[]
+            {
+                "M 5.3 3.3 A 7.8 7.8 0 0 0 1.5 9.5",
+                "M 6.7 4.7 A 5.6 5.6 0 0 0 3.7 9.6",
+                "M 18.7 3.3 A 7.8 7.8 0 0 1 22.5 9.5",
+                "M 17.3 4.7 A 5.6 5.6 0 0 1 20.3 9.6"
+            })
+            {
+                art.Children.Add(new System.Windows.Shapes.Path
+                {
+                    Stroke = red,
+                    StrokeThickness = 1.15,
+                    StrokeStartLineCap = PenLineCap.Round,
+                    StrokeEndLineCap = PenLineCap.Round,
+                    Data = Geometry.Parse(arc)
+                });
+            }
+
+            var btn = new Button
+            {
+                Width = 30,
+                Height = 30,
+                Background = Brushes.Transparent,
+                BorderBrush = Brushes.Transparent,
+                BorderThickness = new Thickness(0),
+                Padding = new Thickness(0),
+                Cursor = Cursors.Hand,
+                ToolTip = "Alerts: the callsigns you are waiting for. A spot for one of them rings, goes to the top row, and is framed in purple.",
+                Content = new Viewbox { Width = 22, Height = 22, Stretch = Stretch.Uniform, Child = art }
+            };
+            // Opt out of the app-wide themed Button style, whose padding would squeeze the icon — the
+            // undo icon just above it does the same.
+            btn.Style = null;
+            btn.Click += (s, e) => OpenClusterAlertsWindow();
+            return btn;
+        }
+
+        // The stock DataGrid template with ONE addition: row 1 of the inner ScrollViewer holds the
+        // Alerts strip (the grid's Tag), between PART_ColumnHeadersPresenter and the scrolling rows.
+        // Everything else - the part names, the scrollbars, the select-all corner button - is the
+        // default, because the DataGrid finds its own pieces by those names and the Live Scale engine
+        // reaches the rows presenter and the scroll content presenter through them.
+        private const string ClusterGridTemplateXaml = @"
+            <ControlTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation'
+                             xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml'
+                             TargetType='{x:Type DataGrid}'>
+                <Border Background='{TemplateBinding Background}'
+                        BorderBrush='{TemplateBinding BorderBrush}'
+                        BorderThickness='{TemplateBinding BorderThickness}'
+                        Padding='{TemplateBinding Padding}'
+                        SnapsToDevicePixels='True'>
+                    <ScrollViewer x:Name='DG_ScrollViewer' Focusable='false'>
+                        <ScrollViewer.Template>
+                            <ControlTemplate TargetType='{x:Type ScrollViewer}'>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width='Auto'/>
+                                        <ColumnDefinition Width='*'/>
+                                        <ColumnDefinition Width='Auto'/>
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height='Auto'/>
+                                        <RowDefinition Height='Auto'/>
+                                        <RowDefinition Height='*'/>
+                                        <RowDefinition Height='Auto'/>
+                                    </Grid.RowDefinitions>
+
+                                    <Button Command='{x:Static DataGrid.SelectAllCommand}' Focusable='false'
+                                            Width='{Binding CellsPanelHorizontalOffset, RelativeSource={RelativeSource AncestorType={x:Type DataGrid}}}'
+                                            Visibility='{Binding HeadersVisibility, ConverterParameter={x:Static DataGridHeadersVisibility.All}, Converter={x:Static DataGrid.HeadersVisibilityConverter}, RelativeSource={RelativeSource AncestorType={x:Type DataGrid}}}'/>
+
+                                    <DataGridColumnHeadersPresenter x:Name='PART_ColumnHeadersPresenter' Grid.Column='1'
+                                            Visibility='{Binding HeadersVisibility, ConverterParameter={x:Static DataGridHeadersVisibility.Column}, Converter={x:Static DataGrid.HeadersVisibilityConverter}, RelativeSource={RelativeSource AncestorType={x:Type DataGrid}}}'/>
+
+                                    <ContentPresenter Grid.Row='1' Grid.Column='1' ClipToBounds='True'
+                                            Content='{Binding Tag, RelativeSource={RelativeSource AncestorType={x:Type DataGrid}}}'/>
+
+                                    <ScrollContentPresenter x:Name='PART_ScrollContentPresenter' Grid.Row='2' Grid.ColumnSpan='2'
+                                            CanContentScroll='{TemplateBinding CanContentScroll}'/>
+
+                                    <ScrollBar x:Name='PART_VerticalScrollBar' Grid.Row='2' Grid.Column='2' Orientation='Vertical'
+                                            Maximum='{TemplateBinding ScrollableHeight}'
+                                            ViewportSize='{TemplateBinding ViewportHeight}'
+                                            Value='{Binding VerticalOffset, Mode=OneWay, RelativeSource={RelativeSource TemplatedParent}}'
+                                            Visibility='{TemplateBinding ComputedVerticalScrollBarVisibility}'/>
+
+                                    <Grid Grid.Row='3' Grid.Column='1'>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width='{Binding NonFrozenColumnsViewportHorizontalOffset, RelativeSource={RelativeSource AncestorType={x:Type DataGrid}}}'/>
+                                            <ColumnDefinition Width='*'/>
+                                        </Grid.ColumnDefinitions>
+                                        <ScrollBar x:Name='PART_HorizontalScrollBar' Grid.Column='1' Orientation='Horizontal'
+                                                Maximum='{TemplateBinding ScrollableWidth}'
+                                                ViewportSize='{TemplateBinding ViewportWidth}'
+                                                Value='{Binding HorizontalOffset, Mode=OneWay, RelativeSource={RelativeSource TemplatedParent}}'
+                                                Visibility='{TemplateBinding ComputedHorizontalScrollBarVisibility}'/>
+                                    </Grid>
+                                </Grid>
+                            </ControlTemplate>
+                        </ScrollViewer.Template>
+                        <ItemsPresenter SnapsToDevicePixels='{TemplateBinding SnapsToDevicePixels}'/>
+                    </ScrollViewer>
+                </Border>
+            </ControlTemplate>";
+
         private DataGrid BuildClusterSpotsGrid()
         {
             var spotsGrid = new DataGrid
@@ -992,6 +1140,13 @@ namespace HolyLogger
                 Opacity = 1
             };
             clusterSpotsGrid = spotsGrid;
+
+            // THE ALERTS STRIP LIVES INSIDE THE TABLE (user, 2026-09-03). A WPF DataGrid has no such
+            // thing as a frozen ROW, so the grid is given its own template: a copy of the stock one with
+            // one row added between the column headers and the scrolling rows. The strip is handed to it
+            // through Tag - the plainest way to get a live element into a template without a new control.
+            spotsGrid.Tag = BuildClusterAlertStrip();
+            spotsGrid.Template = (ControlTemplate)System.Windows.Markup.XamlReader.Parse(ClusterGridTemplateXaml);
 
             // The wheel over the spots tunes the radio - but only in Live Scale, where the list is a
             // frequency scale that re-centres on the VFO by itself, so nothing is taken away. In the
@@ -1047,6 +1202,10 @@ namespace HolyLogger
             var clusterRowStyle = new Style(typeof(DataGridRow));
             clusterRowStyle.Setters.Add(new Setter(DataGridRow.BackgroundProperty, new System.Windows.Data.Binding("RowBackground")));
             clusterRowStyle.Setters.Add(new Setter(DataGridRow.FocusVisualStyleProperty, null));
+            // Purple frame around a watch-list row. Every other row binds a transparent brush and zero
+            // thickness, so the rest of the table looks exactly as it did.
+            clusterRowStyle.Setters.Add(new Setter(DataGridRow.BorderBrushProperty, new System.Windows.Data.Binding("RowBorderBrush")));
+            clusterRowStyle.Setters.Add(new Setter(DataGridRow.BorderThicknessProperty, new System.Windows.Data.Binding("RowBorderThickness")));
             spotsGrid.RowStyle = clusterRowStyle;
 
             // Default cell text follows the theme (Spotter/Country/UTC/Comment columns; the DX/Freq/
@@ -1327,8 +1486,11 @@ namespace HolyLogger
             using (view.DeferRefresh())
             {
                 view.SortDescriptions.Clear();
+                // Watch list first, then New Country, then whatever column the operator sorted by: the
+                // callsign he typed in himself is the one thing he must see without looking for it.
+                view.SortDescriptions.Add(new System.ComponentModel.SortDescription("IsAlertCallsign", System.ComponentModel.ListSortDirection.Descending));
                 view.SortDescriptions.Add(new System.ComponentModel.SortDescription("IsNeededCountry", System.ComponentModel.ListSortDirection.Descending));
-                if (!string.IsNullOrEmpty(memberPath) && memberPath != "IsNeededCountry")
+                if (!string.IsNullOrEmpty(memberPath) && memberPath != "IsNeededCountry" && memberPath != "IsAlertCallsign")
                     view.SortDescriptions.Add(new System.ComponentModel.SortDescription(memberPath, direction));
             }
         }
@@ -2574,6 +2736,22 @@ namespace HolyLogger
                     catch (System.Exception swallowed) { Log.Swallow(swallowed); }
                 }
 
+                // Alerts bell: directly under the "Latest" toggle and centred on it. The canvas starts
+                // just below the header block, so the button's own bottom edge — translated into canvas
+                // coordinates — is the only measurement needed, and it follows Latest through any resize.
+                if (clusterAlertsBtn != null && clusterLatestBtn != null)
+                {
+                    try
+                    {
+                        Point latestBottom = clusterLatestBtn.TranslatePoint(
+                            new Point(0, clusterLatestBtn.ActualHeight), clusterHeaderCanvas);
+                        double bellWidth = clusterAlertsBtn.ActualWidth > 0 ? clusterAlertsBtn.ActualWidth : clusterAlertsBtn.Width;
+                        Canvas.SetLeft(clusterAlertsBtn, latestBottom.X + (clusterLatestBtn.ActualWidth - bellWidth) / 2.0);
+                        Canvas.SetTop(clusterAlertsBtn, latestBottom.Y + ClusterAlertsBellGap);
+                    }
+                    catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+                }
+
                 // The Last/dropdown stays anchored to UTC horizontally (set below), but its bottom is
                 // pinned the same small gap above the table top so the frame nearly meets the grid.
                 if (clusterLastMinutesFilterPanel != null)
@@ -3405,6 +3583,7 @@ namespace HolyLogger
                         IsNeededCountry = IsNeededCountry(dx, workedCountries),
                         IsUnconfirmedCountry = IsUnconfirmedCountry(dx, workedCountries, confirmedEntities),
                         IsLotwUser = LotwUserService.IsLotwUser(dx),
+                        IsAlertCallsign = IsClusterAlertCallsign(dx),
                         SpotKey = key
                     };
 
@@ -3438,7 +3617,11 @@ namespace HolyLogger
                     // The Test buttons in Cluster Settings are unaffected: they play the sound directly.
                     if (clusterWindow != null)
                     {
-                        if (newItems.Any(ClusterSpotQualifiesForNewCountryAlert))
+                        // The watch list is asked FIRST: a callsign the operator typed in himself is the
+                        // one he is waiting for, so it wins the single ring a batch is allowed.
+                        if (newItems.Any(ClusterSpotQualifiesForAlertCallsignAlert))
+                            PlayAlertCallsignAlert();
+                        else if (newItems.Any(ClusterSpotQualifiesForNewCountryAlert))
                             PlayNewCountrySpotAlert();
                         else if (newItems.Any(ClusterSpotQualifiesForUnconfirmedAlert))
                             PlayUnconfirmedSpotAlert();
@@ -4336,34 +4519,65 @@ namespace HolyLogger
             }
 
             bool lotwOnly = Properties.Settings.Default.ClusterLotwOnly;
+            long clusterCutoffUnix = DateTimeOffset.UtcNow.ToUnixTimeSeconds() - (clusterLastMinutesFilterValue * 60L);
             var ordered = clusterAllSpots.Where(s => IsClusterBandEnabled(s.BandText) && IsClusterModeEnabled(s.Mode))
                                          .Where(s => IsClusterSpotSourceEnabled(s.SpotSource))
                                          .Where(s => !lotwOnly || s.IsLotwUser)
-                                         .Where(s => s.UnixTime > 0 && s.UnixTime >= DateTimeOffset.UtcNow.ToUnixTimeSeconds() - (clusterLastMinutesFilterValue * 60L))
+                                         .Where(s => s.UnixTime > 0 && s.UnixTime >= clusterCutoffUnix)
                                          .OrderByDescending(s => s.UnixTime);
 
-            List<ClusterSpotViewItem> filtered;
+            // A watched callsign spotted on a band or mode the table is not showing does NOT join the
+            // list: in Live Scale the list is a frequency scale, and a 7 MHz row among 14 MHz ones lands
+            // at the far end where nobody looks. It is lifted out and pinned above the table instead
+            // (user, 2026-09-03). Newest per callsign+band, and the same "Last N min" window as the table.
+            List<ClusterSpotViewItem> stripSpots = null;
+            if (GetClusterAlertCallSet().Count > 0)
+            {
+                stripSpots = clusterAllSpots
+                    .Where(s => s.IsAlertCallsign)
+                    .Where(s => s.UnixTime > 0 && s.UnixTime >= clusterCutoffUnix)
+                    .Where(s => !(IsClusterBandEnabled(s.BandText) && IsClusterModeEnabled(s.Mode) &&
+                                  IsClusterSpotSourceEnabled(s.SpotSource) &&
+                                  (!lotwOnly || s.IsLotwUser)))
+                    .GroupBy(s => (s.DXCallsign ?? string.Empty).Trim().ToUpperInvariant() + "|" + NormalizeClusterBandKey(s.BandText))
+                    .Select(g => g.OrderByDescending(x => x.UnixTime).First())
+                    .OrderByDescending(s => s.UnixTime)
+                    .Take(5)                      // a strip, not a second table
+                    .ToList();
+            }
+            RefreshClusterAlertStrip(stripSpots);
+
+            List<ClusterSpotViewItem> collapsed;
             if (clusterLatestPerCallsignOn)
             {
                 // Keep only the newest spot for each callsign+band. Source is newest-first, so the
                 // first item seen for a (call|band) key is the one to keep. Then collapse again by
                 // FREQUENCY: when two different stations sit on the same frequency, show only the newest
                 // one (an older spot on that frequency is stale — the frequency is now the newer station's).
-                filtered = ordered
+                // A watched call is exempt from THAT second pass: it must not be dropped because someone
+                // else was spotted on the same frequency a minute later.
+                collapsed = ordered
                     .GroupBy(s => (s.DXCallsign ?? string.Empty).Trim().ToUpperInvariant() + "|" + NormalizeClusterBandKey(s.BandText))
                     .Select(g => g.First())
-                    .GroupBy(s => s.FreqMhz > 0
-                        ? s.FreqMhz.ToString("F5", CultureInfo.InvariantCulture)   // one entry per exact frequency
-                        : "_" + s.SpotKey)                                          // no freq -> never collapse
+                    .GroupBy(s => s.IsAlertCallsign
+                        ? "_W" + s.SpotKey                                            // watch list -> always its own group
+                        : (s.FreqMhz > 0
+                            ? s.FreqMhz.ToString("F5", CultureInfo.InvariantCulture)  // one entry per exact frequency
+                            : "_" + s.SpotKey))                                       // no freq -> never collapse
                     .Select(g => g.OrderByDescending(x => x.UnixTime).First())
                     .OrderByDescending(s => s.UnixTime)
-                    .Take(500)
                     .ToList();
             }
             else
             {
-                filtered = ordered.Take(500).ToList();
+                collapsed = ordered.ToList();
             }
+
+            var filtered = collapsed.Take(500).ToList();
+            // The 500 is a display cap, not a filter. On a busy evening a watched spot could be pushed
+            // past it and disappear exactly when it matters, so any that fall outside are put back.
+            if (collapsed.Count > filtered.Count && GetClusterAlertCallSet().Count > 0)
+                filtered.AddRange(collapsed.Skip(500).Where(s => s.IsAlertCallsign));
 
             // One pass over the log builds an O(1) lookup set; the old per-spot IsClusterCallsignInLog
             // scanned the whole log for EVERY spot (500 spots x 11k QSOs per refresh, on the UI thread).
@@ -4648,6 +4862,247 @@ namespace HolyLogger
             if ((now - _lastUnconfirmedAlertUtc).TotalSeconds < 3) return;
             _lastUnconfirmedAlertUtc = now;
             PlayClusterAlertSound(Properties.Settings.Default.ClusterUnconfirmedSound);
+        }
+
+        // ── Alerts: the watch list ──────────────────────────────────────────────────
+        // The callsigns typed into the Alerts window, kept as one comma-separated line in the settings.
+        // Matching uses the log's own identity rule, so 4Z5SL also catches 4Z5SL/M and 4Z5SL/P — but not
+        // 4X/4Z5SL, which is a different operation in a different country.
+
+        internal List<string> GetClusterAlertCallsigns()
+        {
+            var list = new List<string>();
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            string raw = Properties.Settings.Default.ClusterAlertCallsigns ?? string.Empty;
+            foreach (string part in raw.Split(new[] { ',', ';', '\n', '\r', '\t', ' ' }, StringSplitOptions.RemoveEmptyEntries))
+            {
+                string call = part.Trim().ToUpperInvariant();
+                if (call.Length == 0 || !seen.Add(call)) continue;
+                list.Add(call);
+            }
+            return list;
+        }
+
+        // The set every spot is matched against: identity BASES, so the stroke-suffix rule is applied
+        // once here instead of on each of 1500 spots. Cleared (and rebuilt) when the list is edited.
+        private HashSet<string> GetClusterAlertCallSet()
+        {
+            // Read into a local first: the spots are parsed on the websocket thread while an edit in
+            // the Alerts window clears this field on the UI thread, and returning the field itself
+            // could hand back the null that lands between the two.
+            var set = _clusterAlertCalls;
+            if (set == null)
+            {
+                set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (string call in GetClusterAlertCallsigns())
+                    set.Add(CallsignIdentity.Base(call));
+                _clusterAlertCalls = set;
+            }
+            return set;
+        }
+
+        internal bool IsClusterAlertCallsign(string callsign)
+        {
+            if (string.IsNullOrWhiteSpace(callsign)) return false;
+            var set = GetClusterAlertCallSet();
+            if (set.Count == 0) return false;
+            return set.Contains(CallsignIdentity.Base(callsign.Trim()));
+        }
+
+        // Called by the Alerts window after every edit. The whole spot buffer is re-marked, so a callsign
+        // typed in now also catches the spots that arrived before it was typed.
+        internal void SetClusterAlertCallsigns(IEnumerable<string> calls)
+        {
+            var list = new List<string>();
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (string c in (calls ?? Enumerable.Empty<string>()))
+            {
+                string call = (c ?? string.Empty).Trim().ToUpperInvariant();
+                if (call.Length == 0 || !seen.Add(call)) continue;
+                list.Add(call);
+            }
+
+            Properties.Settings.Default.ClusterAlertCallsigns = string.Join(",", list);
+            try { Properties.Settings.Default.Save(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+
+            _clusterAlertCalls = null;   // rebuilt on the next match
+            if (clusterAllSpots != null)
+                foreach (var spot in clusterAllSpots)
+                    spot.IsAlertCallsign = IsClusterAlertCallsign(spot.DXCallsign);
+
+            RefreshClusterVisibleSpots();
+        }
+
+        // ── Alerts strip: the watched spots the table is not showing ─────────────────────────
+        // One line per such spot, directly above the table and outside it, framed in purple and lined up
+        // with the table's own columns (each cell follows its column's live width, so the strip stays in
+        // step when a column is dragged wider). Empty -> collapsed, and the window looks as it always did.
+
+        private StackPanel BuildClusterAlertStrip()
+        {
+            clusterAlertStrip = new StackPanel
+            {
+                Orientation = Orientation.Vertical,
+                Visibility = Visibility.Collapsed,
+                Margin = new Thickness(0, 1, 0, 1)
+            };
+            // The table's own text size, so a pinned line reads as one of its rows.
+            TextElement.SetFontSize(clusterAlertStrip, 13);
+            return clusterAlertStrip;
+        }
+
+        private void RefreshClusterAlertStrip(List<ClusterSpotViewItem> spots)
+        {
+            if (clusterAlertStrip == null) return;
+
+            clusterAlertStrip.Children.Clear();
+            if (spots == null || spots.Count == 0 || clusterSpotsGrid == null)
+            {
+                clusterAlertStrip.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            foreach (var spot in spots)
+                clusterAlertStrip.Children.Add(BuildClusterAlertStripRow(spot));
+            clusterAlertStrip.Visibility = Visibility.Visible;
+        }
+
+        private FrameworkElement BuildClusterAlertStripRow(ClusterSpotViewItem spot)
+        {
+            var cells = new StackPanel { Orientation = Orientation.Horizontal };
+            foreach (var col in clusterSpotsGrid.Columns.OrderBy(c => c.DisplayIndex))
+            {
+                string key;
+                if (!clusterColumnKeys.TryGetValue(col, out key)) continue;
+
+                var holder = new Border
+                {
+                    Padding = new Thickness(2, 0, 2, 0),
+                    ClipToBounds = true,
+                    Child = BuildClusterAlertStripCell(key)
+                };
+                // The column's live width, so the strip stays lined up with the table through a resize
+                // or a column drag without anything having to notice that it happened.
+                holder.SetBinding(FrameworkElement.WidthProperty,
+                                  new System.Windows.Data.Binding("ActualWidth") { Source = col });
+                cells.Children.Add(holder);
+            }
+
+            var frame = new Border
+            {
+                BorderBrush = new SolidColorBrush(Color.FromRgb(0xAA, 0x00, 0xFF)),   // the watch-list purple
+                BorderThickness = new Thickness(2),
+                Padding = new Thickness(0, 1, 0, 1),
+                Margin = new Thickness(0, 0, 0, 1),
+                HorizontalAlignment = HorizontalAlignment.Left,
+                DataContext = spot,
+                Cursor = System.Windows.Input.Cursors.Hand,
+                ToolTip = "On your Alerts list, spotted on " + (spot.BandText ?? string.Empty) +
+                          " - a band the table is not showing. Double-click to tune to it.",
+                Child = cells
+            };
+            frame.SetResourceReference(Border.BackgroundProperty, "GridRowBg");
+            frame.MouseLeftButtonDown += (s, e) =>
+            {
+                if (e.ClickCount == 2) TuneToClusterSpot(spot);   // same as double-clicking a row
+            };
+            return frame;
+        }
+
+        // One cell of a strip line, built to look exactly like the same column's cell in the table.
+        // The spot is the line's DataContext, so these are the same bindings the table columns use.
+        private FrameworkElement BuildClusterAlertStripCell(string columnKey)
+        {
+            if (columnKey == "Flag")
+            {
+                var flag = new System.Windows.Controls.Image
+                {
+                    Width = 24,
+                    Height = 16,
+                    Stretch = Stretch.Uniform,
+                    HorizontalAlignment = HorizontalAlignment.Center
+                };
+                flag.SetBinding(System.Windows.Controls.Image.SourceProperty, new System.Windows.Data.Binding("FlagPath"));
+                return flag;
+            }
+
+            var text = new TextBlock { VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
+            switch (columnKey)
+            {
+                case "DX":
+                    text.SetBinding(TextBlock.TextProperty, new System.Windows.Data.Binding("DXCallsign"));
+                    text.SetBinding(TextBlock.FontWeightProperty, new System.Windows.Data.Binding("DXFontWeight"));
+                    text.SetBinding(TextBlock.ForegroundProperty, new System.Windows.Data.Binding("DXForeground"));
+                    text.SetBinding(TextBlock.BackgroundProperty, new System.Windows.Data.Binding("DXBackground"));
+                    break;
+                case "Freq":
+                    text.SetBinding(TextBlock.TextProperty, new System.Windows.Data.Binding("FreqDisplayText"));
+                    text.SetBinding(TextBlock.ForegroundProperty, new System.Windows.Data.Binding("FreqForeground"));
+                    text.FontWeight = FontWeights.Bold;
+                    break;
+                case "Mode":
+                    text.SetBinding(TextBlock.TextProperty, new System.Windows.Data.Binding("Mode"));
+                    text.SetBinding(TextBlock.ForegroundProperty, new System.Windows.Data.Binding("ModeForeground"));
+                    text.SetBinding(TextBlock.FontWeightProperty, new System.Windows.Data.Binding("ModeFontWeight"));
+                    text.TextAlignment = TextAlignment.Center;
+                    text.HorizontalAlignment = HorizontalAlignment.Center;
+                    break;
+                case "UTC":
+                    text.SetBinding(TextBlock.TextProperty, new System.Windows.Data.Binding("TimeUtc"));
+                    text.TextAlignment = TextAlignment.Center;
+                    text.HorizontalAlignment = HorizontalAlignment.Center;
+                    text.SetResourceReference(TextBlock.ForegroundProperty, "TextBrush");
+                    break;
+                case "Spotter":
+                    text.SetBinding(TextBlock.TextProperty, new System.Windows.Data.Binding("SpotterCallsign"));
+                    text.SetResourceReference(TextBlock.ForegroundProperty, "TextBrush");
+                    break;
+                case "Country":
+                    text.SetBinding(TextBlock.TextProperty, new System.Windows.Data.Binding("Country"));
+                    text.SetResourceReference(TextBlock.ForegroundProperty, "TextBrush");
+                    break;
+                default:   // Comment
+                    text.SetBinding(TextBlock.TextProperty, new System.Windows.Data.Binding("Comment"));
+                    text.SetResourceReference(TextBlock.ForegroundProperty, "TextBrush");
+                    break;
+            }
+            return text;
+        }
+
+        // The bell under "Latest". One window only — clicking the bell again brings it forward.
+        private void OpenClusterAlertsWindow()
+        {
+            if (clusterAlertsWindow != null)
+            {
+                clusterAlertsWindow.Activate();
+                return;
+            }
+            clusterAlertsWindow = new ClusterAlertsWindow(this);
+            clusterAlertsWindow.Closed += (s, e) => clusterAlertsWindow = null;
+            clusterAlertsWindow.Show();
+        }
+
+        // A spot for a watched callsign. Unlike the other two alerts this one asks nothing about band or
+        // mode: the operator named the station, so where it turns up is not a reason to stay quiet. The
+        // clock still applies — the same "Last N min" window the table shows — and so does the
+        // new-country sound switch in Cluster Settings, which is the master switch for the ring.
+        private bool ClusterSpotQualifiesForAlertCallsignAlert(ClusterSpotViewItem item)
+        {
+            if (item == null || !item.IsAlertCallsign) return false;
+            if (!Properties.Settings.Default.ClusterNewCountrySoundOn) return false;
+            if (!ClusterSpotArrivedWhileConnected(item)) return false;
+
+            return item.UnixTime > 0 &&
+                   item.UnixTime >= DateTimeOffset.UtcNow.ToUnixTimeSeconds() - (clusterLastMinutesFilterValue * 60L);
+        }
+
+        // Same sound as a new country, and its own three-second throttle so a burst rings once.
+        private void PlayAlertCallsignAlert()
+        {
+            var now = DateTime.UtcNow;
+            if ((now - _lastAlertCallsignAlertUtc).TotalSeconds < 3) return;
+            _lastAlertCallsignAlertUtc = now;
+            PlayClusterAlertSound(Properties.Settings.Default.ClusterNewCountrySound);
         }
 
         // Plays the alert sound named in Options → General. A *.wav name plays from C:\Windows\Media,

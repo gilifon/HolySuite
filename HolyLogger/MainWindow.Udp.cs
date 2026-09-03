@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Globalization;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
@@ -29,6 +30,10 @@ namespace HolyLogger
     //                  envelope with the plain ADIF record sitting inside it, so the record is cut
     //                  out of the bytes and read. Their other datagrams (status, decodes, heartbeat)
     //                  carry no ADIF and are ignored.
+    //   WSJT-X Status  Where the sending program is pointing right now. HolyCluster sends one when a
+    //                  spot is selected, so the callsign goes into the DX Callsign box (and the
+    //                  frequency too, when CAT is not driving the radio). Not a contact, not logged.
+    //                  See MainWindow.HolyClusterUdp.cs, which reads it and acts on it.
     //   anything else  Handed to the same reader the old port 2333 used, which is what the programs
     //                  that send a bare field list expect.
     //
@@ -85,6 +90,9 @@ namespace HolyLogger
                     listener.Client = new UdpClient(pair.Key);
                     _udpListeners.Add(listener);
                     listener.Client.BeginReceive(new AsyncCallback(UdpReceive), listener);
+                    // A port just opened: forget the last spot, so selecting the same station in
+                    // HolyCluster fills the DX box again instead of being taken for a re-send.
+                    _lastHolyClusterSpotKey = null;
                 }
                 catch (Exception swallowed)
                 {
@@ -105,8 +113,8 @@ namespace HolyLogger
                     + string.Join("\n", failed.Select(f => "• " + f))
                     + "\n\nAnother program is probably already using it.\n\n"
                     + (failed.Count == 1 ? "That line has been switched off. " : "Those lines have been switched off. ")
-                    + "To try another port, open Options → General → UDP Ports.",
-                    "UDP Ports", this);
+                    + "To try another port, open Options → General → UDP Ports Manager.",
+                    "UDP Ports Manager", this);
             }
         }
 
@@ -149,12 +157,7 @@ namespace HolyLogger
                 IPEndPoint remote = new IPEndPoint(IPAddress.Any, 0);
                 byte[] received = udp.EndReceive(res, ref remote);
 
-                // UTF8 even for the binary datagrams of WSJT-X and its like: the bytes we care about -
-                // the ADIF record inside - are plain text, and the rest becomes replacement characters
-                // that no reader below matches.
-                string data = Encoding.UTF8.GetString(received);
-
-                await HandleUdpDatagram(data);
+                await HandleUdpDatagram(received);
 
                 // Listen again, unless the port was closed while we worked.
                 if (!_isShutdownCleanupDone && listener.Client != null)
@@ -168,8 +171,38 @@ namespace HolyLogger
         }
 
         // Decides what the datagram is (see the note at the top of this file) and acts on it.
-        private async Task HandleUdpDatagram(string data)
+        private async Task HandleUdpDatagram(byte[] datagram)
         {
+            if (datagram == null || datagram.Length == 0) return;
+
+            // WSJT-X "Status": binary, and read from the bytes. This is how HolyCluster passes a
+            // selected spot over, and it is what any WSJT-X-like program sends as it works. It says
+            // where that program is pointing - not a contact - so it fills the DX Callsign box and
+            // nothing is stored.
+            try
+            {
+                string dxCall;
+                double freqMhz;
+                if (TryParseWsjtxStatus(datagram, out dxCall, out freqMhz))
+                {
+                    // Act only when the highlighted station changes; ignore identical re-sends, so an
+                    // F9 clear is not undone by the sender reaffirming the same selection.
+                    string key = dxCall + "|" + freqMhz.ToString("0.0###", CultureInfo.InvariantCulture);
+                    if (key != _lastHolyClusterSpotKey)
+                    {
+                        _lastHolyClusterSpotKey = key;
+                        if (!_isShutdownCleanupDone && !Dispatcher.HasShutdownStarted)
+                            this.Dispatcher.Invoke(() => ApplyHolyClusterSpot(dxCall, freqMhz));
+                    }
+                    return;
+                }
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }   // a malformed datagram is not fatal
+
+            // UTF8 for everything else, the binary envelopes included: the bytes we care about - the
+            // ADIF record inside - are plain text, and the rest becomes replacement characters that no
+            // reader below matches.
+            string data = Encoding.UTF8.GetString(datagram);
             if (string.IsNullOrWhiteSpace(data)) return;
 
             // N1MM+ telling us where its radio is - not a contact.

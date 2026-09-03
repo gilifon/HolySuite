@@ -1,7 +1,7 @@
 <Window x:Class="HolyLogger.UdpPortsWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="UDP Ports" Height="460" MinHeight="360" Width="560" MinWidth="470"
+        Title="UDP Ports Manager" Height="460" MinHeight="360" Width="560" MinWidth="470"
         WindowStartupLocation="CenterOwner" ShowInTaskbar="False" ResizeMode="CanResize"
         Icon="Images/crown.png"
         Background="{DynamicResource WindowBg}"
@@ -14,9 +14,21 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <TextBlock Grid.Row="0" FontSize="16" TextWrapping="Wrap" Margin="0,0,0,10"
-                   Foreground="{DynamicResource MutedTextBrush}"
-                   Text="Other programs can send their contacts to HolyLogger over UDP. Give each program a line here with the port it sends on, and tick the line to listen on it. The name is only a label - you can write anything."/>
+        <!-- The short version stays on screen; the full list of what can be sent, and what HolyLogger
+             does with each, is behind the ? button - a wall of text above a small table read as the
+             window's subject rather than a note about it. -->
+        <Grid Grid.Row="0" Margin="0,0,0,10">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock Grid.Column="0" FontSize="16" TextWrapping="Wrap" VerticalAlignment="Center"
+                       Foreground="{DynamicResource MutedTextBrush}"
+                       Text="Give each program a line with the port it sends on, and tick the line to listen on it. The name is only a label - you can write anything."/>
+            <Button Grid.Column="1" x:Name="BtnWhat" Content="?" Width="34" Height="34" Margin="12,0,0,0"
+                    FontSize="16" FontWeight="Bold" Cursor="Hand" VerticalAlignment="Top"
+                    ToolTip="What can send to HolyLogger?" Click="BtnWhat_Click"/>
+        </Grid>
 
         <DataGrid x:Name="PortsGrid" Grid.Row="1" AutoGenerateColumns="False"
                   CanUserAddRows="False" CanUserDeleteRows="True" CanUserReorderColumns="False"
