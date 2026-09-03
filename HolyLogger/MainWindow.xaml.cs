@@ -485,16 +485,18 @@ namespace HolyLogger
             // entity that existed on its date. Needs an API key; without one this does nothing at all.
             CheckClublogCtyUpdateFireAndForget();
 
-            // Load the cached LoTW user list (for the yellow cluster highlight) and refresh it in the
-            // background if it's missing or more than a week old. Failures are ignored.
-            LotwUserService.Initialize();
-            Log.Step("ctor: LoTW user list");
+            // The cached LoTW user list is NOT read here - see LoadLotwUserListInBackground, started
+            // once the window is up. It is a 6 MB file of 235,000 callsigns, it cost 310 ms of the
+            // operator's wait, and nothing shows its yellow mark until the window is drawn.
+            //
+            // A worker started HERE was tried first and did not pay: it read its 6 MB while the
+            // constructor carried on, and the very next step went from 74 ms to 303 ms - the same
+            // lesson the callsign index taught. Out of the way, not merely off the thread.
+            Log.Step("ctor: LoTW user list deferred");
             CheckLotwUpdateFireAndForget();
-
-            // Every UDP port the operator listed in Options > General > UDP Ports (see
-            // MainWindow.Udp.cs). This replaced the two fixed ports that used to be wired in here.
-            ApplyUdpListeners();
-            Log.Step("ctor: UDP listeners");
+            // Its own mark: this call used to be counted inside the step below it, which is how the
+            // UDP listeners looked more expensive than they were.
+            Log.Step("ctor: LoTW update check started");
 
             // The program must not wait on the internet in order to appear. Windows' own answer - is any
             // adapter up - costs nothing and sends nothing, so it is what the program believes for the
@@ -773,6 +775,24 @@ namespace HolyLogger
         {
             base.OnSourceInitialized(e);
             Log.Step("window: the real window now exists (WPF)");
+        }
+
+        // The LoTW user list now lands a second or two AFTER the window is drawn, so whatever shows
+        // its yellow mark was drawn without it and has to be told.
+        private void OnLotwUserListReady()
+        {
+            if (!IsLoaded) return;
+
+            RefreshClusterLotwMarks();
+
+            // The log table paints its mark through a converter, and nothing tells a converter that the
+            // list has arrived - so the rows are asked to draw again. Only when that mark is switched
+            // on: otherwise there is nothing to redraw it for.
+            if (Properties.Settings.Default.MarkLotwUsersInLog && QSODataGrid != null)
+            {
+                try { QSODataGrid.Items.Refresh(); }
+                catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+            }
         }
 
         private void NormalizeEnterKeyBehaviorSettings()
@@ -1328,6 +1348,10 @@ namespace HolyLogger
             // waiting for should not merely be moved off the thread - it should be moved out of the way.
             LoadCallsignIndexInBackground();
 
+            // The LoTW user list goes the same way and for the same reason (310 ms of file for a mark
+            // nobody can see yet). When it lands, OnLotwUserListReady puts the marks right.
+            LoadLotwUserListInBackground();
+
             // The active profile's file was gone at startup, so factory defaults were loaded. Say so
             // once the main window exists (it owns the dialog) instead of letting the whole setup
             // change without explanation.
@@ -1480,6 +1504,14 @@ namespace HolyLogger
 
             // Initialize RST fields based on the selected mode after window is fully loaded
             ResetRstForMode();
+            // Every UDP port the operator listed in Options > General > UDP Ports (see
+            // MainWindow.Udp.cs). Opening the sockets costs ~170 ms (measured 2026-09-03) and it used
+            // to be spent in the constructor, in front of the operator. Nothing can arrive on those
+            // ports until his other program sends something, so they are opened at Background
+            // priority - after the window has been drawn, not before.
+            Dispatcher.BeginInvoke(new Action(ApplyUdpListeners),
+                                   System.Windows.Threading.DispatcherPriority.Background);
+
             Log.Step("loaded: END of the startup work");
 
             // The last second of the start is WPF measuring, arranging and drawing everything for the
@@ -14093,6 +14125,32 @@ namespace HolyLogger
         // box does not respond": it responded perfectly, it just had nothing to suggest.
         //
         // A second is enough to let the window finish painting, and no more than that.
+        // The LoTW user list, a second after the window is up and on a thread of its own - the same
+        // shape as the callsign index below, and for the same reason.
+        private void LoadLotwUserListInBackground()
+        {
+            var wait = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+            wait.Tick += (s, e) =>
+            {
+                wait.Stop();
+                var worker = new System.Threading.Thread(() =>
+                {
+                    var sw = System.Diagnostics.Stopwatch.StartNew();
+                    LotwUserService.Initialize();
+                    sw.Stop();
+                    Dispatcher.BeginInvoke(new Action(() =>
+                    {
+                        Log.Warn("STARTUP  LoTW user list: read in " + sw.ElapsedMilliseconds
+                                 + " ms, off the startup path");
+                        OnLotwUserListReady();
+                    }), System.Windows.Threading.DispatcherPriority.Background);
+                });
+                worker.IsBackground = true;
+                worker.Start();
+            };
+            wait.Start();
+        }
+
         private void LoadCallsignIndexInBackground()
         {
             var wait = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };

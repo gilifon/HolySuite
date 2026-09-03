@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net.Http;
@@ -102,7 +102,9 @@ namespace HolyLogger
 
         private static void LoadFromFile(string path)
         {
-            var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            // Sized for the file it is about to read (235,000 lines and growing): a set left to grow
+            // by itself re-buckets everything it holds a dozen times on the way up.
+            var set = new HashSet<string>(300000, StringComparer.OrdinalIgnoreCase);
             foreach (string line in File.ReadLines(path))
             {
                 if (string.IsNullOrWhiteSpace(line)) continue;
@@ -110,7 +112,9 @@ namespace HolyLogger
                 string call = (comma >= 0 ? line.Substring(0, comma) : line).Trim();
                 // Skip an optional header row and any non-callsign junk (a real callsign has no space).
                 if (call.Length == 0 || call.IndexOf(' ') >= 0) continue;
-                set.Add(call.ToUpperInvariant());
+                // NOT upper-cased: the set ignores case, so converting every one of 235,000 callsigns
+                // built a second string for nothing.
+                set.Add(call);
             }
             lock (_gate)
             {

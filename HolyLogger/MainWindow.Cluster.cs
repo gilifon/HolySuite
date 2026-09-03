@@ -5069,6 +5069,17 @@ namespace HolyLogger
             return text;
         }
 
+        // The LoTW user list is read on a worker at startup, so a spot built before it landed was
+        // marked "not a LoTW user" for want of the list. Cheap to put right - the buffer holds 1500
+        // spots at most - and called only when the list arrives late (see OnLotwUserListReady).
+        internal void RefreshClusterLotwMarks()
+        {
+            if (clusterAllSpots == null || clusterAllSpots.Count == 0) return;
+            foreach (var spot in clusterAllSpots)
+                spot.IsLotwUser = LotwUserService.IsLotwUser(spot.DXCallsign);
+            RefreshClusterVisibleSpots();
+        }
+
         // The bell under "Latest". One window only — clicking the bell again brings it forward.
         private void OpenClusterAlertsWindow()
         {
