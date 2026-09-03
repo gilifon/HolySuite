@@ -106,6 +106,11 @@ namespace HolyLogger
         internal Action AskSpeed { set { _askSpeed = value; } }
         private Action _askSpeed;
 
+        // Puts a speed ON the radio - the wheel over the readout, and nothing else. Set after the
+        // window is built, like AskSpeed above.
+        internal Action<int> SetSpeed { set { _setSpeed = value; } }
+        private Action<int> _setSpeed;
+
         // Where the radio is listening, in Hz. Null on a radio that cannot be asked, and then the QRL
         // rule below simply never applies.
         internal Func<double> RadioFrequencyHz { set { _rxFrequencyHz = value; } }
@@ -360,6 +365,18 @@ namespace HolyLogger
         private static Brush MakeSentBrush()
         {
             var brush = new SolidColorBrush(Color.FromRgb(0x1E, 0x90, 0xFF));
+            brush.Freeze();
+            return brush;
+        }
+
+        // The yellow a number wears while the pointer is on it - the same mark the frequency displays
+        // carry where the wheel does something. Fixed like the bar it sits on: that bar is one colour
+        // in every scheme, and the black number has to stay readable on it.
+        private static readonly Brush WheelZoneBrush = MakeWheelZoneBrush();
+
+        private static Brush MakeWheelZoneBrush()
+        {
+            var brush = new SolidColorBrush(Color.FromRgb(0xFF, 0xFF, 0x00));
             brush.Freeze();
             return brush;
         }
@@ -1075,6 +1092,15 @@ namespace HolyLogger
                 // Seen on air, and now off it: THIS is the moment the message ended.
                 _txStoppedUtc = DateTime.UtcNow;
                 LearnSpeedFromThisSend();
+
+                // AND THE SPEED IS ASKED FOR HERE, at the end of the transmission rather than at the
+                // end of the tidying that follows it. The knob can be turned while a message is going
+                // out - the readout cannot follow it then, because the question would be competing
+                // with the text for the same wire - so the first thing done once the wire is free is
+                // to ask. Waiting for the row to empty and the line to drop into the record below
+                // would have left the number stale for seconds after the radio was already back in
+                // receive.
+                _askSpeedNow = true;
             }
         }
 
@@ -2880,30 +2906,39 @@ namespace HolyLogger
             return line;
         }
 
-        // -- WPM ##, READ FROM THE RADIO -------------------------------------------------------
+        // -- WPM ##, READ FROM THE RADIO AND TURNED BY THE WHEEL --------------------------------
         //
-        // DISPLAY ONLY, AND ON PURPOSE. The speed was settable from here with a wheel over the
-        // number, and it worked - but the radio's own knob overruled it the moment it was touched,
-        // and the knob resumes from ITS last number rather than from ours. Two controls for one
-        // setting, and no way for the operator to tell which of them had spoken last.
+        // BOTH WAYS ROUND. The radio is asked once a second and the number is whatever it answers, so
+        // the speed knob on the radio moves it; and a notch of the wheel over the number is one word
+        // a minute the other way, sent to the radio.
         //
-        // So the knob on the radio is the only control now, and this is the readout that says where
-        // the knob has left it. Nothing here is ever sent to the radio.
+        // THE WHEEL WAS TAKEN OFF ONCE, and the asking is what lets it come back. Setting the speed
+        // always worked - the radio keyed at what it was sent - but the knob resumes from ITS own
+        // last number, so one nudge of it threw the sent speed away while the readout went on showing
+        // the number the program had sent. Two controls for one setting and no way to tell which had
+        // spoken last. Now whichever of them speaks, the bar is telling the truth again within a
+        // second.
         //
-        // IN THE TITLE BAR, because it is a number glanced at in the middle of a QSO.
+        // TURNED, NOT TYPED. A little faster, a little slower, is how an operator thinks about it -
+        // no Enter to press and no half-typed number to undo.
+        //
+        // IN THE TITLE BAR, because it is changed and glanced at in the middle of a QSO. Behind the
+        // gear it would be three clicks and a dialog, which is not a thing anybody does while sending.
 
         private TextBlock _wpmText;
+        private Border _wpmNumberBox;
         private int _wpm;
 
         private UIElement BuildSpeedReadout()
         {
             var holder = new Border
             {
-                // TIGHT AGAINST THE GEAR. The padding and margin on this side were sized for the
-                // arrows that used to sit after the number, and with them gone the number was left
-                // stranded in the middle of a gap.
-                Margin = new Thickness(0, 0, 2, 0),
-                Padding = new Thickness(6, 0, 0, 0),
+                Margin = new Thickness(0, 0, 10, 0),
+
+                // FIVE PIXELS FURTHER RIGHT than it sat, and the same five taken off the other side
+                // so the patch is no wider: the word, the number and the arrows move, the gear beside
+                // them and everything to the left of them stay where they are.
+                Padding = new Thickness(11, 0, 1, 0),
                 Background = Brushes.Transparent,
                 VerticalAlignment = VerticalAlignment.Center
             };
@@ -2935,24 +2970,68 @@ namespace HolyLogger
                 FontSize = 16,
                 FontWeight = FontWeights.Bold,
                 Foreground = Brushes.Black,
-                VerticalAlignment = VerticalAlignment.Center,
-
-                // Close to the word it belongs to: "WPM 26" reads as one thing, not as a caption and
-                // a number that happen to be near each other.
-                Margin = new Thickness(3, 0, 0, 0)
+                VerticalAlignment = VerticalAlignment.Center
             };
             RefreshSpeedText();
 
+            // THE WORD AND THE NUMBER ARE TWO PIECES, because only one of them lights. The wheel is
+            // answered over the whole patch, but what it CHANGES is the number - so the yellow goes
+            // round the digits and nothing else. The margin keeps the two together: "WPM 26" reads as
+            // one thing, not as a caption and a number that happen to be near each other.
+            _wpmNumberBox = new Border
+            {
+                Background = Brushes.Transparent,
+                Padding = new Thickness(3, 0, 3, 0),
+                Margin = new Thickness(3, 0, 0, 0),
+                VerticalAlignment = VerticalAlignment.Center,
+                Child = _wpmText
+            };
+
+            // THE ARROWS ARE THE WHOLE POINT OF SHOWING IT AS A NUMBER. A wheel over a piece of text
+            // is not something anybody expects, so it is said rather than left to be discovered - and
+            // said beside the number, which is the only place the wheel does anything.
+            var hint = new TextBlock
+            {
+                Text = "⇅",
+                FontSize = 15,
+                FontWeight = FontWeights.Bold,
+                Foreground = Brushes.DimGray,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(4, 0, 0, 0)
+            };
+
             var line = new StackPanel { Orientation = Orientation.Horizontal };
             line.Children.Add(wpmLabel);
-            line.Children.Add(_wpmText);
+            line.Children.Add(_wpmNumberBox);
+            line.Children.Add(hint);
 
+            // ScrollNS, the same cursor the frequency readouts and the cluster's Live Scale list
+            // wear: everywhere in this program that the wheel moves a number, the pointer says so the
+            // same way.
+            holder.Cursor = System.Windows.Input.Cursors.ScrollNS;
             holder.ToolTip = "The radio's keyer speed, as the radio itself reports it."
                            + Environment.NewLine + Environment.NewLine
-                           + "Change it with the speed knob on the radio.";
+                           + "Roll the wheel over it to change it: " + low + " to " + high
+                           + " words a minute."
+                           + Environment.NewLine + Environment.NewLine
+                           + "The speed knob on the radio does the same job. Whichever you turn last "
+                           + "wins, and this number follows both.";
 
             holder.Child = line;
             System.Windows.Shell.WindowChrome.SetIsHitTestVisibleInChrome(holder, true);
+
+            // On the whole patch, so it answers wherever the pointer is when the question occurs to
+            // him.
+            holder.MouseWheel += (s2, e2) =>
+            {
+                Nudge(e2.Delta > 0 ? 1 : -1);
+                e2.Handled = true;
+            };
+
+            // AND IT SAYS SO BEFORE THE WHEEL IS ROLLED. The arrows say a wheel works here; the
+            // yellow says exactly what it works ON, over the whole patch the wheel is answered in.
+            holder.MouseEnter += (s2, e2) => _wpmNumberBox.Background = WheelZoneBrush;
+            holder.MouseLeave += (s2, e2) => _wpmNumberBox.Background = Brushes.Transparent;
 
             // ASKED THE MOMENT THE WINDOW IS UP, not on the first tick a second later: the operator
             // opens this window and looks straight at the number.
@@ -2973,6 +3052,45 @@ namespace HolyLogger
             if (_wpmText != null)
                 _wpmText.Text = _wpm > 0 ? _wpm.ToString(CultureInfo.InvariantCulture) : "--";
         }
+
+        // -- ONE NOTCH, ONE WORD A MINUTE --------------------------------------------------------
+        //
+        // NOTHING UNTIL THE RADIO HAS SAID WHERE IT IS. A notch has to move a number by one, and
+        // there is no moving a number that reads --. So the wheel does nothing while the readout is
+        // still waiting for its first answer: sending a speed of our own choosing at that moment is
+        // exactly the guess this readout was rebuilt to stop making.
+        //
+        // AND IT STOPS AT WHAT THE RADIO ACCEPTS - an Elecraft starts at 8, an Icom stops at 48 -
+        // because a speed outside the maker's own range is a speed the radio may do anything with.
+        private void Nudge(int by)
+        {
+            if (_setSpeed == null || _wpm <= 0) return;
+
+            int low, high;
+            Limits(out low, out high);
+            if (high == 0) return;
+
+            int wanted = _wpm + by;
+            if (wanted < low) wanted = low;
+            if (wanted > high) wanted = high;
+            if (wanted == _wpm) return;
+
+            _wpm = wanted;
+            RefreshSpeedText();
+
+            // THE NUMBER MOVES FIRST, THEN THE RADIO IS TOLD. A notch that waited for the radio to
+            // answer before it showed anything would feel like a wheel with a stone in it.
+            _setUtc = DateTime.UtcNow;
+            try { _setSpeed(_wpm); }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        // AND A MOMENT'S QUIET AFTER SENDING. A question can already be on the wire when the wheel is
+        // turned, and its answer is the OLD speed - so without this the number would jump back for a
+        // second and then forward again. After that the radio's word is the truth once more, wheel or
+        // knob, whichever spoke last.
+        private static readonly TimeSpan SettleAfterSet = TimeSpan.FromSeconds(2);
+        private DateTime _setUtc = DateTime.MinValue;
 
         // -- THE NUMBER FOLLOWS THE RADIO ------------------------------------------------------
         //
@@ -2999,14 +3117,25 @@ namespace HolyLogger
         private DateTime _speedAskedUtc = DateTime.MinValue;
         private int _speedAsksUnanswered;
 
+        // Set at the moment the radio comes off air - see WatchTransmitState. It lets one question
+        // past the two guards below, both of which are about a wire that is busy: the wire is not
+        // busy any more, whatever the row on the screen still shows.
+        private bool _askSpeedNow;
+
         private void AskRadioItsSpeed()
         {
             if (_askSpeed == null || _wpmText == null) return;
 
-            if ((_box.Text ?? string.Empty).Length > 0 || _inFlight.Count > 0) return;
-            if (DateTime.UtcNow < _radioBusyUntil) return;
-            if (DateTime.UtcNow - _speedAskedUtc < AskSpeedEvery) return;
-            if (_speedAsksUnanswered >= AskSpeedGiveUpAfter) return;
+            if (!_askSpeedNow)
+            {
+                if ((_box.Text ?? string.Empty).Length > 0 || _inFlight.Count > 0) return;
+                if (DateTime.UtcNow < _radioBusyUntil) return;
+                if (DateTime.UtcNow - _speedAskedUtc < AskSpeedEvery) return;
+            }
+
+            if (_speedAsksUnanswered >= AskSpeedGiveUpAfter) { _askSpeedNow = false; return; }
+
+            _askSpeedNow = false;
 
             _speedAskedUtc = DateTime.UtcNow;
             _speedAsksUnanswered++;
@@ -3024,6 +3153,10 @@ namespace HolyLogger
             // already shows - so the tries start counting from nothing again and the asking goes on.
             _speedAsksUnanswered = 0;
             if (wpm == _wpm) return;
+
+            // See SettleAfterSet: an answer to a question asked before the wheel was turned says
+            // where the radio WAS, and would pull the readout back off the notch just made.
+            if (DateTime.UtcNow - _setUtc < SettleAfterSet) return;
 
             int low, high;
             Limits(out low, out high);

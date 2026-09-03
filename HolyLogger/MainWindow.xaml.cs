@@ -3974,9 +3974,9 @@ namespace HolyLogger
                 // before it writes the next one over the top of it.
                 IsYaesuKeyer(rigType),
 
-                // The WPM readout in its title bar shows what speeds this radio will accept, so a
-                // number read back from it that could not be one is dropped rather than shown. The
-                // readout does not SET anything - the radio's own knob is the only control there is.
+                // The WPM readout in its title bar shows what speeds this radio will accept: a
+                // number read back from it that could not be one is dropped rather than shown, and
+                // the wheel over it stops at both ends of the same range.
                 (out int low, out int high) => CwSpeedRange(rigType, out low, out high),
 
                 // What {LOG} and {WIPE} in a button's text do when that button is pressed.
@@ -3996,6 +3996,9 @@ namespace HolyLogger
 
             // The readout follows the radio's own knob from here on - see BuildCwSpeedReadCommand.
             cwKeyboard.AskSpeed = AskRadioCwSpeed;
+
+            // And the wheel over that readout sets it - see SetRadioCwSpeed.
+            cwKeyboard.SetSpeed = wpm => SetRadioCwSpeed(rigType, wpm);
 
             // The CQ button holds two texts and is edited as two - see EditCqButton.
             cwKeyboard.EditTwoTexts = (string title, string mainText, ref string extraText) =>
@@ -4423,6 +4426,77 @@ namespace HolyLogger
             if (command == null) return;
 
             TrySendOmniRigCustomCommand(command, replyLength, replyEnd);
+        }
+
+        // -- AND SETTING IT, FROM THE WHEEL OVER THE READOUT -------------------------------------
+        //
+        // THE WHEEL IS BACK, and it is the asking above that makes it safe. It was taken off because
+        // the radio's own knob resumes from ITS last number: a speed set from here was thrown away by
+        // the first nudge of the knob, and the readout went on showing the number the program had
+        // sent rather than the one the radio was keying at. Nothing on the screen admitted it.
+        //
+        // Now the radio is asked once a second and the readout is whatever it answers. The two
+        // controls still overrule each other - that is the radio's arrangement, not ours - but within
+        // a second the number on the bar is the truth again whichever of them spoke last.
+        //
+        // THE SAME COMMAND SETS IT AS READS IT: KSnnn; against KS;, and Icom's 14 0C with a level
+        // after it against 14 0C with nothing.
+        private static string BuildCwSpeedCommand(string rigType, int wpm)
+        {
+            int low, high;
+            CwSpeedRange(rigType, out low, out high);
+            if (high == 0) return null;
+
+            if (wpm < low) wpm = low;
+            if (wpm > high) wpm = high;
+
+            // Icom: a level like any other, command 14 sub-command 0C, and the value is BCD in two
+            // bytes over the range the manual gives - 0 is 6 WPM and 255 is 48.
+            string icom = GetIcomCivAddress(rigType);
+            if (icom != null)
+            {
+                // 14 0C on every Icom checked - IC-705, IC-7300, IC-7610 and IC-9700 all read
+                //   "0C  0000 ~ 0255  Send/read keying speed  (0000=6 WPM ~ 0255=48 WPM)"
+                // in their own guides. Worth saying how that was established: pdftotext's -layout mode
+                // interleaves the two columns of these tables, and reading 0C out of THAT gave a
+                // sub-command belonging to a different row. Read in reading order they agree.
+                int level = (int)Math.Round((wpm - WpmIcomLow) * 255.0 / (WpmIcomHigh - WpmIcomLow));
+                if (level < 0) level = 0;
+                if (level > 255) level = 255;
+
+                // 0..255 written as four BCD digits: 0255 becomes the bytes 02 55.
+                string digits = level.ToString("0000", CultureInfo.InvariantCulture);
+                return "FE FE " + icom + " E0 14 0C " + digits.Substring(0, 2) + " " + digits.Substring(2, 2) + " FD";
+            }
+
+            // Kenwood, Yaesu and Elecraft all spell it the same way: KS and three digits.
+            return "KS" + wpm.ToString("000", CultureInfo.InvariantCulture) + ";";
+        }
+
+        // SAID OUT LOUD ONCE IF IT WILL NOT GO. Every attempt is written to the log with the exact
+        // bytes; a refusal is put on the screen the first time only, because a wheel sends one of
+        // these per notch and a message box per notch is worse than the fault it reports.
+        private bool _cwSpeedRefusalReported;
+
+        private void SetRadioCwSpeed(string rigType, int wpm)
+        {
+            string command = BuildCwSpeedCommand(rigType, wpm);
+            if (command == null) return;
+
+            bool went = TrySendOmniRigCustomCommand(command);
+            Log.Warn("CW keyer speed " + wpm + " WPM to " + rigType + ": " + command
+                     + (went ? "  sent" : "  REFUSED by OmniRig"));
+            if (went || _cwSpeedRefusalReported) return;
+
+            _cwSpeedRefusalReported = true;
+            HolyMessageBox.ShowWarning(
+                "The keyer speed could not be sent to " + rigType + "."
+                + Environment.NewLine + Environment.NewLine
+                + "The speed on the radio has not changed."
+                + Environment.NewLine + Environment.NewLine
+                + "When CAT is working, the radio's name shows in green at the right of the "
+                + "status bar. Anything else there means it is not.",
+                "CW Keyer", this);
         }
 
         // Every custom command's answer comes through here, ours and any other. Anything that is not a
