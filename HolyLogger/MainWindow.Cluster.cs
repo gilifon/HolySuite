@@ -621,7 +621,11 @@ namespace HolyLogger
                 WindowStyle = WindowStyle.None,
                 Width = Properties.Settings.Default.ClusterWindowWidth > 0 ? Properties.Settings.Default.ClusterWindowWidth : 600,
                 Height = Properties.Settings.Default.ClusterWindowHeight > 0 ? Properties.Settings.Default.ClusterWindowHeight : 400,
-                MinWidth = 355,   // narrowest width the user chose (band row fully visible)
+                // WIDE ENOUGH TO STILL SHOW THE GEAR. 355 was the narrowest width that kept the
+                // band row whole; the gear now stands at the end of that row, and a window dragged to
+                // the old floor cut it off - which is the one control in the header that cannot be
+                // reached any other way. Its 26 and the 6 beside it are added to the floor.
+                MinWidth = 355 + 32,
                 MinHeight = 260,
                 Left = Properties.Settings.Default.ClusterWindowLeft,
                 Top = Properties.Settings.Default.ClusterWindowTop,
@@ -728,24 +732,11 @@ namespace HolyLogger
             System.Windows.Shell.WindowChrome.SetIsHitTestVisibleInChrome(closeBtn, true);
             closeBtn.Click += (s, e) => System.Windows.SystemCommands.CloseWindow(clusterWindow);
 
-            // Cluster settings gear: sits in the empty title-bar gap, just left of the window buttons.
-            // Clicking it opens the Cluster Settings window — the single home for the cluster's
-            // display/behaviour settings (they used to be split between a small gear popup and two
-            // different Options pages). Placed inside the caption-button group so nothing else in the
-            // bar moves — it only fills space that was previously empty.
-            var gearBtn = new Button
-            {
-                Content = "",   // Segoe MDL2 "Settings" gear glyph (same font as the caption buttons)
-                Style = Application.Current.Resources["CaptionButtonStyle"] as Style,
-                ToolTip = "Cluster settings",
-                FontSize = 18,        // larger than the window glyphs so the gear stands out
-                FontWeight = FontWeights.Bold
-            };
-            System.Windows.Shell.WindowChrome.SetIsHitTestVisibleInChrome(gearBtn, true);
-            gearBtn.Click += (s, e) => OpenClusterSettingsWindow();
-
+            // THE GEAR IS NOT UP HERE ANY MORE. It sat in the title bar beside the window buttons,
+            // where an operator wrote in that he could barely see it: a small grey glyph on the bar's
+            // own grey, among three other glyphs of the same colour. It is now in the header itself,
+            // above the A / K / SFI bars and to the right of the undo icon - see BuildClusterHeaderPanel.
             var buttons = new StackPanel { Orientation = Orientation.Horizontal };
-            buttons.Children.Add(gearBtn);
             buttons.Children.Add(minimizeBtn);
             buttons.Children.Add(clusterMaxRestoreBtn);
             buttons.Children.Add(closeBtn);
@@ -1642,6 +1633,28 @@ namespace HolyLogger
             // Undo icon on top (at the band-checkbox level), Latest toggle beneath it so it lands on
             // the per-band counter row. Top-aligned so the pair tracks the band cells, not the row center.
             undoButton.Margin = new Thickness(0, 0, 0, 0);   // was bottom 8; removed so Latest sits at the counter row
+
+            // THE UNDO AND THE GEAR SIT SIDE BY SIDE, on one row, both centred against each other.
+            // The gear was put at the end of the whole band row and came out wrong twice over: it
+            // hung level with the TOP of the undo icon rather than with the icon itself - the two are
+            // not the same height - and it stood a finger's width away, because the column it was
+            // following is as wide as the "Latest" button under it, not as wide as the icon. On the
+            // icon's own row it is beside the icon and level with it, which is what was asked for.
+            undoButton.VerticalAlignment = VerticalAlignment.Center;
+
+            var iconRow = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                HorizontalAlignment = HorizontalAlignment.Left,
+                VerticalAlignment = VerticalAlignment.Top
+            };
+            iconRow.Children.Add(undoButton);
+            iconRow.Children.Add(BuildClusterGearButton());
+
+            // "Latest" stays under the undo icon, where it has always been, rather than centring
+            // itself under the pair and drifting to the right of it.
+            btnLatest.HorizontalAlignment = HorizontalAlignment.Left;
+
             var undoColumn = new StackPanel
             {
                 Orientation = Orientation.Vertical,
@@ -1649,7 +1662,7 @@ namespace HolyLogger
                 VerticalAlignment = VerticalAlignment.Top,
                 Margin = new Thickness(2, 0, 0, 0)
             };
-            undoColumn.Children.Add(undoButton);
+            undoColumn.Children.Add(iconRow);
             undoColumn.Children.Add(btnLatest);
 
             var bandRow = new StackPanel
@@ -1697,12 +1710,16 @@ namespace HolyLogger
             modeSelectorPanel.VerticalAlignment = VerticalAlignment.Top;
             clusterModeSelectorPanel = modeSelectorPanel;
 
+            // THE LETTERS START WHERE "LATEST" STARTS. Low enough that a window dragged narrow slides
+            // the gear across the empty band above the A rather than into it, and no lower: 25 is the
+            // icon row (32 high) plus the 2 above Latest, less the 9 the band row is nudged up by, so
+            // the A and the Latest button share a top edge.
             var rightColumnPanel = new StackPanel
             {
                 Orientation = Orientation.Vertical,
                 HorizontalAlignment = HorizontalAlignment.Right,
                 VerticalAlignment = VerticalAlignment.Top,
-                Margin = new Thickness(0, 0, -12, 0)
+                Margin = new Thickness(0, 25, -12, 0)
             };
 
             // Three columns:
@@ -2488,6 +2505,37 @@ namespace HolyLogger
             sv.ScrollToVerticalOffset(target);
         }
 
+        // The gear that opens the Cluster Settings window. Big enough to find: the glyph at 20 on a
+        // bordered face, with a tooltip, rather than a 10-point caption glyph among the window
+        // buttons. It rides on the undo icon's own row, level with it.
+        private Button BuildClusterGearButton()
+        {
+            var gear = new Button
+            {
+                Content = "",                          // Segoe MDL2 "Settings" gear
+                FontFamily = new FontFamily("Segoe MDL2 Assets"),
+                FontSize = 16,
+                Width = 26,
+                Height = 24,
+                Padding = new Thickness(0),
+                HorizontalAlignment = HorizontalAlignment.Left,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(4, 0, 0, 0),
+                ToolTip = "Cluster settings"
+            };
+
+            // The app-wide button style pads to 12,5 and would squeeze the glyph; this one is its own
+            // small square.
+            gear.Style = null;
+            gear.SetResourceReference(Control.ForegroundProperty, "TextBrush");
+            gear.SetResourceReference(Control.BackgroundProperty, "WindowBg");
+            gear.SetResourceReference(Control.BorderBrushProperty, "MutedTextBrush");
+            gear.BorderThickness = new Thickness(1);
+
+            gear.Click += (s, e) => OpenClusterSettingsWindow();
+            return gear;
+        }
+
         private StackPanel BuildClusterLastMinutesPanel()
         {
             var lastMinutesLabel = new TextBlock
@@ -2526,11 +2574,13 @@ namespace HolyLogger
                 }
             };
 
+            // "min" reads as part of the box beside it, so it sits on the box's lower rim rather than
+            // floating in the middle of it.
             var minutesUnitLabel = new TextBlock
             {
                 Text = "min",
                 FontSize = 12,
-                VerticalAlignment = VerticalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Bottom,
                 Margin = new Thickness(4, 0, 0, 0)
             };
 
