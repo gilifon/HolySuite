@@ -4344,15 +4344,18 @@ namespace HolyLogger
 
             Btn_Ai.Content = label;
 
+            // GONE, NOT GREYED. A dead button on screen is a puzzle: he sees "Check with AI" sitting
+            // there and hunts for the setting that would wake it up. The reason it is dead was written
+            // into its tooltip, and a tooltip on a disabled control does not show at all unless
+            // ShowOnDisabled is asked for - so the explanation was never once read. The AI is only
+            // asked about the two country kinds; on every other kind the button simply is not there.
+            Btn_Ai.Visibility = aiKind ? Visibility.Visible : Visibility.Collapsed;
+
             Btn_Ai.IsEnabled = aiKind;
-            Btn_Ai.ToolTip = aiKind
-                ? (answered
-                    ? "Ask a second AI about the same QSOs. Both answers are kept, and the AI column "
-                      + "says where they disagree. Pick the service or model in the next dialog."
-                    : "Ask the AI about the QSOs listed below.")
-                : "Click \"" + CountryNeedsDecision + "\" or \"" + CountryBothAgree + "\" above first. "
-                  + "The AI is asked which country is right for a callsign on the date of the QSO, so it "
-                  + "is only offered for those two kinds.";
+            Btn_Ai.ToolTip = answered
+                ? "Ask a second AI about the same QSOs. Both answers are kept, and the AI column "
+                  + "says where they disagree. Pick the service or model in the next dialog."
+                : "Ask the AI about the QSOs listed below.";
         }
 
         // ── THE PRESS THAT WRITES NOTHING AND STILL SETTLES SOMETHING ───────────────────────────────

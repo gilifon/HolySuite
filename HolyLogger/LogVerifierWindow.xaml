@@ -65,10 +65,13 @@
                          Show all kinds, Check with AI, Fix selected: look at everything, ask about
                          the one pile that needs judgement, then write. Declared after Fix because a
                          DockPanel lays right-docked children out from the right inwards. -->
-                    <!-- Starts disabled: the AI is asked about ONE kind, and no kind is chosen yet.
-                         UpdateAiButton turns it on when a country kind is being worked through. -->
+                    <!-- Starts out of sight: the AI is asked about ONE kind, and no kind is chosen
+                         yet. UpdateAiButton shows it when a country kind is being worked through and
+                         takes it away again on every other kind - a greyed button only sets him
+                         looking for the setting that would turn it on. -->
                     <Button x:Name="Btn_Ai" DockPanel.Dock="Right" Height="38" MinWidth="170"
                             Margin="0,0,10,0" FontSize="16" Click="Btn_Ai_Click" IsEnabled="False"
+                            Visibility="Collapsed"
                             Content="Check with AI" BorderThickness="1.5">
                         <Button.Style>
                             <!-- THE COLOURS LIVE IN THE STYLE, NOT ON THE BUTTON. A value set on the
