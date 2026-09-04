@@ -160,6 +160,7 @@ namespace HolyLogger
             TB_TitleId.Text   = _qso.id > 0 ? "#" + _qso.id : string.Empty;
             TB_Call.Text     = S(_qso.DXCall);
             TB_Country.Text  = S(_qso.Country);
+            TB_Dxcc.Text     = _qso.DxccCode > 0 ? _qso.DxccCode.ToString(CultureInfo.InvariantCulture) : string.Empty;
             // Date / Time shown in the SAME friendly format as the log table (dd-MM-yyyy, HH:mm:ss).
             TB_Date.Text     = (_dateConv.Convert(S(_qso.Date), typeof(string), null, _ci) as string) ?? S(_qso.Date);
             TB_Time.Text     = (_timeConv.Convert(S(_qso.Time), typeof(string), null, _ci) as string) ?? S(_qso.Time);
@@ -190,6 +191,9 @@ namespace HolyLogger
             TB_ItuZone.Text   = S(_qso.ITUZone);
             TB_State.Text     = S(_qso.State);
             TB_Qth.Text       = S(_qso.Qth);
+            TB_ContestId.Text = S(_qso.ContestId);
+            TB_Cnty.Text      = S(_qso.Cnty);
+            TB_Credit.Text    = S(_qso.CreditGranted);
             TB_PropMode.Text  = S(_qso.PROP_MODE);
             TB_SatName.Text   = S(_qso.SAT_NAME);
 
@@ -262,11 +266,16 @@ namespace HolyLogger
         // the QSO never had (an old row logged before the field existed) is filled in from the prefix.
         private void DeriveFromCall(bool onlyIfBlank)
         {
-            if (TB_Country == null || TB_Continent == null) return;
+            if (TB_Country == null || TB_Continent == null || TB_Dxcc == null) return;
             string call = (TB_Call.Text ?? string.Empty).Trim();
             if (call.Length == 0)
             {
-                if (!onlyIfBlank) { TB_Country.Text = string.Empty; TB_Continent.Text = string.Empty; }
+                if (!onlyIfBlank)
+                {
+                    TB_Country.Text = string.Empty;
+                    TB_Continent.Text = string.Empty;
+                    TB_Dxcc.Text = string.Empty;
+                }
                 return;
             }
             try
@@ -284,6 +293,13 @@ namespace HolyLogger
                 if (!string.IsNullOrEmpty(cont) && !string.Equals(cont, "XX", StringComparison.OrdinalIgnoreCase)
                     && (!onlyIfBlank || string.IsNullOrWhiteSpace(TB_Continent.Text)))
                     TB_Continent.Text = cont;
+
+                // THE NUMBER MOVES WITH THE NAME. It did not, and could not, because the window never
+                // touched it: a callsign corrected here changed the country shown and left the entity
+                // number where it was - and the number is what LoTW, Club Log and every award count by.
+                int code = dxcc != null ? dxcc.DxccCode : 0;
+                if (code > 0 && (!onlyIfBlank || string.IsNullOrWhiteSpace(TB_Dxcc.Text)))
+                    TB_Dxcc.Text = code.ToString(CultureInfo.InvariantCulture);
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
         }
@@ -347,6 +363,14 @@ namespace HolyLogger
             {
                 _qso.DXCall    = TB_Call.Text.Trim();
                 _qso.Country   = TB_Country.Text.Trim();
+
+                // Written back with the name it belongs to. A blank box leaves the QSO's own number
+                // alone rather than clearing it: an entity the prefix table cannot name today may
+                // still be the one this contact was credited to.
+                int dxccCode;
+                if (int.TryParse((TB_Dxcc.Text ?? string.Empty).Trim(), NumberStyles.None,
+                                 CultureInfo.InvariantCulture, out dxccCode) && dxccCode > 0)
+                    _qso.DxccCode = dxccCode;
                 _qso.Date      = ds;
                 _qso.Time      = ts;
                 _qso.Band      = (CB_Band.Text ?? string.Empty).Trim();
@@ -371,6 +395,9 @@ namespace HolyLogger
                 _qso.ITUZone   = TB_ItuZone.Text.Trim();
                 _qso.State     = TB_State.Text.Trim();
                 _qso.Qth       = TB_Qth.Text.Trim();
+                _qso.ContestId = TB_ContestId.Text.Trim();
+                _qso.Cnty      = TB_Cnty.Text.Trim();
+                _qso.CreditGranted = TB_Credit.Text.Trim();
                 _qso.PROP_MODE = TB_PropMode.Text.Trim();
                 _qso.SAT_NAME  = TB_SatName.Text.Trim();
                 // MyCall is deliberately NOT written back: the station callsign is the log's identity and

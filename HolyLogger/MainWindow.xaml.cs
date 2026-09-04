@@ -5828,7 +5828,7 @@ namespace HolyLogger
             menu.Items.Add(new Separator { Style = sepStyle });
 
             var editItem = new MenuItem { Header = "Edit", Style = itemStyle, Icon = MakeMenuGlyph("", blue) };
-            editItem.Click += (s, e) => EditQsoFromContextMenu(qso);
+            editItem.Click += (s, e) => EditQsoInFullView(qso);
             menu.Items.Add(editItem);
 
             var deleteItem = new MenuItem { Header = "Delete", Style = dangerStyle, Icon = MakeMenuGlyph("", red) };
@@ -6853,33 +6853,46 @@ namespace HolyLogger
             }
         }
 
-        private void EditQsoFromContextMenu(QSO qso)
+        // TWO WAYS IN, AND EACH IS FOR A DIFFERENT MOMENT.
+        //
+        // RIGHT-CLICK, EDIT opens the Full View & Edit window - the same window the Log Workshop and
+        // the Log Fixer open. Every field the log holds is on it: the locators, the zones, the
+        // references, the county, the contest, the confirmations. That is the window for putting an
+        // old contact right, when there is time to read.
+        //
+        // DOUBLE-CLICK still fills the form at the top of the main window, its boxes turned yellow -
+        // see EditQsoInTheForm. That is the quick correction made between two calls, in the same
+        // fields he logs in, with the same keys.
+        //
+        // Neither replaced the other, and the operator chooses by how he asks.
+        private void EditQsoInFullView(QSO qso)
         {
             if (qso == null) return;
-            // Offer to save (or discard) an in-progress new QSO before loading this one for editing,
-            // so it isn't silently overwritten. Both choices proceed to the edit.
+
+            // Offer to save (or discard) an in-progress new QSO first: the form at the top is not
+            // touched by this window, but a half-typed QSO left standing there while he edits an old
+            // one is a QSO nobody will remember to finish. Both choices go on to the edit.
             GuardUnsavedQso("edit the selected QSO");
+
+            try
             {
-                QsoToUpdate = qso;
-                try
-                {
-                    if (state == State.New)
-                    {
-                        QsoPreUpdate = new QSO();
-                        HoldPreEditUserData();
-                    }
-                    LoadQsoForUpdate();
-                    ShowRigParams();
-                }
-                catch (Exception ex)
-                {
-                    HolyMessageBox.ShowError(
-                        "That QSO could not be opened for editing.\n\n"
-                        + ex.Message + "\n\n"
-                        + HolyMessageBox.WhatToDo(ex.Message, null),
-                        "Edit QSO", this);
-                }
+                // The window writes the QSO itself - see QsoEditWindow.Save - so there is nothing to
+                // save here, only the screens that show what it changed.
+                var editor = new QsoEditWindow(qso) { Owner = this };
+                if (editor.ShowDialog() != true) return;
+
+                QSODataGrid.Items.Refresh();
+                RebuildWorkedCountriesAndRefreshCluster();
+                UpdateNumOfQSOs();
                 UpdateMatrix();
+            }
+            catch (Exception ex)
+            {
+                HolyMessageBox.ShowError(
+                    "That QSO could not be opened for editing.\n\n"
+                    + ex.Message + "\n\n"
+                    + HolyMessageBox.WhatToDo(ex.Message, null),
+                    "Edit QSO", this);
             }
         }
 
@@ -8718,7 +8731,41 @@ namespace HolyLogger
 
             QSODataGrid.SelectedItem = qso;
             e.Handled = true;
-            EditQsoFromContextMenu(qso);
+            EditQsoInTheForm(qso);
+        }
+
+        // THE FORM'S OWN EDIT: the QSO goes back into the boxes at the top of the main window, which
+        // turn yellow to say they are holding an old contact rather than a new one, and Add becomes
+        // Update. Reached by double-clicking the row.
+        private void EditQsoInTheForm(QSO qso)
+        {
+            if (qso == null) return;
+
+            // Offer to save (or discard) an in-progress new QSO before loading this one for editing,
+            // so it isn't silently overwritten. Both choices proceed to the edit.
+            GuardUnsavedQso("edit the selected QSO");
+            {
+                QsoToUpdate = qso;
+                try
+                {
+                    if (state == State.New)
+                    {
+                        QsoPreUpdate = new QSO();
+                        HoldPreEditUserData();
+                    }
+                    LoadQsoForUpdate();
+                    ShowRigParams();
+                }
+                catch (Exception ex)
+                {
+                    HolyMessageBox.ShowError(
+                        "That QSO could not be opened for editing.\n\n"
+                        + ex.Message + "\n\n"
+                        + HolyMessageBox.WhatToDo(ex.Message, null),
+                        "Edit QSO", this);
+                }
+                UpdateMatrix();
+            }
         }
 
         private void HoldPreEditUserData()

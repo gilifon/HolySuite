@@ -108,8 +108,11 @@
                     <ColumnDefinition Width="92"/>
                     <ColumnDefinition Width="76"/>
                     <ColumnDefinition Width="82"/>
-                    <ColumnDefinition Width="172"/>
+                    <!-- Name gives up 44 to the DXCC number beside Country, so this row still measures
+                         the same 700 as the rows under it and the window does not change width. -->
+                    <ColumnDefinition Width="128"/>
                     <ColumnDefinition Width="112"/>
+                    <ColumnDefinition Width="44"/>
                     <ColumnDefinition Width="92"/>
                     <ColumnDefinition Width="74"/>
                 </Grid.ColumnDefinitions>
@@ -123,16 +126,22 @@
                 <TextBlock Grid.Row="0" Grid.Column="2" Text="Callsign"  Style="{StaticResource Hdr}"/>
                 <TextBlock Grid.Row="0" Grid.Column="3" Text="Name"      Style="{StaticResource Hdr}"/>
                 <TextBlock Grid.Row="0" Grid.Column="4" Text="Country"   Style="{StaticResource Hdr}"/>
-                <TextBlock Grid.Row="0" Grid.Column="5" Text="Frequency" Style="{StaticResource Hdr}"/>
-                <TextBlock Grid.Row="0" Grid.Column="6" Text="Band"      Style="{StaticResource Hdr}"/>
+                <TextBlock Grid.Row="0" Grid.Column="5" Text="DXCC"      Style="{StaticResource Hdr}"/>
+                <TextBlock Grid.Row="0" Grid.Column="6" Text="Frequency" Style="{StaticResource Hdr}"/>
+                <TextBlock Grid.Row="0" Grid.Column="7" Text="Band"      Style="{StaticResource Hdr}"/>
 
                 <TextBox  Grid.Row="1" Grid.Column="0" x:Name="TB_Date"    Style="{StaticResource Cell}"/>
                 <TextBox  Grid.Row="1" Grid.Column="1" x:Name="TB_Time"    Style="{StaticResource Cell}"/>
                 <TextBox  Grid.Row="1" Grid.Column="2" x:Name="TB_Call"    Style="{StaticResource Cell}" CharacterCasing="Upper" TextChanged="Call_TextChanged"/>
                 <TextBox  Grid.Row="1" Grid.Column="3" x:Name="TB_Name"    Style="{StaticResource Cell}" HorizontalContentAlignment="Left"/>
                 <TextBox  Grid.Row="1" Grid.Column="4" x:Name="TB_Country" Style="{StaticResource CellRO}" ToolTip="Set from the callsign's DXCC prefix — not editable"/>
-                <TextBox  Grid.Row="1" Grid.Column="5" x:Name="TB_Freq"    Style="{StaticResource Cell}" ToolTip="MHz" TextChanged="Freq_TextChanged"/>
-                <ComboBox Grid.Row="1" Grid.Column="6" x:Name="CB_Band"    IsEditable="True" FontSize="16" Margin="1,0,1,1"
+                <!-- The entity number this QSO counts for. It is what LoTW, Club Log and every award
+                     count by, and the window showed the country's NAME and not the number behind it -
+                     so a QSO credited to the wrong entity looked right on this screen. -->
+                <TextBox  Grid.Row="1" Grid.Column="5" x:Name="TB_Dxcc"    Style="{StaticResource CellRO}"
+                          ToolTip="The DXCC entity number this QSO counts for. Set from the callsign's prefix &#x2014; not editable"/>
+                <TextBox  Grid.Row="1" Grid.Column="6" x:Name="TB_Freq"    Style="{StaticResource Cell}" ToolTip="MHz" TextChanged="Freq_TextChanged"/>
+                <ComboBox Grid.Row="1" Grid.Column="7" x:Name="CB_Band"    IsEditable="True" FontSize="16" Margin="1,0,1,1"
                           VerticalContentAlignment="Center"
                           ToolTip="Pick the band. When a frequency is set, the band is derived from it and locked."/>
             </Grid>
@@ -210,6 +219,34 @@
                      130px comes out of Comment, which had more room than its 65-character content. -->
                 <TextBox Grid.Row="1" Grid.Column="3" x:Name="TB_Qth"      Style="{StaticResource Cell}" HorizontalContentAlignment="Left"
                          ToolTip="The DX station's town (ADIF QTH), e.g. Haifa"/>
+            </Grid>
+
+            <!-- Row 4: three fields the log has always stored and this window never showed. A row of
+                 their own rather than squeezed into the rows above: those measure 700, which is the
+                 width of the window, so a column added to any of them would have pushed it wider. -->
+            <Grid Margin="12,2,12,4">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="140"/>
+                    <ColumnDefinition Width="120"/>
+                    <ColumnDefinition Width="440"/>
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <TextBlock Grid.Row="0" Grid.Column="0" Text="Contest ID"     Style="{StaticResource Hdr}"/>
+                <TextBlock Grid.Row="0" Grid.Column="1" Text="County"         Style="{StaticResource Hdr}"/>
+                <TextBlock Grid.Row="0" Grid.Column="2" Text="Credit Granted" Style="{StaticResource Hdr}"/>
+
+                <TextBox Grid.Row="1" Grid.Column="0" x:Name="TB_ContestId" Style="{StaticResource Cell}" CharacterCasing="Upper"
+                         ToolTip="The contest this QSO was made in, as the contest robots name it (ADIF CONTEST_ID), e.g. CQ-WW-CW"/>
+                <TextBox Grid.Row="1" Grid.Column="1" x:Name="TB_Cnty"      Style="{StaticResource Cell}"
+                         HorizontalContentAlignment="Left"
+                         ToolTip="The DX station's county, for county awards (ADIF CNTY), e.g. MA,Middlesex"/>
+                <TextBox Grid.Row="1" Grid.Column="2" x:Name="TB_Credit"    Style="{StaticResource Cell}" CharacterCasing="Upper"
+                         HorizontalContentAlignment="Left"
+                         ToolTip="Awards this QSO has been credited towards (ADIF CREDIT_GRANTED), e.g. DXCC,WAS"/>
             </Grid>
 
             <!-- ACTIVITY PROGRAMS. Four have a field of their own in ADIF; every other program -
