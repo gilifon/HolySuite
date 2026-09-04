@@ -160,6 +160,33 @@ namespace HolyLogger
                 }));
         }
 
+        // -- ONE FAULT THAT IS NOT OURS AND SAYS NOTHING TO ANYBODY ------------------------------
+        //
+        // An operator clicked out of a cell he had just ticked and got the red "unexpected error"
+        // box: "Value cannot be null. Parameter name: element". Every line of the stack is
+        // Microsoft's:
+        //
+        //   DataGrid.OnExecutedCommitEdit -> ReleaseCellAutomationValueHolders
+        //     -> CellAutomationValueHolder.TrackValue -> UIElementAutomationPeer.FromElement(null)
+        //
+        // The grid commits the edit, then tidies up the bookkeeping it keeps for screen readers, and
+        // the cell's editing element has already gone - so it hands FromElement a null and that
+        // throws. It only happens at all when something on the machine is listening through UI
+        // Automation. THE EDIT ITSELF IS ALREADY DONE: nothing is lost, and there is nothing for the
+        // operator to do about it, which is exactly what makes an error box the wrong answer.
+        //
+        // MATCHED TIGHTLY, so no fault of ours can hide behind it: the right type, the right
+        // parameter name, and WPF's own class in the stack.
+        private static bool IsTheGridsAccessibilityBug(Exception ex)
+        {
+            var missing = ex as ArgumentNullException;
+            if (missing == null) return false;
+            if (missing.ParamName != "element") return false;
+
+            string stack = missing.StackTrace ?? string.Empty;
+            return stack.IndexOf("CellAutomationValueHolder", StringComparison.Ordinal) >= 0;
+        }
+
         private void Application_Startup(object sender, StartupEventArgs e)
         {
             // FOUR SECONDS OF THE START ARE NOT TIMED BY ANYTHING (measured 2026-09-03): before the
@@ -177,6 +204,16 @@ namespace HolyLogger
             // task exceptions can't be recovered and stay log-only.
             DispatcherUnhandledException += (s, args) =>
             {
+                // WPF'S OWN FAULT, AND NOT WORTH A RED BOX. See IsTheGridsAccessibilityBug below.
+                if (IsTheGridsAccessibilityBug(args.Exception))
+                {
+                    Log.Warn("WPF's DataGrid threw its known accessibility fault while committing a "
+                             + "cell edit (CellAutomationValueHolder). Nothing was lost and the edit "
+                             + "stands; the operator has not been told.");
+                    args.Handled = true;
+                    return;
+                }
+
                 Log.Fatal("Dispatcher", args.Exception);
                 var now = DateTime.UtcNow;
                 if ((now - _lastDispatcherException).TotalSeconds < 10) return;   // cascading -> crash
