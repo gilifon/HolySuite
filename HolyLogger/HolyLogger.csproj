@@ -558,6 +558,10 @@
       <DependentUpon>MainWindow.xaml</DependentUpon>
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="MainWindow.UdpSend.cs">
+      <DependentUpon>MainWindow.xaml</DependentUpon>
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="UdpPorts.cs" />
     <Compile Include="MainWindow.Map.cs">
       <DependentUpon>MainWindow.xaml</DependentUpon>

@@ -1730,6 +1730,8 @@ namespace HolyLogger
             {
                 UpdateTitleClock();
                 PaintCqMessageButton();
+                // Radio status out to any broadcast line asking for it - only when the radio moved.
+                BroadcastRadioStatusIfChanged();
                 // Keep the QSO Date/Time pickers ticking with UTC. Two things stop them: a QSO being
                 // edited (state != New), which must not have the clock typed over it, and the status
                 // bar's Time toggle set to Manual.
@@ -2018,6 +2020,10 @@ namespace HolyLogger
 
                     // Copy-to-log: mirror this QSO into the active log's copy-target, if configured.
                     CopyLoggedQsoToTargetLog(LastQSO);
+
+                    // Tell the other programs, on every broadcast line the operator ticked in the UDP
+                    // Ports Manager (nothing is sent if there are none). See MainWindow.UdpSend.cs.
+                    BroadcastQsoLogged(LastQSO);
 
                     if (QSODataGrid.Items != null && QSODataGrid.Items.Count > 0)
                         QSODataGrid.ScrollIntoView(QSODataGrid.Items[0]);

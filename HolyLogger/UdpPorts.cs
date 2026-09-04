@@ -66,6 +66,118 @@ namespace HolyLogger
         private void Raise(string prop) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(prop));
     }
 
+    // ONE ROW OF THE BROADCAST TABLE - the other direction.
+    //
+    // A line HolyLogger listens on can work out for itself what arrived. A line it SENDS on cannot:
+    // nothing is there to be examined, so the operator says which format to write, and where to send
+    // it. Hence the two extra columns that a receiving line does not have.
+    public class UdpBroadcastEntry : INotifyPropertyChanged
+    {
+        // What can be written. The text is what the operator picks in the Format column, so changing
+        // one of these strings changes what is stored in old settings too - don't.
+        public const string FormatAdif = "ADIF";
+        public const string FormatWsjtxAdif = "WSJT-X ADIF";
+        public const string FormatN1mmXml = "N1MM+ XML";
+        public const string FormatRadioStatus = "Radio status";
+
+        public static readonly string[] Formats =
+        {
+            FormatAdif, FormatWsjtxAdif, FormatN1mmXml, FormatRadioStatus
+        };
+
+        private bool _isOn;
+        public bool IsOn
+        {
+            get => _isOn;
+            set { if (_isOn != value) { _isOn = value; Raise(nameof(IsOn)); } }
+        }
+
+        private string _name = "";
+        public string Name
+        {
+            get => _name;
+            set { if (_name != value) { _name = value; Raise(nameof(Name)); Raise(nameof(IsFilled)); } }
+        }
+
+        // Where to send it: a name or an address. 127.0.0.1 is a program on this same PC, which is
+        // what nearly every line will be.
+        // A new line starts at this PC, because that is what nearly every line is - and it shows the
+        // operator the shape of the thing without a word of explanation.
+        private string _address = "127.0.0.1";
+        public string Address
+        {
+            get => _address;
+            set { if (_address != value) { _address = value; Raise(nameof(Address)); Raise(nameof(IsFilled)); } }
+        }
+
+        private string _port = "";
+        public string Port
+        {
+            get => _port;
+            set { if (_port != value) { _port = value; Raise(nameof(Port)); Raise(nameof(IsFilled)); } }
+        }
+
+        private string _format = FormatAdif;
+        public string Format
+        {
+            get => _format;
+            set { if (_format != value) { _format = value; Raise(nameof(Format)); Raise(nameof(IsFilled)); } }
+        }
+
+        // NOT the address: a new line comes with 127.0.0.1 already in it, so counting that as content
+        // would make the blank row at the bottom look filled and breed another blank row for ever.
+        [JsonIgnore]
+        public bool IsFilled => !string.IsNullOrWhiteSpace(Name)
+                             || !string.IsNullOrWhiteSpace(Port);
+
+        [JsonIgnore]
+        public int PortNumber
+        {
+            get
+            {
+                int p;
+                if (int.TryParse((Port ?? string.Empty).Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out p)
+                    && p > 0 && p <= 65535)
+                    return p;
+                return 0;
+            }
+        }
+
+        // Radio status goes out as the operator tunes; everything else goes out when a contact is
+        // logged. Which one a line is decides when it is asked for anything.
+        [JsonIgnore]
+        public bool IsRadioStatus => string.Equals(Format, FormatRadioStatus, StringComparison.Ordinal);
+
+        public event PropertyChangedEventHandler PropertyChanged;
+        private void Raise(string prop) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(prop));
+    }
+
+    public static class UdpBroadcastStore
+    {
+        public static List<UdpBroadcastEntry> Load()
+        {
+            try
+            {
+                string json = Properties.Settings.Default.UdpBroadcastJson;
+                if (!string.IsNullOrWhiteSpace(json))
+                    return JsonConvert.DeserializeObject<List<UdpBroadcastEntry>>(json) ?? new List<UdpBroadcastEntry>();
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+            return new List<UdpBroadcastEntry>();
+        }
+
+        public static void Save(IEnumerable<UdpBroadcastEntry> rows)
+        {
+            try
+            {
+                var toSave = (rows ?? Enumerable.Empty<UdpBroadcastEntry>()).Where(r => r != null && r.IsFilled).ToList();
+                Properties.Settings.Default.UdpBroadcastJson = JsonConvert.SerializeObject(toSave);
+                Properties.Settings.Default.Save();
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+    }
+
     // Where the table lives: one JSON string in the settings, like the Channels window's list.
     public static class UdpPortStore
     {

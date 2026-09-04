@@ -59,6 +59,9 @@ namespace HolyLogger
             try { rows = UdpPortStore.Load(); }
             catch (Exception swallowed) { Log.Swallow(swallowed); return; }
 
+            // The other direction is read at the same moment (MainWindow.UdpSend.cs).
+            ReloadBroadcastLines();
+
             // What should be open, one entry per port (the table window refuses to save the same port
             // twice, but a hand-edited settings file could still hold it).
             var wanted = new Dictionary<int, string>();
@@ -124,6 +127,7 @@ namespace HolyLogger
         {
             foreach (var listener in _udpListeners) CloseListener(listener);
             _udpListeners.Clear();
+            CloseUdpSender();
         }
 
         private static void CloseListener(UdpListener listener)
@@ -344,6 +348,11 @@ namespace HolyLogger
                             Properties.Settings.Default.RecentQSOCounter++;
                             isValid = true;
                             CopyLoggedQsoToTargetLog(q);
+
+                            // Pass it on to any broadcast line. A contact cannot go round in a circle:
+                            // one that comes back to us is caught by the duplicate check above and is
+                            // never stored, so it is never sent on again either.
+                            BroadcastQsoLogged(q);
                         }
                     }
                     if (QSODataGrid.Items != null && QSODataGrid.Items.Count > 0)

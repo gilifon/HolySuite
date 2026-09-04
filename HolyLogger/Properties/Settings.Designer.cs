@@ -1024,6 +1024,18 @@ namespace HolyLogger.Properties {
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string UdpBroadcastJson {
+            get {
+                return ((string)(this["UdpBroadcastJson"]));
+            }
+            set {
+                this["UdpBroadcastJson"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
         public string LotwConfirmedEntities {
             get {
                 return ((string)(this["LotwConfirmedEntities"]));
