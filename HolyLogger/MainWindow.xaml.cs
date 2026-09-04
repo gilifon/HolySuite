@@ -4106,8 +4106,22 @@ namespace HolyLogger
         {
             bool keysAreOurs = cwKeyboard == null;
 
-            if (AddBtn != null) AddBtn.Content = keysAreOurs ? "Add (F1)" : "Add";
-            if (ClearBtnText != null) ClearBtnText.Text = keysAreOurs ? "Clear (F9)" : "Clear";
+            // WHAT THE BUTTON DOES, AND ONLY THEN WHICH KEY DOES IT. Editing a QSO the two read
+            // Update and Exit; a new one, Add and Clear. The key is added to whichever word it is,
+            // and only while the key is really ours.
+            //
+            // BOTH LABELS ARE WRITTEN HERE AND NOWHERE ELSE. There was a second place - it painted
+            // "Add (F1)" and "Clear (F9)" whenever the form changed between new and editing, with no
+            // idea the keyer was open, and it did it by REPLACING the Clear button's whole content.
+            // That threw away the text block this line writes to, so from the first edit onwards the
+            // Clear button could never lose its "(F9)" again however often this ran. Which is exactly
+            // what an operator saw: the keyer open, Add reading "Add", and Clear still promising F9
+            // that belonged to the keyer's ninth macro.
+            string addWord = state == State.Edit ? "Update" : "Add";
+            string clearWord = state == State.Edit ? "Exit" : "Clear";
+
+            if (AddBtn != null) AddBtn.Content = keysAreOurs ? addWord + " (F1)" : addWord;
+            if (ClearBtnText != null) ClearBtnText.Text = keysAreOurs ? clearWord + " (F9)" : clearWord;
 
             // AND THE SAME FOR THE FOUR MSG KEYS. They carry F5 to F8 under their names, and while the
             // keyer is open those four keys are its own macros - the same key printed on two windows
@@ -8890,18 +8904,11 @@ namespace HolyLogger
             UpdateModeComboLock();
         }
 
+        // Kept as a name the rest of the window already calls, but it no longer writes anything
+        // itself - see UpdateActionKeyLabels, which knows about the keyer as well as about the form.
         private void UpdateAddBtnLabel()
         {
-            if (state == State.Edit)
-            {
-                AddBtn.Content = "Update (F1)";
-                ClearBtn.Content = "Exit (F9)";
-            }
-            else if (state == State.New)
-            {
-                AddBtn.Content = "Add (F1)";
-                ClearBtn.Content = "Clear (F9)";
-            }
+            UpdateActionKeyLabels();
         }
 
         private void UpdateEditModeBackground()
