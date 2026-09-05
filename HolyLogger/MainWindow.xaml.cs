@@ -3033,12 +3033,24 @@ namespace HolyLogger
             // out instead of it on a frequency this program has not called on. So it gets the same
             // editor the keyer's first button gets, with both boxes on it; the other three hold one
             // text and get the plain one.
+            var name = new CwKeyboardWindow.ButtonName
+            {
+                Label = MsgButtonLabel(messageNumber),
+                BoxWidth = GetMessageButton(messageNumber) != null ? GetMessageButton(messageNumber).ActualWidth : 0,
+
+                // The keycap's own writing - see the label TextBlock in the XAML. Eleven point in the
+                // system font, which holds half again as many letters as the editor's sixteen would.
+                FaceFontSize = 11,
+                FaceFontFamily = null
+            };
+
             string updated = messageNumber == 1
-                           ? EditCqMessageText()
+                           ? EditCqMessageText(name)
                            : ShowCwTextEditDialog("Edit CW Text " + messageNumber + " (F" + (messageNumber + 4) + ")",
-                                                  GetCwMessageText(messageNumber));
+                                                  GetCwMessageText(messageNumber), name);
             if (updated == null) return;
 
+            SaveMsgButtonLabel(messageNumber, name.Label);
             SetCwMessageText(messageNumber, updated);
             UpdateMessageButtonLabel(GetMessageButton(messageNumber), messageNumber, isCw: true);
 
@@ -3119,6 +3131,27 @@ namespace HolyLogger
             }
         }
 
+        // How wide a word really is in a given font, asked of WPF rather than guessed at from a
+        // character count. Bold is not asked for: the keycaps are not bold, and a measurement taken in
+        // a heavier face would refuse names that fit.
+        private double MeasuredWidth(string word, System.Windows.Media.FontFamily family, double size)
+        {
+            if (string.IsNullOrEmpty(word)) return 0;
+
+            try
+            {
+                var typeface = new System.Windows.Media.Typeface(
+                    family ?? SystemFonts.MessageFontFamily, FontStyles.Normal, FontWeights.Normal,
+                    FontStretches.Normal);
+
+                return new System.Windows.Media.FormattedText(
+                    word, CultureInfo.CurrentCulture, FlowDirection.LeftToRight, typeface, size,
+                    System.Windows.Media.Brushes.Black,
+                    System.Windows.Media.VisualTreeHelper.GetDpi(this).PixelsPerDip).Width;
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); return 0; }
+        }
+
         private static TextBlock CwEditHeading(string text)
         {
             var block = new TextBlock
@@ -3147,10 +3180,11 @@ namespace HolyLogger
             return block;
         }
 
-        internal string ShowCwTextEditDialog(string title, string currentText)
+        internal string ShowCwTextEditDialog(string title, string currentText,
+                                             CwKeyboardWindow.ButtonName name = null)
         {
             string ignored;
-            return ShowCwTextEditDialog(title, currentText, null, null, null, null, null, out ignored);
+            return ShowCwTextEditDialog(title, currentText, null, null, null, null, null, out ignored, name);
         }
 
         // ONE EDITOR, WITH ROOM FOR A SECOND TEXT. The CQ button holds two - the call, and the question
@@ -3164,7 +3198,8 @@ namespace HolyLogger
                                              string mainHeading,
                                              string extraHeading, string extraHint, string extraText,
                                              string mainHint,
-                                             out string extraResult)
+                                             out string extraResult,
+                                             CwKeyboardWindow.ButtonName name = null)
         {
             extraResult = extraText;
             Window dialog = new Window
@@ -3191,6 +3226,8 @@ namespace HolyLogger
                 Owner = this,
                 Icon = Icon
             };
+
+            TextBox nameBox = null;
 
             Grid grid = new Grid { Margin = new Thickness(10) };
             // TWO ROWS, one under the other: what is typed, and what that would put on air. The
@@ -3266,9 +3303,149 @@ namespace HolyLogger
                 catch (Exception swallowed) { Log.Swallow(swallowed); e2.CancelCommand(); }
             });
 
-            Grid.SetRow(tb, 0);
-            Grid.SetColumnSpan(tb, 3);
-            grid.Children.Add(tb);
+            // -- THE NAME AND THE TEXT, SIDE BY SIDE ---------------------------------------------
+            //
+            // A button has two halves and they were written in two different windows: the text here,
+            // on a right-click, and the name behind the gear in the macro editor. So a man who wanted
+            // to call a button MYCALL had to be told where the other half lived.
+            //
+            // THE NAME BOX IS THE WIDTH OF THE BUTTON HE PRESSED. The keyer's twelve are wider than
+            // the four on the main window, and a box of one fixed size would say nothing about how
+            // much of a name will actually fit on the keycap he is naming.
+            //
+            // EMPTY IS A REAL ANSWER, and the buttons already know what to do with it: the keyer's
+            // twelve fall back to the key that presses them, and the four on the main window show
+            // their key while it is theirs and nothing while the keyer has taken it.
+            if (name == null)
+            {
+                Grid.SetRow(tb, 0);
+                Grid.SetColumnSpan(tb, 3);
+                grid.Children.Add(tb);
+            }
+            else
+            {
+                double boxWidth = name.BoxWidth > 0 ? name.BoxWidth : 60;
+                if (boxWidth < 44) boxWidth = 44;      // narrower than this and no name is readable
+
+                // AS MUCH AS THE BUTTON CAN SHOW, AND NOT ONE LETTER MORE.
+                //
+                // A COUNT OF CHARACTERS CANNOT DO THIS. Counted in the widest letter it stopped the
+                // operator at three where his button plainly held "Mycall"; counted in an average one
+                // it would let six M's through and cut them off on the keycap. Letters are not all the
+                // same width, so what is measured is the WORD - the one he is actually typing, in the
+                // font the button writes in - and it is refused at the moment it would no longer fit.
+                //
+                // THE BOX IS BIGGER THAN THE BUTTON WHERE THE BUTTON WRITES SMALLER. The four on the
+                // main window write at 11 point and this box at 16, so the same name needs half as
+                // much room again here; a box the button's exact width would trim what the button
+                // itself shows in full - which is what the operator saw and reported.
+                double faceSize = name.FaceFontSize > 0 ? name.FaceFontSize : 16;
+                var faceFamily = string.IsNullOrEmpty(name.FaceFontFamily)
+                               ? SystemFonts.MessageFontFamily
+                               : new System.Windows.Media.FontFamily(name.FaceFontFamily);
+
+                // What is left of the keycap once its own padding is taken off.
+                double faceRoom = boxWidth - 8;
+                if (faceRoom < 20) faceRoom = 20;
+
+                Func<string, double> onTheButton = word => MeasuredWidth(word, faceFamily, faceSize);
+
+                var idBox = new TextBox
+                {
+                    Text = name.Label ?? string.Empty,
+                    FontSize = 16,
+                    Height = 28,
+                    Width = Math.Max(boxWidth, faceRoom * (16.0 / faceSize) + 14),
+                    HorizontalAlignment = HorizontalAlignment.Left,
+                    VerticalContentAlignment = VerticalAlignment.Center,
+                    Padding = new Thickness(4, 0, 4, 0),
+                    MaxLength = 24,
+
+                    // IT LOOKS LIKE THE THING IT NAMES. The cyan of a CW keycap and its rounded
+                    // corners, so what he types is plainly the writing on the button rather than one
+                    // more white box on a form. A text box cannot round its own corners, so the box
+                    // itself is made invisible and a Border carries the face - see below.
+                    Background = System.Windows.Media.Brushes.Transparent,
+                    Foreground = System.Windows.Media.Brushes.Black,
+                    BorderThickness = new Thickness(0),
+                    CaretBrush = System.Windows.Media.Brushes.Black,
+                    ToolTip = "What this button is called. The typing stops where the button's own "
+                            + "face runs out." + Environment.NewLine + Environment.NewLine
+                            + "Leave it empty and the button shows the key that presses it."
+                };
+
+                var idFace = new Border
+                {
+                    CornerRadius = new CornerRadius(5),
+                    Background = new System.Windows.Media.SolidColorBrush(
+                        System.Windows.Media.Color.FromRgb(0x7F, 0xFE, 0xFF)),   // the CW keycap's own
+                    BorderBrush = new System.Windows.Media.SolidColorBrush(
+                        System.Windows.Media.Color.FromRgb(0x00, 0x9A, 0x9C)),
+                    BorderThickness = new Thickness(1),
+                    Padding = new Thickness(2, 0, 2, 0),
+                    HorizontalAlignment = HorizontalAlignment.Left,
+                    Child = idBox
+                };
+
+                // REFUSED, NOT TRIMMED AFTERWARDS. The last thing that fitted is put back and the
+                // caret with it, so a letter too many simply does not appear.
+                string lastThatFits = idBox.Text;
+                bool restoring = false;
+
+                idBox.TextChanged += (s2, e2) =>
+                {
+                    if (restoring) return;
+
+                    if (onTheButton(idBox.Text ?? string.Empty) <= faceRoom)
+                    {
+                        lastThatFits = idBox.Text;
+                        return;
+                    }
+
+                    restoring = true;
+                    int caret = idBox.CaretIndex;
+                    idBox.Text = lastThatFits;
+                    idBox.CaretIndex = Math.Min(Math.Max(0, caret - 1), idBox.Text.Length);
+                    restoring = false;
+                    BeepRefusedKey();
+                };
+
+                var pair = new Grid();
+                pair.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+                // A HAND'S WIDTH BETWEEN THEM. The two boxes were a hair apart and read as one long
+                // box in two pieces; the macro box has more room than its text ever fills, so the gap
+                // is taken from there and costs nothing.
+                pair.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(30) });
+                pair.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                pair.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                pair.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+
+                var idHead = CwEditHeading("Button ID");
+                Grid.SetRow(idHead, 0);
+                Grid.SetColumn(idHead, 0);
+                pair.Children.Add(idHead);
+
+                // The CQ button names its own text ("Calls CQ"); everything else is simply the macro.
+                var textHead = CwEditHeading(string.IsNullOrEmpty(mainHeading) ? "The Macro text" : mainHeading);
+                Grid.SetRow(textHead, 0);
+                Grid.SetColumn(textHead, 2);
+                pair.Children.Add(textHead);
+
+                Grid.SetRow(idFace, 1);
+                Grid.SetColumn(idFace, 0);
+                pair.Children.Add(idFace);
+
+                Grid.SetRow(tb, 1);
+                Grid.SetColumn(tb, 2);
+                pair.Children.Add(tb);
+
+                Grid.SetRow(pair, 0);
+                Grid.SetColumnSpan(pair, 3);
+                grid.Children.Add(pair);
+
+                nameBox = idBox;
+            }
 
             // THE PAIR SITS IN THE MIDDLE, Save on the left, the way the rest of the program's windows
             // put them. They were pinned to the two outside corners of the window, which on a box this
@@ -3366,8 +3543,10 @@ namespace HolyLogger
                 above.Children.Add(extraBox);
                 if (!string.IsNullOrEmpty(extraHint)) above.Children.Add(CwEditHint(extraHint));
 
+                // With a name box in the window the macro's own heading already stands over it, so
+                // only the line explaining it is left to print here.
                 var mainTitle = new StackPanel { Margin = new Thickness(10, 18, 10, 0) };
-                mainTitle.Children.Add(CwEditHeading(mainHeading));
+                if (name == null) mainTitle.Children.Add(CwEditHeading(mainHeading));
                 if (!string.IsNullOrEmpty(mainHint)) mainTitle.Children.Add(CwEditHint(mainHint));
 
                 var both = new StackPanel();
@@ -3387,6 +3566,7 @@ namespace HolyLogger
             if (dialog.ShowDialog() != true) return null;
 
             if (extraBox != null) extraResult = (extraBox.Text ?? string.Empty).Trim();
+            if (nameBox != null && name != null) name.Label = (nameBox.Text ?? string.Empty).Trim();
             return tb.Text.Trim();
         }
 
@@ -3938,6 +4118,25 @@ namespace HolyLogger
             try { Properties.Settings.Default.Save(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
         }
 
+        // The name the operator has given one of the four, and the way to change just that one.
+        private static string MsgButtonLabel(int messageNumber)
+        {
+            string[] labels = CwKeyboardWindow.ReadLabels(CwKeyboardWindow.MsgLabelsSetting, 4);
+
+            return messageNumber >= 1 && messageNumber <= labels.Length
+                 ? (labels[messageNumber - 1] ?? string.Empty).Trim()
+                 : string.Empty;
+        }
+
+        private static void SaveMsgButtonLabel(int messageNumber, string label)
+        {
+            if (messageNumber < 1 || messageNumber > 4) return;
+
+            string[] labels = CwKeyboardWindow.ReadLabels(CwKeyboardWindow.MsgLabelsSetting, 4);
+            labels[messageNumber - 1] = (label ?? string.Empty).Trim();
+            CwKeyboardWindow.SaveLabels(CwKeyboardWindow.MsgLabelsSetting, labels, 4);
+        }
+
         private Button GetMessageButton(int messageNumber)
         {
             switch (messageNumber)
@@ -4052,7 +4251,7 @@ namespace HolyLogger
                         cwWpmMeasured = true;
                     }
                 },
-                ShowCwTextEditDialog,
+                (title, text, name) => ShowCwTextEditDialog(title, text, name),
                 // Only so a keyer opening for the first time can take a COPY of the four Msg texts into
                 // its own first four - see LoadButtonTexts. After that the two sets are apart.
                 GetCwMessageText,
@@ -4091,7 +4290,8 @@ namespace HolyLogger
             cwKeyboard.SetSpeed = wpm => SetRadioCwSpeed(rigType, wpm);
 
             // The CQ button holds two texts and is edited as two - see EditCqButton.
-            cwKeyboard.EditTwoTexts = (string title, string mainText, ref string extraText) =>
+            cwKeyboard.EditTwoTexts = (string title, string mainText, ref string extraText,
+                                       CwKeyboardWindow.ButtonName name) =>
             {
                 string extra;
                 string result = ShowCwTextEditDialog(
@@ -4102,7 +4302,7 @@ namespace HolyLogger
                     + "on, or has sat on it too long without calling. Recommended: QRL?",
                     extraText,
                     "What the button sends once QRL was asked",
-                    out extra);
+                    out extra, name);
 
                 extraText = extra;
                 return result;
@@ -4159,14 +4359,12 @@ namespace HolyLogger
             if (AddBtn != null) AddBtn.Content = keysAreOurs ? addWord + " (F1)" : addWord;
             if (ClearBtnText != null) ClearBtnText.Text = keysAreOurs ? clearWord + " (F9)" : clearWord;
 
-            // AND THE SAME FOR THE FOUR MSG KEYS. They carry F5 to F8 under their names, and while the
-            // keyer is open those four keys are its own macros - the same key printed on two windows
-            // meaning two different things is exactly what the operator asked about. The line is emptied
-            // rather than removed, so the buttons do not change size as the keyer comes and goes.
-            ShowMessageKeyName(Btn_Msg1, keysAreOurs ? "F5" : string.Empty);
-            ShowMessageKeyName(Btn_Msg2, keysAreOurs ? "F6" : string.Empty);
-            ShowMessageKeyName(Btn_Msg3, keysAreOurs ? "F7" : string.Empty);
-            ShowMessageKeyName(Btn_Msg4, keysAreOurs ? "F8" : string.Empty);
+            // AND THE SAME FOR THE FOUR MSG KEYS. They carry F5 to F8, and while the keyer is open
+            // those four keys are its own macros - the same key printed on two windows meaning two
+            // different things is exactly what the operator asked about. Which line the key goes on
+            // depends on whether he has named the button, so it is decided in one place:
+            // UpdateMessageButtonLabel.
+            UpdateMessageButtonLabels();
         }
 
         private static void ShowMessageKeyName(Button button, string keyName)
@@ -5428,18 +5626,24 @@ namespace HolyLogger
 
             if (panel.Children[0] is TextBlock labelBlock)
             {
-                // HIS OWN NAME FOR IT WHERE HE HAS GIVEN ONE. "Txt 1" says which of the four it is and
-                // nothing about what it holds; a man who has written a name for it in the macro editor
-                // is told that instead. Empty falls back to the numbering, which is what it always was.
-                string[] labels = CwKeyboardWindow.ReadLabels(CwKeyboardWindow.MsgLabelsSetting, 4);
-                string own = messageNumber >= 1 && messageNumber <= labels.Length
-                           ? (labels[messageNumber - 1] ?? string.Empty).Trim()
-                           : string.Empty;
+                // HIS OWN NAME FOR IT WHERE HE HAS GIVEN ONE, AND THE KEY WHERE HE HAS NOT.
+                //
+                // It used to fall back to "Txt 1" or "Msg1", which says which of the four it is and
+                // nothing else - the number was already under it in the key line, so the button said
+                // the same thing twice and neither line said what it holds. An unnamed button now
+                // carries the key that presses it, and nothing at all while the CW keyer has taken
+                // that key for its own macros: a button naming a key that would do something else is
+                // worse than a blank one.
+                string own = MsgButtonLabel(messageNumber);
+                string key = "F" + (messageNumber + 4);
+                bool keysAreOurs = cwKeyboard == null;
 
-                labelBlock.Text = own.Length > 0
-                                ? own
-                                : (isCw ? "Txt " + messageNumber : "Msg" + messageNumber);
+                labelBlock.Text = own.Length > 0 ? own : (keysAreOurs ? key : string.Empty);
                 labelBlock.Foreground = System.Windows.Media.Brushes.Black;
+
+                // The key line under it carries the key only when the name above is the operator's
+                // own; otherwise the name IS the key and printing it twice helps nobody.
+                ShowMessageKeyName(button, own.Length > 0 && keysAreOurs ? key : string.Empty);
             }
 
             // Swap the entire style so hover/press colours are also correct
@@ -5459,7 +5663,7 @@ namespace HolyLogger
         // The rule itself, the question's own words and how long a quiet frequency stays his are all in
         // CwKeyboardWindow, and the mark - where and when the CQ last went out - is shared between the
         // two buttons: it is one CQ on one radio, wherever it was pressed from.
-        private string EditCqMessageText()
+        private string EditCqMessageText(CwKeyboardWindow.ButtonName name)
         {
             string qrl = CwKeyboardWindow.QrlText();
 
@@ -5472,7 +5676,7 @@ namespace HolyLogger
                 + "on, or has sat on it too long without calling. Recommended: QRL?",
                 qrl,
                 "What the button sends once QRL was asked",
-                out extra);
+                out extra, name);
 
             if (result == null) return null;
 

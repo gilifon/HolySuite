@@ -70,6 +70,24 @@ namespace HolyLogger
         // Hands one chunk of text to the radio. True when the CAT command went out.
         private readonly Func<string, bool> _sendChunk;
 
+        // WHAT THE BUTTON IS CALLED, carried into the editor and back out of it. The name used to be
+        // reachable only through the macro editor behind the gear, while the text on the same button
+        // was a right-click away - two windows for the two halves of one keycap. The editor now holds
+        // both, and this is what it is handed: the name as it stands, and how wide the box for it
+        // should be, which is the width of the button he pressed.
+        public class ButtonName
+        {
+            public string Label;
+            public double BoxWidth;
+
+            // WHAT THE KEYCAP ITSELF WEARS, so the editor can work out what will really fit on it. A
+            // name is measured on the button, not in the box that types it: these twelve write at 16
+            // in Consolas, the main window's four at 11 in the system font, and the same six letters
+            // take quite different room in the two.
+            public double FaceFontSize;
+            public string FaceFontFamily;
+        }
+
         // Aborts whatever the radio is keying.
         private readonly Action _stopSending;
 
@@ -228,6 +246,9 @@ namespace HolyLogger
 
         public delegate void SpeedRange(out int low, out int high);
 
+        // The ordinary editor: a title, the text, and the button's name to be edited beside it.
+        public delegate string TextEditor(string title, string text, ButtonName name);
+
         // Turns * and ! into callsigns. The stored text keeps the macro; only what goes on air is
         // expanded, so a button reads the same next year when the callsign in the form is different.
         private readonly Func<string, string> _expandMacros;
@@ -246,7 +267,7 @@ namespace HolyLogger
 
         // Opens the shared CW text editor (title, current text) and gives back the new text, or null
         // when the operator cancelled.
-        private readonly Func<string, string, string> _editText;
+        private readonly TextEditor _editText;
 
         // Reads and writes the four texts the Msg buttons own. Kept as callbacks rather than reading
         // the settings here, so the main window can redraw its own four faces when one is edited from
@@ -409,7 +430,7 @@ namespace HolyLogger
         public CwKeyboardWindow(Func<string, bool> sendChunk, Action stopSending, Func<double> currentWpm,
                                 Func<bool> wpmMeasured, int maxChunk, Func<bool> isTransmitting,
                                 Func<string, string> expandMacros, Func<string, string> macroProblem,
-                                Action<double> learnWpm, Func<string, string, string> editText,
+                                Action<double> learnWpm, TextEditor editText,
                                 Func<int, string> getSharedText,
                                 bool waitForTxIdle = false,
                                 SpeedRange speedRange = null,
@@ -1800,6 +1821,40 @@ namespace HolyLogger
         internal const string KeyerLabelsSetting = "CwKeyerLabelsJson";
         internal const string MsgLabelsSetting = "CwMsgLabelsJson";
 
+        // Everything the editor needs to know about the keycap being named: what it is called now, how
+        // wide it is, and what it writes in - see RefreshButtonFace, which is where that 16 comes from.
+        private ButtonName NameOf(int index)
+        {
+            return new ButtonName
+            {
+                Label = ButtonLabel(index),
+                BoxWidth = ButtonWidth(index),
+                FaceFontSize = 16,
+                FaceFontFamily = "Consolas"
+            };
+        }
+
+        // The width of the keycap he pressed, so the name box in the editor is the size of the thing
+        // it names. The keyer's twelve are wider than the main window's four, and a box that ignored
+        // that would say nothing about how much of a name will actually fit.
+        private double ButtonWidth(int index)
+        {
+            var button = index >= 0 && index < _buttons.Length ? _buttons[index] : null;
+
+            return button != null ? button.ActualWidth : 0;
+        }
+
+        // The name of ONE button, written back into the bank's own list without touching the other
+        // eleven - which is what SaveLabels wants, so the list is read, changed and put back.
+        private void SaveButtonLabel(int index, string label)
+        {
+            if (index < 0 || index >= ButtonCount) return;
+
+            var labels = ReadLabels(KeyerLabelsSetting, ButtonCount);
+            labels[index] = (label ?? string.Empty).Trim();
+            SaveLabels(KeyerLabelsSetting, labels, ButtonCount);
+        }
+
         private string ButtonLabel(int index)
         {
             var labels = ReadLabels(KeyerLabelsSetting, ButtonCount);
@@ -2094,11 +2149,14 @@ namespace HolyLogger
             // Named by the key that presses it, because that is how the operator thinks of it.
             string title = "Edit CW Keyer Text " + (index + 1) + " (F" + (index + 1) + ")";
 
-            string updated = _editText(title, _buttonTexts[index] ?? string.Empty);
+            var name = NameOf(index);
+
+            string updated = _editText(title, _buttonTexts[index] ?? string.Empty, name);
             if (updated == null) return;
 
             _buttonTexts[index] = updated;
             SaveButtonText(index, updated);
+            SaveButtonLabel(index, name.Label);
             RefreshButtonFace(index);
         }
 
@@ -2116,17 +2174,20 @@ namespace HolyLogger
                 // No way to show two: fall back to the one that matters most often.
                 if (_editText == null) return;
 
-                string only = _editText("Edit CW Keyer Text 1 (F1)", _buttonTexts[0] ?? string.Empty);
+                var onlyName = NameOf(0);
+                string only = _editText("Edit CW Keyer Text 1 (F1)", _buttonTexts[0] ?? string.Empty, onlyName);
                 if (only == null) return;
 
                 _buttonTexts[0] = only;
                 SaveButtonText(0, only);
+                SaveButtonLabel(0, onlyName.Label);
                 RefreshButtonFace(0);
                 return;
             }
 
             string qrl = QrlText();
-            string cq = _editTwoTexts("Edit CW Keyer Text 1 (F1)", _buttonTexts[0] ?? string.Empty, ref qrl);
+            var cqName = NameOf(0);
+            string cq = _editTwoTexts("Edit CW Keyer Text 1 (F1)", _buttonTexts[0] ?? string.Empty, ref qrl, cqName);
             if (cq == null) return;
 
             // The question is one setting for the whole program; the call belongs to the bank showing.
@@ -2139,10 +2200,11 @@ namespace HolyLogger
 
             _buttonTexts[0] = cq;
             SaveButtonText(0, cq);
+            SaveButtonLabel(0, cqName.Label);
             RefreshButtonFace(0);
         }
 
-        internal delegate string TwoTextEditor(string title, string mainText, ref string extraText);
+        internal delegate string TwoTextEditor(string title, string mainText, ref string extraText, ButtonName name);
 
         internal TwoTextEditor EditTwoTexts { set { _editTwoTexts = value; } }
         private TwoTextEditor _editTwoTexts;
