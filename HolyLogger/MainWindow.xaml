@@ -1850,8 +1850,8 @@
                    ToolTip="The exchange your station sends"><Run Text="Exchange" FontWeight="Bold"/><LineBreak/><Run Text="send"/></TextBlock>
         <StackPanel x:Name="ContestTxPanel" Orientation="Horizontal" HorizontalAlignment="Left"
                     VerticalAlignment="Top" Margin="101,82,0,0" Grid.Row="1" Panel.ZIndex="6" Visibility="Collapsed"/>
-        <Button x:Name="AddBtn" Style="{StaticResource ActionButtonStyle}" Content="Add (F1)" HorizontalAlignment="Left" Margin="572,123,0,0" VerticalAlignment="Top" Width="95" Height="32" Grid.Row="1" Click="AddBtn_Click" FontSize="16" ToolTip="Save the current QSO data" TabIndex="14" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Padding="0" />
-        <Button x:Name="ClearBtn" Style="{StaticResource ActionButtonStyle}" HorizontalAlignment="Left" Margin="572,84,0,0" VerticalAlignment="Top" Width="95" Height="32" Grid.Row="1" Click="ClearBtn_Click" FontSize="16" ToolTip="Clear the current QSO data" IsTabStop="False" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Padding="0">
+        <Button x:Name="AddBtn" Style="{StaticResource ActionButtonStyle}" Content="Add (F1)" HorizontalAlignment="Left" Margin="567,123,0,0" VerticalAlignment="Top" Width="105" Height="32" Grid.Row="1" Click="AddBtn_Click" FontSize="16" ToolTip="Save the current QSO data" TabIndex="14" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Padding="0" />
+        <Button x:Name="ClearBtn" Style="{StaticResource ActionButtonStyle}" HorizontalAlignment="Left" Margin="567,84,0,0" VerticalAlignment="Top" Width="105" Height="32" Grid.Row="1" Click="ClearBtn_Click" FontSize="16" ToolTip="Clear the current QSO data" IsTabStop="False" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Padding="0">
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                 <TextBlock x:Name="ClearBtnText" Text="Clear (F9)" VerticalAlignment="Center"/>
             </StackPanel>

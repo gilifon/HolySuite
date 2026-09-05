@@ -9213,14 +9213,20 @@ namespace HolyLogger
         private bool Validate()
         {
             bool allOK = true;
+            // THE DX CALLSIGN IS NEVER FRAMED IN RED. It used to be, and the frame stayed there: it
+            // was painted when Add was pressed on an empty box and taken off only by the NEXT Add, so
+            // a form cleared and sitting empty went on wearing a warning about something the operator
+            // had already dealt with. The station callsign wears red while it is empty because that
+            // one is a setting - it should never be empty; the DX callsign is empty at the start of
+            // every single contact, which is not a fault and must not look like one.
+            //
+            // SAID PLAINLY INSTEAD, at the moment it matters. Add used to refuse in silence and leave
+            // the red frame to explain itself.
             if (string.IsNullOrWhiteSpace(TB_DXCallsign.Text))
             {
                 allOK = false;
-                TB_DXCallsign.BorderBrush = System.Windows.Media.Brushes.Red;
-            }
-            else
-            {
-                TB_DXCallsign.BorderBrush = System.Windows.Media.Brushes.Gray;
+                HolyMessageBox.ShowWarning("Type the DX callsign before pressing Add.", "Add QSO", this);
+                try { TB_DXCallsign.Focus(); } catch (Exception swallowed) { Log.Swallow(swallowed); }
             }
             
             if (Properties.Settings.Default.validation_enabled)
