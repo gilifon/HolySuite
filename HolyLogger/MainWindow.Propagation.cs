@@ -26,6 +26,7 @@ namespace HolyLogger
         private Rectangle _propAFill, _propKFill, _propSfiFill;
         private TextBlock _propAText, _propKText, _propSfiText;
         private StackPanel _propagationPanel;
+        private Border _propagationFrame;   // the dark blue frame around the three bars
         private DispatcherTimer _propagationTimer;
 
         // The three columns, in the order they are GIVEN UP as the window narrows: A first, then K,
@@ -36,7 +37,9 @@ namespace HolyLogger
             new System.Collections.Generic.List<StackPanel>();
 
         private const double PropBarBoxWidth = 22;
-        private const double PropBarBoxHeight = 66;
+        // 64, not 66: two of the four pixels taken off the frame's height came from the tube itself.
+        // The ruler and the reading are both worked out from this one number, so they follow it.
+        private const double PropBarBoxHeight = 64;
 
         // The height inside the tube, once its border and padding are taken off. The ruler is exactly
         // this tall, always; the reading is a fraction of it. One number, so the two cannot drift apart.
@@ -44,16 +47,16 @@ namespace HolyLogger
 
         // Built once with the cluster window and handed to its header. Returns null for nothing to show,
         // which the caller treats as "add nothing" rather than having to know why.
-        private StackPanel BuildPropagationBars()
+        private FrameworkElement BuildPropagationBars()
         {
             var panel = new StackPanel
             {
                 Orientation = Orientation.Horizontal,
                 HorizontalAlignment = HorizontalAlignment.Right,
                 VerticalAlignment = VerticalAlignment.Top,
-                // 24 on the right: the panel is right-aligned, so a BIGGER right margin is what moves
-                // the three bars left, away from the window edge. Settled by eye - 15px in, then 5 back.
-                Margin = new Thickness(0, 0, 24, 0),
+                // The position is the frame's business now (see the Border at the end of this method);
+                // this panel only holds the three columns.
+                Margin = new Thickness(0),
                 ToolTip = "Space weather from NOAA, read once an hour.\n"
                         + "A and K: the earth's magnetic field — lower is better.\n"
                         + "SFI: solar flux — higher is better."
@@ -74,7 +77,40 @@ namespace HolyLogger
             _propColumnsByDropOrder.Add(sfiColumn);   // goes last
 
             ShowPropagation(SolarDataService.Latest);
-            return panel;
+
+            // A FRAME AROUND THE THREE OF THEM. The letters, the tubes and the numbers are one reading of
+            // one thing - the state of the sun - and standing loose in the header they read as three
+            // separate ornaments. The same dark blue as the table frame and the window's other edges, so
+            // it belongs to the program rather than announcing itself.
+            //
+            // AS TIGHT AS IT GOES WITHOUT TOUCHING. Each column already carries 2px of its own on each
+            // side, so the frame adds none there - it would have doubled the gap at the sides against a
+            // hairline at top and bottom, which is what made it look loose. One pixel above and below,
+            // two at the sides, and nothing touches the line.
+            var frame = new Border
+            {
+                BorderBrush = new SolidColorBrush(Color.FromRgb(0x15, 0x65, 0xC0)),
+                // THE ENTRY FORM'S OWN BLUE, taken from the palette rather than copied: FormBg is the
+                // light blue the main screen's QSO form is painted in, so the bars sit on the same
+                // ground as the program's main working area - and follow it through a colour-scheme
+                // change or an edit in Customize Colors.
+
+                BorderThickness = new Thickness(2),
+                CornerRadius = new CornerRadius(6),
+                // No padding at all now: the letter and the number stand against the line, and the two
+                // pixels this used to add were the other half of the four taken off the height.
+                Padding = new Thickness(0),
+                // WHERE IT STANDS IS SET BY THE HEADER, from the window's own origin - see
+                // ClusterPropagationBarsLeft. The 2 of top margin given there goes with the -2 on the
+                // letter inside (see BuildOneBar): together they bring the upper rim down two pixels
+                // and leave the lower one where it was.
+                HorizontalAlignment = HorizontalAlignment.Left,
+                VerticalAlignment = VerticalAlignment.Top,
+                Child = panel
+            };
+            frame.SetResourceReference(Border.BackgroundProperty, "FormBg");
+            _propagationFrame = frame;
+            return frame;
         }
 
         // One bar: its letter on top, the tube, and the number underneath. The tube holds a fixed
@@ -96,7 +132,15 @@ namespace HolyLogger
                 FontSize = 16,
                 FontWeight = FontWeights.Bold,
                 HorizontalAlignment = HorizontalAlignment.Center,
-                Margin = new Thickness(0, 0, 0, 2)
+                // Sits ON the tube: the letter and the number belong to the bar between them, and the
+                // air that used to be here read as three loose things rather than one instrument.
+                //
+                // The -2 on top is not a move: a 16-point line box carries a few empty pixels above the
+                // capital, and this takes two of them out of the column's height. Paired with the two
+                // added to the frame's own top margin below, the letter stays exactly where it is on
+                // screen while the frame's upper rim comes down to meet it - and its lower rim, which
+                // has nothing above it to give, does not move at all.
+                Margin = new Thickness(0, -2, 0, 0)
             });
 
             // THE RULER IS ALWAYS FULL HEIGHT. Given no height of its own it stretched to whatever the
@@ -158,7 +202,8 @@ namespace HolyLogger
                 FontSize = 16,
                 FontWeight = FontWeights.Bold,
                 HorizontalAlignment = HorizontalAlignment.Center,
-                Margin = new Thickness(0, 1, 0, 0)
+                // Pulled up two, like the letter above the tube: text and bar are one reading.
+                Margin = new Thickness(0, -1, 0, 0)
             };
             column.Children.Add(valueText);
 
@@ -278,9 +323,11 @@ namespace HolyLogger
             for (int i = 0; i < _propColumnsByDropOrder.Count; i++)
                 _propColumnsByDropOrder[i].Visibility = i < hide ? Visibility.Collapsed : Visibility.Visible;
 
-            // The panel itself only disappears when nothing is left in it, so its margin never takes
-            // room from the header for bars that are not there.
-            _propagationPanel.Visibility = fits > 0 ? Visibility.Visible : Visibility.Collapsed;
+            // THE FRAME goes with them when nothing is left to frame - hiding only the panel inside it
+            // would leave an empty blue box in the header - and its margin stops taking room for bars
+            // that are not there.
+            var host = (FrameworkElement)_propagationFrame ?? _propagationPanel;
+            host.Visibility = fits > 0 ? Visibility.Visible : Visibility.Collapsed;
         }
 
         // Started when the cluster window opens, stopped when it closes - there is no point reading

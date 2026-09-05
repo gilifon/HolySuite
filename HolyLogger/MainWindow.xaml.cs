@@ -599,8 +599,15 @@ namespace HolyLogger
             // the window it opens belongs to the main window and not to the splash - a dialog owned by
             // the splash is torn down with it. Runs whether or not automatic update checking is on:
             // this is about the version already installed, not about finding a newer one.
+            // NOT WHILE DEVELOPING (user, 2026-09-05). The flag this reads is the moment the program
+            // file was written, and every rebuild rewrites it - so a developer would be greeted as a
+            // fresh install at every single build. The call is left out of Debug builds altogether;
+            // Help > What's New opens the same window whenever it is wanted. An installed build is
+            // unaffected: it shows once after an install, and never again until the next one.
+#if !DEBUG
             Dispatcher.BeginInvoke(new Action(async () => await ShowWhatsNewIfVersionChanged()),
                                    DispatcherPriority.ApplicationIdle);
+#endif
 
             this.Loaded += MainWindow_Loaded;
                 Properties.Settings.Default.PropertyChanged += Settings_PropertyChanged;
@@ -12644,13 +12651,6 @@ namespace HolyLogger
                 bool freshInstall = !string.IsNullOrEmpty(stamp)
                                  && !string.Equals(stamp, ReleaseNotes.SeenInstallStamp, StringComparison.Ordinal);
 
-#if DEBUG
-                // RUNNING FROM VISUAL STUDIO: show it EVERY time, and never write the stamp that would
-                // stop it showing again. There is no other way to look at this window while working on
-                // it - it is by nature a once-per-install thing - and a released build is unaffected.
-                freshInstall = true;
-                stamp = null;
-#endif
 
                 string seen = ReleaseNotes.LastSeenVersion;
                 bool newVersion = !string.Equals(seen, current, StringComparison.Ordinal);

@@ -138,6 +138,7 @@ namespace HolyLogger
         HashSet<string> _clusterAlertCalls = null;                 // identity bases, upper case; built on demand
         StackPanel clusterAlertStrip = null;                        // pinned lines above the table (see BuildClusterAlertStrip)
         Button clusterAlertsBtn = null;                            // the bell button on the header canvas
+        TextBlock clusterAlertsCountText = null;                   // how many callsigns are on the watch list
         ClusterAlertsWindow clusterAlertsWindow = null;            // single instance
         DateTime _lastAlertCallsignAlertUtc = DateTime.MinValue;   // throttles the watch-list alert sound
         FrameworkElement clusterCenterLine = null;    // overlay that hosts the reference line (fills the table area)
@@ -179,7 +180,12 @@ namespace HolyLogger
         // Layout constants for the cluster window floating overlay panels
         const double ClusterOffScreenPosition = -400;
         const double ClusterHeaderCanvasHeight = 92;
-        const double ClusterAlertsBellGap = 14;  // gap between the "Latest" toggle and the Alerts bell below it
+        const double ClusterAlertsBellGap = 11;  // gap between the "Latest" toggle and the Alerts bell below it
+
+        // Where the A / K / SFI bars stand, measured from the header's left edge - which is the window's
+        // corner plus its own inset. Two numbers, changed here and nowhere else.
+        const double ClusterPropagationBarsLeft = 346;   // settled by eye
+        const double ClusterPropagationBarsTop = 26;
         const double ClusterTableTopGap = 10;
         const double ClusterShowBandsPanelWidth = 115;
         // Fixed half-width used to center the active-band indicator under the Freq column.
@@ -622,10 +628,15 @@ namespace HolyLogger
                 Width = Properties.Settings.Default.ClusterWindowWidth > 0 ? Properties.Settings.Default.ClusterWindowWidth : 600,
                 Height = Properties.Settings.Default.ClusterWindowHeight > 0 ? Properties.Settings.Default.ClusterWindowHeight : 400,
                 // WIDE ENOUGH TO STILL SHOW THE GEAR. 355 was the narrowest width that kept the
-                // band row whole; the gear now stands at the end of that row, and a window dragged to
-                // the old floor cut it off - which is the one control in the header that cannot be
-                // reached any other way. Its 26 and the 6 beside it are added to the floor.
-                MinWidth = 355 + 32,
+                // band row whole; the gear stands at the end of that row, and a window dragged to the
+                // old floor cut it off - which is the one control in the header that cannot be reached
+                // any other way. Its 26 and the 6 beside it are added to the floor.
+                //
+                // The last 4 are the frame that now goes round the A/K/SFI bars - 2px of border on each
+                // side, and no padding there. The left block, gear and all, is what gives way when the
+                // header runs out of room, so anything added on the RIGHT has to be added to this floor
+                // too or it is paid for by the gear.
+                MinWidth = 355 + 32 + 4,
                 MinHeight = 260,
                 Left = Properties.Settings.Default.ClusterWindowLeft,
                 Top = Properties.Settings.Default.ClusterWindowTop,
@@ -871,6 +882,7 @@ namespace HolyLogger
             clusterBandSelectorPanel = null;
             clusterModeSelectorPanel = null;
             clusterAlertsBtn = null;
+            clusterAlertsCountText = null;
             clusterAlertStrip = null;
             clusterBandSpotCountTexts.Clear();
             clusterLastMinutesComboBox = null;
@@ -1033,26 +1045,63 @@ namespace HolyLogger
             return new Viewbox { Width = size, Height = size, Stretch = Stretch.Uniform, Child = art };
         }
 
-        // The Alerts bell as a button, sitting under the "Latest" toggle.
+        // The Alerts bell as a button, sitting under the "Latest" toggle, with HOW MANY CALLSIGNS ARE ON
+        // THE LIST written across it - the same idea as the number on the undo icon above it. A list
+        // typed once and forgotten is the way this feature fails quietly; the number keeps it in sight.
         private Button BuildClusterAlertsButton()
         {
+            // White on the bell's red body, and NOT centred: the bell's mass is below its middle, so a
+            // number sitting on the true centre would stand half on the dome and half in the air.
+            clusterAlertsCountText = new TextBlock
+            {
+                Text = string.Empty,
+                FontSize = 11,
+                FontWeight = FontWeights.Bold,
+                Foreground = Brushes.White,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                TextAlignment = TextAlignment.Center,
+                Margin = new Thickness(0, -1, 0, 0),
+                IsHitTestVisible = false
+            };
+
+            var content = new Grid();
+            content.Children.Add(MakeAlertBell(28));
+            content.Children.Add(clusterAlertsCountText);
+
             var btn = new Button
             {
-                Width = 30,
-                Height = 30,
+                Width = 36,
+                Height = 36,
                 Background = Brushes.Transparent,
                 BorderBrush = Brushes.Transparent,
                 BorderThickness = new Thickness(0),
                 Padding = new Thickness(0),
                 Cursor = Cursors.Hand,
                 ToolTip = "Alerts: the callsigns you are waiting for. A spot for one of them rings, goes to the top row, and is framed in purple.",
-                Content = MakeAlertBell(22)
+                Content = content
             };
             // Opt out of the app-wide themed Button style, whose padding would squeeze the icon — the
             // undo icon just above it does the same.
             btn.Style = null;
             btn.Click += (s, e) => OpenClusterAlertsWindow();
+
+            UpdateClusterAlertsCount();
             return btn;
+        }
+
+        // THE NUMBER IS ALWAYS THERE, zero included (user, 2026-09-05): a bell reading 0 says the list
+        // is empty, which is worth knowing - a bell with nothing written on it only says nobody looked.
+        private void UpdateClusterAlertsCount()
+        {
+            if (clusterAlertsCountText == null) return;
+
+            int count = GetClusterAlertCallSet().Count;
+            clusterAlertsCountText.Text = count.ToString(CultureInfo.InvariantCulture);
+
+            // The bell's body is thirteen pixels across at its widest, so two digits at the one-digit
+            // size stand on its edges. They step down instead of running over the red.
+            clusterAlertsCountText.FontSize = clusterAlertsCountText.Text.Length >= 2 ? 9.5 : 11;
         }
 
         // The stock DataGrid template with ONE addition: row 1 of the inner ScrollViewer holds the
@@ -1622,7 +1671,9 @@ namespace HolyLogger
             {
                 Content = "Latest",
                 HorizontalAlignment = HorizontalAlignment.Center,
-                Margin = new Thickness(0, 2, 0, 0),
+                // -3, not 2: the icon row above took five pixels of top margin to stop being trimmed,
+                // and this gives them back so the button does not move at all.
+                Margin = new Thickness(0, -3, 0, 0),
                 Padding = new Thickness(6, 0, 6, 0),
                 Style = MakeClusterBandFilterBtnStyle(clusterLatestPerCallsignOn),
                 ToolTip = "Latest report per callsign: show only the newest spot for each callsign on each band, collapsing repeats. Off = every spot within the \"Last N min\" window."
@@ -1642,11 +1693,18 @@ namespace HolyLogger
             // icon's own row it is beside the icon and level with it, which is what was asked for.
             undoButton.VerticalAlignment = VerticalAlignment.Center;
 
+            // FIVE PIXELS DOWN, AND THE ROW STOPS BEING TRIMMED. The band row is lifted nine pixels
+            // (see bandRow below) and the top of this row was being cut with it - visible on the undo
+            // icon, and fatal to the gear's frame, whose top line simply never appeared. The row is
+            // given those five back here rather than by lifting the band row less, which would move the
+            // band checkboxes and the counters under them. "Latest" takes five off its own top margin,
+            // so it - and the Alerts bell, which is measured from it - stay exactly where they were.
             var iconRow = new StackPanel
             {
                 Orientation = Orientation.Horizontal,
                 HorizontalAlignment = HorizontalAlignment.Left,
-                VerticalAlignment = VerticalAlignment.Top
+                VerticalAlignment = VerticalAlignment.Top,
+                Margin = new Thickness(0, 5, 0, 0)
             };
             iconRow.Children.Add(undoButton);
             iconRow.Children.Add(BuildClusterGearButton());
@@ -1732,15 +1790,30 @@ namespace HolyLogger
             headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            // The A / K / SFI bars live in the right column, which until now was created and left
-            // empty. See MainWindow.Propagation.cs - the numbers are NOAA's, read once an hour, and
-            // the ranges and colours are The Holy Cluster's own, so the two can never disagree.
-            rightColumnPanel.Children.Add(BuildPropagationBars());
-
             Grid.SetColumn(leftColumnPanel, 0);
             Grid.SetColumn(rightColumnPanel, 2);
             headerGrid.Children.Add(leftColumnPanel);
             headerGrid.Children.Add(rightColumnPanel);
+
+            // THE A / K / SFI BARS ARE PLACED FROM THE WINDOW'S OWN ORIGIN, and from nothing else.
+            //
+            // They were right-aligned in the third column, which tied them to the window's right edge,
+            // and then to the "Last" dropdown, which tied them to a control that moves with the table's
+            // columns. Both were wrong in the same way: the bars are a fixed part of the header's
+            // picture, so their place is a measurement from the corner of the window and stays put.
+            //
+            // Spanning all three columns takes them out of the column measuring entirely - they neither
+            // widen a column nor take room from the spacer. See MainWindow.Propagation.cs for what they
+            // show: NOAA's numbers, with The Holy Cluster's own ranges and colours.
+            var propagationBars = BuildPropagationBars();
+            propagationBars.HorizontalAlignment = HorizontalAlignment.Left;
+            propagationBars.VerticalAlignment = VerticalAlignment.Top;
+            //  x and y: both from the header's left/top edge, which is the window's own inset away from
+            //  its corner. Nothing else is consulted.
+            propagationBars.Margin = new Thickness(ClusterPropagationBarsLeft, ClusterPropagationBarsTop, 0, 0);
+            Grid.SetColumn(propagationBars, 0);
+            Grid.SetColumnSpan(propagationBars, 3);
+            headerGrid.Children.Add(propagationBars);
 
             // The header block and the table are both capped to their container, so neither forces
             // the window width. The window's only floor is its fixed MinWidth (set at creation).
@@ -2515,8 +2588,10 @@ namespace HolyLogger
                 Content = "",                          // Segoe MDL2 "Settings" gear
                 FontFamily = new FontFamily("Segoe MDL2 Assets"),
                 FontSize = 16,
+                // A SQUARE, now that the row is no longer trimmed: 26 by 26, so the frame around the
+                // gear is a square and not the letterbox it had to be while its top was being cut.
                 Width = 26,
-                Height = 24,
+                Height = 26,
                 Padding = new Thickness(0),
                 HorizontalAlignment = HorizontalAlignment.Left,
                 VerticalAlignment = VerticalAlignment.Center,
@@ -2524,13 +2599,45 @@ namespace HolyLogger
                 ToolTip = "Cluster settings"
             };
 
-            // The app-wide button style pads to 12,5 and would squeeze the glyph; this one is its own
-            // small square.
+            // THE FRAME IS DRAWN INSIDE THE BUTTON, NOT ON ITS OUTER EDGE.
+            //
+            // The top rim kept going missing, and three explanations were tried and disproved: pixel
+            // rounding (snapping cured nothing), Windows' own ButtonChrome (rendering this button both
+            // ways, on its own, draws all four sides either way), and the title bar (the arithmetic puts
+            // the button's top three pixels clear of it). Whatever eats that line, it eats the OUTERMOST
+            // row of pixels - so the frame is moved off it: the template's outer border is a transparent
+            // one-pixel margin, and the visible frame sits inside that, where nothing can reach it.
+            //
+            // The button stays 26x24 and level with the undo icon; only the drawn frame moves inward.
             gear.Style = null;
+            gear.UseLayoutRounding = true;
+            gear.SnapsToDevicePixels = true;
             gear.SetResourceReference(Control.ForegroundProperty, "TextBrush");
             gear.SetResourceReference(Control.BackgroundProperty, "WindowBg");
             gear.SetResourceReference(Control.BorderBrushProperty, "MutedTextBrush");
             gear.BorderThickness = new Thickness(1);
+            gear.Template = (ControlTemplate)System.Windows.Markup.XamlReader.Parse(@"
+                <ControlTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation'
+                                 xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml'
+                                 TargetType='{x:Type Button}'>
+                    <Border Background='Transparent' Padding='1'>
+                        <Border x:Name='face'
+                                Background='{TemplateBinding Background}'
+                                BorderBrush='{TemplateBinding BorderBrush}'
+                                BorderThickness='{TemplateBinding BorderThickness}'
+                                SnapsToDevicePixels='True'>
+                            <ContentPresenter HorizontalAlignment='Center' VerticalAlignment='Center'/>
+                        </Border>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property='IsMouseOver' Value='True'>
+                            <Setter TargetName='face' Property='Background' Value='#A8D8FF'/>
+                        </Trigger>
+                        <Trigger Property='IsPressed' Value='True'>
+                            <Setter TargetName='face' Property='Background' Value='#7DC0F5'/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>");
 
             gear.Click += (s, e) => OpenClusterSettingsWindow();
             return gear;
@@ -2581,7 +2688,7 @@ namespace HolyLogger
                 Text = "min",
                 FontSize = 12,
                 VerticalAlignment = VerticalAlignment.Bottom,
-                Margin = new Thickness(4, 0, 0, 0)
+                Margin = new Thickness(4, 0, 0, -2)   // 2px lower: it sat a shade high against the box
             };
 
             // The spot-count badge is no longer part of this UTC-anchored panel; it floats on the
@@ -4993,6 +5100,7 @@ namespace HolyLogger
                 foreach (var spot in clusterAllSpots)
                     spot.IsAlertCallsign = IsClusterAlertCallsign(spot.DXCallsign);
 
+            UpdateClusterAlertsCount();   // the number on the bell follows the list
             RefreshClusterVisibleSpots();
         }
 
