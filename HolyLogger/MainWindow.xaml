@@ -2009,6 +2009,28 @@
                 <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightTextBrushKey}" Color="{x:Static SystemColors.HighlightTextColor}"/>
                 <!-- ConfirmHeaderStyle (and the confirmation columns' templates) come from the app-wide
                      Themes/ConfirmationColumns.xaml merged in App.xaml, shared with the Log Workshop. -->
+
+                <!-- Frequency and Band print their text in the band's own colour (BandColorConverter):
+                     orange for 10M, red for 20M, blue for 15M and so on. Those colours were chosen to
+                     read on the plain table background. When a callsign filter is active the whole row
+                     is tinted (green for a match in this log, blue for one from the copy-target log) and
+                     the band colours all but vanish against it. So these two cells keep the ordinary row
+                     colour whatever the row behind them is doing.
+                     Tag carries it: QSODataGrid_LoadingRow puts the row's own plain background (normal or
+                     alternating) there using the SAME odd/even test it uses for the row itself, so the two
+                     can never disagree - which relying on AlternationIndex here could, since the grid
+                     recycles row containers. The style is set per COLUMN (CellStyle), so it travels with
+                     the column if the user drags Frequency or Band to another position. -->
+                <Style x:Key="PlainRowBgCell" TargetType="DataGridCell" BasedOn="{StaticResource {x:Type DataGridCell}}">
+                    <Setter Property="Background"
+                            Value="{Binding RelativeSource={RelativeSource AncestorType=DataGridRow}, Path=Tag}"/>
+                    <Style.Triggers>
+                        <!-- Selection still wins: the selected row must look selected right across. -->
+                        <Trigger Property="IsSelected" Value="True">
+                            <Setter Property="Background" Value="{DynamicResource SelectionBg}"/>
+                        </Trigger>
+                    </Style.Triggers>
+                </Style>
             </DataGrid.Resources>
             <DataGrid.ColumnHeaderStyle>
                 <Style TargetType="DataGridColumnHeader">
@@ -2038,7 +2060,8 @@
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
-                <DataGridTemplateColumn Header="Frequency" IsReadOnly="True" CanUserSort="False" Width="Auto">
+                <DataGridTemplateColumn Header="Frequency" IsReadOnly="True" CanUserSort="False" Width="Auto"
+                                       CellStyle="{StaticResource PlainRowBgCell}">
                     <!-- Header content stays the string "Frequency" (column order/width persistence keys on
                          it); the template just appends a small bold "MHz". -->
                     <DataGridTemplateColumn.HeaderTemplate>
@@ -2110,7 +2133,8 @@
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
-                <DataGridTemplateColumn Header="Band" IsReadOnly="True" CanUserSort="False" Width="Auto">
+                <DataGridTemplateColumn Header="Band" IsReadOnly="True" CanUserSort="False" Width="Auto"
+                                       CellStyle="{StaticResource PlainRowBgCell}">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <TextBlock Text="{Binding Band}" Foreground="{Binding Band, Converter={StaticResource BandColorConverter}}"

@@ -2105,7 +2105,11 @@ namespace HolyLogger
                 QsoToUpdate.Name = TB_DX_Name.Text.Length > 25 ? TB_DX_Name.Text.Substring(0, 25) : TB_DX_Name.Text; //FName.Length > 25 ? FName.Substring(0, 25) : FName;
                 QsoToUpdate.MyCall = TB_MyCallsign.Text;
                 QsoToUpdate.Operator = TB_Operator.Text;
-                QsoToUpdate.STX = TB_MyHolyland.Text;
+                // Only when the square box is actually holding THIS QSO's sent exchange - it was loaded
+                // from it, or the operator typed a square into it during the edit. Otherwise the box is
+                // showing his own station square, and writing that back would replace the contest
+                // exchange the QSO was logged with (an IARU zone, a serial) with a Holyland square.
+                if (_squareBoxHoldsQsoExchange) QsoToUpdate.STX = TB_MyHolyland.Text;
                 QsoToUpdate.MyLocator = TB_MyLocator.Text;
                 QsoToUpdate.DXLocator = TB_DXLocator.Text;
                 ActivityToQso(QsoToUpdate);         // IOTA / SOTA / POTA / WWFF and the Other pair
@@ -2215,8 +2219,16 @@ namespace HolyLogger
             TB_Frequency.Text = QsoPreUpdate.Freq;
             TB_MyCallsign.Text = QsoPreUpdate.MyCall;
             TB_Operator.Text = QsoPreUpdate.Operator;
-            TB_MyHolyland.Text = QsoPreUpdate.STX;
-            TB_MyLocator.Text = QsoPreUpdate.MyLocator;
+            // The edit is over: the square box goes back to being the operator's own square, and stops
+            // standing for any QSO's sent exchange.
+            _squareBoxHoldsQsoExchange = false;
+            _writingStationBoxes = true;
+            try
+            {
+                TB_MyHolyland.Text = QsoPreUpdate.STX;
+                TB_MyLocator.Text = QsoPreUpdate.MyLocator;
+            }
+            finally { _writingStationBoxes = false; }
             //TB_DXLocator.Text = QsoPreUpdate.DXLocator;
             //TB_RSTRcvd.Text = QsoPreUpdate.RST_RCVD;
             //TB_RSTSent.Text = QsoPreUpdate.RST_SENT;
@@ -2814,6 +2826,14 @@ namespace HolyLogger
         {
             bool isAlternate = e.Row.GetIndex() % 2 != 0;
             bool isLastQso = LastQSO != null && e.Row.Item == LastQSO;
+
+            // The plain (untinted) colour this row would have had. The Frequency and Band cells paint
+            // themselves with it through the PlainRowBgCell style in the XAML, so their band-coloured
+            // text stays readable when the row itself is tinted by the filter. Set from the same
+            // isAlternate test used just below, so the stripes always line up.
+            e.Row.Tag = isAlternate
+                ? ThemeManager.Brush("GridAltRowBg")
+                : ThemeManager.Brush("GridRowBg");
 
             if (FilteredQsos != null && !isLastQso)
             {
@@ -8830,8 +8850,25 @@ namespace HolyLogger
                 TB_Frequency.Text = QsoToUpdate.Freq;
                 TB_MyCallsign.Text = QsoToUpdate.MyCall;
                 TB_Operator.Text = QsoToUpdate.Operator;
-                TB_MyHolyland.Text = QsoToUpdate.STX;
-                TB_MyLocator.Text = QsoToUpdate.MyLocator;
+
+                // THE HOLYLAND SQUARE BOX ONLY EVER HOLDS A HOLYLAND SQUARE. What a QSO stores in
+                // stx_string is the exchange that was SENT, and that is a square only in the Holyland
+                // contest: in IARU it is an ITU zone (a 4Z station sends 39), in CQ WW a CQ zone,
+                // elsewhere a serial number. Dropping that into a box labelled "Holyland Square" - a
+                // box two-way bound to the operator's own saved square - showed him a number where his
+                // square belongs and could overwrite the real one. So load it only when it really is a
+                // square; otherwise his own square stays put and Update leaves the QSO's sent exchange
+                // untouched (see the write-back in the update path). A sent exchange that is not a
+                // square is still editable in the Log Workshop's "Exchange Sent" field.
+                _squareBoxHoldsQsoExchange = IsHolylandSquare(QsoToUpdate.STX);
+                _writingStationBoxes = true;
+                try
+                {
+                    if (_squareBoxHoldsQsoExchange) TB_MyHolyland.Text = QsoToUpdate.STX;
+                    TB_MyLocator.Text = QsoToUpdate.MyLocator;
+                }
+                finally { _writingStationBoxes = false; }
+
                 TB_DXLocator.Text = QsoToUpdate.DXLocator;
                 ActivityFromQso(QsoToUpdate);       // IOTA / SOTA / POTA / WWFF and the Other pair
                 TB_RSTRcvd.Text = QsoToUpdate.RST_RCVD;
@@ -8926,7 +8963,12 @@ namespace HolyLogger
 
             var backgroundColor = (state == State.Edit) ? editModeColor : normalColor;
 
-            // Only highlight QSO-specific fields, not user station information
+            // THE RULE: every box the edit can change wears the yellow. If a field is loaded from the
+            // QSO by LoadQsoForUpdate and written back by Update, it is part of the edit and has to say
+            // so - otherwise the operator changes his own station details thinking he is only fixing an
+            // old contact. The two exceptions are My Callsign and Operator, and only because those two
+            // already carry a colour that means something else: setLockBtnState paints them red when
+            // unlocked and blue when locked, and yellow on top would hide the lock.
             TB_Frequency.Background = backgroundColor;
             TB_DXCallsign.Background = backgroundColor;
             TB_Exchange.Background = backgroundColor;
@@ -8945,6 +8987,16 @@ namespace HolyLogger
             CB_Mode.Background = backgroundColor;
             TB_ITUZone.Background = backgroundColor;
             TB_CQZone.Background = backgroundColor;
+
+            // My Locator and My Holyland square. They look like station settings (and are bound to
+            // them), but the edit loads the QSO's own values into them and Update writes them back, so
+            // they change with the contact like every box above.
+            TB_MyLocator.Background = backgroundColor;
+            TB_MyHolyland.Background = backgroundColor;
+
+            // Date and time. Editable, loaded from the QSO and saved back with it.
+            TP_Date.Background = backgroundColor;
+            TP_Time.Background = backgroundColor;
 
             // The activity boxes take the same yellow, but they also paint themselves pale red while
             // what is in them is not a valid reference. Remember which colour "not complaining" means
@@ -13480,9 +13532,25 @@ namespace HolyLogger
             alert.ShowDialog();
         }
         
+        // Set while the CODE is writing into the My Locator / My Holyland Square boxes, so a
+        // programmatic load isn't mistaken for the operator typing.
+        private bool _writingStationBoxes;
+
+        // True when the Holyland Square box is standing for the QSO being edited - it was loaded from
+        // that QSO's sent exchange, or the operator typed a square into it during the edit. Only then
+        // does Update write the box back to the QSO. False means the box is just showing his own
+        // station square and the QSO's stored exchange must be left alone.
+        private bool _squareBoxHoldsQsoExchange;
+
         // Shared by the My Locator and My Holyland Square boxes (both wire TextChanged here).
         private void TB_MyHolyland_TextChanged(object sender, TextChangedEventArgs e)
         {
+            // The operator typed (or pasted) a square while editing a QSO: from here on the box is his
+            // answer for THIS QSO, so Update saves it - that is how a square is added to a QSO that
+            // was logged without one.
+            if (!_writingStationBoxes && state == State.Edit && ReferenceEquals(sender, TB_MyHolyland))
+                _squareBoxHoldsQsoExchange = true;
+
             if (signboard != null)
             {
                 signboard.signboardData.Square = TB_MyHolyland.Text;
@@ -13504,6 +13572,14 @@ namespace HolyLogger
         private static readonly HashSet<string> _validHolylandSquares = new HashSet<string>(
             HolyParser.HolyLogParser.validSquares.Select(s => s.Replace("-", string.Empty).ToUpperInvariant()),
             StringComparer.OrdinalIgnoreCase);
+
+        // Is this stored value a real Holyland square? Blank is not one - it is simply no square.
+        private static bool IsHolylandSquare(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return false;
+            return _validHolylandSquares.Contains(
+                value.Trim().Replace("-", string.Empty).Replace(" ", string.Empty).ToUpperInvariant());
+        }
 
         // Validates the operator's own Holyland square against the official list. Blank is fine (only
         // Israeli 4X/4Z stations send a square). Only user edits fire this — programmatic changes don't.
