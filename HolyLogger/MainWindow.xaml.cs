@@ -4101,7 +4101,7 @@ namespace HolyLogger
                     "Sent instead of the CQ when the radio has moved off the frequency it last called "
                     + "on, or has sat on it too long without calling. Recommended: QRL?",
                     extraText,
-                    "What the button sends once the frequency has been asked about.",
+                    "What the button sends once QRL was asked",
                     out extra);
 
                 extraText = extra;
@@ -5471,7 +5471,7 @@ namespace HolyLogger
                 "Sent instead of the CQ when the radio has moved off the frequency it last called "
                 + "on, or has sat on it too long without calling. Recommended: QRL?",
                 qrl,
-                "What the button sends once the frequency has been asked about.",
+                "What the button sends once QRL was asked",
                 out extra);
 
             if (result == null) return null;
