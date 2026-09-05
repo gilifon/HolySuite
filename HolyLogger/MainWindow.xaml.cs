@@ -629,8 +629,7 @@ namespace HolyLogger
 
             // Lock via IsReadOnly (not IsEnabled) so the field keeps full opacity — a disabled TextBox
             // dims to ~56%, which washed out the lock-blue background and greyed the text.
-            TB_MyCallsign.IsReadOnly = Properties.Settings.Default.isLocked;
-            TB_Operator.IsReadOnly = Properties.Settings.Default.isLocked;
+            ApplyStationBoxLock();
             setLockBtnState();
 
             TB_Comment.IsEnabled = !Properties.Settings.Default.isCommentLocked;
@@ -1835,8 +1834,7 @@ namespace HolyLogger
             Properties.Settings.Default.isLocked = !Properties.Settings.Default.isLocked;
             // Lock via IsReadOnly (not IsEnabled) so the field keeps full opacity — a disabled TextBox
             // dims to ~56%, which washed out the lock-blue background and greyed the text.
-            TB_MyCallsign.IsReadOnly = Properties.Settings.Default.isLocked;
-            TB_Operator.IsReadOnly = Properties.Settings.Default.isLocked;
+            ApplyStationBoxLock();
             //TB_MyGrid.IsEnabled = !Properties.Settings.Default.isLocked;
             setLockBtnState();
 
@@ -1857,14 +1855,35 @@ namespace HolyLogger
 
             if (LockBtnBorder != null) LockBtnBorder.Background = bg;
 
-            // Callsign fields carry the same red/blue background as the lock, with bold black text in
-            // both states (legible on the light red and the vivid lock-blue alike).
-            TB_MyCallsign.Background = bg;
-            TB_Operator.Background = bg;
-            TB_MyCallsign.Foreground = System.Windows.Media.Brushes.Black;
-            TB_Operator.Foreground = System.Windows.Media.Brushes.Black;
-            TB_MyCallsign.FontWeight = FontWeights.Bold;
-            TB_Operator.FontWeight = FontWeights.Bold;
+            // The station boxes take a lighter blue than the lock button when locked (#90CAF9 against
+            // the button's #64B5F6 - the next step up the same blue). The button is a small square of
+            // colour and can carry the strong shade; four filled boxes of it across the top of the form
+            // were heavy, and the callsigns inside them read better on the lighter ground.
+            var boxLocked = new SolidColorBrush(Color.FromRgb(0x90, 0xCA, 0xF9));
+            var boxBg = locked ? boxLocked : lightRed;
+
+            // The four station boxes carry the same red/blue background as the lock, with bold black
+            // text in both states (legible on the light red and the lock-blue alike). They describe the
+            // station, not the contact, so they never take the edit-mode yellow - this colour is the
+            // only thing they wear, and it says whether they can be typed in.
+            foreach (var box in new[] { TB_MyCallsign, TB_Operator, TB_MyLocator, TB_MyHolyland })
+            {
+                if (box == null) continue;
+                box.Background = boxBg;
+                box.Foreground = System.Windows.Media.Brushes.Black;
+                box.FontWeight = FontWeights.Bold;
+            }
+        }
+
+        // The lock covers all four station boxes. Read-only rather than disabled, for the reason given
+        // at each call site: a disabled TextBox dims to ~56% and washes the lock colour out.
+        private void ApplyStationBoxLock()
+        {
+            bool locked = Properties.Settings.Default.isLocked;
+            if (TB_MyCallsign != null) TB_MyCallsign.IsReadOnly = locked;
+            if (TB_Operator != null) TB_Operator.IsReadOnly = locked;
+            if (TB_MyLocator != null) TB_MyLocator.IsReadOnly = locked;
+            if (TB_MyHolyland != null) TB_MyHolyland.IsReadOnly = locked;
         }
 
         private void LockComment_Btn_MouseUp(object sender, MouseButtonEventArgs e)
@@ -2105,12 +2124,11 @@ namespace HolyLogger
                 QsoToUpdate.Name = TB_DX_Name.Text.Length > 25 ? TB_DX_Name.Text.Substring(0, 25) : TB_DX_Name.Text; //FName.Length > 25 ? FName.Substring(0, 25) : FName;
                 QsoToUpdate.MyCall = TB_MyCallsign.Text;
                 QsoToUpdate.Operator = TB_Operator.Text;
-                // Only when the square box is actually holding THIS QSO's sent exchange - it was loaded
-                // from it, or the operator typed a square into it during the edit. Otherwise the box is
-                // showing his own station square, and writing that back would replace the contest
-                // exchange the QSO was logged with (an IARU zone, a serial) with a Holyland square.
-                if (_squareBoxHoldsQsoExchange) QsoToUpdate.STX = TB_MyHolyland.Text;
-                QsoToUpdate.MyLocator = TB_MyLocator.Text;
+                // STX and MyLocator are deliberately absent: the Holyland Square and My Locator boxes
+                // are station settings the edit never loaded, so writing them back would overwrite what
+                // the QSO was logged with (its sent contest exchange, its locator at the time) with
+                // whatever the station happens to be set to today. Both are edited per QSO in the Log
+                // Workshop editor instead.
                 QsoToUpdate.DXLocator = TB_DXLocator.Text;
                 ActivityToQso(QsoToUpdate);         // IOTA / SOTA / POTA / WWFF and the Other pair
                 QsoToUpdate.RST_RCVD = TB_RSTRcvd.Text;
@@ -2219,16 +2237,7 @@ namespace HolyLogger
             TB_Frequency.Text = QsoPreUpdate.Freq;
             TB_MyCallsign.Text = QsoPreUpdate.MyCall;
             TB_Operator.Text = QsoPreUpdate.Operator;
-            // The edit is over: the square box goes back to being the operator's own square, and stops
-            // standing for any QSO's sent exchange.
-            _squareBoxHoldsQsoExchange = false;
-            _writingStationBoxes = true;
-            try
-            {
-                TB_MyHolyland.Text = QsoPreUpdate.STX;
-                TB_MyLocator.Text = QsoPreUpdate.MyLocator;
-            }
-            finally { _writingStationBoxes = false; }
+            // Nothing to restore for My Locator or Holyland Square - the edit never wrote to them.
             //TB_DXLocator.Text = QsoPreUpdate.DXLocator;
             //TB_RSTRcvd.Text = QsoPreUpdate.RST_RCVD;
             //TB_RSTSent.Text = QsoPreUpdate.RST_SENT;
@@ -8823,8 +8832,8 @@ namespace HolyLogger
             QsoPreUpdate.Freq = TB_Frequency.Text;
             QsoPreUpdate.MyCall = TB_MyCallsign.Text;
             QsoPreUpdate.Operator = TB_Operator.Text;
-            QsoPreUpdate.STX = TB_MyHolyland.Text;
-            QsoPreUpdate.MyLocator = TB_MyLocator.Text;
+            // My Locator and Holyland Square are not held: the edit does not touch those boxes, so
+            // there is nothing to put back when it ends.
             QsoPreUpdate.DXLocator = TB_DXLocator.Text;
             QsoPreUpdate.RST_RCVD = TB_RSTRcvd.Text;
             QsoPreUpdate.RST_SENT = TB_RSTSent.Text;
@@ -8851,24 +8860,13 @@ namespace HolyLogger
                 TB_MyCallsign.Text = QsoToUpdate.MyCall;
                 TB_Operator.Text = QsoToUpdate.Operator;
 
-                // THE HOLYLAND SQUARE BOX ONLY EVER HOLDS A HOLYLAND SQUARE. What a QSO stores in
-                // stx_string is the exchange that was SENT, and that is a square only in the Holyland
-                // contest: in IARU it is an ITU zone (a 4Z station sends 39), in CQ WW a CQ zone,
-                // elsewhere a serial number. Dropping that into a box labelled "Holyland Square" - a
-                // box two-way bound to the operator's own saved square - showed him a number where his
-                // square belongs and could overwrite the real one. So load it only when it really is a
-                // square; otherwise his own square stays put and Update leaves the QSO's sent exchange
-                // untouched (see the write-back in the update path). A sent exchange that is not a
-                // square is still editable in the Log Workshop's "Exchange Sent" field.
-                _squareBoxHoldsQsoExchange = IsHolylandSquare(QsoToUpdate.STX);
-                _writingStationBoxes = true;
-                try
-                {
-                    if (_squareBoxHoldsQsoExchange) TB_MyHolyland.Text = QsoToUpdate.STX;
-                    TB_MyLocator.Text = QsoToUpdate.MyLocator;
-                }
-                finally { _writingStationBoxes = false; }
-
+                // MY LOCATOR AND HOLYLAND SQUARE ARE NOT LOADED. They are the station's own settings,
+                // and the edit leaves them exactly as the operator set them. Loading the QSO into them
+                // did real damage: a QSO holding no locator emptied the box, and with it the saved
+                // setting the map reads, so the map went dead; and stx_string is the exchange that was
+                // SENT, a Holyland square only in the Holyland contest - in IARU it is an ITU zone, in
+                // CQ WW a CQ zone, elsewhere a serial - so a contest QSO put a number where the square
+                // belongs. Both stay editable per QSO in the Log Workshop editor.
                 TB_DXLocator.Text = QsoToUpdate.DXLocator;
                 ActivityFromQso(QsoToUpdate);       // IOTA / SOTA / POTA / WWFF and the Other pair
                 TB_RSTRcvd.Text = QsoToUpdate.RST_RCVD;
@@ -8966,9 +8964,12 @@ namespace HolyLogger
             // THE RULE: every box the edit can change wears the yellow. If a field is loaded from the
             // QSO by LoadQsoForUpdate and written back by Update, it is part of the edit and has to say
             // so - otherwise the operator changes his own station details thinking he is only fixing an
-            // old contact. The two exceptions are My Callsign and Operator, and only because those two
-            // already carry a colour that means something else: setLockBtnState paints them red when
-            // unlocked and blue when locked, and yellow on top would hide the lock.
+            // old contact.
+            //
+            // The four station boxes are NOT in this list and never turn yellow: My Callsign, Operator,
+            // My Locator and Holyland Square describe the station, not the contact. They carry the
+            // lock's own colour instead - red while they can be typed in, blue once the lock is shut
+            // (setLockBtnState) - and yellow on top would hide whether the lock is on.
             TB_Frequency.Background = backgroundColor;
             TB_DXCallsign.Background = backgroundColor;
             TB_Exchange.Background = backgroundColor;
@@ -8987,12 +8988,6 @@ namespace HolyLogger
             CB_Mode.Background = backgroundColor;
             TB_ITUZone.Background = backgroundColor;
             TB_CQZone.Background = backgroundColor;
-
-            // My Locator and My Holyland square. They look like station settings (and are bound to
-            // them), but the edit loads the QSO's own values into them and Update writes them back, so
-            // they change with the contact like every box above.
-            TB_MyLocator.Background = backgroundColor;
-            TB_MyHolyland.Background = backgroundColor;
 
             // Date and time. Editable, loaded from the QSO and saved back with it.
             TP_Date.Background = backgroundColor;
@@ -9058,14 +9053,14 @@ namespace HolyLogger
                 // off/offline or Manual, which UpdateStatus owns and re-applies).
                 UpdateStatus();
 
+                // The red frame is not painted here any more. This ran only on a save attempt, and only
+                // with validation switched on, and it wrote the colour as a LOCAL value - so the box
+                // was left wearing a plain grey that no longer matched the theme, and nothing could
+                // change it back. The style on the box (see the XAML) reddens it the moment it is
+                // empty, whatever else is going on. All that is left to do here is fail the check.
                 if (string.IsNullOrWhiteSpace(TB_MyCallsign.Text))
                 {
                     allOK = false;
-                    TB_MyCallsign.BorderBrush = System.Windows.Media.Brushes.Red;
-                }
-                else
-                {
-                    TB_MyCallsign.BorderBrush = System.Windows.Media.Brushes.Gray;
                 }
 
                 //if (TB_MyCallsign.Text.StartsWith("4X") || TB_MyCallsign.Text.StartsWith("4Z"))
@@ -10990,8 +10985,7 @@ namespace HolyLogger
             NetworkFlagItem.Visibility = Properties.Settings.Default.ShowNetworkFlag ? Visibility.Visible : Visibility.Collapsed;
             // Lock via IsReadOnly (not IsEnabled) so the field keeps full opacity — a disabled TextBox
             // dims to ~56%, which washed out the lock-blue background and greyed the text.
-            TB_MyCallsign.IsReadOnly = Properties.Settings.Default.isLocked;
-            TB_Operator.IsReadOnly = Properties.Settings.Default.isLocked;
+            ApplyStationBoxLock();
             setLockBtnState();
 
             // The eQSL accounts table may have changed (a callsign added/removed). Re-evaluate the "!"
@@ -13532,25 +13526,9 @@ namespace HolyLogger
             alert.ShowDialog();
         }
         
-        // Set while the CODE is writing into the My Locator / My Holyland Square boxes, so a
-        // programmatic load isn't mistaken for the operator typing.
-        private bool _writingStationBoxes;
-
-        // True when the Holyland Square box is standing for the QSO being edited - it was loaded from
-        // that QSO's sent exchange, or the operator typed a square into it during the edit. Only then
-        // does Update write the box back to the QSO. False means the box is just showing his own
-        // station square and the QSO's stored exchange must be left alone.
-        private bool _squareBoxHoldsQsoExchange;
-
         // Shared by the My Locator and My Holyland Square boxes (both wire TextChanged here).
         private void TB_MyHolyland_TextChanged(object sender, TextChangedEventArgs e)
         {
-            // The operator typed (or pasted) a square while editing a QSO: from here on the box is his
-            // answer for THIS QSO, so Update saves it - that is how a square is added to a QSO that
-            // was logged without one.
-            if (!_writingStationBoxes && state == State.Edit && ReferenceEquals(sender, TB_MyHolyland))
-                _squareBoxHoldsQsoExchange = true;
-
             if (signboard != null)
             {
                 signboard.signboardData.Square = TB_MyHolyland.Text;
@@ -13592,8 +13570,7 @@ namespace HolyLogger
             if (string.IsNullOrEmpty(typed))
                 return;
 
-            string normalized = typed.Replace("-", string.Empty).Replace(" ", string.Empty);
-            if (!_validHolylandSquares.Contains(normalized))
+            if (!IsHolylandSquare(typed))
             {
                 e.Handled = true;
                 WarnInvalidField(TB_MyHolyland,

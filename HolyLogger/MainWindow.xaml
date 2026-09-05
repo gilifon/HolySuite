@@ -473,6 +473,63 @@
     <Border BorderBrush="White" BorderThickness="2" CornerRadius="8">
     <Grid x:Name="AddLogGrid" ShowGridLines="false" Margin="0" TextElement.Foreground="{DynamicResource TextBrush}"
           SizeChanged="AddLogGrid_SizeChanged">
+        <Grid.Resources>
+            <!-- The red "you have not filled this in" word that sits inside an empty station box. It is
+                 a Border laid over the box (same Margin/Width/Height, hit-testing off) rather than real
+                 text, so the box itself stays empty and nothing has to be stripped out before the value
+                 is used. #BB3300 is the Danger red, written out rather than taken from the theme because
+                 the boxes underneath carry the lock's fixed red/blue whatever the scheme is. -->
+            <!-- THE FOUR STATION BOXES KEEP THE FRAME THEY ARE GIVEN. Windows' own TextBox template
+                 repaints its border from inside on two triggers - IsMouseOver to #C5DAED and
+                 IsKeyboardFocused to #B5CFE7 - and a template trigger beats anything a style sets. Both
+                 are pale blue, which is invisible against these boxes' lock colours (#90CAF9 locked,
+                 #FFB0B0 unlocked): the frame appeared at startup and then vanished the moment the
+                 pointer arrived, and the red "you have not filled this in" frame never showed at all,
+                 because looking at the box is hovering over it. This template is the stock one with
+                 those two triggers left out, so the frame is exactly what the style asks for. Focus is
+                 still plain to see - the caret is in the box. -->
+            <Style x:Key="StationBox" TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="TextBox">
+                            <Border Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                    Padding="{TemplateBinding Padding}" SnapsToDevicePixels="True">
+                                <ScrollViewer x:Name="PART_ContentHost" Focusable="False"
+                                              HorizontalScrollBarVisibility="Hidden"
+                                              VerticalScrollBarVisibility="Hidden"/>
+                            </Border>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+                <Style.Triggers>
+                    <!-- Hover says "you can type in here", so it fires only while the box is unlocked -
+                         a locked box does not answer the mouse and must not pretend it does. The frame
+                         both darkens to the form blue and doubles: the thickness is what carries the
+                         message when the colour cannot, as on an empty Station Callsign, where the red
+                         "Must fill" frame stays red and only grows. Windows' own pale hover blue is
+                         what caused the trouble here in the first place - see the template above. -->
+                    <MultiTrigger>
+                        <MultiTrigger.Conditions>
+                            <Condition Property="IsMouseOver" Value="True"/>
+                            <Condition Property="IsReadOnly" Value="False"/>
+                        </MultiTrigger.Conditions>
+                        <Setter Property="BorderBrush" Value="#1565C0"/>
+                        <Setter Property="BorderThickness" Value="2"/>
+                    </MultiTrigger>
+                </Style.Triggers>
+            </Style>
+
+            <Style x:Key="FieldHintText" TargetType="TextBlock">
+                <Setter Property="FontSize" Value="16"/>
+                <Setter Property="FontWeight" Value="Bold"/>
+                <Setter Property="Foreground" Value="#BB3300"/>
+                <Setter Property="VerticalAlignment" Value="Center"/>
+                <Setter Property="HorizontalAlignment" Value="Left"/>
+                <Setter Property="Margin" Value="5,0,0,0"/>
+            </Style>
+        </Grid.Resources>
         <Grid.RowDefinitions>
             <RowDefinition Height="70" />
             <RowDefinition x:Name="MainForm" Height="344" />
@@ -1231,7 +1288,38 @@
             <LineBreak />
             <Run Text="Callsign" />
         </TextBlock>
-        <TextBox x:Name="TB_MyCallsign" HorizontalAlignment="Left" Height="28" Margin="71,11,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="113" CharacterCasing="Upper" Grid.Row="1" Text="{Binding Default.my_callsign, Source={StaticResource Settings}}" TextChanged="TB_MyCallsign_TextChanged" GotFocus="TB_MyCallsign_GotFocus" LostFocus="TB_MyCallsign_LostFocus" PreviewKeyDown="PreventSpaceInCallsign" FontSize="16" MaxLength="14" BorderBrush="#FFABADB3" TabIndex="1"/>
+        <TextBox x:Name="TB_MyCallsign" HorizontalAlignment="Left" Height="28" Margin="71,11,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="113" CharacterCasing="Upper" Grid.Row="1" Text="{Binding Default.my_callsign, Source={StaticResource Settings}}" TextChanged="TB_MyCallsign_TextChanged" GotFocus="TB_MyCallsign_GotFocus" LostFocus="TB_MyCallsign_LostFocus" PreviewKeyDown="PreventSpaceInCallsign" FontSize="16" MaxLength="14" TabIndex="1">
+            <!-- No BorderBrush of its own any more. It used to carry #ABADB3, so pale against the form
+                 that this box alone looked unframed while every other one wore the app's InputBorder.
+                 It takes that frame now, and turns red the moment it is empty - the one box the program
+                 will not log a QSO without. Red written out rather than the Danger resource because
+                 this box's fill is the lock's fixed red/blue in every scheme. -->
+            <TextBox.Style>
+                <Style TargetType="TextBox" BasedOn="{StaticResource StationBox}">
+                    <Style.Triggers>
+                        <Trigger Property="Text" Value="">
+                            <Setter Property="BorderBrush" Value="#BB3300"/>
+                        </Trigger>
+                    </Style.Triggers>
+                </Style>
+            </TextBox.Style>
+        </TextBox>
+        <!-- "Must fill", not "Please fill": the station callsign is the one box the program will not
+             log a QSO without. It says so here instead of in a message box after the fact. -->
+        <Border Grid.Row="1" Margin="71,11,0,0" Width="113" Height="28" HorizontalAlignment="Left"
+                VerticalAlignment="Top" IsHitTestVisible="False">
+            <Border.Style>
+                <Style TargetType="Border">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding Text, ElementName=TB_MyCallsign}" Value="">
+                            <Setter Property="Visibility" Value="Visible"/>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Border.Style>
+            <TextBlock Text="Must fill" Style="{StaticResource FieldHintText}"/>
+        </Border>
         <!-- Shown OVER THE DX CALLSIGN box when the current station callsign has no log set for it (the
              active log's identity is a different callsign). It masks the DX box and blocks typing a DX
              callsign, so a QSO can't be started until a log is set for the current station callsign;
@@ -1383,13 +1471,43 @@
             <LineBreak />
             <Run Text="Locator" />
         </TextBlock>
-        <TextBox x:Name="TB_MyLocator" HorizontalAlignment="Left" Margin="252,11,0,0" Grid.Row="1" TextWrapping="NoWrap" VerticalAlignment="Top" CharacterCasing="Upper" Text="{Binding Default.my_locator, Source={StaticResource Settings}}" Width="72" Height="28" TextChanged="TB_MyHolyland_TextChanged" PreviewLostKeyboardFocus="TB_MyLocator_PreviewLostKeyboardFocus" FontSize="16" TextAlignment="Left" HorizontalContentAlignment="Left" VerticalContentAlignment="Center" MaxLength="6" TabIndex="3"/>
+        <TextBox x:Name="TB_MyLocator" HorizontalAlignment="Left" Margin="252,11,0,0" Grid.Row="1" TextWrapping="NoWrap" VerticalAlignment="Top" CharacterCasing="Upper" Text="{Binding Default.my_locator, Source={StaticResource Settings}}" Width="72" Height="28" TextChanged="TB_MyHolyland_TextChanged" PreviewLostKeyboardFocus="TB_MyLocator_PreviewLostKeyboardFocus" FontSize="16" TextAlignment="Left" HorizontalContentAlignment="Left" VerticalContentAlignment="Center" MaxLength="6" TabIndex="3" Style="{StaticResource StationBox}"/>
+        <!-- "Fill me", not "Please fill": this box is 72px wide and "Please fill" needs 71px of text
+             room inside a 62px opening, so it would be cut off. Same for the Holyland square below. -->
+        <Border Grid.Row="1" Margin="252,11,0,0" Width="72" Height="28" HorizontalAlignment="Left"
+                VerticalAlignment="Top" IsHitTestVisible="False">
+            <Border.Style>
+                <Style TargetType="Border">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding Text, ElementName=TB_MyLocator}" Value="">
+                            <Setter Property="Visibility" Value="Visible"/>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Border.Style>
+            <TextBlock Text="Fill me" Style="{StaticResource FieldHintText}"/>
+        </Border>
         <TextBlock HorizontalAlignment="Left" Margin="332,12,0,0" VerticalAlignment="Top" Grid.Row="1" Width="65" Height="38" FontSize="15" ToolTip="Your Holyland square" TextAlignment="Left" LineHeight="14" LineStackingStrategy="BlockLineHeight">
             <Run Text="Holyland" FontWeight="Bold" />
             <LineBreak />
             <Run Text="Square" />
         </TextBlock>
-        <TextBox x:Name="TB_MyHolyland" HorizontalAlignment="Left" Margin="400,11,0,0" Grid.Row="1" TextWrapping="NoWrap" VerticalAlignment="Top" CharacterCasing="Upper" Text="{Binding Default.my_square, Source={StaticResource Settings}}" Width="58" Height="28" TextChanged="TB_MyHolyland_TextChanged" PreviewLostKeyboardFocus="TB_MyHolyland_PreviewLostKeyboardFocus" FontSize="16" TextAlignment="Left" HorizontalContentAlignment="Left" VerticalContentAlignment="Center" MaxLength="5" TabIndex="4"/>
+        <TextBox x:Name="TB_MyHolyland" HorizontalAlignment="Left" Margin="400,11,0,0" Grid.Row="1" TextWrapping="NoWrap" VerticalAlignment="Top" CharacterCasing="Upper" Text="{Binding Default.my_square, Source={StaticResource Settings}}" Width="58" Height="28" TextChanged="TB_MyHolyland_TextChanged" PreviewLostKeyboardFocus="TB_MyHolyland_PreviewLostKeyboardFocus" FontSize="16" TextAlignment="Left" HorizontalContentAlignment="Left" VerticalContentAlignment="Center" MaxLength="5" TabIndex="4" Style="{StaticResource StationBox}"/>
+        <Border Grid.Row="1" Margin="400,11,0,0" Width="58" Height="28" HorizontalAlignment="Left"
+                VerticalAlignment="Top" IsHitTestVisible="False">
+            <Border.Style>
+                <Style TargetType="Border">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding Text, ElementName=TB_MyHolyland}" Value="">
+                            <Setter Property="Visibility" Value="Visible"/>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Border.Style>
+            <TextBlock Text="Fill me" Style="{StaticResource FieldHintText}"/>
+        </Border>
         <Label Content="Mode" HorizontalAlignment="Left" Margin="479,48,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16"  ToolTip="Select the working mode"/>
         <ComboBox x:Name="CB_Mode" Text="{Binding Default.Mode, Source={StaticResource Settings}}" HorizontalAlignment="Left" Margin="528,49,0,0" Grid.Row="1" VerticalAlignment="Top" Width="50" FontSize="16" Height="28" TabIndex="7" SelectionChanged="CB_Mode_SelectionChanged" BorderBrush="#FFABADB3" Background="{DynamicResource ControlBg}" Foreground="{DynamicResource TextBrush}"
                   Template="{StaticResource FlatComboTemplate}">
@@ -1477,6 +1595,33 @@
         </Border>
         <TextBlock HorizontalAlignment="Left" Margin="12,82,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" ToolTip="The DX Station Callsign" TextAlignment="Left"><Run Text="DX" FontWeight="Bold" /><Run Text=" Callsign" /></TextBlock>
         <TextBox x:Name="TB_DXCallsign" HorizontalAlignment="Left" Height="28" Margin="101,87,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="130" CharacterCasing="Upper" Grid.Row="1" Text="" TextChanged="TB_DXCallsign_TextChanged" LostFocus="TB_DXCallsign_LostFocus" PreviewKeyDown="TB_DXCallsign_KeyDown" PreviewMouseLeftButtonDown="TB_DXCallsign_PreviewMouseLeftButtonDown" FontSize="16" MaxLength="15" TabIndex="8"/>
+        <!-- With no station callsign the program will not log anything, and this is the box the
+             operator is looking at when he starts, so the reminder is put here rather than in a message
+             he would have to dismiss. It goes as soon as either box has something in it. Danger (the
+             theme red) and not the fixed #BB3300, because this box wears the normal input colour and
+             turns dark with the scheme. "Set your callsign" and not the longer sentence: 130px of box
+             will not hold more than that at FontSize 16. -->
+        <Border Grid.Row="1" Margin="101,87,0,0" Width="130" Height="28" HorizontalAlignment="Left"
+                VerticalAlignment="Top" IsHitTestVisible="False">
+            <Border.Style>
+                <Style TargetType="Border">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                    <Style.Triggers>
+                        <MultiDataTrigger>
+                            <MultiDataTrigger.Conditions>
+                                <Condition Binding="{Binding Text, ElementName=TB_MyCallsign}" Value=""/>
+                                <Condition Binding="{Binding Text, ElementName=TB_DXCallsign}" Value=""/>
+                            </MultiDataTrigger.Conditions>
+                            <Setter Property="Visibility" Value="Visible"/>
+                        </MultiDataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Border.Style>
+            <!-- Not bold, unlike the one-or-two-word hints: bold "Set your callsign" measures 123.5px
+                 in a box with 125px of room, and a pixel and a half is not enough margin to trust. -->
+            <TextBlock Text="Set your callsign" Style="{StaticResource FieldHintText}"
+                       FontWeight="Normal" Foreground="{DynamicResource Danger}"/>
+        </Border>
 
         <!-- Suggest toggle: shows and controls the callsign-suggestions dropdown mode.
              Looks pressed INTO the screen when ON (IsChecked), raised OUT when OFF. -->
@@ -2381,7 +2526,21 @@
             <LineBreak />
             <Run Text="Callsign" />
         </TextBlock>
-        <TextBox Text="{Binding Default.Operator, Source={StaticResource Settings}}" x:Name="TB_Operator" HorizontalAlignment="Left" Height="28" Margin="85,47,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="99" CharacterCasing="Upper" Grid.Row="1"  TextChanged="TB_MyCallsign_TextChanged" PreviewKeyDown="PreventSpaceInCallsign" FontSize="16" VerticalContentAlignment="Center" MaxLength="14" TabIndex="2"/>
+        <TextBox Text="{Binding Default.Operator, Source={StaticResource Settings}}" x:Name="TB_Operator" HorizontalAlignment="Left" Height="28" Margin="85,47,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="99" CharacterCasing="Upper" Grid.Row="1"  TextChanged="TB_MyCallsign_TextChanged" PreviewKeyDown="PreventSpaceInCallsign" FontSize="16" VerticalContentAlignment="Center" MaxLength="14" TabIndex="2" Style="{StaticResource StationBox}"/>
+        <Border Grid.Row="1" Margin="85,47,0,0" Width="99" Height="28" HorizontalAlignment="Left"
+                VerticalAlignment="Top" IsHitTestVisible="False">
+            <Border.Style>
+                <Style TargetType="Border">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding Text, ElementName=TB_Operator}" Value="">
+                            <Setter Property="Visibility" Value="Visible"/>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Border.Style>
+            <TextBlock Text="Please fill" Style="{StaticResource FieldHintText}"/>
+        </Border>
         <!-- Busy overlay shown while a (potentially large) log is loaded/switched, so the user
              sees that work is happening rather than a frozen window. -->
         <Border x:Name="LogLoadingOverlay" Grid.Row="0" Grid.RowSpan="4" Visibility="Collapsed"
