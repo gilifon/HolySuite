@@ -801,9 +801,22 @@ namespace HolyLogger
 
             // WHAT HAS GONE IS GONE. The front of this row is in the radio's hands even though it is
             // still on the screen, so Backspace and Delete are not allowed to reach into it.
-            // Holding for Enter this reaches almost nothing, which is the point: none of the line has
-            // been handed over yet, so all of it can still be corrected.
-            if ((e.Key == Key.Back || e.Key == Key.Delete) && _box.SelectionStart < _handedUpTo)
+            //
+            // BACKSPACE DELETES THE LETTER BEFORE THE CARET, which is why "before the mark" is not the
+            // test for it. With the caret sitting exactly ON the mark, the letter it takes is the LAST
+            // ONE HANDED OVER, and the old test let that through. An operator sent TU, pressed
+            // Backspace while it was still on the screen, and took the U back off a row the radio had
+            // already been given: the marks then stood past the end of the text, and the next thing
+            // he typed was believed to be already sent - Enter did nothing at all, for the rest of
+            // the session.
+            //
+            // A SELECTION IS DIFFERENT: it takes what it covers and nothing in front of it, so one
+            // starting at the mark touches only text the radio has not seen.
+            int firstTouched = _box.SelectionLength > 0 || e.Key == Key.Delete
+                             ? _box.SelectionStart
+                             : _box.SelectionStart - 1;
+
+            if ((e.Key == Key.Back || e.Key == Key.Delete) && firstTouched < _handedUpTo)
             {
                 e.Handled = true;
             }
@@ -811,6 +824,7 @@ namespace HolyLogger
 
         private void Pump_Tick(object sender, EventArgs e)
         {
+            KeepMarksInsideTheRow();
             AskRadioItsSpeed();
             AdvanceKeyingClock();
 
@@ -954,6 +968,22 @@ namespace HolyLogger
         // Every chunk whose keying time is up leaves the typing row and joins the record below it.
         // The caret comes back the same number of characters, so text taken from in front of it does
         // not move the cursor out from under the operator's fingers mid-word.
+        // THE MARKS CANNOT STAND PAST THE END OF THE TEXT. Everything in this window is worked out
+        // from how much of the row has been handed over and how much released, and a row that grows
+        // shorter than either of them leaves both pointing at nothing: the pump then sees the new
+        // text as already sent and never hands it to the radio. Called wherever the row changes
+        // under them - one line, and it makes the whole arrangement safe against the next way
+        // somebody finds to shorten it.
+        private void KeepMarksInsideTheRow()
+        {
+            int length = (_box.Text ?? string.Empty).Length;
+
+            if (_handedUpTo > length) _handedUpTo = length;
+            if (_releasedUpTo > length) _releasedUpTo = length;
+            if (_handedUpTo < 0) _handedUpTo = 0;
+            if (_releasedUpTo < 0) _releasedUpTo = 0;
+        }
+
         private void DropWhatTheRadioHasKeyed()
         {
             if (_inFlight.Count == 0) return;

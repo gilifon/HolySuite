@@ -403,7 +403,22 @@ namespace HolyLogger
 
             // WHAT HAS GONE IS GONE. The front of this line is in the radio's hands even though it is
             // still on the screen, so Backspace and Delete are not allowed to reach into it.
-            if ((e.Key == Key.Back || e.Key == Key.Delete) && _box.SelectionStart < _handedUpTo)
+            //
+            // BACKSPACE DELETES THE LETTER BEFORE THE CARET, which is why "before the mark" is not the
+            // test for it. With the caret sitting exactly ON the mark, the letter it takes is the LAST
+            // ONE HANDED OVER, and the old test let that through. An operator sent TU, pressed
+            // Backspace while it was still on the screen, and took the U back off a row the radio had
+            // already been given: the marks then stood past the end of the text, and the next thing
+            // he typed was believed to be already sent - Enter did nothing at all, for the rest of
+            // the session.
+            //
+            // A SELECTION IS DIFFERENT: it takes what it covers and nothing in front of it, so one
+            // starting at the mark touches only text the radio has not seen.
+            int firstTouched = _box.SelectionLength > 0 || e.Key == Key.Delete
+                             ? _box.SelectionStart
+                             : _box.SelectionStart - 1;
+
+            if ((e.Key == Key.Back || e.Key == Key.Delete) && firstTouched < _handedUpTo)
             {
                 e.Handled = true;
             }
@@ -432,6 +447,11 @@ namespace HolyLogger
 
         private void Pump_Tick(object sender, EventArgs e)
         {
+            // The mark cannot stand past the end of the line - see the keyer window's own note.
+            int length = (_box.Text ?? string.Empty).Length;
+            if (_handedUpTo > length) _handedUpTo = length;
+            if (_handedUpTo < 0) _handedUpTo = 0;
+
             AskRadioItsSpeed();
             AdvanceKeyingClock();
             RepaintLine();
