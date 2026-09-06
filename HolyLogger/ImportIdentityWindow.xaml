@@ -10,16 +10,23 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
         <TextBlock x:Name="Header" Grid.Row="0" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}"
                    TextWrapping="Wrap" Text="Confirm the identity of the imported log"/>
-        <TextBlock Grid.Row="1" Margin="0,8,0,0" TextWrapping="Wrap" FontSize="16" Foreground="#666666"
-                   Text="The station callsign is read from the ADIF file and can't be edited. If the file has no operator, add it — an identity needs both. This is permanent for the log you're importing into. Cancel stops the import."/>
+        <StackPanel Grid.Row="1" Margin="0,8,0,0">
+            <TextBlock TextWrapping="Wrap" FontSize="16" Foreground="#666666"
+                       Text="Please choose the callsign you want HolyLogger to put in the Station Callsign field on the main window when you open this log."/>
+            <!-- The field itself, filled in code with whatever is chosen below. -->
+            <ContentControl x:Name="PicturePlace" HorizontalAlignment="Left" Margin="0,12,0,0"/>
+        </StackPanel>
 
         <Grid Grid.Row="2" Margin="0,16,0,0">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="130"/>
+                <!-- Wide enough for "Operator (optional)". The boxes are in the star column, so widening
+                     this one narrows them from the left and leaves their right edges where they were. -->
+                <ColumnDefinition Width="160"/>
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
             <Grid.RowDefinitions>
@@ -28,13 +35,29 @@
             </Grid.RowDefinitions>
             <TextBlock Grid.Row="0" Grid.Column="0" Text="Station callsign" VerticalAlignment="Center" FontSize="16"/>
             <ComboBox x:Name="CB_Station" Grid.Row="0" Grid.Column="1" Margin="0,0,0,6" FontSize="16"/>
-            <TextBlock Grid.Row="1" Grid.Column="0" Text="Operator" VerticalAlignment="Center" FontSize="16"/>
+            <TextBlock Grid.Row="1" Grid.Column="0" Text="Operator (optional)" VerticalAlignment="Center" FontSize="16"/>
             <ComboBox x:Name="CB_Operator" Grid.Row="1" Grid.Column="1" FontSize="16" IsEditable="True"/>
         </Grid>
 
-        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,20,0,0">
-            <Button x:Name="Btn_Cancel" Content="Cancel import" Width="130" Height="32" FontSize="16" Margin="0,0,8,0" IsCancel="True"/>
-            <Button x:Name="Btn_Ok" Content="Confirm and import" Width="170" Height="32" FontSize="16" FontWeight="Bold"
+        <!-- Only shown when the file actually holds records that name no callsign at all. -->
+        <StackPanel x:Name="NoCallPanel" Grid.Row="3" Margin="0,18,0,0" Visibility="Collapsed">
+            <TextBlock x:Name="NoCallText" TextWrapping="Wrap" FontSize="16"/>
+            <RadioButton x:Name="RB_FillMissing" GroupName="MissingCall" IsChecked="True"
+                         FontSize="16" Margin="0,8,0,0">
+                <!-- Wrapped in a TextBlock: a plain string on a RadioButton does not wrap, and this
+                     text is longer than the window is wide. -->
+                <TextBlock x:Name="RB_FillMissingText" TextWrapping="Wrap" FontSize="16" MaxWidth="400"/>
+            </RadioButton>
+            <RadioButton x:Name="RB_LeaveMissing" GroupName="MissingCall" FontSize="16" Margin="0,6,0,0">
+                <TextBlock TextWrapping="Wrap" FontSize="16" MaxWidth="400"
+                           Text="Leave them out — they are saved to a file you can correct and import again"/>
+            </RadioButton>
+        </StackPanel>
+
+        <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,20,0,0">
+            <!-- MinWidth + Padding, not a fixed Width: "Confirm and import" was cut short at 170. -->
+            <Button x:Name="Btn_Cancel" Content="Cancel import" MinWidth="130" Height="32" Padding="14,0" FontSize="16" Margin="0,0,8,0" IsCancel="True"/>
+            <Button x:Name="Btn_Ok" Content="Confirm and import" MinWidth="170" Height="32" Padding="14,0" FontSize="16" FontWeight="Bold"
                     IsDefault="True" Click="Btn_Ok_Click"/>
         </StackPanel>
     </Grid>

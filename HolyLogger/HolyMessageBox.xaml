@@ -40,9 +40,28 @@
                       x:Name="MessageScroller"
                       VerticalScrollBarVisibility="Auto"
                       HorizontalScrollBarVisibility="Disabled">
-            <TextBlock x:Name="MessageText"
-                       FontSize="18" TextWrapping="Wrap"
-                       VerticalAlignment="Center"/>
+            <StackPanel>
+                <!-- A heading in the accent colour, when a caller names one. It says what the dialog is
+                     ABOUT in two words, so the message underneath can get straight to the facts. -->
+                <TextBlock x:Name="MessageHeading" Visibility="Collapsed"
+                           FontSize="18" FontWeight="Bold" TextWrapping="Wrap"
+                           Foreground="{DynamicResource AccentBrush}" Margin="0,0,0,10"/>
+                <TextBlock x:Name="MessageText"
+                           FontSize="18" TextWrapping="Wrap"
+                           VerticalAlignment="Center"/>
+                <!-- A PICTURE OF THE THING BEING TALKED ABOUT, when a caller hands one over. A message
+                     that names a box on the main window is asking the reader to go and find it; showing
+                     that box here, with what is actually in it, is not asking anything. Drawn with the
+                     program's own controls rather than pasted in as an image, so it follows the theme
+                     and stays sharp at any screen scaling. Collapsed for every message without one. -->
+                <ContentControl x:Name="MessagePicture" Visibility="Collapsed"
+                                HorizontalAlignment="Left" Margin="0,16,0,0"/>
+                <!-- What is said AFTER the picture. A message that shows a box and then explains what
+                     happens to it reads in that order; with one text block the picture could only ever
+                     come last, under the explanation it belongs above. -->
+                <TextBlock x:Name="MessageTextAfter" Visibility="Collapsed"
+                           FontSize="18" TextWrapping="Wrap" Margin="0,16,0,0"/>
+            </StackPanel>
         </ScrollViewer>
 
         <!-- OK button (info/success/warning/error mode). Right by default, as every dialog in the

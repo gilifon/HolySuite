@@ -13,6 +13,71 @@ namespace HolyLogger
 {
     public static class Helper
     {
+        // THE STATION CALLSIGN BOX AS IT LOOKS ON THE MAIN WINDOW, drawn with the program's own
+        // controls rather than pasted in as a picture, so it follows the theme and stays sharp at any
+        // screen scaling. A message that names a box on the main window is asking the reader to go and
+        // find it; showing that box is not asking anything.
+        //
+        // The label, the sizes and the two colours are the ones the real boxes carry (MainWindow.xaml:
+        // the two-line "Station Callsign" caption, a 113x28 box, #90CAF9 filled, framed in form blue).
+        // Set callsign later through the returned box: Tag holds the TextBlock the value is written in.
+        public static System.Windows.FrameworkElement StationCallsignPicture(string callsign,
+                                                                             out System.Windows.Controls.TextBlock valueText)
+        {
+            var row = new System.Windows.Controls.StackPanel
+            {
+                Orientation = System.Windows.Controls.Orientation.Horizontal,
+                VerticalAlignment = System.Windows.VerticalAlignment.Center
+            };
+
+            var caption = new System.Windows.Controls.TextBlock
+            {
+                FontSize = 16, Width = 60, LineHeight = 14,
+                LineStackingStrategy = System.Windows.LineStackingStrategy.BlockLineHeight,
+                VerticalAlignment = System.Windows.VerticalAlignment.Center,
+                Margin = new System.Windows.Thickness(0, 0, 8, 0)
+            };
+            caption.Inlines.Add(new System.Windows.Documents.Run("Station") { FontWeight = System.Windows.FontWeights.Bold });
+            caption.Inlines.Add(new System.Windows.Documents.LineBreak());
+            caption.Inlines.Add(new System.Windows.Documents.Run("Callsign"));
+            row.Children.Add(caption);
+
+            valueText = new System.Windows.Controls.TextBlock
+            {
+                Text = (callsign ?? string.Empty).Trim().ToUpperInvariant(),
+                FontSize = 16, Foreground = System.Windows.Media.Brushes.Black,
+                Margin = new System.Windows.Thickness(4, 0, 0, 0),
+                VerticalAlignment = System.Windows.VerticalAlignment.Center
+            };
+            row.Children.Add(new System.Windows.Controls.Border
+            {
+                Width = 113, Height = 28,
+                Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x90, 0xCA, 0xF9)),
+                BorderBrush = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x15, 0x65, 0xC0)),
+                BorderThickness = new System.Windows.Thickness(1),
+                VerticalAlignment = System.Windows.VerticalAlignment.Center,
+                Child = valueText
+            });
+
+            // Rounded corners, a white rim and a soft shadow, so it reads as a piece cut out of the
+            // main window and laid on this one.
+            return new System.Windows.Controls.Border
+            {
+                Background = ThemeManager.Brush("FormBg"),
+                BorderBrush = System.Windows.Media.Brushes.White,
+                BorderThickness = new System.Windows.Thickness(2),
+                CornerRadius = new System.Windows.CornerRadius(8),
+                Padding = new System.Windows.Thickness(12, 10, 14, 10),
+                HorizontalAlignment = System.Windows.HorizontalAlignment.Left,
+                Effect = new System.Windows.Media.Effects.DropShadowEffect
+                {
+                    Color = System.Windows.Media.Colors.Black,
+                    Opacity = 0.35, BlurRadius = 8, ShadowDepth = 2, Direction = 270
+                },
+                Child = row
+            };
+        }
+
         // Shared client for downloading QRZ photos off the UI thread. Reused so we don't leak
         // sockets, and given a browser User-Agent because some image CDNs reject the default one.
         private static readonly HttpClient _imageHttpClient = CreateImageHttpClient();

@@ -36,23 +36,27 @@ namespace HolyLogger
         // A message with no asterisks is set as plain text exactly as before, so no existing caller
         // changes behaviour. An odd number of markers means somebody wrote a literal asterisk: the
         // trailing piece is added as plain text rather than swallowed.
-        private void SetMessage(string message)
+        private void SetMessage(string message) => SetMessage(MessageText, message);
+
+        private void SetMessage(System.Windows.Controls.TextBlock target, string message)
         {
             string text = message ?? string.Empty;
             if (text.IndexOf("**", StringComparison.Ordinal) < 0)
             {
-                MessageText.Text = text;
+                target.Text = text;
                 return;
             }
 
-            MessageText.Text = string.Empty;
-            MessageText.Inlines.Clear();
-            AddMarkup(text);
+            target.Text = string.Empty;
+            target.Inlines.Clear();
+            AddMarkup(target, text);
         }
 
         // Appends text to whatever is already in the message, turning **...** into bold. Separate from
         // SetMessage so a caller can add a line AFTER the links it put below the message.
-        private void AddMarkup(string text)
+        private void AddMarkup(string text) => AddMarkup(MessageText, text);
+
+        private void AddMarkup(System.Windows.Controls.TextBlock target, string text)
         {
             if (string.IsNullOrEmpty(text)) return;
 
@@ -67,7 +71,7 @@ namespace HolyLogger
                 {
                     var run = new System.Windows.Documents.Run(piece);
                     if (bold) run.FontWeight = FontWeights.Bold;
-                    MessageText.Inlines.Add(run);
+                    target.Inlines.Add(run);
                 }
 
                 if (mark < 0) break;
@@ -76,11 +80,27 @@ namespace HolyLogger
             }
         }
 
-        private HolyMessageBox(string message, string title, HolyMsgType type, Window owner, bool confirm, double width = 0)
+        private HolyMessageBox(string message, string title, HolyMsgType type, Window owner, bool confirm, double width = 0,
+                               UIElement picture = null, string messageAfter = null, string heading = null)
         {
             InitializeComponent();
             Title = title;
             SetMessage(message);
+            if (!string.IsNullOrWhiteSpace(heading))
+            {
+                MessageHeading.Text = heading;
+                MessageHeading.Visibility = Visibility.Visible;
+            }
+            if (picture != null)
+            {
+                MessagePicture.Content = picture;
+                MessagePicture.Visibility = Visibility.Visible;
+            }
+            if (!string.IsNullOrWhiteSpace(messageAfter))
+            {
+                SetMessage(MessageTextAfter, messageAfter);
+                MessageTextAfter.Visibility = Visibility.Visible;
+            }
             // AN OWNER THAT HAS NOT BEEN SHOWN YET IS NOT AN OWNER. WPF throws "Cannot set Owner
             // property to a Window that has not been shown previously" - and a dialog raised from
             // inside MainWindow's constructor hits exactly that. It took HolyLogger down at startup on
@@ -237,13 +257,31 @@ namespace HolyLogger
                     IconPath.Fill = Brushes.White;
                     break;
                 default: // Info
-                    IconCircle.Fill = Brush("#1565C0");
-                    IconPath.Data = Geometry.Parse("M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z");
+                    // A FILLED GREEN CIRCLE, like the other three. It used to draw a white "i" on a
+                    // TRANSPARENT circle - white on a white window, so the icon was all but invisible.
+                    // Green because an information message is saying that all is well.
+                    IconCircle.Fill = Brush("#34A853");
+                    // Drawn a little thicker and taller than the stock 24x24 glyph, and still centred on
+                    // (12,12): the dot spans y 6-9, the stem y 11-18, both 3 wide about x 12.
+                    IconPath.Data = Geometry.Parse("M10.5 6h3v3h-3z M10.5 11h3v7h-3z");
                     IconPath.Fill = Brushes.White;
-                    IconCircle.Fill = Brushes.Transparent;
-                    IconViewbox.Width = 44;
-                    IconViewbox.Height = 44;
-                    IconViewbox.Margin = new System.Windows.Thickness(0, 0, 0, 0);
+
+                    // CENTRED BY GIVING IT THE WHOLE SQUARE TO SIT IN. The other three glyphs fill
+                    // their 24x24 box, so stretching them to the Viewbox lands them in the middle. The
+                    // "i" is 2 wide and 10 tall: stretched the same way it is scaled off its own centre
+                    // and ends up sitting high and left of the circle it is drawn on. So it is NOT
+                    // stretched - it is drawn at its true position inside a 24x24 square, where it is
+                    // centred on (12,12) by design, and that whole square is what the Viewbox scales.
+                    var square = new System.Windows.Controls.Grid { Width = 24, Height = 24 };
+                    IconViewbox.Child = null;
+                    IconPath.Stretch = Stretch.None;
+                    square.Children.Add(IconPath);
+                    IconViewbox.Child = square;
+                    // Nearly the whole circle: the square is mostly empty air around a small glyph, so a
+                    // 26 box left the "i" tiny. 40 across the 44 circle, 2 in from each edge.
+                    IconViewbox.Width = 40;
+                    IconViewbox.Height = 40;
+                    IconViewbox.Margin = new System.Windows.Thickness(2, 2, 0, 0);
                     break;
             }
         }
@@ -357,9 +395,10 @@ namespace HolyLogger
         public static bool ShowConfirm(string message, string title = "HolyLogger",
             HolyMsgType type = HolyMsgType.Warning, Window owner = null, double width = 0,
             string yesText = null, string noText = null,
-            string yesBackground = null, string yesForeground = null, string yesBorder = null)
+            string yesBackground = null, string yesForeground = null, string yesBorder = null,
+            UIElement picture = null, string messageAfter = null, string heading = null)
         {
-            var dlg = new HolyMessageBox(message, title, type, owner, confirm: true, width);
+            var dlg = new HolyMessageBox(message, title, type, owner, confirm: true, width, picture, messageAfter, heading);
 
             if (!string.IsNullOrWhiteSpace(yesText)) dlg.YesBtn.Content = yesText;
             if (!string.IsNullOrWhiteSpace(noText)) dlg.NoBtn.Content = noText;

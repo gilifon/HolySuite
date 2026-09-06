@@ -376,12 +376,16 @@ namespace HolyLogger
             string logCall = (Selected.Callsign ?? string.Empty).Trim();
             if (typed.Length > 0 && logCall.Length > 0 && !_dal.LogAcceptsCallsign(Selected.Id, typed))
             {
+                // The log's name in bold and without quotes around it, and a width that keeps the first
+                // line from wrapping in the middle of that name.
                 if (!HolyMessageBox.ShowConfirm(
-                        "\"" + Selected.Name + "\" is a log for " + logCall + ", and you have " + typed +
-                        " in the main window.\n\nOpening it changes your station callsign to " + logCall +
-                        ". New QSOs will be logged as " + logCall + ".",
-                        "Open a log for " + logCall + "?", HolyMsgType.Warning, this,
-                        yesText: "Open and use " + logCall, noText: "Cancel"))
+                        "The log: **" + Selected.Name + "** is a log for " + logCall + ", and you have " +
+                        typed + " as the current station callsign in the main window.",
+                        "Open a log for " + logCall + "?", HolyMsgType.Warning, this, width: 620,
+                        yesText: "Open and use " + logCall, noText: "Cancel",
+                        picture: Helper.StationCallsignPicture(typed, out _),
+                        messageAfter: "Opening it changes your station callsign to **" + logCall + "**.\n" +
+                                      "New QSOs will be logged as **" + logCall + "**."))
                     return;
             }
 

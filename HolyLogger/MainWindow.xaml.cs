@@ -1958,7 +1958,7 @@ namespace HolyLogger
             // suspenders; startup / log-switch already prompt).
             if (!EnsureActiveLogHasIdentity())
             {
-                HolyMessageBox.ShowWarning("Set this log's identity (station callsign + operator) before logging QSOs into it.\n\n"
+                HolyMessageBox.ShowWarning("Set this log's station callsign before logging QSOs into it.\n\n"
                     + "File → Log Manager, pick this log and press Set Identity.",
                     "Log identity required", this);
                 return;
@@ -8461,6 +8461,99 @@ namespace HolyLogger
         // is busy, so the operator gets a frozen window and then, out of nowhere, the next dialog. The
         // reading and the ADIF building happen on a worker; this thread does nothing but hold the
         // message up, which is all it was ever asked to do.
+        // The backup window. Returns the file to write, or null if the operator backed out.
+        private string AskWhereToSaveTheBackup(string logName, int qsoCount, string suggestedPath)
+        {
+            string chosen = null;
+            var dialog = new Window
+            {
+                Title = "Back up your log & Replace",
+                SizeToContent = SizeToContent.Height,
+                Width = 640,
+                ResizeMode = ResizeMode.NoResize,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                Owner = this,
+                ShowInTaskbar = false,
+                Background = (System.Windows.Media.Brush)FindResource("WindowBg")
+            };
+            var root = new StackPanel { Margin = new Thickness(22, 18, 22, 18) };
+
+            root.Children.Add(new TextBlock
+            {
+                Text = "Back up your log & Replace", FontSize = 16, FontWeight = FontWeights.Bold,
+                Foreground = (System.Windows.Media.Brush)FindResource("AccentBrush"),
+                TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 12)
+            });
+
+            var line = new TextBlock { TextWrapping = TextWrapping.Wrap, FontSize = 16 };
+            line.Inlines.Add(new System.Windows.Documents.Run("Your log "));
+            line.Inlines.Add(new System.Windows.Documents.Run(string.IsNullOrWhiteSpace(logName) ? "this log" : logName)
+                { FontWeight = FontWeights.Bold });
+            line.Inlines.Add(new System.Windows.Documents.Run(" has "));
+            line.Inlines.Add(new System.Windows.Documents.Run(qsoCount.ToString("N0") + (qsoCount == 1 ? " QSO" : " QSOs"))
+                { FontWeight = FontWeights.Bold });
+            line.Inlines.Add(new System.Windows.Documents.Run("."));
+            root.Children.Add(line);
+
+            root.Children.Add(new TextBlock
+            {
+                Text = "They will be saved to a file before the import replaces them.",
+                TextWrapping = TextWrapping.Wrap, FontSize = 16, Margin = new Thickness(0, 4, 0, 16)
+            });
+
+            root.Children.Add(new TextBlock { Text = "Save to:", FontSize = 16, Margin = new Thickness(0, 0, 0, 4) });
+
+            var pathRow = new Grid();
+            pathRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            pathRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            var pathBox = new TextBox { Text = suggestedPath, FontSize = 16, Padding = new Thickness(4, 3, 4, 3), VerticalContentAlignment = VerticalAlignment.Center };
+            Grid.SetColumn(pathBox, 0);
+            var browse = new Button { Content = "Browse…", FontSize = 16, MinWidth = 100, Height = 30, Margin = new Thickness(8, 0, 0, 0), Padding = new Thickness(12, 0, 12, 0) };
+            Grid.SetColumn(browse, 1);
+            pathRow.Children.Add(pathBox);
+            pathRow.Children.Add(browse);
+            root.Children.Add(pathRow);
+
+            browse.Click += (s, e) =>
+            {
+                var picker = new Microsoft.Win32.SaveFileDialog
+                {
+                    Filter = "ADIF files (*.adi)|*.adi",
+                    Title = "Where to save the backup of your log"
+                };
+                try
+                {
+                    picker.InitialDirectory = System.IO.Path.GetDirectoryName(pathBox.Text);
+                    picker.FileName = System.IO.Path.GetFileName(pathBox.Text);
+                }
+                catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+                if (picker.ShowDialog() == true) pathBox.Text = picker.FileName;
+            };
+
+            var buttonRow = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 20, 0, 0) };
+            var okBtn = new Button { Content = "Save & Replace", FontSize = 16, FontWeight = FontWeights.Bold, MinWidth = 150, Height = 32, Padding = new Thickness(12, 0, 12, 0), Margin = new Thickness(0, 0, 8, 0), IsDefault = true };
+            var cancelBtn = new Button { Content = "Cancel", FontSize = 16, MinWidth = 100, Height = 32, Padding = new Thickness(12, 0, 12, 0), IsCancel = true };
+            okBtn.Click += (s, e) =>
+            {
+                string p = (pathBox.Text ?? string.Empty).Trim();
+                if (p.Length == 0)
+                {
+                    HolyMessageBox.ShowWarning("Choose where to save the backup.", "Backing up your log", dialog);
+                    return;
+                }
+                chosen = p;
+                dialog.Close();
+            };
+            cancelBtn.Click += (s, e) => { chosen = null; dialog.Close(); };
+            buttonRow.Children.Add(okBtn);
+            buttonRow.Children.Add(cancelBtn);
+            root.Children.Add(buttonRow);
+
+            dialog.Content = root;
+            dialog.ShowDialog();
+            return chosen;
+        }
+
         private async System.Threading.Tasks.Task<bool> BackupLogForReplace()
         {
             // The active log's name is part of the proposed backup filename so it is easy to tell which
@@ -8471,19 +8564,23 @@ namespace HolyLogger
                 ? string.Empty
                 : string.Join("_", logName.Split(System.IO.Path.GetInvalidFileNameChars())).Trim() + "_";
 
-            var saveDialog = new Microsoft.Win32.SaveFileDialog
-            {
-                Filter = "ADIF files (*.adi)|*.adi",
-                FileName = "HolyLogger_backup_" + safeLog + DateTime.Now.ToString("yyyyMMdd_HHmmss") + ".adi",
-                Title = "Save a backup of your current log before replacing it"
-            };
-            if (saveDialog.ShowDialog() != true)
-                return false; // user cancelled -> abort the replace
+            // ONE WINDOW THAT SAYS WHY IT IS THERE. The file picker used to open on its own, with its
+            // reason written in the small print of its title bar - so the operator was handed a Save
+            // dialog out of nowhere. This says what is about to happen, in his own log's terms, and
+            // holds the place the file will go; the picker only opens if he presses Browse.
+            string suggested = System.IO.Path.Combine(
+                DataAccess.LogBackupsFolder,
+                "HolyLogger_backup_" + safeLog + DateTime.Now.ToString("yyyyMMdd_HHmmss") + ".adi");
+
+            int qsoCount = 0;
+            try { qsoCount = dal.GetQsoCountForLog(dal.ActiveLogId); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+
+            string backupPath = AskWhereToSaveTheBackup(logName, qsoCount, suggested);
+            if (string.IsNullOrWhiteSpace(backupPath)) return false;   // cancelled -> abort the replace
 
             // Read here, on the thread that owns them, and handed to the worker as plain values.
             long logId = dal.ActiveLogId;
             string contestName = Contests.ContestService.Active?.CabrilloName;
-            string backupPath = saveDialog.FileName;
 
             try
             {
@@ -8687,34 +8784,18 @@ namespace HolyLogger
             UploadProgress = importRunning ? "Stopping — putting your log back…" : "Stopping…";
         }
         
-        private void QSODataGrid_Drop(object sender, DragEventArgs e)
+        // A FILE DROPPED ON THE LOG IS THE SAME IMPORT AS THE ONE IN THE MENU. It used to be a path
+        // of its own: straight into the log that was open, with nothing asked - no choice of which log,
+        // no merge or replace, no callsign. Where the file came from is not a reason to treat it
+        // differently, so a drop now runs the whole flow, one file at a time.
+        private async void QSODataGrid_Drop(object sender, DragEventArgs e)
         {
-            if (e.Data.GetDataPresent(DataFormats.FileDrop))
-            {
-                // Note that you can have more than one file.
-                string[] files = (string[])e.Data.GetData(DataFormats.FileDrop);
+            if (!e.Data.GetDataPresent(DataFormats.FileDrop)) return;
 
-                // Dropped on the grid: no dialog, so nothing was chosen - the files go into the log
-                // that is open, which is what Merge means. Said out loud for the report.
-                _importChoice = ImportChoice.Merge;
-
-                //collect files in Queue
-                foreach (var file in files)
-                {
-                    // THE CALLSIGN QUESTION IS ASKED HERE TOO, per file, before anything is read.
-                    // The import worker used to ask it after parsing, which covered dropped files as
-                    // well; now that it is asked up front, this path has to ask it itself or a dropped
-                    // file would go in with no warning at all.
-                    ScanAdifIdentity(file, out var droppedCalls, out _);
-                    if (!ApproveDifferentStationCallsign(file, droppedCalls)) continue;
-
-                    ImportFileQ.Add(file);
-                    //HandleAdifFileImport(file);
-                }
-
-                //run async handler
-                if (ImportFileQ.Count > 0) StartAdifImportWorker();
-            }
+            // Note that you can have more than one file.
+            string[] files = (string[])e.Data.GetData(DataFormats.FileDrop);
+            foreach (var file in files)
+                await ImportAdifFile(file);
         }
 
         private void ExpotCSVMenuItem_Click(object sender, RoutedEventArgs e)

@@ -12,15 +12,25 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <TextBlock x:Name="Prompt" Grid.Row="0" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}"
-                   TextWrapping="Wrap" Text="Enter a name for the log:"/>
+        <StackPanel Grid.Row="0">
+            <!-- WHAT WAS SELECTED, before what is being asked. Shown only when a caller names it (an
+                 import does); every other use of this window starts at the question. -->
+            <StackPanel x:Name="IntroPanel" Visibility="Collapsed" Margin="0,0,0,18">
+                <TextBlock x:Name="IntroLabel" FontSize="16" FontWeight="Bold"
+                           Foreground="{DynamicResource AccentBrush}" TextWrapping="Wrap"/>
+                <TextBlock x:Name="IntroValue" FontSize="16" TextWrapping="Wrap" Margin="0,4,0,0"/>
+            </StackPanel>
+            <TextBlock x:Name="Prompt" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}"
+                       TextWrapping="Wrap" Text="Enter a name for the log:"/>
+        </StackPanel>
         <TextBox x:Name="TB_Name" Grid.Row="1" Margin="0,10,0,0" FontSize="16" Padding="5,4"/>
 
         <!-- Optional copy-to-log section (shown only when creating a log, not for Rename). -->
         <StackPanel x:Name="CopyOptionsPanel" Grid.Row="2" Visibility="Collapsed" Margin="0,16,0,0">
             <Border BorderBrush="#CCCCCC" BorderThickness="0,1,0,0" Margin="0,0,0,12"/>
 
-            <TextBlock Text="This log's station callsign" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}"/>
+            <TextBlock x:Name="CallsignSectionTitle" Text="This log's station callsign" TextWrapping="Wrap"
+                       FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}"/>
             <Grid Margin="0,8,0,0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="120"/>
@@ -29,14 +39,38 @@
                 <TextBlock Grid.Column="0" Text="Station callsign" VerticalAlignment="Center" FontSize="16"/>
                 <TextBox x:Name="TB_Callsign" Grid.Column="1" FontSize="16" Padding="4,3"
                          CharacterCasing="Upper"/>
+                <!-- Shown INSTEAD of the box when the caller hands over a list to pick from - an ADIF
+                     holding QSOs made under several callsigns. One callsign is not a list, so a single
+                     one still arrives in the box above. -->
+                <!-- EDITABLE: the file's callsigns are offered, not imposed. A log can be for any
+                     callsign its owner says, and one that is not in the file has nowhere else to be
+                     typed once this list is on screen. -->
+                <ComboBox x:Name="CB_Callsign" Grid.Column="1" FontSize="16" Visibility="Collapsed"
+                          IsEditable="True"/>
             </Grid>
-            <TextBlock TextWrapping="Wrap" FontSize="16" Foreground="#777777" Margin="0,6,0,0"
+            <TextBlock x:Name="CallsignHint" TextWrapping="Wrap" FontSize="16" Foreground="#777777" Margin="0,6,0,0"
                        Text="The log is opened for this callsign. It is filled in from the main window, and you can type a different one here. Opening this log later puts its callsign back into the main window."/>
 
-            <TextBlock Text="Copy new QSOs into:" FontSize="16" Margin="0,14,0,4"/>
-            <ComboBox x:Name="CB_CopyTarget" FontSize="16" DisplayMemberPath="Name" SelectedValuePath="Id"/>
-            <TextBlock TextWrapping="Wrap" FontSize="16" Foreground="#777777" Margin="0,6,0,0"
-                       Text="Any of your logs can receive the copies (contest logs cannot). Each QSO you log here is copied into the chosen log; deleting a QSO here also removes its copy there."/>
+            <!-- The records in the file that name no callsign at all. Asked here, next to the callsign
+                 they would be given, rather than in a window of its own after this one. -->
+            <StackPanel x:Name="NoCallPanel" Visibility="Collapsed" Margin="0,16,0,0">
+                <TextBlock x:Name="NoCallText" TextWrapping="Wrap" FontSize="16" FontWeight="Bold"/>
+                <RadioButton x:Name="RB_FillMissing" GroupName="MissingCall" IsChecked="True"
+                             FontSize="16" Margin="0,8,0,0">
+                    <TextBlock x:Name="RB_FillMissingText" TextWrapping="Wrap" FontSize="16" MaxWidth="400"/>
+                </RadioButton>
+                <RadioButton x:Name="RB_LeaveMissing" GroupName="MissingCall" FontSize="16" Margin="0,6,0,0">
+                    <TextBlock TextWrapping="Wrap" FontSize="16" MaxWidth="400"
+                               Text="Leave them out — they are saved to a file you can correct and import again"/>
+                </RadioButton>
+            </StackPanel>
+
+            <StackPanel x:Name="CopyTargetSection">
+                <TextBlock Text="Copy new QSOs into:" FontSize="16" Margin="0,14,0,4"/>
+                <ComboBox x:Name="CB_CopyTarget" FontSize="16" DisplayMemberPath="Name" SelectedValuePath="Id"/>
+                <TextBlock TextWrapping="Wrap" FontSize="16" Foreground="#777777" Margin="0,6,0,0"
+                           Text="Any of your logs can receive the copies (contest logs cannot). Each QSO you log here is copied into the chosen log; deleting a QSO here also removes its copy there."/>
+            </StackPanel>
         </StackPanel>
 
         <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,18,0,0">

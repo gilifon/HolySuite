@@ -594,6 +594,29 @@ namespace HolyLogger
             }
         }
 
+        // WHERE THE ADIF COPY OF A LOG GOES before an import replaces it. Beside the Reports folder,
+        // for the same reason: the program's own place, always there, never the operator's desktop.
+        // He can still choose anywhere else - this is only what the box opens holding.
+        public static string LogBackupsFolder
+        {
+            get
+            {
+                try
+                {
+                    string dir = Path.Combine(
+                        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                        "4Z1KD", "HolyLogger", "Backups");
+                    Directory.CreateDirectory(dir);
+                    return dir;
+                }
+                catch (Exception swallowed)
+                {
+                    Log.Swallow(swallowed);
+                    return Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+                }
+            }
+        }
+
         // The live database file itself (logDB.db), for the in-app Restore feature.
         public string DbPath => dbPath;
 

@@ -52,9 +52,11 @@ namespace HolyLogger
         {
             string call = (TB_Callsign.Text ?? string.Empty).Trim();
             string opr = (TB_Operator.Text ?? string.Empty).Trim();
-            if (call.Length == 0 || opr.Length == 0)
+            // The callsign alone is the identity. The operator is not part of it - one callsign can
+            // have many operators behind it - so an empty one is not an error.
+            if (call.Length == 0)
             {
-                HolyMessageBox.ShowWarning("Enter both a station callsign and an operator.", "Set log identity", this);
+                HolyMessageBox.ShowWarning("Enter a station callsign.", "Set log identity", this);
                 return;
             }
             Callsign = call;

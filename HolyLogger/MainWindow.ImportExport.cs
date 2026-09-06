@@ -244,43 +244,59 @@ namespace HolyLogger
         // backup a replace makes - can run off this thread with a message standing on the screen.
         private async void ImportAdifMenuItem_Click(object sender, RoutedEventArgs e)
         {
-            // Offer to save an in-progress new QSO before an import reloads the log.
-            GuardUnsavedQso("import the ADIF file");
-
             //CultureInfo provider = CultureInfo.InvariantCulture;
             OpenFileDialog openFileDialog = new OpenFileDialog();
             openFileDialog.Filter = "ADIF files (*.adi)|*.adi";
-            
 
             if (openFileDialog.ShowDialog() == true)
+                await ImportAdifFile(openFileDialog.FileName);
+        }
+
+        // THE IMPORT ITSELF, from wherever the file came from. It used to live inside the menu handler,
+        // which meant a file DROPPED on the log went in by a path of its own: no name, no choice of log,
+        // no merge-or-replace, nothing asked at all. One file, one set of questions, however it arrives.
+        public async System.Threading.Tasks.Task ImportAdifFile(string path)
+        {
+            // Offer to save an in-progress new QSO before an import reloads the log.
+            GuardUnsavedQso("import the ADIF file");
+
             {
                 // WHO MADE THIS FILE, read before a single question is asked about it. The scan walks
                 // the file line by line and keeps nothing but the callsigns, so it is cheap next to the
-                // parse - and it lets the one question that can send the operator away be asked first.
-                // Nothing below asks for it again; the lists are carried down.
+                // parse. Nothing below asks for it again; the lists are carried down.
                 ShowBusyOverlay("Reading the file\u2026");
-                string scanPath = openFileDialog.FileName;
+                string scanPath = path;
                 System.Collections.Generic.List<string> scannedCalls = null, scannedOps = null;
+                int scannedRecords = 0, scannedNoCall = 0;
                 try
                 {
                     await System.Threading.Tasks.Task.Run(() =>
-                        ScanAdifIdentity(scanPath, out scannedCalls, out scannedOps));
+                        ScanAdifIdentity(scanPath, out scannedCalls, out scannedOps, out scannedRecords, out scannedNoCall));
                 }
                 finally { HideBusyOverlay(); }
                 var adifCalls = scannedCalls ?? new System.Collections.Generic.List<string>();
                 var adifOps = scannedOps ?? new System.Collections.Generic.List<string>();
 
-                // "Not my callsign - import anyway?" comes before everything else. Answering No after
-                // naming a new log, or after choosing merge or replace, wastes all of that.
-                if (!ApproveDifferentStationCallsign(openFileDialog.FileName, adifCalls)) return;
+                // Nothing carried over from a previous import: what is set below decides which
+                // questions are asked, and a leftover would silently answer one of them.
+                _pendingImportCallsign = null;
+                _pendingImportOperator = null;
 
-                // Next: does this file become its OWN new log, or get added to the log open now?
+                // NO "THIS IS NOT YOUR CALLSIGN" WARNING HERE. It compared the file against the callsign
+                // in the station box, which is not the question that matters: what matters is the log the
+                // QSOs are about to go into, and that is asked below - by the identity window for a log
+                // that has no identity yet, and by the "different callsign / operator" confirm for one
+                // that has. Both name the file's callsign and both can still stop the import, so this
+                // only added a third dialog - and a false alarm whenever the station box happened to
+                // hold a different callsign than the log being imported into.
+
+                // First: does this file become its OWN new log, or get added to the log open now?
                 // With NO log open there is no "log open now" to add to, so the question is not asked -
                 // the file becomes its own new log, which is the only answer there is. Import is
                 // deliberately NOT blocked when no log is open: bringing a file in is exactly how an
                 // operator with no logs gets one.
                 bool noLogOpen = dal != null && !dal.HasActiveLog;
-                ImportTarget target = AskImportTarget(noLogOpen);
+                ImportTarget target = AskImportTarget(noLogOpen, adifCalls, scannedRecords);
                 if (target == ImportTarget.Cancel) return;
 
                 _importChoice = ImportChoice.NewLog;   // corrected below if it goes into the log open now
@@ -296,11 +312,29 @@ namespace HolyLogger
                 {
                     // Create a new REGULAR log for the file and make it active so the import lands in it —
                     // nothing touches the existing logs. Its identity comes from the ADIF (below).
-                    string suggested = UniqueLogName(System.IO.Path.GetFileNameWithoutExtension(openFileDialog.FileName));
-                    var nameDlg = new NewLogWindow(dal, "Name the new log for the imported file:", suggested) { Owner = this };
+                    // THE NAME AND THE CALLSIGN IN ONE WINDOW. They are one decision - what this log is
+                    // called and whose it is - and a name is easier to choose with the callsign in front
+                    // of you. The callsign comes from the file: one, and it is filled in; several, and
+                    // they are offered as a list; none, and the box is empty and has to be filled.
+                    string suggested = UniqueLogName(System.IO.Path.GetFileNameWithoutExtension(path));
+                    // THE FILE'S OWN NAME, EXTENSION AND ALL. The suggested log name has the extension
+                    // stripped (a log is not a file), which leaves the reader without the one thing that
+                    // says WHICH file is about to be imported. It is said here instead.
+                    var nameDlg = new NewLogWindow(dal, "Please give the log a name:", suggested, 0,
+                        introLabel: "You selected importing:",
+                        introValue: System.IO.Path.GetFileName(path),
+                        showCopyOptions: true,
+                        defaultCallsign: adifCalls.Count > 0 ? adifCalls[0] : string.Empty,
+                        callsignChoices: adifCalls, showCopyTarget: false,
+                        callsignHint: "The file does not say which callsign made its QSOs. The log is opened for the callsign you type here.",
+                        noCallsignCount: scannedNoCall)
+                        { Owner = this };
                     if (nameDlg.ShowDialog() != true) return;   // cancelled -> abort, nothing created yet
                     createdLogId = dal.CreateLog(nameDlg.LogName, string.Empty);
                     SwitchActiveLog(createdLogId);
+                    // Given to the log once the import finishes, like every other import identity.
+                    _pendingImportCallsign = nameDlg.LogCallsign;
+                    _newLogFillMissingCall = nameDlg.FillMissingCallsign;
                 }
                 else
                 {
@@ -327,16 +361,27 @@ namespace HolyLogger
                 // it was made under.
                 if (dal != null)
                 {
-                    string fileName = System.IO.Path.GetFileName(openFileDialog.FileName);
+                    string fileName = System.IO.Path.GetFileName(path);
 
-                    if (!dal.LogHasIdentity(dal.ActiveLogId))
+                    // Back to the default before it is asked: only the dialog below can turn it off,
+                    // and an answer given for one file must not still be standing for the next.
+                    _pendingImportFillMissingCall = true;
+
+                    if (!string.IsNullOrWhiteSpace(_pendingImportCallsign))
+                    {
+                        // A new log: the naming window asked everything - what it is called, whose it
+                        // is, and what to do with the records naming no callsign.
+                        _pendingImportFillMissingCall = _newLogFillMissingCall;
+                    }
+                    else if (!dal.LogHasIdentity(dal.ActiveLogId))
                     {
                         // No identity yet -> confirm (and let the user cancel) the identity the imported
                         // log will get. Station callsign from the ADIF (not editable); operator editable.
-                        var idDlg = new ImportIdentityWindow(adifCalls, adifOps, fileName) { Owner = this };
+                        var idDlg = new ImportIdentityWindow(adifCalls, adifOps, fileName, scannedNoCall) { Owner = this };
                         if (idDlg.ShowDialog() != true) { AbandonNewLog(createdLogId); return; }
                         _pendingImportCallsign = idDlg.Callsign;
                         _pendingImportOperator = idDlg.Operator;
+                        _pendingImportFillMissingCall = idDlg.FillMissingCallsign;
                     }
                     else
                     {
@@ -344,23 +389,42 @@ namespace HolyLogger
                         // or operator, the user must knowingly approve mixing those QSOs in (any that don't
                         // match the log's identity won't be copied to a copy-target).
                         dal.GetLogIdentity(dal.ActiveLogId, out string idCall, out string idOp);
+                        // ONLY THE CALLSIGN DECIDES. The operator used to be compared too, and a file
+                        // whose operator differed raised this window even when the callsign matched
+                        // perfectly - a question about something that is not part of a log's identity.
                         bool callDiff = adifCalls.Any(c => !CallsignIdentity.Same(c, idCall));
-                        bool opDiff = adifOps.Any(o => !string.Equals(o, idOp, System.StringComparison.OrdinalIgnoreCase));
-                        if (callDiff || opDiff)
+                        // ONE WINDOW FOR THE WHOLE MERGE. It also carries the question about records
+                        // naming no callsign, so it is shown whenever there is either thing to say -
+                        // and skipped when there is neither, rather than asking for a click over a
+                        // window with nothing in it.
+                        if (callDiff || scannedNoCall > 0)
                         {
-                            string fileId = (adifCalls.Count > 0 ? string.Join(", ", adifCalls) : "(no station callsign)")
-                                          + "  /  " + (adifOps.Count > 0 ? string.Join(", ", adifOps) : "(no operator)");
+                            // WHOSE LOG THIS IS, AND WHOSE THE FILE IS. That is the whole question, and
+                            // it is all this says. Two sentences that used to stand here are gone: that
+                            // QSOs not matching the log's identity would not be copied to a copy-target
+                            // (untrue - copying has no callsign test), and that the QSOs will be added,
+                            // which is what the word on the button already says.
+                            var merging = CallsignsPicture(adifCalls, scannedNoCall, idCall, out RadioButton leaveOut);
+                            string intoName = dal.GetLogName(dal.ActiveLogId) ?? idCall;
+                            // 640 wide so "The QSOs in the imported log were made under:" stays on one
+                            // line - a sentence introducing the list below it should not break in two.
                             if (!HolyMessageBox.ShowConfirm(
-                                    "The file \"" + fileName + "\" was made under:\n    " + fileId + "\n\n" +
-                                    "That differs from this log's permanent identity:\n    " + idCall + " / " + idOp + "\n\n" +
-                                    "The QSOs will be added, but any that don't match this log's identity will NOT be copied to a copy-target. Import anyway?",
-                                    "Different callsign / operator", HolyMsgType.Warning, this))
+                                    "The log into which the imported log will be merged is:\n" +
+                                    "**" + intoName + "**\n\n" +
+                                    "The QSOs in the imported log were made under:",
+                                    // Information, not a warning: nothing here is wrong, and the orange
+                                    // triangle made a plain statement of fact look like trouble.
+                                    "Merging logs", HolyMsgType.Info, this, width: 640,
+                                    heading: "Merging logs",
+                                    yesText: "Merge", noText: "Cancel",
+                                    picture: merging))
                             { AbandonNewLog(createdLogId); return; }   // declined -> abort the import
+                            _pendingImportFillMissingCall = leaveOut == null || leaveOut.IsChecked != true;
                         }
                     }
                 }
 
-                ImportFileQ.Add(openFileDialog.FileName);
+                ImportFileQ.Add(path);
                 StartAdifImportWorker();
             }
         }
@@ -381,6 +445,7 @@ namespace HolyLogger
                 RefreshCopyIndicator();
                 _pendingImportCallsign = null;
                 _pendingImportOperator = null;
+                _pendingImportFillMissingCall = true;
                 UpdateNumOfQSOs();
             }
             catch (Exception ex)
@@ -394,6 +459,15 @@ namespace HolyLogger
         // Identity confirmed in the import dialog; applied to the log once the import finishes.
         private string _pendingImportCallsign;
         private string _pendingImportOperator;
+
+        // Answered in the same dialog, for the records that name no callsign at all: false means they
+        // are NOT to be given one, so they are turned away and land in the file of records to correct.
+        // True for every other path - a file dropped on the grid, or a log that already has an identity.
+        private bool _pendingImportFillMissingCall = true;
+
+        // The same answer as it came back from the naming window of a NEW log, held until the identity
+        // step below reads it.
+        private bool _newLogFillMissingCall = true;
 
         // WHICH OF THE THREE THE OPERATOR CHOSE, kept for the report. The choice was made in a dialog,
         // acted on, and forgotten - so the report could say what the import DID but never what it had
@@ -415,50 +489,49 @@ namespace HolyLogger
         //
         // Reading by line is safe here because an ADIF tag never contains a line break, and neither a
         // station callsign nor an operator ever does.
-        // "THIS FILE WAS MADE UNDER A DIFFERENT CALLSIGN - IMPORT IT ANYWAY?", asked BEFORE the file is
-        // read instead of after.
-        //
-        // It used to be asked by the import worker, from the parsed QSOs, which meant the operator sat
-        // through the whole file - three minutes on a big logbook, the spinner reading "Parsing ADIF
-        // 100%" - and was only then asked whether he wanted it at all. Answering No threw away every
-        // second of it. Nothing needed the parsed records: the callsigns come from a scan of the file
-        // that already runs before the import, so the same question with the same list can be asked at
-        // once.
-        //
-        // Returns false when the operator says no; the caller must then leave the file alone.
-        private bool ApproveDifferentStationCallsign(string filePath,
-                                                     System.Collections.Generic.List<string> callsInFile)
-        {
-            string myCallsign = Properties.Settings.Default.my_callsign;
-            if (string.IsNullOrWhiteSpace(myCallsign)) return true;
-            if (callsInFile == null || callsInFile.Count == 0) return true;
-            if (!callsInFile.Any(c => !CallsignIdentity.Same(c, myCallsign))) return true;
-
-            return HolyMessageBox.ShowConfirm(
-                "The ADIF file \"" + System.IO.Path.GetFileName(filePath) + "\" contains QSOs logged "
-                + "under a different callsign than your current station callsign.\n\n"
-                + "Callsign(s) in the file:  " + string.Join(", ", callsInFile) + "\n"
-                + "Your current station callsign:  " + myCallsign.Trim() + "\n\n"
-                + "Do you want to import these QSOs into your log anyway?",
-                "Different callsign in ADIF file", HolyMsgType.Warning, this);
-        }
-
-        private static void ScanAdifIdentity(string filePath, out System.Collections.Generic.List<string> stationCallsigns, out System.Collections.Generic.List<string> operators)
+        private static void ScanAdifIdentity(string filePath, out System.Collections.Generic.List<string> stationCallsigns, out System.Collections.Generic.List<string> operators, out int recordCount, out int recordsWithNoCallsign)
         {
             var callCounts = new System.Collections.Generic.Dictionary<string, int>(System.StringComparer.OrdinalIgnoreCase);
             var opCounts = new System.Collections.Generic.Dictionary<string, int>(System.StringComparer.OrdinalIgnoreCase);
+            recordCount = 0;
+            recordsWithNoCallsign = 0;
             try
             {
                 var callRx = AdifFieldRegex("station_callsign");
                 var opRx = AdifFieldRegex("operator");
+
+                // ONE RECORD AT A TIME, NOT ONE LINE AT A TIME. <eor> ends a record, and a record may
+                // be spread over many lines or several may share one - so the file is walked in the
+                // pieces BETWEEN those markers, and each piece is one record. That is what makes
+                // "this record names no callsign anywhere" a question that can be answered at all.
+                var eorRx = new System.Text.RegularExpressions.Regex("<eor>",
+                    System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                bool callSeenInRecord = false;
 
                 using (var reader = new System.IO.StreamReader(filePath, System.Text.Encoding.UTF8))
                 {
                     string line;
                     while ((line = reader.ReadLine()) != null)
                     {
-                        CollectAdifFieldValues(callRx, line, callCounts);
-                        CollectAdifFieldValues(opRx, line, opCounts);
+                        var pieces = eorRx.Split(line);
+                        for (int i = 0; i < pieces.Length; i++)
+                        {
+                            string piece = pieces[i];
+                            CollectAdifFieldValues(callRx, piece, callCounts);
+                            CollectAdifFieldValues(opRx, piece, opCounts);
+                            // Asked of the text of THIS record. The counts above cannot answer it: a
+                            // callsign already seen adds no new entry to them.
+                            if (!callSeenInRecord && (callRx.IsMatch(piece) || opRx.IsMatch(piece)))
+                                callSeenInRecord = true;
+
+                            // Every piece but the last ended at an <eor>: that is a whole record.
+                            if (i < pieces.Length - 1)
+                            {
+                                recordCount++;
+                                if (!callSeenInRecord) recordsWithNoCallsign++;
+                                callSeenInRecord = false;
+                            }
+                        }
                     }
                 }
             }
@@ -488,6 +561,128 @@ namespace HolyLogger
             System.Collections.Generic.Dictionary<string, int> counts) =>
             counts.OrderByDescending(kv => kv.Value).Select(kv => kv.Key).ToList();
 
+        // THE SAME QUESTION, FOR THE IMPORTS THAT NEVER SEE THE IDENTITY WINDOW.
+        //
+        // A log that already has a callsign is not asked to confirm one, and a file dropped on the grid
+        // is not asked anything at all - so on both of those paths records naming no callsign used to be
+        // given one with nobody told. Nothing about an import should change what goes into the log
+        // without the operator having said so, which is what this asks.
+        //
+        // Sets _pendingImportFillMissingCall. Returns false when the import is to be abandoned.
+        private bool AskFillMissingCallsigns(int count, string callsign)
+        {
+            _pendingImportFillMissingCall = true;
+            if (count <= 0) return true;
+
+            bool go = false;
+            var dialog = new Window
+            {
+                Title = "QSOs with no callsign",
+                SizeToContent = SizeToContent.WidthAndHeight,
+                ResizeMode = ResizeMode.NoResize,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                Owner = this,
+                ShowInTaskbar = false
+            };
+            var root = new StackPanel { Margin = new Thickness(18, 14, 18, 16) };
+            root.Children.Add(new TextBlock
+            {
+                Text = count.ToString("N0") + (count == 1 ? " QSO in this file does" : " QSOs in this file do")
+                     + " not say which callsign made them.",
+                TextWrapping = TextWrapping.Wrap, FontSize = 16, MaxWidth = 440,
+                FontWeight = FontWeights.Bold, Margin = new Thickness(0, 0, 0, 14)
+            });
+
+            string call = (callsign ?? string.Empty).Trim().ToUpperInvariant();
+            var fill = new RadioButton { GroupName = "MissingCall", IsChecked = true, FontSize = 16, Margin = new Thickness(0, 0, 0, 6),
+                Content = new TextBlock { TextWrapping = TextWrapping.Wrap, FontSize = 16, MaxWidth = 400,
+                    Text = call.Length > 0 ? "Give them " + call : "Give them this log's callsign" } };
+            var leave = new RadioButton { GroupName = "MissingCall", FontSize = 16, Margin = new Thickness(0, 0, 0, 22),
+                Content = new TextBlock { TextWrapping = TextWrapping.Wrap, FontSize = 16, MaxWidth = 400,
+                    Text = "Leave them out — they are saved to a file you can correct and import again" } };
+            root.Children.Add(fill);
+            root.Children.Add(leave);
+
+            var buttonRow = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center };
+            var okBtn = new Button { Content = "Import", MinWidth = 100, Margin = new Thickness(6, 0, 6, 0), Padding = new Thickness(12, 5, 12, 5), FontSize = 16, IsDefault = true };
+            var cancelBtn = new Button { Content = "Cancel", MinWidth = 100, Margin = new Thickness(6, 0, 6, 0), Padding = new Thickness(12, 5, 12, 5), FontSize = 16, IsCancel = true };
+            okBtn.Click += (s, e) => { go = true; dialog.Close(); };
+            cancelBtn.Click += (s, e) => { go = false; dialog.Close(); };
+            buttonRow.Children.Add(okBtn);
+            buttonRow.Children.Add(cancelBtn);
+            root.Children.Add(buttonRow);
+
+            dialog.Content = root;
+            dialog.ShowDialog();
+
+            _pendingImportFillMissingCall = leave.IsChecked != true;
+            return go;
+        }
+
+        // WHAT STANDS UNDER THE MERGING SENTENCE: the callsigns the file was made under - one is a word,
+        // several are a list to open - and, when the file holds records naming no callsign at all, the
+        // choice about those as well.
+        //
+        // THE TWO QUESTIONS BELONG IN ONE WINDOW. They are asked at the same moment, about the same
+        // file, and both are about whose QSOs these are; two windows one after the other made the second
+        // look like a new subject. leaveOut is the radio button to read afterwards, null when the file
+        // has no such records and nothing was asked.
+        private static UIElement CallsignsPicture(System.Collections.Generic.List<string> calls,
+                                                  int noCallsignCount, string fillWith,
+                                                  out RadioButton leaveOut)
+        {
+            leaveOut = null;
+            if ((calls == null || calls.Count == 0) && noCallsignCount <= 0) return null;
+
+            var panel = new StackPanel { HorizontalAlignment = HorizontalAlignment.Left };
+
+            if (calls != null && calls.Count == 1)
+                panel.Children.Add(new TextBlock
+                {
+                    Text = calls[0], FontSize = 18, FontWeight = FontWeights.Bold,
+                    HorizontalAlignment = HorizontalAlignment.Left
+                });
+            else if (calls != null && calls.Count > 1)
+                panel.Children.Add(new ComboBox
+                {
+                    ItemsSource = calls,
+                    SelectedIndex = 0,          // most-used first
+                    IsEditable = false,
+                    FontSize = 16,
+                    MinWidth = 180,
+                    HorizontalAlignment = HorizontalAlignment.Left
+                });
+
+            if (noCallsignCount > 0)
+            {
+                panel.Children.Add(new TextBlock
+                {
+                    Text = noCallsignCount.ToString("N0")
+                         + (noCallsignCount == 1 ? " QSO in this file does" : " QSOs in this file do")
+                         + " not say which callsign made them.",
+                    TextWrapping = TextWrapping.Wrap, FontSize = 16, MaxWidth = 420,
+                    FontWeight = FontWeights.Bold, Margin = new Thickness(0, 18, 0, 8)
+                });
+
+                string call = (fillWith ?? string.Empty).Trim().ToUpperInvariant();
+                panel.Children.Add(new RadioButton
+                {
+                    GroupName = "MissingCall", IsChecked = true, FontSize = 16, Margin = new Thickness(0, 0, 0, 6),
+                    Content = new TextBlock { TextWrapping = TextWrapping.Wrap, FontSize = 16, MaxWidth = 380,
+                        Text = call.Length > 0 ? "Give them " + call : "Give them this log's callsign" }
+                });
+                leaveOut = new RadioButton
+                {
+                    GroupName = "MissingCall", FontSize = 16,
+                    Content = new TextBlock { TextWrapping = TextWrapping.Wrap, FontSize = 16, MaxWidth = 380,
+                        Text = "Leave them out — they are saved to a file you can correct and import again" }
+                };
+                panel.Children.Add(leaveOut);
+            }
+
+            return panel;
+        }
+
         private enum ImportTarget { Cancel, NewLog, CurrentLog }
 
         // Asks whether an imported ADIF becomes its own NEW log or is added to the log open now.
@@ -497,7 +692,14 @@ namespace HolyLogger
         // is, and it decides whether a contact the file holds twice is stored once or twice. Skipping
         // the dialog altogether hid that from the one operator most likely to be affected by it: the
         // one importing a lifetime's logbook from another program on the day he installs this one.
-        private ImportTarget AskImportTarget(bool newLogIsTheOnlyAnswer = false)
+        //
+        // WHOSE QSOs ARE IN THE FILE, said at the top. This is where New log / Current log is chosen,
+        // and that choice turns on whether the file belongs with what is already in the open log - so
+        // the callsigns the file was made under are the one fact the operator needs in front of him.
+        // They cost nothing: the file has already been scanned by the time this is asked.
+        private ImportTarget AskImportTarget(bool newLogIsTheOnlyAnswer = false,
+                                             System.Collections.Generic.List<string> callsInFile = null,
+                                             int qsoCount = 0)
         {
             ImportTarget result = ImportTarget.Cancel;
             var dialog = new Window
@@ -516,6 +718,90 @@ namespace HolyLogger
                                              : "Where should the imported QSOs go?",
                 FontSize = 16, FontWeight = FontWeights.Bold, Margin = new Thickness(0, 0, 0, 14)
             });
+
+            // ONE CALLSIGN IS A SENTENCE, SEVERAL ARE A LIST. A drop-down holding a single item is a
+            // control that cannot be used, and it makes the reader look for a choice that is not there.
+            //
+            // "IN TOTAL" IS THERE ON PURPOSE where several callsigns are named: without it the count
+            // and the callsigns sit side by side and read as that many QSOs EACH.
+            //
+            // A COUNT OF NOTHING IS NOT SHOWN. The scan is best-effort and a file it could not read
+            // leaves the count at zero; "0 QSOs" would be a statement about the file, and the wrong
+            // one. The callsign line still says what it found.
+            var fileCalls = callsInFile ?? new System.Collections.Generic.List<string>();
+            string qsos = qsoCount == 1 ? "1 QSO" : qsoCount.ToString("N0") + " QSOs";
+
+            if (fileCalls.Count == 0)
+            {
+                root.Children.Add(new TextBlock
+                {
+                    Text = (qsoCount > 0 ? qsos + ". " : string.Empty) + "The file names no station callsign.",
+                    TextWrapping = TextWrapping.Wrap, FontSize = 16, MaxWidth = 440,
+                    Margin = new Thickness(0, 0, 0, 14)
+                });
+            }
+            else if (fileCalls.Count == 1)
+            {
+                var tb = new TextBlock
+                {
+                    TextWrapping = TextWrapping.Wrap, FontSize = 16, MaxWidth = 440,
+                    Margin = new Thickness(0, 0, 0, 14)
+                };
+                tb.Inlines.Add(new System.Windows.Documents.Run(
+                    qsoCount > 0 ? qsos + ", all made under " : "Made under "));
+                tb.Inlines.Add(new System.Windows.Documents.Run(fileCalls[0]) { FontWeight = FontWeights.Bold });
+                tb.Inlines.Add(new System.Windows.Documents.Run("."));
+                root.Children.Add(tb);
+            }
+            else
+            {
+                // Left-aligned rather than stretched, so the block is as wide as its own text and no
+                // wider - that width is what the drop-down below is then matched to.
+                var callsLabel = new TextBlock
+                {
+                    Text = (qsoCount > 0 ? qsos + " in total, made under " : "Made under ")
+                         + fileCalls.Count + " different station callsigns:",
+                    TextWrapping = TextWrapping.Wrap, FontSize = 16, MaxWidth = 440,
+                    HorizontalAlignment = HorizontalAlignment.Left,
+                    Margin = new Thickness(0, 0, 0, 6)
+                };
+                root.Children.Add(callsLabel);
+
+                // WIDE ENOUGH FOR A CALLSIGN AND NO WIDER: fifteen characters, measured in the font it
+                // will actually be drawn in rather than guessed at, plus the room the arrow takes.
+                double boxWidth;
+                {
+                    var typeface = new System.Windows.Media.Typeface(SystemFonts.MessageFontFamily,
+                        FontStyles.Normal, FontWeights.Normal, FontStretches.Normal);
+                    var sample = new System.Windows.Media.FormattedText(
+                        new string('0', 15), CultureInfo.CurrentCulture, FlowDirection.LeftToRight,
+                        typeface, 16, System.Windows.Media.Brushes.Black,
+                        System.Windows.Media.VisualTreeHelper.GetDpi(this).PixelsPerDip);
+                    boxWidth = sample.Width + 34;
+                }
+
+                var callsBox = new ComboBox
+                {
+                    ItemsSource = fileCalls,
+                    SelectedIndex = 0,          // most-used first, so this is the file's main callsign
+                    IsEditable = false,
+                    FontSize = 16,
+                    Width = boxWidth,
+                    HorizontalAlignment = HorizontalAlignment.Right
+                };
+                // ENDS WHERE THE LINE ABOVE ENDS. The box sits at the right of a strip as wide as the
+                // sentence, so it lines up with the colon whatever that sentence says - bound rather
+                // than measured, because the count and the number of callsigns change its length.
+                var callsRow = new Grid
+                {
+                    HorizontalAlignment = HorizontalAlignment.Left,
+                    Margin = new Thickness(0, 0, 0, 14)
+                };
+                callsRow.SetBinding(FrameworkElement.WidthProperty,
+                    new System.Windows.Data.Binding("ActualWidth") { Source = callsLabel });
+                callsRow.Children.Add(callsBox);
+                root.Children.Add(callsRow);
+            }
 
             string curName = null;
             try { curName = dal?.GetLogName(dal.ActiveLogId); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
@@ -805,14 +1091,18 @@ namespace HolyLogger
 
                 string msg = anyRejected ? "Import finished.\n\n" : "Import completed successfully!\n\n";
 
-                msg += $"Added to this log:  {result.ImportedQsoCount:N0}\n";
+                // Each number says what it counts. A column of bare figures leaves the reader to work
+                // out that they are contacts and not records, files or anything else.
+                string Qsos(int n) => n.ToString("N0") + (n == 1 ? " QSO" : " QSOs");
+
+                msg += $"Added to this log:  {Qsos(result.ImportedQsoCount)}\n";
                 if (result.CompletedQsoCount > 0)
-                    msg += $"Already here, filled in:  {result.CompletedQsoCount:N0}\n";
+                    msg += $"Already here, filled in:  {Qsos(result.CompletedQsoCount)}\n";
                 if (result.AmbiguousQsoCount > 0)
-                    msg += $"Already here, too alike to match:  {result.AmbiguousQsoCount:N0}\n";
+                    msg += $"Already here, too alike to match:  {Qsos(result.AmbiguousQsoCount)}\n";
                 if (anyRejected)
-                    msg += $"NOT stored:  {result.RejectedCount:N0}\n";
-                msg += $"Total now in this log:  {totalQsos:N0}\n";
+                    msg += $"NOT stored:  {Qsos(result.RejectedCount)}\n";
+                msg += $"Total now in this log:  {Qsos(totalQsos)}\n";
 
                 // The check ran and found nothing is a different statement from the check never ran, and
                 // only one line separates them.
@@ -850,7 +1140,7 @@ namespace HolyLogger
 
                 if (anyRejected)
                 {
-                    msg += $"\n\nThe {result.RejectedCount:N0} not stored are missing something a QSO cannot be "
+                    msg += $"\n\nThe {Qsos(result.RejectedCount)} not stored are missing something a QSO cannot be "
                          + "stored without — a callsign, a date, a time, a band, a mode or the station callsign. "
                          + "They are saved beside the report as an ADIF you can correct and import again; nothing "
                          + "already in your log will be duplicated.";
@@ -884,6 +1174,7 @@ namespace HolyLogger
                 catch (Exception swallowed) { Log.Swallow(swallowed); }
                 _pendingImportCallsign = null;
                 _pendingImportOperator = null;
+                _pendingImportFillMissingCall = true;
                 RefreshCopyIndicator();
             }
 
@@ -1258,7 +1549,10 @@ namespace HolyLogger
             bool isOverride = Properties.Settings.Default.IsOverrideOperatorFromFile;
             bool isParseDuplicates = Properties.Settings.Default.IsParseDuplicates;
             bool isParseWARC = Properties.Settings.Default.IsParseWARC;
-            string myCallsign = Properties.Settings.Default.my_callsign;
+            // THE BOX, NOT THE SAVED SETTING. A callsign typed into the station box is written to the
+            // setting only when the box loses focus, so typing one and importing straight away left this
+            // holding the callsign BEFORE the change - and the import then answered for the old station.
+            string myCallsign = this.Dispatcher.Invoke(() => (TB_MyCallsign.Text ?? string.Empty).Trim());
             List<string> files = this.Dispatcher.Invoke(() => ImportFileQ.ToList());
 
             int faultyQSO = 0;
@@ -1438,7 +1732,7 @@ namespace HolyLogger
                         // which records and why; this only points at it.
                         int turnedAway = parser.GetRejected().Count;
                         string why = turnedAway > 0
-                            ? $"All {turnedAway:N0} of its records were turned away - the report on your Desktop says which and why."
+                            ? $"All {turnedAway:N0} of its records were turned away. The report says which, and why. Open it with File → Open Reports Folder."
                             : "The file may be in an unsupported format or empty.";
                         if (StopWasAskedFor()) { stopped = true; break; }
                         this.Dispatcher.Invoke(() =>
@@ -1447,8 +1741,8 @@ namespace HolyLogger
                     }
 
                     // NO CALLSIGN QUESTION HERE ANY MORE. It was asked at this point - after the whole
-                    // file had been read - and is now asked before the reading starts, where a No costs
-                    // nothing. See ApproveDifferentStationCallsign.
+                    // file had been read - and then before the reading started, and is now not asked at
+                    // all: the log's own identity dialogs cover it, before the import runs.
 
                     foreach (var rq in rawQSOList)
                     {
@@ -1737,7 +2031,7 @@ namespace HolyLogger
                 catch (Exception swallowed)
                 {
                     Log.Swallow(swallowed);
-                    HolyMessageBox.ShowWarning("The report could not be opened. It is on your Desktop:\n\n" + path,
+                    HolyMessageBox.ShowWarning("The report could not be opened. It is here:\n\n" + path,
                                                "Import report", this);
                 }
             }
@@ -1749,6 +2043,8 @@ namespace HolyLogger
         // rather than attributed to a station that may not have made them.
         private string FallbackStationCall(string programCallsign)
         {
+            // Asked and answered "leave them out": nothing is filled in, so the parser turns them away.
+            if (!_pendingImportFillMissingCall) return string.Empty;
             if (!string.IsNullOrWhiteSpace(_pendingImportCallsign)) return _pendingImportCallsign.Trim();
             try
             {
