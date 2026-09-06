@@ -2137,21 +2137,55 @@ namespace HolyLogger
             // rather than at the end of every macro: with nothing waiting there is nothing to separate,
             // so a press on an idle keyer starts as immediately as it always did, and no transmission
             // ends by keying a gap nobody is waiting for.
+            // HOLDING FOR ENTER, A BUTTON STILL SENDS AT ONCE.
+            //
+            // It used to write into the row like typing and wait there for Enter, which put the two
+            // things an operator does with this window into one queue: the message he is composing
+            // letter by letter, and the button he presses to send something NOW. Pressing TU while
+            // half a callsign stood in the row sent the half callsign with it, or made him finish a
+            // line he was not ready to finish.
+            //
+            // THE MACRO GOES IN FRONT OF WHAT IS WAITING, not on the end of it. The row is one line
+            // and what has been released is its front, so the button's text is put at the end of the
+            // released part and released with it. Everything already on its way keeps its place, the
+            // button follows it immediately, and what he has typed stays where it is - unsent, and
+            // his to finish - until Enter releases it in its turn.
+            if (HoldForEnter)
+            {
+                string row = _box.Text ?? string.Empty;
+                int at = Math.Max(0, Math.Min(_releasedUpTo, row.Length));
+
+                string ahead = row.Substring(0, at);
+                string waiting = row.Substring(at);
+
+                // A WORD GAP EITHER SIDE. In front, so a press landing on a message still going out
+                // does not run into it; behind, so what he types is a word of its own when Enter
+                // finally lets it go. The gap behind belongs to the WAITING text, not to this press,
+                // or the radio would key a space nobody is waiting for at the end of the macro.
+                if (ahead.Length > 0 && !ahead.EndsWith(" ", StringComparison.Ordinal)) ahead += " ";
+                if (waiting.Length > 0 && !waiting.StartsWith(" ", StringComparison.Ordinal)) waiting = " " + waiting;
+
+                _box.Text = ahead + text + waiting;
+                _releasedUpTo = ahead.Length + text.Length;
+
+                // The caret goes back to the end, which is where the next letter he types belongs.
+                _box.CaretIndex = _box.Text.Length;
+                _box.Focus();
+
+                // AND WHAT THE BUTTON'S TEXT ASKED FOR HAPPENS NOW, because the text is going now.
+                // It used to be held until Enter, which was right while the press only wrote into the
+                // row and is wrong the moment the press sends.
+                if (logsQso) _logQso();
+                else if (wipesForm) _wipeForm();
+                return;
+            }
+
             string pending = _box.Text ?? string.Empty;
             if (pending.Length > 0 && !pending.EndsWith(" ", StringComparison.Ordinal)) pending += " ";
 
             _box.Text = pending + text;
             _box.CaretIndex = _box.Text.Length;
             _box.Focus();
-
-            // HOLDING FOR ENTER, THE BUTTON WRITES RATHER THAN SENDS. That is what makes a message out
-            // of several macros possible. What its text asked for waits with it - see ReleaseTypedText.
-            if (HoldForEnter)
-            {
-                _heldLogQso |= logsQso;
-                _heldWipeForm |= wipesForm;
-                return;
-            }
 
             // AFTER the text is on its way, and without waiting for the radio to finish keying it -
             // the whole point of putting {LOG} on the TU button is that the next callsign can be
