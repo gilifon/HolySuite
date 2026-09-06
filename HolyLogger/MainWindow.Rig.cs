@@ -1389,6 +1389,18 @@ namespace HolyLogger
                     khz = (double)Rig.GetRxFrequency() / 1000.0;
                     mode = GetNormalizedRigMode();
 
+                    // GetNormalizedRigMode collapses both of OmniRig's digital slots into "DIGI" -
+                    // right for the main GUI's Mode box, which has no RTTY entry of its own, but wrong
+                    // for the Radio Control Panel's RTTY button: RTTY presses PM_DIG_L specifically
+                    // (see MapClusterModeToRigMode), so a radio actually sitting on that slot should
+                    // light RTTY there, not leave every mode button dark because none of them says
+                    // "DIGI". PM_DIG_U (FT8/data) is left alone and still reports as "DIGI".
+                    if (string.Equals(mode, "DIGI", StringComparison.OrdinalIgnoreCase)
+                        && Rig.Mode == (OmniRig.RigParamX)PM_DIG_L)
+                    {
+                        mode = "RTTY";
+                    }
+
                     // NO POLLING OF OUR OWN. OmniRig polls the radio on its own timer and raises
                     // ParamsChange when anything moves; this is that event, and Rig.Tx is the state it
                     // has already read. The CW keyer reads the same property in the same way.

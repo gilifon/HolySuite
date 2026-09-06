@@ -10,16 +10,24 @@
         Foreground="{DynamicResource TextBrush}">
 
     <Window.Resources>
-        <!-- The colour of a lit button. It is a resource, not a fixed colour in the trigger, because
-             the panel repaints it when the mode changes: blue while the radio is on SSB, red while
-             it is on CW. Every lit button reads this one brush, so the band button always wears the
-             colour of the mode it would send the radio to. -->
+        <!-- The colour of a lit button, and the colour its text turns. Both are resources, not fixed
+             colours in the trigger, because the panel repaints them when the mode changes: blue
+             background with white text while the radio is on SSB, red with white on CW - but yellow
+             with the ordinary text colour on RTTY, which is lit with EditFieldBg, the same yellow a
+             QSO field wears while being edited in the main window; there too the text stays its usual
+             colour and only the background changes. White would read fine on that yellow in the dark
+             scheme (EditFieldBg is a dark olive there) but not in the light one, where it is a bright,
+             saturated yellow - so the text colour travels with the mode exactly like the background
+             does, in PanelLitTextBrush, and every lit button (a band button included, when the radio
+             is on RTTY) reads correctly in both schemes without a second style to keep in step. -->
         <SolidColorBrush x:Key="PanelLitBrush" Color="#FF1565C0"/>
+        <SolidColorBrush x:Key="PanelLitTextBrush" Color="White"/>
 
         <!-- The panel's own button look. The application's ordinary button style says nothing about a
              PRESSED state, and this panel's whole job is to show, at a glance, which band and which
-             mode the radio is on: the lit button carries the mode's colour, white bold text and a
-             gold edge, none of which any other button in the program wears. -->
+             mode the radio is on: the lit button carries the mode's colour, bold text in whichever
+             colour PanelLitTextBrush currently holds, and a gold edge - none of which any other
+             button in the program wears. -->
         <Style x:Key="PanelToggleStyle" TargetType="{x:Type primitives:ToggleButton}">
             <Setter Property="FontSize" Value="18"/>
             <Setter Property="FontWeight" Value="Bold"/>
@@ -45,49 +53,7 @@
                                 <Setter TargetName="Face" Property="Background" Value="{DynamicResource PanelLitBrush}"/>
                                 <Setter TargetName="Face" Property="BorderBrush" Value="#FFFFC400"/>
                                 <Setter TargetName="Face" Property="BorderThickness" Value="3"/>
-                                <Setter Property="Foreground" Value="White"/>
-                            </Trigger>
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter Property="Opacity" Value="0.45"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <!-- RTTY's own style: identical to PanelToggleStyle except that its IsChecked trigger leaves
-             the text alone instead of forcing it white. RTTY is lit with EditFieldBg, the same yellow
-             a QSO field wears while being edited in the main window - and there, the text stays its
-             ordinary colour; only the background changes. White text would read fine on that yellow
-             in the dark scheme (EditFieldBg is a dark olive there) but not in the light one, where it
-             is a bright, saturated yellow. Matching the main window's own convention sidesteps the
-             contrast problem in both schemes at once, rather than picking a text colour for one. -->
-        <Style x:Key="PanelToggleStyleRtty" TargetType="{x:Type primitives:ToggleButton}">
-            <Setter Property="FontSize" Value="18"/>
-            <Setter Property="FontWeight" Value="Bold"/>
-            <Setter Property="Margin" Value="2,4"/>
-            <Setter Property="Height" Value="38"/>
-            <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
-            <Setter Property="Background" Value="{DynamicResource ButtonBg}"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="{x:Type primitives:ToggleButton}">
-                        <Border x:Name="Face"
-                                CornerRadius="5"
-                                BorderThickness="2"
-                                BorderBrush="{DynamicResource ThemeBorderBrush}"
-                                Background="{TemplateBinding Background}">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Face" Property="Background" Value="{DynamicResource ButtonHoverBg}"/>
-                            </Trigger>
-                            <Trigger Property="IsChecked" Value="True">
-                                <Setter TargetName="Face" Property="Background" Value="{DynamicResource PanelLitBrush}"/>
-                                <Setter TargetName="Face" Property="BorderBrush" Value="#FFFFC400"/>
-                                <Setter TargetName="Face" Property="BorderThickness" Value="3"/>
+                                <Setter Property="Foreground" Value="{DynamicResource PanelLitTextBrush}"/>
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter Property="Opacity" Value="0.45"/>

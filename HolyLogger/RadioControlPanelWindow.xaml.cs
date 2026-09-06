@@ -35,9 +35,9 @@ namespace HolyLogger
         // instead of another hand-written IsChecked/IsEnabled pair.
         private List<(ToggleButton Button, string Mode)> _modeButtons;
 
-        // Which of a band's two frequencies a band button uses. It follows the radio whenever the
-        // radio is on SSB or CW; on RTTY, AM or FM the last of the two is kept, so a band button
-        // still has an answer even though none of those three has a frequency of its own.
+        // Which of a band's frequencies a band button uses. It follows the radio whenever the radio
+        // is on SSB, CW or RTTY; on AM or FM the last of those three is kept, so a band button still
+        // has an answer even though neither AM nor FM has a frequency of its own.
         private string _mode = "SSB";
 
         // True while the box is showing the radio's own frequency. The first character typed wipes
@@ -56,8 +56,10 @@ namespace HolyLogger
             new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x15, 0x65, 0xC0));
         private static readonly System.Windows.Media.Brush CwLit =
             new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0xD3, 0x2F, 0x2F));
+        // The exact colour the Cluster's own UHF band checkbox uses (Properties.Settings.Default.
+        // ClusterBandColors, "UHF": "#5ECFFF") - asked for by eye, confirmed against the saved setting.
         private static readonly System.Windows.Media.Brush AmLit =
-            new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0xE6, 0x51, 0x00));
+            new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x5E, 0xCF, 0xFF));
         // Same green as the RX lamp below (RxLit) - a colour this window already uses, rather than a
         // fourth green invented for the occasion.
         private static readonly System.Windows.Media.Brush FmLit =
@@ -194,9 +196,9 @@ namespace HolyLogger
 
             // RTTY and FM moved out of the button grid entirely, into the row shared with TX/RX - the
             // XAML's RttySlot/FmSlot flank the centred TX/RX block, in the space that was already
-            // free there. RTTY's own style: EditFieldBg's yellow needs the text left at its ordinary
-            // colour rather than forced white - see PanelToggleStyleRtty in the XAML.
-            _rttyButton = MakeModeButton("RTTY", (Style)Resources["PanelToggleStyleRtty"]);
+            // free there. Same shared style as everything else - PanelLitTextBrush (see ShowRigState)
+            // is what keeps RTTY's text readable on its yellow, not a separate style.
+            _rttyButton = MakeModeButton("RTTY", style);
             RttySlot.Children.Add(_rttyButton);
 
             _fmButton = MakeModeButton("FM", style);
@@ -282,6 +284,10 @@ namespace HolyLogger
             }
 
             Resources["PanelLitBrush"] = BrushForMode(_mode);
+            // White reads fine on every lit colour except RTTY's yellow, where the ordinary text
+            // colour is what the main GUI itself uses over that same yellow on an edited QSO field,
+            // and AM's blue, asked to keep black text regardless of theme.
+            Resources["PanelLitTextBrush"] = TextBrushForMode(_mode);
 
             _currentBand = rigOnline && khz > 0
                 ? _bands.FirstOrDefault(b => b.Contains(khz))
@@ -327,6 +333,19 @@ namespace HolyLogger
             if (string.Equals(mode, "AM", StringComparison.OrdinalIgnoreCase)) return AmLit;
             if (string.Equals(mode, "FM", StringComparison.OrdinalIgnoreCase)) return FmLit;
             return SsbLit;   // SSB, and anything the radio reports that the panel does not know
+        }
+
+        /// <summary>
+        /// The colour every lit button's TEXT wears for this mode - the counterpart to BrushForMode,
+        /// since a colour bright enough to read well itself does not always leave white legible on it.
+        /// </summary>
+        private System.Windows.Media.Brush TextBrushForMode(string mode)
+        {
+            if (string.Equals(mode, "RTTY", StringComparison.OrdinalIgnoreCase))
+                return (System.Windows.Media.Brush)FindResource("TextBrush");
+            if (string.Equals(mode, "AM", StringComparison.OrdinalIgnoreCase))
+                return System.Windows.Media.Brushes.Black;
+            return System.Windows.Media.Brushes.White;
         }
 
         /// <summary>
@@ -376,14 +395,15 @@ namespace HolyLogger
 
             _mode = mode;
 
-            // SSB and CW each have their own frequency for every band (the Options page), so asking
-            // for CW on 20m puts the radio on the 20m CW frequency, not on CW where the SSB part of
-            // the band was. RTTY, AM and FM have no frequency of their own to go with a band - the
-            // Options page holds only the two - so pressing one of those just changes the mode at
-            // wherever the radio already is, rather than jumping to the SSB slot for a sub-band that
-            // is usually somewhere else entirely.
+            // SSB, CW and RTTY each have their own frequency for every band (the Options page), so
+            // asking for CW on 20m puts the radio on the 20m CW frequency, not on CW where the SSB
+            // part of the band was - and the same now holds for RTTY. AM and FM have no frequency of
+            // their own to go with a band, so pressing either just changes the mode at wherever the
+            // radio already is, rather than jumping to the SSB slot for a sub-band that is usually
+            // somewhere else entirely.
             bool hasOwnFrequency = string.Equals(mode, "SSB", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(mode, "CW", StringComparison.OrdinalIgnoreCase);
+                || string.Equals(mode, "CW", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(mode, "RTTY", StringComparison.OrdinalIgnoreCase);
             double khz = hasOwnFrequency && _currentBand != null ? _currentBand.FrequencyFor(mode) : _rigKhz;
             if (khz <= 0) return;
 

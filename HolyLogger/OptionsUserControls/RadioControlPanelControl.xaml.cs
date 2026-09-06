@@ -15,6 +15,7 @@ namespace HolyLogger.OptionsUserControls
         private List<RadioBandPreset> _bands;
         private readonly List<TextBox> _ssbBoxes = new List<TextBox>();
         private readonly List<TextBox> _cwBoxes = new List<TextBox>();
+        private readonly List<TextBox> _rttyBoxes = new List<TextBox>();
 
         /// <summary>True once anything here was edited, so the open panel can be rebuilt.</summary>
         public bool HasChanged { get; private set; }
@@ -30,6 +31,7 @@ namespace HolyLogger.OptionsUserControls
             _bands = bands;
             _ssbBoxes.Clear();
             _cwBoxes.Clear();
+            _rttyBoxes.Clear();
 
             BandGrid.Children.Clear();
             BandGrid.RowDefinitions.Clear();
@@ -37,6 +39,8 @@ namespace HolyLogger.OptionsUserControls
 
             BandGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(160) });
             BandGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(140) });
+            BandGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(140) });
+            // New column goes on the right, after CW - never inserted between existing ones.
             BandGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(140) });
 
             AddHeaderRow();
@@ -60,8 +64,10 @@ namespace HolyLogger.OptionsUserControls
 
                 var ssb = MakeBox(band.SsbKhz, row, 1);
                 var cw = MakeBox(band.CwKhz, row, 2);
+                var rtty = MakeBox(band.RttyKhz, row, 3);
                 _ssbBoxes.Add(ssb);
                 _cwBoxes.Add(cw);
+                _rttyBoxes.Add(rtty);
             }
         }
 
@@ -83,6 +89,11 @@ namespace HolyLogger.OptionsUserControls
             Grid.SetRow(cw, 0);
             Grid.SetColumn(cw, 2);
             BandGrid.Children.Add(cw);
+
+            var rtty = new TextBlock { Text = "RTTY (kHz)", FontSize = 16, FontWeight = FontWeights.Bold, Margin = new Thickness(0, 0, 8, 4) };
+            Grid.SetRow(rtty, 0);
+            Grid.SetColumn(rtty, 3);
+            BandGrid.Children.Add(rtty);
         }
 
         private TextBox MakeBox(int khz, int row, int column)
@@ -121,6 +132,7 @@ namespace HolyLogger.OptionsUserControls
             {
                 changed |= ReadBox(_ssbBoxes[i], value => _bands[i].SsbKhz = value, _bands[i].SsbKhz);
                 changed |= ReadBox(_cwBoxes[i], value => _bands[i].CwKhz = value, _bands[i].CwKhz);
+                changed |= ReadBox(_rttyBoxes[i], value => _bands[i].RttyKhz = value, _bands[i].RttyKhz);
             }
 
             if (!changed) return;
