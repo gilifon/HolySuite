@@ -885,9 +885,9 @@ namespace HolyLogger
         // their own count back up cannot turn into a loop.
         private bool _syncingKind;
 
-        // Maidenhead: field, square, and optionally subsquare and extended square.
+        // Maidenhead: field, square, and optionally subsquare, extended square, and extended subsquare.
         private static readonly Regex LegalLocator =
-            new Regex("^[A-R]{2}[0-9]{2}([A-X]{2}([0-9]{2})?)?$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+            new Regex("^[A-R]{2}[0-9]{2}([A-X]{2}([0-9]{2}([A-X]{2})?)?)?$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
         // A Holyland square (one letter, two digits, two letters - K07YZ) is not a Maidenhead locator, but
         // Holyland contest QSOs in this log do carry one in the DX locator field. It is deliberate data,

@@ -11922,7 +11922,7 @@ namespace HolyLogger
                 return string.Empty;
             }
 
-            var match = Regex.Match(text.ToUpperInvariant(), "\\b([A-R]{2}\\d{2}(?:[A-X]{2}(?:\\d{2})?)?)\\b");
+            var match = Regex.Match(text.ToUpperInvariant(), "\\b([A-R]{2}\\d{2}(?:[A-X]{2}(?:\\d{2}(?:[A-X]{2})?)?)?)\\b");
             if (!match.Success)
             {
                 return string.Empty;
@@ -13918,7 +13918,7 @@ namespace HolyLogger
             {
                 e.Handled = true;
                 WarnInvalidField(TB_MyLocator,
-                    "\"" + locator + "\" is not a valid grid square.\n\nUse 2 letters + 2 digits (e.g. KM72), optionally followed by 2 letters (e.g. KM72OR). The first pair is A–R, the 5th/6th characters are letters A–X (e.g. O), not zeros (0).",
+                    "\"" + locator + "\" is not a valid grid square.\n\nUse 2 letters + 2 digits (e.g. KM72). Two more letters (KM72OR), then two more digits (KM72OR12), then two more letters (KM72OR12AB) can be added for extra precision. The 1st/2nd characters are letters A–R, the 5th/6th and 9th/10th are letters A–X (e.g. O), not zeros (0).",
                     "Invalid My Locator");
             }
         }
