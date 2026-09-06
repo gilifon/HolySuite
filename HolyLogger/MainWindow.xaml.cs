@@ -10778,6 +10778,22 @@ namespace HolyLogger
             catch (System.Exception swallowed) { Log.Swallow(swallowed); }
         }
 
+        // Open Options on the Radio Control Panel page — the band frequencies the panel's buttons
+        // send the radio to. Used by the gear beside the panel's frequency box.
+        internal void OpenOptionsOnRadioPanelPage()
+        {
+            try
+            {
+                OptionsMenuItemMenuItem_Click(null, null);
+                if (options != null)
+                {
+                    options.RadioPanelItem.IsSelected = true;
+                    options.Activate();
+                }
+            }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
         // Soft callsign guard on Add (F1). Returns true to let the save proceed, false to stop it.
         //
         // The two questions the Log Fixer asks of a callsign already in the log, asked before the QSO

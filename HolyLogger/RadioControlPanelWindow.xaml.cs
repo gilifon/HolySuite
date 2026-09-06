@@ -10,7 +10,8 @@ using System.Windows.Input;
 namespace HolyLogger
 {
     /// <summary>
-    /// The Radio Control Panel: a frequency box and twelve buttons - ten bands, SSB and CW.
+    /// The Radio Control Panel: a frequency box, one button per band, and five mode buttons - SSB,
+    /// CW, RTTY, AM and FM.
     ///
     /// IT NEVER DECIDES WHAT IS LIT. Pressing a button asks the radio to move; what the panel shows
     /// comes back from the radio itself, through MainWindow.UpdateRadioPanel. So turning the VFO on
@@ -25,10 +26,18 @@ namespace HolyLogger
         private readonly List<ToggleButton> _bandButtons = new List<ToggleButton>();
         private ToggleButton _ssbButton;
         private ToggleButton _cwButton;
+        private ToggleButton _rttyButton;
+        private ToggleButton _amButton;
+        private ToggleButton _fmButton;
+
+        // Every mode button, paired with the word BandButton_Click/ModeButton_Click and OmniRig know
+        // it by. One list, read by ShowRigState, so lighting a sixth mode later is one line here
+        // instead of another hand-written IsChecked/IsEnabled pair.
+        private List<(ToggleButton Button, string Mode)> _modeButtons;
 
         // Which of a band's two frequencies a band button uses. It follows the radio whenever the
-        // radio is on SSB or CW; on any other mode (data, FM, AM) the last of the two is kept, so a
-        // band button still has an answer.
+        // radio is on SSB or CW; on RTTY, AM or FM the last of the two is kept, so a band button
+        // still has an answer even though none of those three has a frequency of its own.
         private string _mode = "SSB";
 
         // True while the box is showing the radio's own frequency. The first character typed wipes
@@ -36,12 +45,23 @@ namespace HolyLogger
         // and until Enter is pressed, or the box is left, the radio no longer writes into it.
         private bool _boxShowsRadio = true;
 
-        // Blue for SSB, red for CW. One brush, read by every lit button, so the band button and the
-        // mode button always agree about which mode the panel is on.
+        // One colour per mode, and one brush shared by every lit button (see PanelLitBrush in the
+        // XAML), so the band button and the mode button always agree about which mode the panel is
+        // on - pressing RTTY paints the current band's own button the same yellow as the RTTY button.
+        // Only ever shows on a CHECKED button: the style's IsChecked trigger is what paints
+        // PanelLitBrush onto a button's face at all, so an unchecked button stays the plain ButtonBg
+        // it always wore - none of these colours is visible except on the one button (or two, band
+        // and mode together) for whichever mode the radio is actually on right now.
         private static readonly System.Windows.Media.Brush SsbLit =
             new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x15, 0x65, 0xC0));
         private static readonly System.Windows.Media.Brush CwLit =
             new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0xD3, 0x2F, 0x2F));
+        private static readonly System.Windows.Media.Brush AmLit =
+            new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0xE6, 0x51, 0x00));
+        // Same green as the RX lamp below (RxLit) - a colour this window already uses, rather than a
+        // fourth green invented for the occasion.
+        private static readonly System.Windows.Media.Brush FmLit =
+            new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x00, 0xA6, 0x50));
 
         // Lamp colours. Red is the same red as a lit CW button, green is the panel's own.
         private static readonly System.Windows.Media.Brush TxLit =
@@ -145,23 +165,51 @@ namespace HolyLogger
             _bands = RadioPanelPresets.Load();
             _bandButtons.Clear();
             ButtonGrid.Children.Clear();
+            RttySlot.Children.Clear();
+            FmSlot.Children.Clear();
 
             var style = (Style)Resources["PanelToggleStyle"];
 
-            // Rows 1-3 are nine bands; the fourth row is SSB, the tenth band, CW.
-            for (int i = 0; i < 9 && i < _bands.Count; i++)
+            // Every band gets a button, in order, except the last one - that band sits alone in the
+            // middle of its row now; its left and right cells (Columns 0 and 2) are left blank on
+            // purpose - SSB and CW moved down to share AM's row instead, one row below the last band.
+            for (int i = 0; i < _bands.Count - 1; i++)
                 ButtonGrid.Children.Add(MakeBandButton(_bands[i], style));
+
+            ButtonGrid.Children.Add(new Border());   // blank - SSB used to sit here
+
+            if (_bands.Count > 0)
+                ButtonGrid.Children.Add(MakeBandButton(_bands[_bands.Count - 1], style));
+
+            ButtonGrid.Children.Add(new Border());   // blank - CW used to sit here
 
             _ssbButton = MakeModeButton("SSB", style);
             ButtonGrid.Children.Add(_ssbButton);
 
-            if (_bands.Count > 9)
-                ButtonGrid.Children.Add(MakeBandButton(_bands[9], style));
-            else
-                ButtonGrid.Children.Add(new Border());
+            _amButton = MakeModeButton("AM", style);
+            ButtonGrid.Children.Add(_amButton);
 
             _cwButton = MakeModeButton("CW", style);
             ButtonGrid.Children.Add(_cwButton);
+
+            // RTTY and FM moved out of the button grid entirely, into the row shared with TX/RX - the
+            // XAML's RttySlot/FmSlot flank the centred TX/RX block, in the space that was already
+            // free there. RTTY's own style: EditFieldBg's yellow needs the text left at its ordinary
+            // colour rather than forced white - see PanelToggleStyleRtty in the XAML.
+            _rttyButton = MakeModeButton("RTTY", (Style)Resources["PanelToggleStyleRtty"]);
+            RttySlot.Children.Add(_rttyButton);
+
+            _fmButton = MakeModeButton("FM", style);
+            FmSlot.Children.Add(_fmButton);
+
+            _modeButtons = new List<(ToggleButton, string)>
+            {
+                (_ssbButton, "SSB"),
+                (_cwButton, "CW"),
+                (_rttyButton, "RTTY"),
+                (_amButton, "AM"),
+                (_fmButton, "FM"),
+            };
         }
 
         private ToggleButton MakeBandButton(RadioBandPreset band, Style style)
@@ -228,14 +276,12 @@ namespace HolyLogger
             _transmitting = transmitting;
             ShowTxRx(rigOnline ? transmitting : null);
 
-            if (string.Equals(mode, "SSB", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(mode, "CW", StringComparison.OrdinalIgnoreCase))
+            if (_modeButtons != null && _modeButtons.Any(m => string.Equals(m.Mode, mode, StringComparison.OrdinalIgnoreCase)))
             {
                 _mode = mode.ToUpperInvariant();
             }
 
-            Resources["PanelLitBrush"] =
-                string.Equals(_mode, "CW", StringComparison.OrdinalIgnoreCase) ? CwLit : SsbLit;
+            Resources["PanelLitBrush"] = BrushForMode(_mode);
 
             _currentBand = rigOnline && khz > 0
                 ? _bands.FirstOrDefault(b => b.Contains(khz))
@@ -244,14 +290,16 @@ namespace HolyLogger
             foreach (var button in _bandButtons)
                 button.IsChecked = rigOnline && ReferenceEquals(button.Tag, _currentBand);
 
-            bool ssbLit = rigOnline && string.Equals(mode, "SSB", StringComparison.OrdinalIgnoreCase);
-            bool cwLit = rigOnline && string.Equals(mode, "CW", StringComparison.OrdinalIgnoreCase);
-            if (_ssbButton != null) _ssbButton.IsChecked = ssbLit;
-            if (_cwButton != null) _cwButton.IsChecked = cwLit;
+            if (_modeButtons != null)
+            {
+                foreach (var entry in _modeButtons)
+                {
+                    entry.Button.IsChecked = rigOnline && string.Equals(mode, entry.Mode, StringComparison.OrdinalIgnoreCase);
+                    entry.Button.IsEnabled = rigOnline;
+                }
+            }
 
             foreach (var button in _bandButtons) button.IsEnabled = rigOnline;
-            if (_ssbButton != null) _ssbButton.IsEnabled = rigOnline;
-            if (_cwButton != null) _cwButton.IsEnabled = rigOnline;
             TB_Frequency.IsEnabled = rigOnline;
 
             // A dead box marks nothing: the band goes out with the radio.
@@ -264,6 +312,21 @@ namespace HolyLogger
 
             // The digits may have shifted under a mouse that never moved.
             ShowWheelZone();
+        }
+
+        /// <summary>
+        /// The colour every lit button on the panel wears while the radio is on this mode.
+        /// </summary>
+        private static System.Windows.Media.Brush BrushForMode(string mode)
+        {
+            if (string.Equals(mode, "CW", StringComparison.OrdinalIgnoreCase)) return CwLit;
+            // The same yellow the main GUI paints a QSO field with while it is being edited
+            // (EditFieldBg - see ThemePalette), so RTTY reads as "this is what changed" the same way
+            // an edited field does. Read live rather than cached once: a scheme change repaints it.
+            if (string.Equals(mode, "RTTY", StringComparison.OrdinalIgnoreCase)) return ThemeManager.Brush("EditFieldBg");
+            if (string.Equals(mode, "AM", StringComparison.OrdinalIgnoreCase)) return AmLit;
+            if (string.Equals(mode, "FM", StringComparison.OrdinalIgnoreCase)) return FmLit;
+            return SsbLit;   // SSB, and anything the radio reports that the panel does not know
         }
 
         /// <summary>
@@ -313,12 +376,26 @@ namespace HolyLogger
 
             _mode = mode;
 
-            // Mode and frequency travel together: asking for CW on 20m puts the radio on the 20m CW
-            // frequency, not on CW where the SSB part of the band was.
-            double khz = _currentBand != null ? _currentBand.FrequencyFor(mode) : _rigKhz;
+            // SSB and CW each have their own frequency for every band (the Options page), so asking
+            // for CW on 20m puts the radio on the 20m CW frequency, not on CW where the SSB part of
+            // the band was. RTTY, AM and FM have no frequency of their own to go with a band - the
+            // Options page holds only the two - so pressing one of those just changes the mode at
+            // wherever the radio already is, rather than jumping to the SSB slot for a sub-band that
+            // is usually somewhere else entirely.
+            bool hasOwnFrequency = string.Equals(mode, "SSB", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(mode, "CW", StringComparison.OrdinalIgnoreCase);
+            double khz = hasOwnFrequency && _currentBand != null ? _currentBand.FrequencyFor(mode) : _rigKhz;
             if (khz <= 0) return;
 
             _main.TuneRadioToKhz(khz, mode);
+        }
+
+        // The gear beside the frequency box. What a band button sends the radio to is set on the
+        // panel's own page in Options, so the gear opens Options already on that page rather than
+        // leaving the operator to find it in the list.
+        private void PanelSettingsBtn_Click(object sender, RoutedEventArgs e)
+        {
+            _main.OpenOptionsOnRadioPanelPage();
         }
 
         // ---- only a frequency can be typed into the box ------------------------------------

@@ -31,9 +31,9 @@ namespace HolyLogger
     }
 
     /// <summary>
-    /// The ten band buttons of the Radio Control Panel, and the two frequencies behind each of them.
+    /// The band buttons of the Radio Control Panel, and the two frequencies behind each of them.
     ///
-    /// The band list itself is FIXED (the panel has ten band buttons and no more); only the two
+    /// The band list itself is FIXED (the panel has exactly these buttons and no more); only the two
     /// frequencies per band are the operator's to change, on Options > Radio Control Panel. They are
     /// kept in one settings string rather than twenty settings, so adding or renaming a band later is
     /// one edit here instead of twenty in Settings.settings.
@@ -43,11 +43,20 @@ namespace HolyLogger
         // Region 1 calling / commonly used frequencies. 10 MHz and 18 MHz have no SSB by band plan;
         // their "SSB" slot holds the same CW-part frequency so a press there still does something
         // sensible, and the operator can put whatever he wants in it.
+        //
+        // 60m, 8m and 4m are secondary/experimental in most administrations and the exact edges vary
+        // by country - these are the widest commonly-cited spans (IARU Region 1 / Wikipedia), and like
+        // every other row here the two frequencies are only a starting point the operator can edit.
+        // 60m: WRC-15 allocation 5351.5-5366.5 kHz, USB dial 5354/5357/5360/5363, CW below 5354.
+        // 8m: 40.66-40.70 MHz is the span shared by most of the handful of countries with an
+        // allocation (Slovenia, Croatia, Italy, Belgium); no established calling frequency.
+        // 4m: 70.0-70.5 MHz (UK/IARU R1); combined CW/SSB calling frequency 70.200 MHz.
         private static readonly object[][] Factory =
         {
             //   label   name    low     high    ssb     cw
             new object[] { "1.8", "160m",  1800,   2000,   1843,   1825 },
             new object[] { "3.5", "80m",   3500,   4000,   3750,   3530 },
+            new object[] { "5",   "60m",   5351,   5367,   5357,   5352 },
             new object[] { "7",   "40m",   7000,   7200,   7090,   7030 },
             new object[] { "10",  "30m",  10100,  10150,  10120,  10120 },
             new object[] { "14",  "20m",  14000,  14350,  14250,  14030 },
@@ -55,7 +64,9 @@ namespace HolyLogger
             new object[] { "21",  "15m",  21000,  21450,  21250,  21030 },
             new object[] { "24",  "12m",  24890,  24990,  24950,  24900 },
             new object[] { "28",  "10m",  28000,  29700,  28450,  28030 },
+            new object[] { "40",  "8m",   40660,  40700,  40680,  40680 },
             new object[] { "50",  "6m",   50000,  54000,  50150,  50090 },
+            new object[] { "70",  "4m",   70000,  70500,  70200,  70200 },
         };
 
         // The band EDGES never change and are not the operator's to edit - only the two frequencies

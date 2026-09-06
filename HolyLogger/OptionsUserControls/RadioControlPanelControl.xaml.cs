@@ -7,7 +7,7 @@ using System.Windows.Controls;
 namespace HolyLogger.OptionsUserControls
 {
     /// <summary>
-    /// Options > Radio Control Panel: the two frequencies behind each of the panel's ten band
+    /// Options > Radio Control Panel: the two frequencies behind each of the panel's band
     /// buttons. The band list is fixed; only the frequencies are the operator's to change.
     /// </summary>
     public partial class RadioControlPanelControl : UserControl

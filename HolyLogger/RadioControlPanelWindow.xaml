@@ -55,6 +55,48 @@
                 </Setter.Value>
             </Setter>
         </Style>
+
+        <!-- RTTY's own style: identical to PanelToggleStyle except that its IsChecked trigger leaves
+             the text alone instead of forcing it white. RTTY is lit with EditFieldBg, the same yellow
+             a QSO field wears while being edited in the main window - and there, the text stays its
+             ordinary colour; only the background changes. White text would read fine on that yellow
+             in the dark scheme (EditFieldBg is a dark olive there) but not in the light one, where it
+             is a bright, saturated yellow. Matching the main window's own convention sidesteps the
+             contrast problem in both schemes at once, rather than picking a text colour for one. -->
+        <Style x:Key="PanelToggleStyleRtty" TargetType="{x:Type primitives:ToggleButton}">
+            <Setter Property="FontSize" Value="18"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Margin" Value="2,4"/>
+            <Setter Property="Height" Value="38"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
+            <Setter Property="Background" Value="{DynamicResource ButtonBg}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type primitives:ToggleButton}">
+                        <Border x:Name="Face"
+                                CornerRadius="5"
+                                BorderThickness="2"
+                                BorderBrush="{DynamicResource ThemeBorderBrush}"
+                                Background="{TemplateBinding Background}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Face" Property="Background" Value="{DynamicResource ButtonHoverBg}"/>
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Face" Property="Background" Value="{DynamicResource PanelLitBrush}"/>
+                                <Setter TargetName="Face" Property="BorderBrush" Value="#FFFFC400"/>
+                                <Setter TargetName="Face" Property="BorderThickness" Value="3"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.45"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
 
     <Grid Margin="8">
@@ -77,6 +119,47 @@
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
+            <!-- The gear stands in the empty left-hand column, beside the box. That column is as wide
+                 as the one "kHz" stands in, so a small button fits there without the window growing
+                 and without pushing the frequency box off centre. It opens the panel's own page in
+                 Options - the band frequencies these buttons send the radio to. -->
+            <!-- THE SAME GEAR AS THE CLUSTER'S, down to the frame around it: the Segoe MDL2 settings
+                 glyph at 16 in a 26x26 square, a one-pixel frame drawn INSIDE a transparent one-pixel
+                 margin, and the cluster's own hover and pressed blues. Two gears that open two
+                 settings pages should not be two different-looking buttons. -->
+            <Button x:Name="PanelSettingsBtn" Grid.Column="0"
+                    Content="&#xE713;" FontFamily="Segoe MDL2 Assets" FontSize="16"
+                    Width="26" Height="26" Padding="0"
+                    HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,6,0"
+                    UseLayoutRounding="True" SnapsToDevicePixels="True"
+                    Foreground="{DynamicResource TextBrush}"
+                    Background="{DynamicResource WindowBg}"
+                    BorderBrush="{DynamicResource MutedTextBrush}" BorderThickness="1"
+                    Cursor="Hand"
+                    Click="PanelSettingsBtn_Click"
+                    ToolTip="Open the settings for this panel">
+                <Button.Template>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="Transparent" Padding="1">
+                            <Border x:Name="face"
+                                    Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                    SnapsToDevicePixels="True">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="face" Property="Background" Value="#A8D8FF"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="face" Property="Background" Value="#7DC0F5"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Button.Template>
+            </Button>
             <!-- THE ARROWS SIT INSIDE THE BOX, at its right-hand edge. A wheel over a text box is not
                  something anybody expects, and the hint has to be ON the thing it is about - beside
                  the box it read as decoration next to "kHz". IsHitTestVisible="False" so the arrows
@@ -115,24 +198,43 @@
                        Foreground="{DynamicResource TextBrush}"/>
         </Grid>
 
-        <!-- Twelve buttons, four rows of three: ten bands, plus SSB and CW either side of the
-             bottom row. They are built in code from the frequencies on the Options page, so
-             editing a frequency there changes what a button does without touching this file. -->
-        <UniformGrid x:Name="ButtonGrid" Grid.Row="1" Rows="4" Columns="3" VerticalAlignment="Top" Margin="0,4,0,0"/>
+        <!-- Sixteen buttons, six rows of three: twelve bands three to a row, then the last band alone
+             in the middle of its row (blank either side), then SSB/AM/CW filling out the row under
+             that. RTTY and FM are not here at all any more - they sit in the row below, flanking
+             TX/RX (see the next Grid). They are built in code from the frequencies on the Options
+             page, so editing a frequency there changes what a button does without touching this
+             file, and the row count here (Rows) always matches what BuildButtons (in the code-behind)
+             lays out. -->
+        <UniformGrid x:Name="ButtonGrid" Grid.Row="1" Rows="6" Columns="3" VerticalAlignment="Top" Margin="0,4,0,0"/>
 
         <!-- Built the way the radio itself does it: the words TX/RX, and one rectangular lamp under
              them - green while the radio is listening, red while it is transmitting. Dark when there
              is no radio, and then the label reads NO RADIO instead, which is the panel's one place
              for saying so now that the window is a fixed size. Nothing here polls: the lamp is
-             written from the same OmniRig event as everything else in the panel. -->
-        <StackPanel Grid.Row="2" HorizontalAlignment="Center" Margin="0,8,0,0">
-            <TextBlock x:Name="TxRxLabel" Text="TX/RX" FontSize="14" FontWeight="Bold"
-                       HorizontalAlignment="Center" Foreground="{DynamicResource TextBrush}"/>
-            <!-- No Width of its own: stretched inside a stack that is only as wide as the words
-                 above it, the lamp comes out exactly the length of the label. -->
-            <Border x:Name="TxRxLamp" Height="14" CornerRadius="2" Margin="0,3,0,0"
-                    BorderThickness="1" BorderBrush="{DynamicResource ThemeBorderBrush}"
-                    Background="{DynamicResource ButtonBg}"/>
-        </StackPanel>
+             written from the same OmniRig event as everything else in the panel.
+             THE SAME THREE COLUMNS AS THE BAND GRID ABOVE, so RttySlot and FmSlot line up under
+             columns 0 and 2 rather than floating at some other width. RTTY and FM moved down into the
+             space already free on either side of the centred TX/RX block - not a new row, this row
+             already existed - so the window grows only by the few pixels their own buttons are taller
+             than the label+lamp stack, not by a whole extra row. -->
+        <Grid Grid.Row="2" Margin="0,8,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition/>
+                <ColumnDefinition/>
+                <ColumnDefinition/>
+            </Grid.ColumnDefinitions>
+            <!-- Both filled in by BuildButtons in the code-behind, the same way ButtonGrid's cells are. -->
+            <Grid x:Name="RttySlot" Grid.Column="0" VerticalAlignment="Center"/>
+            <Grid x:Name="FmSlot" Grid.Column="2" VerticalAlignment="Center"/>
+            <StackPanel Grid.Column="1" HorizontalAlignment="Center">
+                <TextBlock x:Name="TxRxLabel" Text="TX/RX" FontSize="14" FontWeight="Bold"
+                           HorizontalAlignment="Center" Foreground="{DynamicResource TextBrush}"/>
+                <!-- No Width of its own: stretched inside a stack that is only as wide as the words
+                     above it, the lamp comes out exactly the length of the label. -->
+                <Border x:Name="TxRxLamp" Height="14" CornerRadius="2" Margin="0,3,0,0"
+                        BorderThickness="1" BorderBrush="{DynamicResource ThemeBorderBrush}"
+                        Background="{DynamicResource ButtonBg}"/>
+            </StackPanel>
+        </Grid>
     </Grid>
 </Window>

@@ -939,7 +939,7 @@ namespace HolyLogger
 
         // ---- Radio Control Panel ------------------------------------------------------------
         //
-        // A small window of its own: a frequency box, ten band buttons and SSB/CW. It holds no state
+        // A small window of its own: a frequency box, one button per band and SSB/CW. It holds no state
         // about the radio - it asks the radio to move, and what it SHOWS is written by
         // UpdateRadioPanel from what the radio reports, so a band or mode changed on the radio's own
         // knobs lights up here exactly as a button press does.
