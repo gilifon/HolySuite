@@ -167,32 +167,33 @@ namespace HolyLogger
             _bands = RadioPanelPresets.Load();
             _bandButtons.Clear();
             ButtonGrid.Children.Clear();
+            ModeRow.Children.Clear();
             RttySlot.Children.Clear();
             FmSlot.Children.Clear();
 
             var style = (Style)Resources["PanelToggleStyle"];
 
             // Every band gets a button, in order, except the last one - that band sits alone in the
-            // middle of its row now; its left and right cells (Columns 0 and 2) are left blank on
-            // purpose - SSB and CW moved down to share AM's row instead, one row below the last band.
+            // middle of its row, its left and right cells (Columns 0 and 2) left blank on purpose.
+            // SSB, AM and CW are not in this grid at all - they fill ModeRow, just below the divider.
             for (int i = 0; i < _bands.Count - 1; i++)
                 ButtonGrid.Children.Add(MakeBandButton(_bands[i], style));
 
-            ButtonGrid.Children.Add(new Border());   // blank - SSB used to sit here
+            ButtonGrid.Children.Add(new Border());   // blank - left of the last band
 
             if (_bands.Count > 0)
                 ButtonGrid.Children.Add(MakeBandButton(_bands[_bands.Count - 1], style));
 
-            ButtonGrid.Children.Add(new Border());   // blank - CW used to sit here
+            ButtonGrid.Children.Add(new Border());   // blank - right of the last band
 
             _ssbButton = MakeModeButton("SSB", style);
-            ButtonGrid.Children.Add(_ssbButton);
+            ModeRow.Children.Add(_ssbButton);
 
             _amButton = MakeModeButton("AM", style);
-            ButtonGrid.Children.Add(_amButton);
+            ModeRow.Children.Add(_amButton);
 
             _cwButton = MakeModeButton("CW", style);
-            ButtonGrid.Children.Add(_cwButton);
+            ModeRow.Children.Add(_cwButton);
 
             // RTTY and FM moved out of the button grid entirely, into the row shared with TX/RX - the
             // XAML's RttySlot/FmSlot flank the centred TX/RX block, in the space that was already
@@ -305,7 +306,14 @@ namespace HolyLogger
                 }
             }
 
-            foreach (var button in _bandButtons) button.IsEnabled = rigOnline;
+            // Not every radio covers every band this panel offers. A band unchecked on the Options
+            // page stays disabled and grey no matter what the radio itself is doing - it never comes
+            // back with the rig, the way every other button does.
+            foreach (var button in _bandButtons)
+            {
+                var band = button.Tag as RadioBandPreset;
+                button.IsEnabled = rigOnline && (band == null || band.Enabled);
+            }
             TB_Frequency.IsEnabled = rigOnline;
 
             // A dead box marks nothing: the band goes out with the radio.

@@ -118,6 +118,7 @@ namespace HolyLogger
         // Stable key per cluster table column, used to persist/restore the column ORDER.
         Dictionary<DataGridColumn, string> clusterColumnKeys = new Dictionary<DataGridColumn, string>();
         ScrollViewer clusterSpotsScrollViewer = null;
+        FrameworkElement clusterSpotsRowsArea = null;               // the rows viewport; carries the list's mouse pointer
 
         // ── Live Scale (real-time frequency scale) ─────────────────────────────────────────────────
         // When on, the spot list is sorted by frequency (highest at top), the grid auto-scrolls so the
@@ -872,6 +873,7 @@ namespace HolyLogger
             clusterModeColumn = null;
             clusterCommentColumn = null;
             clusterSpotsScrollViewer = null;
+            clusterSpotsRowsArea = null;
             clusterLiveScaleOn = false;
             clusterLiveScaleBtn = null;
             clusterCenterLine = null;
@@ -2285,7 +2287,7 @@ namespace HolyLogger
 
             // The pointer may already be sitting over the table, where no MouseMove is coming to
             // correct it - so the cursor is put right here, as the switch is thrown.
-            if (clusterSpotsDataGrid != null) clusterSpotsDataGrid.Cursor = ClusterIdleCursor();
+            SetClusterListCursor(ClusterIdleCursor());
 
             // Live Scale is a remembered state: reopening the cluster (or restarting the program)
             // restores it.
@@ -2427,6 +2429,12 @@ namespace HolyLogger
             // from the VFO, so nothing is needed from us for that.
             // The same question the pointer asks - see CanTuneRadioByWheel.
             if (!CanTuneRadioByWheel()) return;
+
+            // NOT OVER THE COLUMN HEADINGS. They are a row of buttons that sort and are dragged to
+            // reorder - not part of the list - and they carry the plain arrow, so tuning the radio from
+            // there would be the pointer saying one thing and the wheel doing another.
+            if (FindVisualParent<System.Windows.Controls.Primitives.DataGridColumnHeader>(
+                    e.OriginalSource as DependencyObject) != null) return;
 
             // NOT OVER THE TWO CALLSIGNS. Those cells are a click that opens QRZ, and they wear the
             // hand to say so - a wheel that tuned the radio from under a hand would be two different
@@ -3021,6 +3029,25 @@ namespace HolyLogger
             return clusterLiveScaleOn && CanTuneRadioByWheel() ? Cursors.ScrollNS : Cursors.Arrow;
         }
 
+        // THE POINTER GOES ON THE LIST, NOT ON THE TABLE. It used to be set on the DataGrid itself, and
+        // a cursor set on a parent shows through everything inside it - the column headings included,
+        // where nothing scrolls and the wheel is now kept out. Putting it on the rows viewport (the
+        // template's PART_ScrollContentPresenter, which holds the rows and the empty space under them)
+        // and on the pinned Alerts strip, which is a spot line like any other, puts the pointer exactly
+        // where the wheel does something. Nothing has to be taken back anywhere, so there is no second
+        // rule to keep in step with this one.
+        private void SetClusterListCursor(System.Windows.Input.Cursor cursor)
+        {
+            if (clusterSpotsDataGrid == null) return;
+
+            if (clusterSpotsRowsArea == null)
+            {
+                clusterSpotsRowsArea = FindVisualChild<ScrollContentPresenter>(clusterSpotsDataGrid);
+            }
+            if (clusterSpotsRowsArea != null) clusterSpotsRowsArea.Cursor = cursor;
+            if (clusterAlertStrip != null) clusterAlertStrip.Cursor = cursor;
+        }
+
         // IS THERE A RADIO TO TURN? Manual mode says where the LOG gets its frequency, not whether
         // the radio can be tuned, so it has no part in this.
         //
@@ -3067,28 +3094,10 @@ namespace HolyLogger
 
             Point mousePoint = e.GetPosition(dataGrid);
 
-            // NOT OVER THE COLUMN HEADINGS. The up-and-down pointer is about the LIST - it says the rows
-            // are moving under the mouse and the wheel is tuning the radio. The heading row does neither:
-            // it sorts and it is dragged to reorder, and a scroll pointer there promises something that
-            // does not happen. The plain arrow is the truth over the headings.
-            if (FindVisualParent<System.Windows.Controls.Primitives.DataGridColumnHeader>(
-                    e.OriginalSource as DependencyObject) != null
-                || FindVisualParent<System.Windows.Controls.Primitives.DataGridColumnHeadersPresenter>(
-                    e.OriginalSource as DependencyObject) != null)
-            {
-                dataGrid.Cursor = Cursors.Arrow;
-                if (clusterHoverToolTip != null)
-                {
-                    clusterHoverToolTip.IsOpen = false;
-                }
-                clusterLastHoverToolTipColumn = null;
-                return;
-            }
-
             DataGridCell cell = FindVisualParent<DataGridCell>(e.OriginalSource as DependencyObject);
             if (cell == null)
             {
-                dataGrid.Cursor = ClusterIdleCursor();
+                SetClusterListCursor(ClusterIdleCursor());
                 if (clusterHoverToolTip != null)
                 {
                     clusterHoverToolTip.IsOpen = false;
@@ -3127,7 +3136,7 @@ namespace HolyLogger
             // there by a double-click on the row), so it belongs to the wheel like the rest of the
             // row and wears the wheel's cursor.
             bool isInteractiveColumn = cell.Column == clusterDxColumn || cell.Column == clusterSpotterColumn;
-            dataGrid.Cursor = isInteractiveColumn ? Cursors.Hand : ClusterIdleCursor();
+            SetClusterListCursor(isInteractiveColumn ? Cursors.Hand : ClusterIdleCursor());
 
             if (cell.Column == clusterDxColumn || cell.Column == clusterSpotterColumn)
             {
@@ -3152,7 +3161,7 @@ namespace HolyLogger
             var dataGrid = sender as DataGrid;
             if (dataGrid != null)
             {
-                dataGrid.Cursor = ClusterIdleCursor();
+                SetClusterListCursor(ClusterIdleCursor());
                 if (clusterHoverToolTip != null)
                 {
                     clusterHoverToolTip.IsOpen = false;
@@ -5423,10 +5432,7 @@ namespace HolyLogger
                 {
                     clusterHoverToolTip.IsOpen = false;
                 }
-                if (clusterSpotsDataGrid != null)
-                {
-                    clusterSpotsDataGrid.Cursor = ClusterIdleCursor();
-                }
+                SetClusterListCursor(ClusterIdleCursor());
                 clusterLastHoverToolTipColumn = null;
             }
         }

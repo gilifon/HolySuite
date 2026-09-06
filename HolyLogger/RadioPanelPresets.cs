@@ -22,6 +22,12 @@ namespace HolyLogger
         public int CwKhz { get; set; }
         public int RttyKhz { get; set; }
 
+        // Not every radio covers every band this panel offers. True by default (every existing
+        // config, with nothing saved yet, keeps every button working exactly as it always did) -
+        // unchecked on the Options page, the matching band button goes disabled and grey on the
+        // panel, whatever the radio itself is doing.
+        public bool Enabled { get; set; } = true;
+
         public bool Contains(double khz)
         {
             return khz >= LowKhz && khz <= HighKhz;
@@ -116,8 +122,9 @@ namespace HolyLogger
         /// <summary>
         /// The bands as the operator left them. Anything missing or unreadable in the saved string
         /// falls back to that band's factory frequencies, so a half-written setting never empties a
-        /// button. The saved pair is "ssb/cw" from before RTTY had a column, or "ssb/cw/rtty" since -
-        /// an old two-part save just leaves RttyKhz at its factory value.
+        /// button. The saved value has grown over three versions - "ssb/cw", then "ssb/cw/rtty", now
+        /// "ssb/cw/rtty/enabled" - and an older, shorter save just leaves whatever it doesn't carry
+        /// (RttyKhz, Enabled) at its factory default, which for Enabled is true.
         /// </summary>
         public static List<RadioBandPreset> Load()
         {
@@ -146,6 +153,8 @@ namespace HolyLogger
                     if (parts.Length >= 3
                         && int.TryParse(parts[2].Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out int rtty) && rtty > 0)
                         band.RttyKhz = rtty;
+                    if (parts.Length >= 4)
+                        band.Enabled = parts[3].Trim() != "0";
                 }
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
@@ -162,7 +171,8 @@ namespace HolyLogger
                 text.Append(band.Label).Append('=')
                     .Append(band.SsbKhz.ToString(CultureInfo.InvariantCulture)).Append('/')
                     .Append(band.CwKhz.ToString(CultureInfo.InvariantCulture)).Append('/')
-                    .Append(band.RttyKhz.ToString(CultureInfo.InvariantCulture));
+                    .Append(band.RttyKhz.ToString(CultureInfo.InvariantCulture)).Append('/')
+                    .Append(band.Enabled ? "1" : "0");
             }
 
             Properties.Settings.Default.RadioPanelBands = text.ToString();

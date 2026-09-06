@@ -10,7 +10,7 @@
     <StackPanel HorizontalAlignment="Left" Width="680">
         <TextBlock Text="Radio Control Panel" FontSize="18" FontWeight="Bold" Margin="0,0,0,6"/>
         <TextBlock FontSize="16" TextWrapping="Wrap" Margin="0,0,0,10"
-                   Text="Each band button on the panel holds three frequencies. Pressing the button moves the radio to the SSB one when the panel is on SSB, the CW one when it is on CW, and the RTTY one when it is on RTTY. Frequencies are in kHz."/>
+                   Text="Each band button on the panel holds three frequencies. Pressing the button moves the radio to the SSB one when the panel is on SSB, the CW one when it is on CW, and the RTTY one when it is on RTTY. Frequencies are in kHz. Uncheck Select for a band your radio does not cover - its button on the panel goes grey and stops responding."/>
 
         <!-- The rows are built in code from the band list, so a band cannot be listed here and
              missing from the panel, or the other way round. -->

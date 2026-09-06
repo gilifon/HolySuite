@@ -74,6 +74,8 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
         <!-- Type a frequency, press Enter, the radio goes there. -->
@@ -85,10 +87,12 @@
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
-            <!-- The gear stands in the empty left-hand column, beside the box. That column is as wide
-                 as the one "kHz" stands in, so a small button fits there without the window growing
-                 and without pushing the frequency box off centre. It opens the panel's own page in
-                 Options - the band frequencies these buttons send the radio to. -->
+            <!-- The gear stands in the empty left-hand column, beside the box, left-aligned at the
+                 same 2px inset the band buttons below use (PanelToggleStyle's own Margin) - so its
+                 frame lines up with the "1.8" button's frame directly beneath it, rather than sitting
+                 wherever the column's own (narrower) width happened to centre or right-align it. It
+                 opens the panel's own page in Options - the band frequencies these buttons send the
+                 radio to. -->
             <!-- THE SAME GEAR AS THE CLUSTER'S, down to the frame around it: the Segoe MDL2 settings
                  glyph at 16 in a 26x26 square, a one-pixel frame drawn INSIDE a transparent one-pixel
                  margin, and the cluster's own hover and pressed blues. Two gears that open two
@@ -96,7 +100,7 @@
             <Button x:Name="PanelSettingsBtn" Grid.Column="0"
                     Content="&#xE713;" FontFamily="Segoe MDL2 Assets" FontSize="16"
                     Width="26" Height="26" Padding="0"
-                    HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,6,0"
+                    HorizontalAlignment="Left" VerticalAlignment="Center" Margin="2,0,0,0"
                     UseLayoutRounding="True" SnapsToDevicePixels="True"
                     Foreground="{DynamicResource TextBrush}"
                     Background="{DynamicResource WindowBg}"
@@ -160,18 +164,28 @@
                  something anybody expects, so it has to be shown rather than discovered: the two
                  arrows say it in the one place the wheel works. -->
             <TextBlock Grid.Column="2" Text="kHz" FontSize="14" FontWeight="Bold"
-                       HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="2,0,0,0"
+                       HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="3,0,0,-3"
                        Foreground="{DynamicResource TextBrush}"/>
         </Grid>
 
-        <!-- Sixteen buttons, six rows of three: twelve bands three to a row, then the last band alone
-             in the middle of its row (blank either side), then SSB/AM/CW filling out the row under
-             that. RTTY and FM are not here at all any more - they sit in the row below, flanking
-             TX/RX (see the next Grid). They are built in code from the frequencies on the Options
-             page, so editing a frequency there changes what a button does without touching this
-             file, and the row count here (Rows) always matches what BuildButtons (in the code-behind)
-             lays out. -->
-        <UniformGrid x:Name="ButtonGrid" Grid.Row="1" Rows="6" Columns="3" VerticalAlignment="Top" Margin="0,4,0,0"/>
+        <!-- Fifteen band buttons, five rows of three: twelve bands three to a row, then the last band
+             alone in the middle of its row (blank either side). They are built in code from the
+             frequencies on the Options page, so editing a frequency there changes what a button does
+             without touching this file, and the row count here (Rows) always matches what
+             BuildButtons (in the code-behind) lays out. -->
+        <UniformGrid x:Name="ButtonGrid" Grid.Row="1" Rows="5" Columns="3" VerticalAlignment="Top" Margin="0,4,0,0"/>
+
+        <!-- Separates the bands from the mode row below - asked for by eye: brown, 2px, short of the
+             window frame on both sides so it reads as a rule drawn on the panel rather than a seam in
+             it. No top/bottom margin of its own: the row above and below already carry their
+             buttons' usual 4px margins, and giving the divider more air on top of that was the one
+             thing that made the window taller than it used to be. -->
+        <Border Grid.Row="2" Height="2" Background="#8B5A2B" Margin="2,0,2,0"/>
+
+        <!-- SSB, AM and CW - one row, filled in by BuildButtons the same way ButtonGrid's cells are.
+             RTTY and FM are not here at all - they sit in the row below, flanking TX/RX (see the next
+             Grid). -->
+        <UniformGrid x:Name="ModeRow" Grid.Row="3" Rows="1" Columns="3"/>
 
         <!-- Built the way the radio itself does it: the words TX/RX, and one rectangular lamp under
              them - green while the radio is listening, red while it is transmitting. Dark when there
@@ -183,7 +197,7 @@
              space already free on either side of the centred TX/RX block - not a new row, this row
              already existed - so the window grows only by the few pixels their own buttons are taller
              than the label+lamp stack, not by a whole extra row. -->
-        <Grid Grid.Row="2" Margin="0,8,0,0">
+        <Grid Grid.Row="4" Margin="0,8,0,0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition/>
                 <ColumnDefinition/>
