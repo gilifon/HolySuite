@@ -17657,14 +17657,27 @@ namespace HolyLogger
         }
     }
 
+    // The QSO time as the log shows it: HH:mm:ss.
+    //
+    // The seconds have always been stored - the entry clock writes HHmmss - and they were only ever
+    // dropped on the way to the screen. They are shown now, because a contact is identified by its
+    // second as well as its minute.
+    //
+    // An imported file that logged only to the minute leaves a 4-character HHmm in the database
+    // (Log4OM writes those). That is shown as HH:mm:00 rather than left as bare digits, so a column
+    // of times still reads as one column.
     public class QsoTimeDisplayConverter : System.Windows.Data.IValueConverter
     {
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
             string raw = value as string;
-            if (!string.IsNullOrWhiteSpace(raw) && raw.Length == 6 && DateTime.TryParseExact(raw, "HHmmss", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime dt))
+            if (!string.IsNullOrWhiteSpace(raw))
             {
-                return dt.ToString("HH:mm", CultureInfo.InvariantCulture);
+                if (raw.Length == 6 && DateTime.TryParseExact(raw, "HHmmss", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime dt))
+                    return dt.ToString("HH:mm:ss", CultureInfo.InvariantCulture);
+
+                if (raw.Length == 4 && DateTime.TryParseExact(raw, "HHmm", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime hm))
+                    return hm.ToString("HH:mm:ss", CultureInfo.InvariantCulture);
             }
 
             return value;

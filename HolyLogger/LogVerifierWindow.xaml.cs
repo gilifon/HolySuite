@@ -1580,12 +1580,12 @@ namespace HolyLogger
                     // "In Log", not "In File": this report is the verifier's, and the verifier reads the
                     // LOG. The import report is the one that speaks about a file, and it no longer judges
                     // countries at all. The last column has no width - nothing follows it to push out.
-                    sb.AppendLine("  " + Col("Date", 12) + Col("Time", 7) + Col("Callsign", 14)
+                    sb.AppendLine("  " + Col("Date", 12) + Col("Time", 10) + Col("Callsign", 14)
                                   + Pad(nowHeader, nowWidth, centre)
                                   + (explains ? Col("Holylogger suggest", newWidth)
                                                 + Col("cty.dat matched", ctyWidth) + "Club Log matched"
                                               : Pad("Holylogger suggest", newWidth, centre).TrimEnd()));
-                    sb.AppendLine("  " + Col(new string('-', 10), 12) + Col(new string('-', 5), 7)
+                    sb.AppendLine("  " + Col(new string('-', 10), 12) + Col(new string('-', 8), 10)
                                   + Col(new string('-', 12), 14)
                                   + Col(new string('-', nowWidth - 2), nowWidth)
                                   + (explains ? Col(new string('-', newWidth - 2), newWidth)
@@ -1613,7 +1613,7 @@ namespace HolyLogger
                         }
 
                         sb.AppendLine(("  " + Col(FormatDate(f.Qso == null ? "" : f.Qso.Date), 12)
-                                      + Col(Text(f.Time), 7)
+                                      + Col(Text(f.Time), 10)
                                       + Col(Text(f.Call), 14)
                                       + Pad(nowHead, nowWidth, centre)
                                       + (explains ? Col(newHead, newWidth) + Col(ctyPart, ctyWidth) + clubPart
@@ -2353,9 +2353,24 @@ namespace HolyLogger
             return s.Substring(6, 2) + "-" + s.Substring(4, 2) + "-" + s.Substring(0, 4);
         }
 
+        // A QSO's time as the log shows it: HH:mm:ss, the same as the log table and the Log Workshop.
+        // The seconds matter here more than anywhere - this window is the one that WRITES a corrected
+        // time back, and a cell that only ever showed HH:mm sent HHmm to the database and threw the
+        // logged seconds away. A time imported to the minute only reads as HH:mm:00.
         private static string FormatTime(string hhmmss)
         {
             string s = (hhmmss ?? string.Empty).Trim();
+            if (s.Length < 4) return s;
+            return s.Substring(0, 2) + ":" + s.Substring(2, 2) + ":"
+                   + (s.Length >= 6 ? s.Substring(4, 2) : "00");
+        }
+
+        // The REVIEW stamp's time - when the operator answered a question, not when a contact was made.
+        // That is written to the minute and stays to the minute: seconds it never had would only read
+        // as false precision.
+        private static string FormatStampTime(string hhmm)
+        {
+            string s = (hhmm ?? string.Empty).Trim();
             if (s.Length < 4) return s;
             return s.Substring(0, 2) + ":" + s.Substring(2, 2);
         }
@@ -2697,14 +2712,15 @@ namespace HolyLogger
             return digits.Length == 8 ? digits : null;
         }
 
-        // "13:55" back to "1355".
+        // "13:55:07" back to "135507" (and "13:55" back to "1355", for a time typed without seconds).
         private static string UnformatTime(string shown)
         {
             string digits = new string((shown ?? "").Where(char.IsDigit).ToArray());
             if (digits.Length != 4 && digits.Length != 6) return null;
-            int hh, mm;
+            int hh, mm, ss;
             if (!int.TryParse(digits.Substring(0, 2), out hh) || hh > 23) return null;
             if (!int.TryParse(digits.Substring(2, 2), out mm) || mm > 59) return null;
+            if (digits.Length == 6 && (!int.TryParse(digits.Substring(4, 2), out ss) || ss > 59)) return null;
             return digits;
         }
 
@@ -2799,7 +2815,7 @@ namespace HolyLogger
             string[] parts = stamp.Split(' ');
             if (parts.Length != 2 || parts[0].Length != 8) return stamp;
             string date = FormatDate(parts[0]);
-            string time = FormatTime(parts[1]);
+            string time = FormatStampTime(parts[1]);
             return time.Length > 0 ? date + "  " + time : date;
         }
 

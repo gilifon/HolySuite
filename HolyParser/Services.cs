@@ -350,7 +350,17 @@ namespace HolyParser
                     return "ph";
                 return mode;
             }
-            
+
+            // A Cabrillo 3.0 QSO line carries the time as FOUR digits (HHMM). The log stores HHmmss,
+            // so the seconds are dropped here and only here: a contest robot reads the QSO line by
+            // column, and a six-digit time shifts every field after it. ADIF keeps the full seconds.
+            // A time we do not recognise is passed through untouched rather than cut blind.
+            string _cabrillo_time(string time)
+            {
+                string t = (time ?? string.Empty).Trim().Replace(":", "");
+                return t.Length >= 4 ? t.Substring(0, 4) : t;
+            }
+
             string version = Assembly.GetExecutingAssembly().GetName().Version.ToString();
 
             StringBuilder cbr = new StringBuilder(200);
@@ -395,7 +405,7 @@ namespace HolyParser
                 if (qso.Freq != null) cbr.AppendFormat("{0} ", qso.Freq);
                 if (qso.Mode != null) cbr.AppendFormat("{0} ", _convert_mode(qso.Mode));
                 if (qso.Date != null) cbr.AppendFormat("{0} ", qso.Date);
-                if (qso.Time != null) cbr.AppendFormat("{0} ", qso.Time);
+                if (qso.Time != null) cbr.AppendFormat("{0} ", _cabrillo_time(qso.Time));
                 if (qso.MyCall != null) cbr.AppendFormat("{0} ", qso.MyCall);
                 if (qso.RST_SENT != null) cbr.AppendFormat("{0} ", qso.RST_SENT);
                 if (qso.STX != null) cbr.AppendFormat("{0} ", qso.STX);
