@@ -3067,6 +3067,24 @@ namespace HolyLogger
 
             Point mousePoint = e.GetPosition(dataGrid);
 
+            // NOT OVER THE COLUMN HEADINGS. The up-and-down pointer is about the LIST - it says the rows
+            // are moving under the mouse and the wheel is tuning the radio. The heading row does neither:
+            // it sorts and it is dragged to reorder, and a scroll pointer there promises something that
+            // does not happen. The plain arrow is the truth over the headings.
+            if (FindVisualParent<System.Windows.Controls.Primitives.DataGridColumnHeader>(
+                    e.OriginalSource as DependencyObject) != null
+                || FindVisualParent<System.Windows.Controls.Primitives.DataGridColumnHeadersPresenter>(
+                    e.OriginalSource as DependencyObject) != null)
+            {
+                dataGrid.Cursor = Cursors.Arrow;
+                if (clusterHoverToolTip != null)
+                {
+                    clusterHoverToolTip.IsOpen = false;
+                }
+                clusterLastHoverToolTipColumn = null;
+                return;
+            }
+
             DataGridCell cell = FindVisualParent<DataGridCell>(e.OriginalSource as DependencyObject);
             if (cell == null)
             {
