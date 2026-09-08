@@ -224,7 +224,10 @@ namespace HolyLogger
                     // Locator is present but not a valid Maidenhead grid (e.g. a digit where a
                     // letter belongs, like the easily-confused 'O' vs '0'). Tell the user instead
                     // of leaving a silently blank map.
-                    MapControl.ShowPlaceholder("Invalid My Locator: \"" + TB_MyLocator.Text.Trim() + "\"&#x0a;Enter a valid grid square (e.g. KM72 or KM72OR)");
+                    // The shape comes from MaidenheadLocator, the same place the parser that just
+                    // threw takes it from - the old text named only KM72 and KM72OR, which read as
+                    // though 8 and 10 characters were not allowed.
+                    MapControl.ShowPlaceholder("Invalid My Locator: \"" + TB_MyLocator.Text.Trim() + "\"&#x0a;Enter a valid grid square: " + MaidenheadLocator.ShortFormatHint);
                 }
             }
             else

@@ -264,7 +264,7 @@ namespace HolyLogger
 
                     // the worked station's grid
                     case "DX Locator is wrong":
-                        return "The grid is not a grid: two letters, two digits, and usually two more letters";
+                        return "The grid is not a grid: " + MaidenheadLocator.ShortFormatHint;
 
                     // the comment
                     case "Reference sitting in the comment":
@@ -885,9 +885,14 @@ namespace HolyLogger
         // their own count back up cannot turn into a loop.
         private bool _syncingKind;
 
-        // Maidenhead: field, square, and optionally subsquare, extended square, and extended subsquare.
-        private static readonly Regex LegalLocator =
-            new Regex("^[A-R]{2}[0-9]{2}([A-X]{2}([0-9]{2}([A-X]{2})?)?)?$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        // Maidenhead: field, square, and optionally subsquare, extended square, and extended
+        // subsquare. The pattern itself is NOT written out here any more - it lives beside the
+        // locator maths in MaidenheadLocator.Legal, so this window and the entry form cannot come
+        // to disagree about what a locator is.
+        private static bool IsLegalLocator(string grid)
+        {
+            return MaidenheadLocator.IsValidLocator(grid);
+        }
 
         // A Holyland square (one letter, two digits, two letters - K07YZ) is not a Maidenhead locator, but
         // Holyland contest QSOs in this log do carry one in the DX locator field. It is deliberate data,
@@ -905,6 +910,35 @@ namespace HolyLogger
                 || !string.IsNullOrWhiteSpace(q.PotaRef)
                 || !string.IsNullOrWhiteSpace(q.WwffRef)
                 || !string.IsNullOrWhiteSpace(q.Sig);
+        }
+
+        // Does the worked station's grid square look like it is really in the country the callsign
+        // resolved to? Only fires when CountryBoundaryService actually holds a boundary for that
+        // country - about 250 of DXCC's ~340 entities (see the data file's own header for which and
+        // why). For everything else this says nothing at all, on purpose: a wrong "does not match"
+        // told to an operator whose grid was correct all along is worse than never checking.
+        //
+        // The tolerance is not fixed here - each entity carries its OWN, sized to what that entity
+        // actually needed when the data was curated (see CountryBoundaryService). A flat number
+        // loose enough for a scattered-atoll nation would have been useless for a compact country.
+        private static void CheckGridAgainstCountry(QSO q, string grid, List<Finding> findings)
+        {
+            string country = (q.Country ?? string.Empty).Trim();
+            if (country.Length == 0) return;
+
+            LatLng ll;
+            try { ll = MaidenheadLocator.LocatorToLatLng(grid); }
+            catch { return; }
+
+            double distanceKm, toleranceKm;
+            if (!CountryBoundaryService.TryCheck(country, ll.Lat, ll.Long, out distanceKm, out toleranceKm))
+                return;   // no boundary held for this entity - stay silent rather than guess
+
+            if (distanceKm > toleranceKm)
+                findings.Add(Fyi(q, "DX Locator does not match the country", grid,
+                                 "it is about " + Math.Round(distanceKm) + " km from " + country +
+                                 " - the grid or the country is wrong",
+                                 "the log", "DX Locator"));
         }
 
         // Which program a piece of a COMMENT belongs to - a stricter question than asking it of a box
@@ -1948,14 +1982,21 @@ namespace HolyLogger
 
                 // --- the worked station's grid ------------------------------------------------------
                 string grid = (q.DXLocator ?? string.Empty).Trim();
-                if (grid.Length > 0 && !LegalLocator.IsMatch(grid) && !HolylandSquare.IsMatch(grid))
+                if (grid.Length > 0 && !IsLegalLocator(grid) && !HolylandSquare.IsMatch(grid))
                     // "Grid is not a locator" said nothing: to an operator those two words mean the same
                     // thing, so the sentence read as a contradiction rather than a fault. What is
                     // actually wrong is that the text in the box is not shaped like a grid square at
                     // all - so say that, and show the shape it should have.
+                    //
+                    // The shape comes from MaidenheadLocator, not from a sentence typed here. The
+                    // sentence that used to be here said "usually two more letters", which quietly
+                    // told the operator that 8 and 10 characters were doubtful - they are not, and
+                    // the test has always accepted them.
                     findings.Add(Fyi(q, "DX Locator is wrong", grid,
-                                     "two letters, two digits, and usually two more letters — KM72OR",
+                                     MaidenheadLocator.ShortFormatHint,
                                      "the log", "DX Locator"));
+                else if (grid.Length > 0 && IsLegalLocator(grid))
+                    CheckGridAgainstCountry(q, grid, findings);
 
                 // --- an activity reference typed into the comment -----------------------------------
                 //
@@ -4673,7 +4714,7 @@ namespace HolyLogger
                     if (!_qrzGrid.TryGetValue(f.Qso.DXCall.Trim(), out grid)) grid = null;
                     asked++;
 
-                    if (string.IsNullOrWhiteSpace(grid) || !LegalLocator.IsMatch(grid))
+                    if (string.IsNullOrWhiteSpace(grid) || !IsLegalLocator(grid))
                     {
                         // WHY there is nothing to offer, said on the row itself. "No suggestion" alone
                         // leaves an operator wondering whether the program failed or simply cannot

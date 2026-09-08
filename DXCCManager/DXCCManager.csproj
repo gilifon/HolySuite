@@ -45,6 +45,7 @@
       <Link>VersionInfo.cs</Link>
     </Compile>
     <Compile Include="ClubLogData.cs" />
+    <Compile Include="CountryBoundaryService.cs" />
     <Compile Include="CountryLookup.cs" />
     <Compile Include="DXCC.cs" />
     <Compile Include="DeletedEntities.cs" />
@@ -53,6 +54,7 @@
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="cty.dat" />
+    <EmbeddedResource Include="DxccBoundaries.txt" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

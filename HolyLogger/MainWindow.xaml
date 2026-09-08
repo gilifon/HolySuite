@@ -1471,7 +1471,12 @@
             <LineBreak />
             <Run Text="Locator" />
         </TextBlock>
-        <TextBox x:Name="TB_MyLocator" HorizontalAlignment="Left" Margin="252,11,0,0" Grid.Row="1" TextWrapping="NoWrap" VerticalAlignment="Top" CharacterCasing="Upper" Text="{Binding Default.my_locator, Source={StaticResource Settings}}" Width="72" Height="28" TextChanged="TB_MyHolyland_TextChanged" PreviewLostKeyboardFocus="TB_MyLocator_PreviewLostKeyboardFocus" FontSize="16" TextAlignment="Left" HorizontalContentAlignment="Left" VerticalContentAlignment="Center" MaxLength="6" TabIndex="3" Style="{StaticResource StationBox}"/>
+        <TextBox x:Name="TB_MyLocator" HorizontalAlignment="Left" Margin="252,11,0,0" Grid.Row="1" TextWrapping="NoWrap" VerticalAlignment="Top" CharacterCasing="Upper" Text="{Binding Default.my_locator, Source={StaticResource Settings}}" Width="72" Height="28" TextChanged="TB_MyHolyland_TextChanged" PreviewLostKeyboardFocus="TB_MyLocator_PreviewLostKeyboardFocus" FontSize="16" TextAlignment="Left" HorizontalContentAlignment="Left" VerticalContentAlignment="Center" MaxLength="10" TabIndex="3" Style="{StaticResource StationBox}"/>
+        <!-- MaxLength 10, not 6: a locator is legally 4, 6, 8 or 10 characters, and at 6 the box
+             silently swallowed the extended square of anyone who works VHF/microwave - the dialog
+             told them KM72OR12AB was allowed while the field refused to hold it. Kept in step with
+             MaidenheadLocator.MaxLength. The box stays 72px wide (the Holyland Square label starts
+             8px later, so there is nowhere to widen to) and simply scrolls for the long forms. -->
         <!-- "Fill me", not "Please fill": this box is 72px wide and "Please fill" needs 71px of text
              room inside a 62px opening, so it would be cut off. Same for the Holyland square below. -->
         <Border Grid.Row="1" Margin="252,11,0,0" Width="72" Height="28" HorizontalAlignment="Left"
@@ -1941,7 +1946,9 @@
             <LineBreak />
             <Run Text="Locator" />
         </TextBlock>
-        <TextBox x:Name="TB_DXLocator" HorizontalAlignment="Left" Margin="69,201,0,0" Grid.Row="1" TextWrapping="NoWrap" VerticalAlignment="Top" CharacterCasing="Upper" Width="74" Height="28" FontSize="16" MaxLength="8" TabIndex="18"/>
+        <!-- MaxLength 10, not 8: same reason as My Locator above - the extended subsquare pair is
+             part of the format, and a spot or a QRZ lookup can arrive carrying one. -->
+        <TextBox x:Name="TB_DXLocator" HorizontalAlignment="Left" Margin="69,201,0,0" Grid.Row="1" TextWrapping="NoWrap" VerticalAlignment="Top" CharacterCasing="Upper" Width="74" Height="28" FontSize="16" MaxLength="10" TabIndex="18"/>
         <Label Content="ITU" HorizontalAlignment="Left" Margin="142,199,0,0" VerticalAlignment="Top" Height="28" VerticalContentAlignment="Center" Grid.Row="1" FontSize="16" ToolTip="ITU Zone (from QRZ.com)"/>
         <TextBox x:Name="TB_ITUZone" HorizontalAlignment="Left" Height="28" Margin="177,201,0,0" VerticalAlignment="Top" Width="31" Grid.Row="1" FontSize="16" MaxLength="2" PreviewTextInput="ZoneTextBox_PreviewTextInput" VerticalContentAlignment="Center" IsTabStop="False"/>
         <Label Content="CQ" HorizontalAlignment="Left" Margin="212,199,0,0" VerticalAlignment="Top" Height="28" VerticalContentAlignment="Center" Grid.Row="1" FontSize="16" ToolTip="CQ Zone (from QRZ.com)"/>

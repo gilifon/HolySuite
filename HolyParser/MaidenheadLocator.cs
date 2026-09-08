@@ -10,6 +10,44 @@ namespace HolyParser
     public static class MaidenheadLocator
     {
         /// <summary>
+        /// The shape a locator is allowed to have, in ONE place, because the program used to hold
+        /// the same rule in four: this class, the Log Verifier, the cluster's comment scraper and
+        /// the sentences shown to the operator - and the sentences had drifted away from the test.
+        ///
+        /// Pairs, always. Field (2 letters A-R) and square (2 digits) are required; subsquare
+        /// (2 letters A-X), extended square (2 digits) and extended subsquare (2 letters A-X) are
+        /// each optional but only in that order. So 4, 6, 8 or 10 characters - never 5, 7 or 9,
+        /// and never fewer than 4. The four branches of LocatorToLatLng below are those same four
+        /// lengths; anything asking "is this a locator?" should ask here rather than write the
+        /// pattern out again.
+        /// </summary>
+        public static readonly Regex Legal =
+            new Regex("^[A-R]{2}[0-9]{2}(?:[A-X]{2}(?:[0-9]{2}(?:[A-X]{2})?)?)?$",
+                      RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+        /// <summary>Shortest and longest a locator may be. Useful for a text box's MaxLength.</summary>
+        public const int MinLength = 4;
+        public const int MaxLength = 10;
+
+        /// <summary>
+        /// What to tell the operator when what they typed is not a locator - the long form, for a
+        /// dialog that has room for it. Kept next to Legal on purpose: a message that describes the
+        /// format has to change in the same edit as the format itself.
+        /// </summary>
+        public const string FormatHint =
+            "Use 2 letters + 2 digits (e.g. KM72). Two more letters (KM72OR), then two more digits " +
+            "(KM72OR12), then two more letters (KM72OR12AB) can be added for extra precision - so a " +
+            "locator is 4, 6, 8 or 10 characters, always added in pairs, never 5, 7 or 9. " +
+            "The 1st/2nd characters are letters A-R, the 5th/6th and 9th/10th are letters A-X " +
+            "(e.g. O), not zeros (0).";
+
+        /// <summary>
+        /// The same rule in one line, for a table cell or a placeholder with no room for the long form.
+        /// </summary>
+        public const string ShortFormatHint =
+            "2 letters and 2 digits, then optional pairs - KM72, KM72OR, KM72OR12 or KM72OR12AB";
+
+        /// <summary>
         /// Convert a locator to latitude and longitude in degrees
         /// </summary>
         /// <param name="locator">Locator string to convert</param>
@@ -61,15 +99,12 @@ namespace HolyParser
         {
             if (string.IsNullOrWhiteSpace(locator))
                 return false;
-            try
-            {
-                LocatorToLatLng(locator);
-                return true;
-            }
-            catch
-            {
-                return false;
-            }
+
+            // Asked of Legal rather than by calling LocatorToLatLng and catching: the question is
+            // "is this the right shape", which is what Legal answers, and a wrong locator is then a
+            // false rather than a thrown exception - this is called once per QSO over a whole log.
+            // Trimmed and case-insensitive, exactly as LocatorToLatLng treats its argument.
+            return Legal.IsMatch(locator.Trim());
         }
 
         /// <summary>

@@ -11922,6 +11922,11 @@ namespace HolyLogger
                 return string.Empty;
             }
 
+            // The one place the pattern is spelled out a second time, and it has to be: this hunts a
+            // locator inside a free-text cluster comment, so it needs \b at both ends rather than
+            // MaidenheadLocator.Legal's ^ and $. Same pairs, same optional groups, same order - if
+            // MaidenheadLocator.Legal ever changes, this changes with it, which is what the
+            // IsValidLocator check below is here to catch.
             var match = Regex.Match(text.ToUpperInvariant(), "\\b([A-R]{2}\\d{2}(?:[A-X]{2}(?:\\d{2}(?:[A-X]{2})?)?)?)\\b");
             if (!match.Success)
             {
@@ -11929,15 +11934,7 @@ namespace HolyLogger
             }
 
             string locator = match.Groups[1].Value;
-            try
-            {
-                MaidenheadLocator.LocatorToLatLng(locator);
-                return locator;
-            }
-            catch
-            {
-                return string.Empty;
-            }
+            return MaidenheadLocator.IsValidLocator(locator) ? locator : string.Empty;
         }
 
         private string GetFlagPathFromCountryName(string countryName)
@@ -13914,12 +13911,47 @@ namespace HolyLogger
             // Validate against the same rules the map parser uses, so valid 4-char grids
             // (e.g. KM72) are accepted and malformed ones (e.g. KM720R, a zero where the
             // 5th-position letter belongs) are caught here rather than silently breaking the map.
+            // "Same rules" is now literal: MaidenheadLocator.Legal is the only place the shape is
+            // written down, and FormatHint below is the sentence that describes THAT regex.
             if (!MaidenheadLocator.IsValidLocator(locator))
             {
                 e.Handled = true;
                 WarnInvalidField(TB_MyLocator,
-                    "\"" + locator + "\" is not a valid grid square.\n\nUse 2 letters + 2 digits (e.g. KM72). Two more letters (KM72OR), then two more digits (KM72OR12), then two more letters (KM72OR12AB) can be added for extra precision. The 1st/2nd characters are letters A–R, the 5th/6th and 9th/10th are letters A–X (e.g. O), not zeros (0).",
+                    "\"" + locator + "\" is not a valid grid square.\n\n" + MaidenheadLocator.FormatHint,
                     "Invalid My Locator");
+                return;
+            }
+
+            // Well-formed, but is it really where My Callsign says the station is? Only asked when
+            // the callsign resolves to a country we hold a boundary for (see CountryBoundaryService) -
+            // most entities are, but for the ones that are not this says nothing, on purpose: a wrong
+            // "does not match" here would be corrected by typing over a locator that was right all
+            // along, which is worse than not asking.
+            string myCall = ((TB_MyCallsign != null ? TB_MyCallsign.Text : null) ?? string.Empty).Trim();
+            if (myCall.Length == 0) return;
+
+            DXCC myEntity;
+            try { myEntity = CountryLookup.Shared.Resolve(myCall); }
+            catch { return; }
+            if (myEntity == null || string.IsNullOrWhiteSpace(myEntity.Name)) return;
+
+            LatLng ll;
+            try { ll = MaidenheadLocator.LocatorToLatLng(locator); }
+            catch { return; }
+
+            // Each entity carries its own tolerance (see CountryBoundaryService) - tight for a
+            // compact country, looser only for the few that genuinely need it.
+            double distanceKm, toleranceKm;
+            if (!CountryBoundaryService.TryCheck(myEntity.Name, ll.Lat, ll.Long, out distanceKm, out toleranceKm))
+                return;
+
+            if (distanceKm > toleranceKm)
+            {
+                e.Handled = true;
+                WarnInvalidField(TB_MyLocator,
+                    "\"" + locator + "\" is about " + Math.Round(distanceKm) + " km from " + myEntity.Name +
+                    ", which is where \"" + myCall + "\" is.\n\nCheck the locator, or check My Callsign.",
+                    "My Locator does not match My Callsign");
             }
         }
 
