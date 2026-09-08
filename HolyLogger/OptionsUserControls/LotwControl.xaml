@@ -80,11 +80,11 @@
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
-            <Label Grid.Column="0" Content="TQSL Path" HorizontalAlignment="Left" VerticalAlignment="Center" FontSize="16"/>
+            <Label Grid.Column="0" x:Name="LBL_TqslPath" Content="TQSL Path" HorizontalAlignment="Left" VerticalAlignment="Center" FontSize="16"/>
             <TextBox Grid.Column="1" x:Name="TB_TqslPath" Height="26" TextWrapping="NoWrap"
                      VerticalAlignment="Center" FontSize="16" VerticalContentAlignment="Center"
                      TextChanged="TB_TqslPath_TextChanged"/>
-            <Button Grid.Column="2" x:Name="BrowseBtn" Content="Browse…" Width="72" Margin="6,0,0,0"
+            <Button Grid.Column="2" x:Name="BrowseBtn" Content="Browse…" MinWidth="72" Padding="14,2" Margin="6,0,0,0"
                     FontSize="16" Click="BrowseBtn_Click"/>
         </Grid>
 
