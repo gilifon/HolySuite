@@ -4,8 +4,8 @@
         xmlns:local="clr-namespace:HolyLogger"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         Title="Log Workshop"
-        Height="720" Width="1025"
-        MinHeight="560" MinWidth="1025"
+        Height="764" Width="1025"
+        MinHeight="604" MinWidth="1025"
         WindowStyle="None" ResizeMode="CanResize"
         Icon="Images/crown.png"
         Background="{DynamicResource WindowBg}"
@@ -330,6 +330,33 @@
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                       <TextBlock Text="Paper:" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
                       <ComboBox x:Name="CB_Paper" Width="120" FontSize="16" VerticalAlignment="Center" SelectionChanged="Filter_Changed"/>
+                    </StackPanel>
+                  </StackPanel>
+                  </Border>
+
+                  <!-- Row 4b: WHAT WE SENT OUT, as against the row above it, which is what came back.
+                       The two are easy to confuse and are kept apart on purpose: a QSO can sit uploaded
+                       for years and never be confirmed. Light brown, so the eye tells the rows apart. -->
+                  <Border Background="#EAD9C0" CornerRadius="4" Padding="6,5" Margin="0,6,0,0">
+                  <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
+                    <TextBlock Text="Uploaded to:" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,12,0"
+                               ToolTip="What we sent to each service - not what the other station confirmed"/>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,16,0">
+                      <TextBlock Text="LoTW:" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                      <ComboBox x:Name="CB_UpLotw" Width="120" FontSize="16" VerticalAlignment="Center" SelectionChanged="Filter_Changed"
+                                ToolTip="Uploaded = sent to the service. QSOs imported from a file were marked as sent without being uploaded."/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,16,0">
+                      <TextBlock Text="QRZ:" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                      <ComboBox x:Name="CB_UpQrz" Width="120" FontSize="16" VerticalAlignment="Center" SelectionChanged="Filter_Changed"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,16,0">
+                      <TextBlock Text="eQSL:" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                      <ComboBox x:Name="CB_UpEqsl" Width="120" FontSize="16" VerticalAlignment="Center" SelectionChanged="Filter_Changed"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                      <TextBlock Text="Club Log:" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                      <ComboBox x:Name="CB_UpClublog" Width="120" FontSize="16" VerticalAlignment="Center" SelectionChanged="Filter_Changed"/>
                     </StackPanel>
                   </StackPanel>
                   </Border>

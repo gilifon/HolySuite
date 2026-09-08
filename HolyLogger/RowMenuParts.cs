@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
 
@@ -21,6 +22,9 @@ namespace HolyLogger
         private static readonly Brush TitleBrush = new SolidColorBrush(Color.FromRgb(0x15, 0x65, 0xC0));
         private static readonly Brush SubtitleBrush = new SolidColorBrush(Color.FromRgb(0x55, 0x55, 0x55));
         private static readonly Brush ItemTextBrush = new SolidColorBrush(Color.FromRgb(0x1A, 0x1A, 0x1A));
+        // The "switched off" hint. A deep red rather than pure red: it has to stand out beside black text
+        // without shouting, and stay readable on the menu's light background.
+        private static readonly Brush OffBrush = new SolidColorBrush(Color.FromRgb(0xC6, 0x28, 0x28));
 
         // The caption at the top of a menu: what it is about to act on.
         //
@@ -96,14 +100,29 @@ namespace HolyLogger
             return string.Join("  •  ", parts);
         }
 
-        // A service checkbox. Disabled (and greyed with a hint) when that service isn't set up, so you
-        // can't queue to a logger you don't use. The left indent lives on the grid below, not here.
-        public static CheckBox MakeServiceCheck(string name, bool configured)
+        // A service checkbox. Disabled with a hint when that service's master switch - Options > LoTW /
+        // eQSL / QRZ Services / Club Log, "Use ... for QSOs logging" - is off, so you can't queue to a
+        // logger you have turned off. The left indent lives on the grid below, not here.
+        //
+        // THE HINT NAMES THE REAL CAUSE. It used to read "(not configured)", which sent an operator
+        // hunting for a login he had already entered: the switch is what this reads, and a service can be
+        // fully set up and still switched off. The hint alone is red - the logger's name stays black, or
+        // the whole line reads as an error rather than as one switch to go and turn back on.
+        public static CheckBox MakeServiceCheck(string name, bool inUse)
         {
+            object content = name;
+            if (!inUse)
+            {
+                var line = new TextBlock();
+                line.Inlines.Add(new Run(name));
+                line.Inlines.Add(new Run("   (switched off in Options)") { Foreground = OffBrush });
+                content = line;
+            }
+
             return new CheckBox
             {
-                Content = configured ? name : name + "   (not configured)",
-                IsEnabled = configured,
+                Content = content,
+                IsEnabled = inUse,
                 Foreground = ItemTextBrush,
                 FontSize = 16,
                 VerticalAlignment = VerticalAlignment.Center

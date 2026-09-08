@@ -137,24 +137,23 @@ namespace HolyLogger
         {
             var box = FindVisualParent<CheckBox>(e.OriginalSource as DependencyObject);
             if (box == null) return;
-            if ((box.Tag as string) == "PickBox") return;    // the pick box: selecting is its whole job
 
-            // Everything else with a tick in it - Paper QSL today - keeps its hands off the selection.
+            // THE PICK BOX NEEDS THIS TOO, and letting it through here is what made ticking a row
+            // impossible: WPF selects the row on mouse DOWN, that selection ticked the box through the
+            // line above, and the click delivered on mouse UP then toggled the tick straight back off.
+            // One click, and the row was left exactly as it started. Freezing the selection for the
+            // length of the click leaves the box to do the ticking on its own, which is its whole job.
+            //
+            // Every box with a tick in it - the pick box and Paper QSL - keeps its hands off the selection.
             // Not enough to stop the ticks following: WPF still SELECTS the row the box sits in, so the
             // row would light up while its pick box stayed empty and the two would openly disagree. The
             // selection is put back the way it was, from the ticks, once the click has been delivered.
             _selectionFrozen = true;
             Dispatcher.BeginInvoke(new Action(() =>
             {
-                try
-                {
-                    _syncingPicks = true;
-                    ResultsGrid.UnselectAll();
-                    foreach (QSO q in ResultsGrid.Items.OfType<QSO>())
-                        if (q.IsPicked) ResultsGrid.SelectedItems.Add(q);
-                }
+                try { SyncSelectionFromPicks(); }        // the one place that knows how to do this quickly
                 catch (Exception swallowed) { Log.Swallow(swallowed); }
-                finally { _syncingPicks = false; _selectionFrozen = false; }
+                finally { _selectionFrozen = false; }
             }), System.Windows.Threading.DispatcherPriority.Input);
         }
 
@@ -1507,12 +1506,37 @@ namespace HolyLogger
         // Ticks -> highlight. The other direction is ResultsGrid_SelectionChanged; this one is for the
         // places that set IsPicked directly - a Shift+click across the boxes, the header's tick-all -
         // where the rows must light up to match or the table contradicts itself.
+        // How many ticked rows are still worth mirroring into the grid's own selection. Above this the
+        // selection is simply emptied - see the comment below for why that loses nothing.
+        private const int SelectionMirrorLimit = 200;
+
         private void SyncSelectionFromPicks()
         {
             try
             {
                 _syncingPicks = true;
+
+                // THE HIGHLIGHT DOES NOT COME FROM THE SELECTION, and on a bulk tick it must not try to.
+                // Every ticked row is already painted by the RowStyle trigger on IsPicked, which costs
+                // nothing because WPF styles only the rows on screen. Putting those rows into the grid's
+                // SelectedItems as well is what made the header box look like a hang: adding them one at
+                // a time is quadratic (23.7 seconds for 10,000 rows, measured), and SelectAll has to
+                // register every cell of every row instead. The Log Fixer's table hit exactly this and
+                // was cured the same way. So: a handful of ticks are still mirrored, because a small
+                // selection is what Ctrl+C copies; a big one just empties the selection and lets the
+                // ticks speak for themselves.
+                int picked = 0;
+                foreach (QSO q in ResultsGrid.Items.OfType<QSO>())
+                {
+                    if (q.IsPicked) picked++;
+                    if (picked > SelectionMirrorLimit) break;
+                }
+
+                if (picked > SelectionMirrorLimit) { ResultsGrid.SelectedItems.Clear(); return; }
+
                 ResultsGrid.UnselectAll();
+                if (picked == 0) return;
+
                 foreach (QSO q in ResultsGrid.Items.OfType<QSO>())
                     if (q.IsPicked) ResultsGrid.SelectedItems.Add(q);
             }
@@ -1645,6 +1669,8 @@ namespace HolyLogger
             if (CB_Clublog.Items.Count > 0) CB_Clublog.SelectedIndex = 0;
             if (CB_Paper.Items.Count > 0)   CB_Paper.SelectedIndex = 0;
             if (CB_Review.Items.Count > 0)  CB_Review.SelectedIndex = 0;
+            foreach (var cb in new[] { CB_UpLotw, CB_UpQrz, CB_UpEqsl, CB_UpClublog })
+                if (cb.Items.Count > 0) cb.SelectedIndex = 0;
 
             // Back to the whole log, not to an empty grid - clearing a filter should reveal everything
             // again, exactly as removing a spreadsheet filter does.
@@ -1693,7 +1719,11 @@ namespace HolyLogger
                               SelectedFilter(CB_Eqsl) != null ||
                               SelectedFilter(CB_Clublog) != null ||
                               SelectedFilter(CB_Paper) != null ||
-                              SelectedFilter(CB_Review) != null;
+                              SelectedFilter(CB_Review) != null ||
+                              SelectedFilter(CB_UpLotw) != null ||
+                              SelectedFilter(CB_UpQrz) != null ||
+                              SelectedFilter(CB_UpEqsl) != null ||
+                              SelectedFilter(CB_UpClublog) != null;
             // SWITCHED OFF, NOT ONLY GREYED. With no filter set there is nothing to clear, and a button
             // that can be pressed to no effect is a button that teaches the operator to distrust the
             // window. Worse, the two greys had come to mean different things - Search's grey was dead
@@ -2048,6 +2078,11 @@ namespace HolyLogger
             string clublog   = SelectedFilter(CB_Clublog);
             string paper     = SelectedFilter(CB_Paper);
             string review    = SelectedFilter(CB_Review);
+            // WHAT WE SENT, not what came back: these read the upload state kept per service.
+            string upLotw    = SelectedFilter(CB_UpLotw);
+            string upQrz     = SelectedFilter(CB_UpQrz);
+            string upEqsl    = SelectedFilter(CB_UpEqsl);
+            string upClublog = SelectedFilter(CB_UpClublog);
 
             // No filter set means show the WHOLE log, the way a spreadsheet shows every row until you
             // filter it. An empty grid told the operator nothing about what was in the log and made the
@@ -2066,7 +2101,8 @@ namespace HolyLogger
                               string.IsNullOrEmpty(time) && string.IsNullOrEmpty(state) &&
                               string.IsNullOrEmpty(qth) &&
                               qrz == null && eqsl == null && clublog == null && paper == null &&
-                              review == null;
+                              review == null &&
+                              upLotw == null && upQrz == null && upEqsl == null && upClublog == null;
 
             var results = _allQsos.AsEnumerable();
 
@@ -2174,6 +2210,14 @@ namespace HolyLogger
             if (eqsl != null)    { bool w = eqsl == LotwConfirmed;    results = results.Where(q => (q.EqslQslRcvd == 1) == w); }
             if (clublog != null) { bool w = clublog == LotwConfirmed; results = results.Where(q => (q.ClublogQslRcvd == 1) == w); }
             if (paper != null)   { bool w = paper == LotwConfirmed;   results = results.Where(q => (q.PaperQslRcvd == 1) == w); }
+
+            // WHETHER WE UPLOADED IT, which is a different question from whether it was confirmed - a
+            // QSO can be sitting at every service for years and confirmed by none of them. The state is
+            // 1 sent, 0 still waiting in the queue, 2 taken out of the queue without being sent.
+            if (upLotw != null)    results = results.Where(q => UploadStateMatches(q.LotwStatus, upLotw));
+            if (upQrz != null)     results = results.Where(q => UploadStateMatches(q.QrzStatus, upQrz));
+            if (upEqsl != null)    results = results.Where(q => UploadStateMatches(q.EqslStatus, upEqsl));
+            if (upClublog != null) results = results.Where(q => UploadStateMatches(q.ClublogStatus, upClublog));
 
             // WHAT THE LOG FIXER HAS SETTLED ABOUT THIS CONTACT, decided in the Fixer's own class so
             // this box and the window that opens when Log Fixer is pressed can never come to mean
@@ -2337,6 +2381,11 @@ namespace HolyLogger
             foreach (var cb in new[] { CB_Lotw, CB_Qrz, CB_Eqsl, CB_Clublog, CB_Paper })
                 SetItems(cb, new List<string> { AnyItem, LotwConfirmed, LotwNotConfirmed });
 
+            // Fixed choices for the same reason: "Waiting" has to be offerable on a log where nothing
+            // is waiting today.
+            foreach (var cb in new[] { CB_UpLotw, CB_UpQrz, CB_UpEqsl, CB_UpClublog })
+                SetItems(cb, new List<string> { AnyItem, UploadSent, UploadWaiting, UploadNotSent });
+
             // The same answers, worded the same way, as the window that opens when Log Fixer is
             // pressed - with approved split into who approved it, which is a question only worth
             // asking when looking back.
@@ -2346,6 +2395,19 @@ namespace HolyLogger
 
         private const string LotwConfirmed = "Confirmed";
         private const string LotwNotConfirmed = "Not confirmed";
+
+        // The three upload states, in the words the operator sees. "Not sent" is the queue-cleared
+        // state: it was waiting, it was taken out, and it never went anywhere.
+        private const string UploadSent = "Uploaded";
+        private const string UploadWaiting = "Waiting";
+        private const string UploadNotSent = "Not sent";
+
+        private static bool UploadStateMatches(int status, string wanted)
+        {
+            if (wanted == UploadSent)    return status == 1;
+            if (wanted == UploadWaiting) return status == 0;
+            return status == 2;                                  // "Not sent"
+        }
 
         // What the Log Fixer has settled about this QSO: never checked (review_state 0), checked and
         // fixed (1), approved on his own judgement (2), approved with an AI backing him (4). Checked
