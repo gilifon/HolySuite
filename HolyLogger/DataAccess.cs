@@ -2001,18 +2001,42 @@ Environment.NewLine +
                 if (q != null && q.id > 0 && string.IsNullOrEmpty(q.ExtraAdif)) byId[q.id] = q;
             if (byId.Count == 0) return;
 
+            // ASKED FOR BY ID, NOT SIFTED OUT OF THE WHOLE TABLE. This used to read every row in the
+            // database that had any carried ADIF at all and throw away all but the wanted ones - and
+            // extra_adif is the biggest column there is (190 MB of one operator's 382 MB), so exporting
+            // or deleting a log of thirty QSOs still read and unpacked a hundred thousand blobs. The
+            // ids are the primary key, so each batch is a straight index lookup.
+            //
+            // In batches because SQLite allows 999 terms in one statement by default, and the ids are
+            // numbers that came out of this database - there is nothing here to quote or escape.
+            var wanted = new List<long>(byId.Keys);
+            const int IdsPerQuery = 900;
+
             lock (_dbLock)
             {
                 if (con == null || con.State != System.Data.ConnectionState.Open) return;
-                using (var cmd = new SQLiteCommand(
-                    "SELECT Id, extra_adif FROM qso WHERE extra_adif IS NOT NULL AND extra_adif <> ''", con))
-                using (var rdr = cmd.ExecuteReader())
-                    while (rdr.Read())
+
+                for (int start = 0; start < wanted.Count; start += IdsPerQuery)
+                {
+                    int take = Math.Min(IdsPerQuery, wanted.Count - start);
+
+                    var sql = new StringBuilder("SELECT Id, extra_adif FROM qso WHERE Id IN (");
+                    for (int i = 0; i < take; i++)
                     {
-                        long id = Convert.ToInt64(rdr[0]);
-                        QSO q;
-                        if (byId.TryGetValue(id, out q)) q.ExtraAdif = UnpackCarriedAdif(rdr[1]);
+                        if (i > 0) sql.Append(',');
+                        sql.Append(wanted[start + i].ToString(CultureInfo.InvariantCulture));
                     }
+                    sql.Append(") AND extra_adif IS NOT NULL AND extra_adif <> ''");
+
+                    using (var cmd = new SQLiteCommand(sql.ToString(), con))
+                    using (var rdr = cmd.ExecuteReader())
+                        while (rdr.Read())
+                        {
+                            long id = Convert.ToInt64(rdr[0]);
+                            QSO q;
+                            if (byId.TryGetValue(id, out q)) q.ExtraAdif = UnpackCarriedAdif(rdr[1]);
+                        }
+                }
             }
         }
 

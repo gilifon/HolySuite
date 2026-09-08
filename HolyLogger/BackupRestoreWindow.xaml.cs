@@ -74,6 +74,7 @@ namespace HolyLogger
             WindowBounds.Attach(this, "BackupRestore");   // remember position + size
             _backupsFolder = backupsFolder;
             RefreshExtraFolder();
+            RefreshDeletedFolder();
             LoadBackupList();
         }
 
@@ -512,12 +513,16 @@ namespace HolyLogger
         // the user picked a usable folder; false if they cancelled or it wasn't writable (an error is
         // shown in that case). Shared by this window's Browse button and the first-run offer so the
         // pick-and-validate behaviour stays identical in both places.
-        public static bool TryPickWritableFolder(Window owner, string initial, out string chosen)
+        // Two folders are picked this way now - the extra backup copies and the deleted logs - so the
+        // wording is the caller's; everything else about picking and checking a folder stays shared.
+        public static bool TryPickWritableFolder(Window owner, string initial, out string chosen,
+                                                string description = "Choose a folder for extra copies of your daily backups",
+                                                string errorTitle = "Extra backup folder")
         {
             chosen = null;
             using (var dlg = new System.Windows.Forms.FolderBrowserDialog())
             {
-                dlg.Description = "Choose a folder for extra copies of your daily backups";
+                dlg.Description = description;
                 dlg.ShowNewFolderButton = true;
                 if (!string.IsNullOrWhiteSpace(initial) && System.IO.Directory.Exists(initial))
                     dlg.SelectedPath = initial;
@@ -543,13 +548,97 @@ namespace HolyLogger
                         "That folder can't be written to, so it wasn't set:\n" + path + "\n\n"
                         + "Pick a folder on a drive that is always connected, and one you own — "
                         + "a folder inside Documents always works.",
-                        "Extra backup folder", owner);
+                        errorTitle, owner);
                     return false;
                 }
 
                 chosen = path;
                 return true;
             }
+        }
+
+        // -- Deleted logs folder ----------------------------------------------------------------
+        private void RefreshDeletedFolder()
+        {
+            TB_DeletedFolder.Text = DeletedLogsArchive.Folder;
+            Btn_DeletedDefault.IsEnabled = !DeletedLogsArchive.IsDefaultFolder;
+        }
+
+        private void Btn_DeletedOpen_Click(object sender, RoutedEventArgs e)
+        {
+            DeletedLogsArchive.OpenFolder(this);
+        }
+
+        private void Btn_DeletedBrowse_Click(object sender, RoutedEventArgs e)
+        {
+            string oldFolder = DeletedLogsArchive.Folder;
+            if (!TryPickWritableFolder(this, oldFolder, out string chosen,
+                                       "Choose a folder to keep your deleted logs in",
+                                       "Deleted logs folder"))
+                return;
+
+            Properties.Settings.Default.DeletedLogsFolder = chosen;
+            Properties.Settings.Default.Save();
+            MoveSavedLogs(oldFolder, chosen);
+            RefreshDeletedFolder();
+        }
+
+        private void Btn_DeletedDefault_Click(object sender, RoutedEventArgs e)
+        {
+            string oldFolder = DeletedLogsArchive.Folder;
+            Properties.Settings.Default.DeletedLogsFolder = string.Empty;
+            Properties.Settings.Default.Save();
+            MoveSavedLogs(oldFolder, DeletedLogsArchive.DefaultFolder);
+            RefreshDeletedFolder();
+        }
+
+        // MOVING THE FOLDER MOVES WHAT IS IN IT. Leaving the old files behind splits the one place a
+        // lost log can be found into two, and he would only discover the second one on the day he is
+        // hunting for a log that "should be here". He is asked first: the files are his.
+        private void MoveSavedLogs(string from, string to)
+        {
+            if (string.IsNullOrWhiteSpace(from) || string.IsNullOrWhiteSpace(to)) return;
+            if (string.Equals(from.TrimEnd('\\', '/'), to.TrimEnd('\\', '/'), StringComparison.OrdinalIgnoreCase)) return;
+
+            string[] files;
+            try
+            {
+                if (!Directory.Exists(from)) return;
+                files = Directory.GetFiles(from, "*.adi");
+            }
+            catch (Exception ex) { Log.Swallow(ex); return; }
+            if (files.Length == 0) return;
+
+            if (!HolyMessageBox.ShowConfirm(
+                    files.Length.ToString("N0") + " deleted log file(s) are still in the old folder:\n" + from
+                    + "\n\nMove them to the new folder, so all your deleted logs stay in one place?",
+                    "Deleted logs folder", HolyMsgType.Info, this))
+                return;
+
+            int moved = 0, failed = 0;
+            try { Directory.CreateDirectory(to); }
+            catch (Exception ex) { Log.Swallow(ex); }
+
+            foreach (string f in files)
+            {
+                try
+                {
+                    string dest = Path.Combine(to, Path.GetFileName(f));
+                    // A file of that name already there is left alone and this one lands beside it under
+                    // a new name: nothing that was saved is ever written over.
+                    for (int i = 2; File.Exists(dest) && i < 1000; i++)
+                        dest = Path.Combine(to, Path.GetFileNameWithoutExtension(f) + " (" + i + ").adi");
+                    File.Move(f, dest);
+                    moved++;
+                }
+                catch (Exception ex) { Log.Swallow(ex); failed++; }
+            }
+
+            if (failed > 0)
+                HolyMessageBox.ShowWarning(
+                    moved.ToString("N0") + " file(s) were moved, " + failed.ToString("N0") + " could not be.\n\n"
+                    + "The ones left behind are still in:\n" + from,
+                    "Deleted logs folder", this);
         }
 
         private void Btn_Clear_Click(object sender, RoutedEventArgs e)

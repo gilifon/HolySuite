@@ -378,10 +378,15 @@ namespace HolyLogger
 
         // ── Static helpers ────────────────────────────────────────────────
 
+        // fitLongestLine: for a message whose point is a path or a file name. See
+        // FitWidthToLongestLine - the window is widened so the line is read whole, not in two halves.
         public static void Show(string message, string title = "HolyLogger",
-            HolyMsgType type = HolyMsgType.Info, Window owner = null, double width = 0)
+            HolyMsgType type = HolyMsgType.Info, Window owner = null, double width = 0,
+            bool fitLongestLine = false)
         {
-            new HolyMessageBox(message, title, type, owner, confirm: false, width).ShowDialog();
+            var dlg = new HolyMessageBox(message, title, type, owner, confirm: false, width);
+            if (fitLongestLine) dlg.FitWidthToLongestLine();
+            dlg.ShowDialog();
         }
 
         // width, like Show's: a question carrying a list - the changes in a new version, say - reads
@@ -402,7 +407,8 @@ namespace HolyLogger
             HolyMsgType type = HolyMsgType.Warning, Window owner = null, double width = 0,
             string yesText = null, string noText = null,
             string yesBackground = null, string yesForeground = null, string yesBorder = null,
-            UIElement picture = null, string messageAfter = null, string heading = null)
+            UIElement picture = null, string messageAfter = null, string heading = null,
+            bool fitLongestLine = false)
         {
             var dlg = new HolyMessageBox(message, title, type, owner, confirm: true, width, picture, messageAfter, heading);
 
@@ -411,6 +417,7 @@ namespace HolyLogger
 
             PaintButton(dlg.YesBtn, yesBackground, yesForeground, yesBorder);
             dlg.FitWidthToButtons();   // the words just set may need more room than the text did
+            if (fitLongestLine) dlg.FitWidthToLongestLine();
 
             dlg.ShowDialog();
             return dlg.Confirmed;
@@ -585,6 +592,51 @@ namespace HolyLogger
             catch (Exception swallowed) { Log.Swallow(swallowed); }
         }
 
+        // A MESSAGE WHOSE LINES MUST NOT BE BROKEN. Most text reads the same however it wraps, but
+        // some messages carry a thing the reader has to take in whole - a log name, a folder path -
+        // and a line break dropped into the middle of one turns it into two half-words he then has to
+        // put back together. Every line is measured as it stands and the window is made wide enough
+        // for the longest, up to what the screen can hold; past that, wrapping is the lesser evil.
+        internal void FitWidthToLongestLine()
+        {
+            try
+            {
+                if (MessageText == null) return;
+                string plain = MessageText.Text ?? string.Empty;
+                if (plain.Length == 0) return;
+
+                double widest = 0;
+                foreach (string line in plain.Replace("\r\n", "\n").Split('\n'))
+                {
+                    if (line.Length == 0) continue;
+                    widest = Math.Max(widest, WidthOf(line));
+                }
+
+                double needed = widest + SideFurniture + 8;   // 8 of air, so nothing sits on the edge
+                if (needed <= Width) return;
+
+                double room = Math.Max(460, SystemParameters.WorkArea.Width - 80);
+                Width = Math.Min(needed, room);
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        // One line, unwrapped, in the message's own font. Bold, like HeightAt below, so a line that
+        // turns out to be bold is never measured short.
+        private double WidthOf(string line)
+        {
+            var drawn = new System.Windows.Media.FormattedText(
+                line,
+                System.Globalization.CultureInfo.CurrentUICulture,
+                FlowDirection.LeftToRight,
+                new System.Windows.Media.Typeface(MessageText.FontFamily, MessageText.FontStyle,
+                                                  FontWeights.Bold, MessageText.FontStretch),
+                MessageText.FontSize,
+                System.Windows.Media.Brushes.Black,
+                VisualTreeHelper.GetDpi(this).PixelsPerDip);
+            return drawn.Width;
+        }
+
         // How tall this message would be if the window were `windowWidth` across. Bold throughout, so a
         // message with bold in it is never measured short.
         private double HeightAt(string text, double windowWidth)
@@ -656,14 +708,17 @@ namespace HolyLogger
                  + " If it keeps happening, use Help → Support and paste the line above.";
         }
 
-        public static void ShowSuccess(string message, string title = "HolyLogger", Window owner = null, double width = 0)
-            => Show(message, title, HolyMsgType.Success, owner, width);
+        public static void ShowSuccess(string message, string title = "HolyLogger", Window owner = null, double width = 0,
+                                       bool fitLongestLine = false)
+            => Show(message, title, HolyMsgType.Success, owner, width, fitLongestLine);
 
-        public static void ShowError(string message, string title = "HolyLogger", Window owner = null, double width = 0)
-            => Show(message, title, HolyMsgType.Error, owner, width);
+        public static void ShowError(string message, string title = "HolyLogger", Window owner = null, double width = 0,
+                                     bool fitLongestLine = false)
+            => Show(message, title, HolyMsgType.Error, owner, width, fitLongestLine);
 
-        public static void ShowWarning(string message, string title = "HolyLogger", Window owner = null, double width = 0)
-            => Show(message, title, HolyMsgType.Warning, owner, width);
+        public static void ShowWarning(string message, string title = "HolyLogger", Window owner = null, double width = 0,
+                                       bool fitLongestLine = false)
+            => Show(message, title, HolyMsgType.Warning, owner, width, fitLongestLine);
 
         // A message with file paths written out at the end as LINKS the operator can click. A path is
         // worth printing in full - it can be read, copied, and pasted into an editor - but a path that

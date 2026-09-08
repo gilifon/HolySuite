@@ -426,7 +426,19 @@ namespace HolyLogger
             LoadLogs();
         }
 
-        private void Btn_Delete_Click(object sender, RoutedEventArgs e)
+        // Puts the spinner up (or takes it down). The work it covers must be on another thread - an
+        // overlay shown in front of work that blocks THIS thread is a still picture of a spinner.
+        private void ShowBusy(string what)
+        {
+            if (BusyOverlay == null) return;
+            if (what == null) { BusyOverlay.Visibility = Visibility.Collapsed; return; }
+            BusyText.Text = what;
+            BusyOverlay.Visibility = Visibility.Visible;
+        }
+
+        // async: the two slow steps - writing the ADIF copy and removing the rows - are awaited off
+        // this thread, so the window keeps painting and the ring keeps turning while they run.
+        private async void Btn_Delete_Click(object sender, RoutedEventArgs e)
         {
             if (!RequireSelection()) return;
             long id = Selected.Id;
@@ -441,32 +453,152 @@ namespace HolyLogger
             var sources = (LogsGrid.ItemsSource as System.Collections.Generic.IEnumerable<Row>)
                           ?.Where(r => r.CopyTargetLogId == id).Select(r => r.Name).ToList()
                           ?? new System.Collections.Generic.List<string>();
+            //
+            // ONE SENTENCE TO A LINE, here and in openNote below. The window widens itself to hold its
+            // longest line whole (fitLongestLine), so two sentences run together on one line made a
+            // window as wide as the screen to say something that reads better in two.
             string copyNote = sources.Count > 0
-                ? "\n\nNote: " + string.Join(", ", sources) + " " + (sources.Count == 1 ? "copies" : "copy") +
-                  " new QSOs into this log; that copying will be turned off. QSOs already copied elsewhere are not affected."
+                ? "\n\n" + string.Join(", ", sources) + " " + (sources.Count == 1 ? "copies" : "copy") +
+                  " new QSOs into this log.\nThat copying will be turned off." +
+                  "\nQSOs already copied are not affected."
                 : string.Empty;
 
             // Deleting the log that is OPEN closes it, and the operator is told so before they agree:
             // the log table empties, and nothing can be logged until a log is opened or created.
             string openNote = deletingOpenLog
-                ? "\n\nThis log is the one currently open. Deleting it will CLOSE it — no log will be open, " +
-                  "and you will not be able to log a QSO until you open or create one."
+                ? "\n\nThis log is the one currently open, and deleting it will CLOSE it." +
+                  "\nYou cannot log a QSO until you open or create another log."
                 : string.Empty;
 
-            if (!HolyMessageBox.ShowConfirm(
-                    "Delete the log \"" + _dal.GetLogName(id) + "\" and ALL " + Selected.QsoCount.ToString("N0") +
-                    " QSO(s) in it?\n\nThis permanently removes those QSOs from the database and cannot be undone."
-                    + openNote + copyNote,
-                    "Delete Log", HolyMsgType.Warning, this))
+            // The delete is still a delete - but the QSOs are written out to an ADIF file first, so it
+            // is no longer the end of them. Said here, before he agrees, because a man deciding whether
+            // to press Delete needs to know a copy is kept, and where it will be.
+            //
+            // THE TWO THINGS HE MUST READ WHOLE - which log this is, and where its copy goes - each get
+            // a line of their own under the words that name them, and fitLongestLine widens the window
+            // so neither a long log name nor a long path is broken across two lines.
+            string logName = _dal.GetLogName(id);
+            string message =
+                "Log:\n"
+                + logName + "   -   " + Selected.QsoCount.ToString("N0") + " QSOs\n\n"
+                + "For your safety, an ADIF file of this log will be saved at:\n"
+                + DeletedLogsArchive.Folder
+                + openNote + copyNote;
+
+            if (!HolyMessageBox.ShowConfirm(message, "Delete Log", HolyMsgType.Warning, this,
+                                            yesText: "Delete", noText: "Cancel", fitLongestLine: true))
                 return;
+
+            // THE COPY IS WRITTEN FIRST, AND NOTHING IS DELETED IF IT FAILS. A delete that went ahead
+            // after losing its own safety copy would be the exact accident this was built to stop, so a
+            // full disk, a folder that has been moved away, or a drive that is not plugged in, stops the
+            // delete - rather than being reported afterwards, over a log that is already gone.
+            // Read on this thread, before the work moves off it: Selected is a grid row.
+            string callsign = Selected.Identity;
+
+            bool saved = false;
+            string savedFile = null, saveError = null;
+            ShowBusy("Saving a copy of the log\u2026");
+            try
+            {
+                await System.Threading.Tasks.Task.Run(() =>
+                {
+                    string file, error;
+                    saved = DeletedLogsArchive.TrySave(_dal, id, logName, callsign, out file, out error);
+                    savedFile = file;
+                    saveError = error;
+                });
+            }
+            finally { ShowBusy(null); }
+
+            if (!saved)
+            {
+                HolyMessageBox.ShowError(
+                    "The log was NOT deleted, because its ADIF copy could not be written.\n\n"
+                    + saveError + "\n\nThe folder is:\n" + DeletedLogsArchive.Folder
+                    + "\n\nYour log is untouched. Choose another folder in File > Backups & Restore, "
+                    + "or make room on the disk, then delete again.",
+                    "Delete Log", this);
+                return;
+            }
 
             // Close it BEFORE the row goes, so ActiveLogId never names a log that is not there - that
             // gap is what would have let a QSO be written to a log nothing could read.
             if (deletingOpenLog) _main.CloseActiveLog();
 
-            _dal.DeleteLog(id);
+            // Removing the rows is its own wait on a big log - the QSOs, and their fix history with
+            // them - so it gets the same spinner rather than a frozen window at the last moment.
+            ShowBusy("Deleting the log\u2026");
+            try { await System.Threading.Tasks.Task.Run(() => _dal.DeleteLog(id)); }
+            finally { ShowBusy(null); }
+
             _main.RefreshCopyIndicator();
             LoadLogs();
+
+            // Where the copy went, named in full and on one line - a file name broken across two
+            // lines is a file name he has to piece back together before he can look for it.
+            HolyMessageBox.ShowSuccess(
+                "The log was deleted.\n\nIts QSOs were saved in this file:\n" + savedFile,
+                "Delete Log", this, fitLongestLine: true);
+        }
+
+        // The folder holding every log that was deleted, one ADIF file each. Beside Delete on purpose:
+        // the way back sits next to the thing that needs it, so nobody has to know it exists first.
+        private void Btn_DeletedLogs_Click(object sender, RoutedEventArgs e)
+        {
+            DeletedLogsArchive.OpenFolder(this);
+        }
+
+        // BRINGING A DELETED LOG BACK. The same import as the button on its left, started in the
+        // folder where deleted logs are kept, so he is looking at a list of them instead of hunting
+        // through AppData for a folder he has never opened. The file he picks then goes through the
+        // ordinary import - naming the new log, choosing the callsign, merge or replace - because a
+        // log coming back deserves the same questions as any other file.
+        private void Btn_ImportDeleted_Click(object sender, RoutedEventArgs e)
+        {
+            string folder = DeletedLogsArchive.Folder;
+
+            string[] files;
+            try
+            {
+                System.IO.Directory.CreateDirectory(folder);
+                files = System.IO.Directory.GetFiles(folder, "*.adi");
+            }
+            catch (Exception ex)
+            {
+                Log.Swallow(ex);
+                HolyMessageBox.ShowError(
+                    "This folder could not be opened:\n" + folder + "\n\n" + ex.Message,
+                    "Import Deleted Log", this);
+                return;
+            }
+
+            // NOTHING TO SHOW IS NOT AN ERROR. An empty file dialog opening on an empty folder says
+            // nothing; this says what the folder is for and that he has not lost anything yet.
+            if (files.Length == 0)
+            {
+                HolyMessageBox.Show(
+                    "You have not deleted any log yet, so there is nothing to bring back.\n\n"
+                    + "When you delete a log, it is saved as an ADIF file here first:\n" + folder,
+                    "Import Deleted Log", HolyMsgType.Info, this);
+                return;
+            }
+
+            var open = new Microsoft.Win32.OpenFileDialog
+            {
+                Title = "Choose the deleted log to bring back",
+                Filter = "Deleted logs (*.adi)|*.adi",
+                InitialDirectory = folder,
+                CheckFileExists = true
+            };
+            if (open.ShowDialog() != true) return;
+
+            // Import runs on the main window with its own dialogs, so this modal window goes first -
+            // the same order Import ADIF uses, and for the same reason.
+            string picked = open.FileName;
+            Close();
+            _main.Dispatcher.BeginInvoke(new System.Action(async () => await _main.ImportAdifFile(picked)),
+                System.Windows.Threading.DispatcherPriority.Background);
         }
 
         // Import runs on the main window with its own dialogs, so close the Log Manager first (it's modal),

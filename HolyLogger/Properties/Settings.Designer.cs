@@ -2826,6 +2826,18 @@ namespace HolyLogger.Properties {
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string DeletedLogsFolder {
+            get {
+                return ((string)(this["DeletedLogsFolder"]));
+            }
+            set {
+                this["DeletedLogsFolder"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
         public string ExtraBackupFolder {
             get {
                 return ((string)(this["ExtraBackupFolder"]));

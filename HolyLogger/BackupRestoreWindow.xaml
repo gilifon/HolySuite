@@ -11,6 +11,7 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
         <!-- "Log" was wrong and misleading: a backup here is the WHOLE DATABASE, every log in it, and
@@ -159,6 +160,37 @@
                             FontSize="16" Margin="8,0,0,0" Click="Btn_Browse_Click"/>
                     <Button x:Name="Btn_Clear" Grid.Column="2" Content="Clear" MinWidth="70" Height="30"
                             FontSize="16" Margin="8,0,0,0" Click="Btn_Clear_Click"/>
+                </Grid>
+            </StackPanel>
+        </Border>
+
+        <!-- Deleted logs. It belongs on this window because this is where a man comes when something
+             has been lost - and a log he deleted himself is the commonest thing to lose. -->
+        <Border Grid.Row="3" Padding="12,10" Margin="0,10,0,0"
+                Background="{DynamicResource PanelBg}" BorderBrush="{DynamicResource AccentBrush}"
+                BorderThickness="1" CornerRadius="3">
+            <StackPanel>
+                <TextBlock Text="Deleted logs"
+                           FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}"/>
+                <TextBlock Margin="0,4,0,0" TextWrapping="Wrap" FontSize="16" Foreground="{DynamicResource TextBrush}"
+                           Text="When you delete a log in the Log Manager, its QSOs are saved here first, as an ADIF file. Nothing is ever removed from this folder, so you can bring a log back at any time with Import ADIF. Keep it where it is, or put it anywhere you like."/>
+                <Grid Margin="0,8,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBox x:Name="TB_DeletedFolder" Grid.Column="0" IsReadOnly="True"
+                             FontSize="16" Height="30" VerticalContentAlignment="Center" Padding="6,0"
+                             Background="{DynamicResource WindowBg}" Foreground="{DynamicResource TextBrush}"/>
+                    <Button x:Name="Btn_DeletedOpen" Grid.Column="1" Content="Open Folder" MinWidth="110" Height="30"
+                            FontSize="16" Margin="8,0,0,0" Click="Btn_DeletedOpen_Click"/>
+                    <Button x:Name="Btn_DeletedBrowse" Grid.Column="2" Content="Change..." MinWidth="90" Height="30"
+                            FontSize="16" Margin="8,0,0,0" Click="Btn_DeletedBrowse_Click"/>
+                    <Button x:Name="Btn_DeletedDefault" Grid.Column="3" Content="Default" MinWidth="80" Height="30"
+                            FontSize="16" Margin="8,0,0,0" Click="Btn_DeletedDefault_Click"
+                            ToolTip="Put it back beside your log database, next to the Backups folder"/>
                 </Grid>
             </StackPanel>
         </Border>

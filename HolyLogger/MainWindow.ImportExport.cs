@@ -2783,7 +2783,163 @@ namespace HolyLogger
         }
 
     }
+
+    // -- The Deleted Logs folder --------------------------------------------------------------------
+    // Deleting a log used to be final. DataAccess.DeleteLog removes the log row, every QSO in it and
+    // their fix history, and nothing kept a copy: the only way back was a daily database backup, which
+    // restores the WHOLE database and so throws away every QSO worked since that backup was made. One
+    // wrong click cost a log for good.
+    //
+    // So a log is written out to an ADIF file BEFORE it is removed, into a folder the operator can open
+    // and can move somewhere of his own choosing. ADIF rather than a database copy on purpose: every
+    // logging program on earth reads ADIF, so the file is still worth something even if HolyLogger is
+    // not there to read it back.
+    //
+    // What ADIF cannot carry is the LOG itself - its name, its station callsign, whether it was a
+    // contest log. Those go in a header comment above <adif_ver>, which is legal ADIF (a file is
+    // allowed to open with free text before the first tag) and which every parser skips. So the file
+    // still imports anywhere, while a human who opens it in Notepad can see which log he is holding.
+    public static class DeletedLogsArchive
+    {
+        public const string FolderName = "Deleted Logs";
+
+        // Where the files go: the operator's own folder if he chose one, otherwise beside the database
+        // next to Backups - one place holding everything that is a copy of the log.
+        public static string Folder
+        {
+            get
+            {
+                string chosen = Properties.Settings.Default.DeletedLogsFolder;
+                return string.IsNullOrWhiteSpace(chosen) ? DefaultFolder : chosen;
+            }
+        }
+
+        public static string DefaultFolder
+        {
+            get
+            {
+                try
+                {
+                    string data = DataAccess.GetInstance()?.DataFolder;
+                    if (!string.IsNullOrWhiteSpace(data)) return Path.Combine(data, FolderName);
+                }
+                catch (Exception ex) { Log.Swallow(ex); }
+
+                // Only if the database folder is somehow unknown. Documents always exists and is always
+                // writable, so the copy still has somewhere to go.
+                return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
+                                    "HolyLogger " + FolderName);
+            }
+        }
+
+        // True while the folder is the built-in one (nothing was chosen) - for the "Default" button.
+        public static bool IsDefaultFolder
+        {
+            get { return string.IsNullOrWhiteSpace(Properties.Settings.Default.DeletedLogsFolder); }
+        }
+
+        // Writes the log out. Returns false WITH the reason if anything failed - and the caller must
+        // then leave the log where it is: a delete that quietly lost its copy is the very accident this
+        // exists to prevent.
+        public static bool TrySave(DataAccess dal, long logId, string logName, string callsign,
+                                   out string savedFile, out string error)
+        {
+            savedFile = null;
+            error = null;
+            if (dal == null) { error = "The log database is not open."; return false; }
+
+            try
+            {
+                ObservableCollection<QSO> qsos = dal.GetQSOsForLog(logId);
+
+                // Everything the QSOs arrived with, including the fields HolyLogger has no column for:
+                // the same full export File > Export ADIF writes, not the trimmed one sent to the QSL
+                // services. A file kept against disaster must give back the log that was lost, whole.
+                try { dal.FillCarriedAdif(qsos); } catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+                // THIS log's contest - not whichever contest happens to be running right now.
+                string cabrilloName = null;
+                try
+                {
+                    Contests.Contest c = Contests.ContestService.FindById(dal.GetLogEventType(logId));
+                    if (c != null) cabrilloName = c.CabrilloName;
+                }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+                string adif = Services.GenerateAdif(qsos, cabrilloName, includeImportedFields: true);
+
+                string folder = Folder;
+                Directory.CreateDirectory(folder);
+                string path = UniquePath(folder, logName);
+
+                File.WriteAllText(path, Header(logName, callsign, qsos.Count) + adif);
+                savedFile = path;
+                Log.Warn("Deleted log \"" + logName + "\" was saved to " + path + " (" + qsos.Count + " QSOs).");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Log.Swallow(ex);
+                error = ex.Message;
+                return false;
+            }
+        }
+
+        // The free text above <adif_ver>. Written for somebody opening the file months later with no
+        // idea what it is, so it says what it is, which log it was, and how to get it back.
+        private static string Header(string logName, string callsign, int qsoCount)
+        {
+            string nl = Environment.NewLine;
+            return
+                "This is a log that was deleted in HolyLogger. It was saved here just before it was removed." + nl +
+                nl +
+                "Log name:      " + (string.IsNullOrWhiteSpace(logName) ? "(no name)" : logName) + nl +
+                "Station call:  " + (string.IsNullOrWhiteSpace(callsign) ? "(not known)" : callsign) + nl +
+                "QSOs:          " + qsoCount.ToString("N0") + nl +
+                "Deleted:       " + DateTime.Now.ToString("yyyy-MM-dd HH:mm") + nl +
+                nl +
+                "To get it back: open HolyLogger, go to File > Log Manager, press Import ADIF," + nl +
+                "and choose this file." + nl +
+                nl;
+        }
+
+        // "Holyland 2026 - deleted 2026-09-08 1432.adi", plus a (2), (3)... if that name is taken: two
+        // logs of the same name deleted in the same minute must not overwrite each other.
+        private static string UniquePath(string folder, string logName)
+        {
+            string stem = SafeName(logName) + " - deleted " + DateTime.Now.ToString("yyyy-MM-dd HHmm");
+            string path = Path.Combine(folder, stem + ".adi");
+            for (int n = 2; File.Exists(path) && n < 1000; n++)
+                path = Path.Combine(folder, stem + " (" + n + ").adi");
+            return path;
+        }
+
+        private static string SafeName(string logName)
+        {
+            string name = string.IsNullOrWhiteSpace(logName) ? "log" : logName.Trim();
+            foreach (char bad in Path.GetInvalidFileNameChars()) name = name.Replace(bad, '_');
+            if (name.Length > 60) name = name.Substring(0, 60).TrimEnd();
+            return name.Length == 0 ? "log" : name;
+        }
+
+        // Opens the folder in Explorer, making it first if no log has ever been deleted - an empty
+        // folder that opens says "nothing here yet" better than an error does.
+        public static void OpenFolder(Window owner)
+        {
+            string folder = Folder;
+            try
+            {
+                Directory.CreateDirectory(folder);
+                System.Diagnostics.Process.Start("explorer.exe", "\"" + folder + "\"");
+            }
+            catch (Exception ex)
+            {
+                Log.Swallow(ex);
+                HolyMessageBox.ShowError(
+                    "This folder could not be opened:" + Environment.NewLine + folder + Environment.NewLine +
+                    Environment.NewLine + ex.Message,
+                    "Deleted logs", owner);
+            }
+        }
+    }
 }
-
-
-
