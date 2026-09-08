@@ -1479,16 +1479,24 @@ namespace HolyLogger
             return brush;
         }
 
+        // THE FRESHEST ANSWER THE ONCE-A-SECOND RULE ALLOWS, and BOTH painters ask through here.
+        // ShowEsmNext used to read _qrlNext without ever having caused it to be worked out, and on a
+        // window that has only just opened that flag is still at its default false - so ESM lit the CQ
+        // green, and the first pump tick a moment later turned it red. The button changed colour by
+        // itself while the operator watched the window come up. Now whoever asks first settles it.
+        private void RefreshQrlNext()
+        {
+            if (DateTime.UtcNow - _qrlCheckedUtc < TimeSpan.FromSeconds(1)) return;
+            _qrlCheckedUtc = DateTime.UtcNow;
+            _qrlNext = ShouldAskQrl();
+        }
+
         private void PaintCqButton()
         {
             var button = _buttons.Length > 0 ? _buttons[0] : null;
             if (button == null) return;
 
-            if (DateTime.UtcNow - _qrlCheckedUtc >= TimeSpan.FromSeconds(1))
-            {
-                _qrlCheckedUtc = DateTime.UtcNow;
-                _qrlNext = ShouldAskQrl();
-            }
+            RefreshQrlNext();
 
             if (_qrlNext)
             {
@@ -1768,6 +1776,10 @@ namespace HolyLogger
         // Only the first four: buttons 5-12 are the operator's own, and ESM knows nothing about them.
         internal void ShowEsmNext(int messageNumber)
         {
+            // Before the loop, because the guard below depends on the answer and this may well be the
+            // first thing to ask for it - see RefreshQrlNext.
+            RefreshQrlNext();
+
             for (int i = 0; i < EsmButtons && i < _buttons.Length; i++)
             {
                 var button = _buttons[i];

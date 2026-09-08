@@ -8196,10 +8196,6 @@ namespace HolyLogger
                 {
                     button.Background = VoiceMessageActiveBrush;
                 }
-                else if (isEsmNext)
-                {
-                    button.Background = EsmNextBrush;
-                }
                 else if (messageNumber == 1 && ShouldAskQrlNow())
                 {
                     // AND THE CQ'S OWN WARNING LIVES HERE TOO, not in a painter of its own. It had one,
@@ -8207,7 +8203,25 @@ namespace HolyLogger
                     // went red on the clock's tick and back to its keycap cyan the moment anything
                     // refreshed the row - a button changing colour by itself with nobody touching
                     // anything. One painter owns the background now, and this is it.
+                    //
+                    // AND IT IS ASKED BEFORE THE ESM GREEN, which is the order the keyer has always
+                    // used (CwKeyboardWindow.ShowEsmNext skips button 0 while the question is due).
+                    // Asked the other way round the two windows disagreed about the same CQ on the
+                    // same radio - green here, red on the keyer - and the red is the one that matters:
+                    // it says this press will ASK whether the frequency is free rather than call on it.
                     button.Background = QrlWarningBrush;
+                }
+                else if (isEsmNext && messageNumber != EsmCqMessage)
+                {
+                    // NOT ON THE CQ, THOUGH. The green says "Enter sends this one next", which is worth
+                    // showing while it MOVES - it walks 2, 3, 4 as the QSO does. On CQ it never moves:
+                    // Run mode with an empty callsign box is where the program sits between every
+                    // contact, and ESM points at CQ the whole time, so the button was green from the
+                    // moment the form cleared until the next callsign was typed. A mark that is on
+                    // permanently marks nothing; it just left one of four keycaps looking wrong.
+                    // The CQ's own two states still show: red while the next press would ask QRL?,
+                    // orange while it is going out.
+                    button.Background = EsmNextBrush;
                 }
                 else
                 {
@@ -8216,9 +8230,12 @@ namespace HolyLogger
                 return;
             }
 
-            button.Background = isActive ? VoiceMessageActiveBrush
-                              : isEsmNext ? EsmNextBrush
-                              : VoiceMessageDefaultBrush;
+            // VOICE LEAVES THE GREEN ALONE. ESM's "this one goes next" mark belongs to CW, where the
+            // four buttons are the keyer's own macros and the operator is watching them walk the QSO.
+            // In voice they are the radio's four recorded messages and are meant to read as one set:
+            // a green CQ standing beside three lavender ones looks like a fault in the button, not a
+            // hint about Enter. Orange still says what is going out, which is the one that matters.
+            button.Background = isActive ? VoiceMessageActiveBrush : VoiceMessageDefaultBrush;
         }
 
         // How many digits an RST report has in the current mode: 2 on voice, 3 on CW and the data modes,
