@@ -1,4 +1,24 @@
-﻿== 8.9.6 ==
+﻿== 8.9.7 ==
+
+New
+- A log you delete is kept. Before it goes, its QSOs are written to an ADIF file in a
+  Deleted Logs folder, so a log deleted by mistake can be brought back. If that file
+  cannot be written, nothing is deleted and your log is untouched.
+- The question asked before a delete says which log it is, how many QSOs are in it, and
+  where the copy will be saved.
+- Deleted Logs, in the Log Manager, opens that folder.
+- Import Deleted Log, the yellow button beside Import ADIF, shows what is in that folder
+  and brings back the log you pick.
+- Backups & Restore holds the folder too: open it, or put it somewhere else. Move it and
+  the files already saved move with it, so they stay in one place.
+- Deleting a big log shows a spinner while it works, instead of looking frozen.
+
+Fixed
+- Deleting a log, and exporting one to ADIF, were slow however small the log: the program
+  read the carried ADIF fields of every QSO in the database each time. It now reads only
+  the log it was asked for.
+
+== 8.9.6 ==
 
 New
 - UDP Ports Manager: the three fixed ports become a table you write yourself, as many
