@@ -659,47 +659,103 @@ namespace HolyLogger
         // the whole point of letting the window open.
         private string _cannotKeyReason = string.Empty;
 
+        // TWO REASONS SENDING CAN BE OFF, AND THEY BEHAVE DIFFERENTLY. The radio being unkeyable by
+        // CAT is settled the moment the window opens and never lifts while it is up. The radio not
+        // being in CW lifts and returns as often as the operator turns the mode knob. Held apart so
+        // the second cannot clear the first: on an unkeyable radio going to CW and back must not end
+        // up looking as though the keyer had come alive.
+        private string _blockedBecauseRadio;   // permanent for this window
+        private string _blockedBecauseMode;    // comes and goes with the mode knob
+
+        private Border _blockBanner;
+        private TextBlock _blockBannerLine;
+
         internal void CannotKey(string reason)
         {
-            _cannotKey = true;
+            _blockedBecauseRadio = reason ?? string.Empty;
+            ApplySendingBlock();
+        }
+
+        // THE KEYER IS NO LONGER FOR CW ONLY. It opens on any mode, because the twelve macros, the
+        // banks, the labels, the speed and the whole gear window are settings - and a man sets them
+        // when he has a minute, which is not usually the minute he is calling CQ. What a mode other
+        // than CW takes away is sending, and only sending, exactly as an unkeyable radio does.
+        internal void SetCwMode(bool inCw)
+        {
+            _blockedBecauseMode = inCw
+                ? null
+                : "The radio is not in CW, so nothing typed or pressed here will go out. Everything "
+                + "else works: right-click a button to write its macro, and the gear holds the rest.";
+            ApplySendingBlock();
+        }
+
+        private void ApplySendingBlock()
+        {
+            // The radio's own inability wins the wording when both apply - it is the one that will
+            // still be true after the mode knob has been turned back.
+            string reason = _blockedBecauseRadio ?? _blockedBecauseMode;
+
+            bool wasBlocked = _cannotKey;
+            _cannotKey = reason != null;
             _cannotKeyReason = reason ?? string.Empty;
 
             // READ-ONLY, NOT DISABLED. A disabled box is skipped by the caret and by selection, and
             // the operator cannot even mark what he had already typed to copy it somewhere useful.
-            _box.IsReadOnly = true;
-            _box.IsTabStop = false;
+            _box.IsReadOnly = _cannotKey;
+            _box.IsTabStop = !_cannotKey;
 
-            foreach (var button in _buttons)
-                if (button != null) button.Opacity = 0.5;
+            if (_cannotKey) ShowBlockBanner(_cannotKeyReason);
+            else if (_blockBanner != null) _blockBanner.Visibility = Visibility.Collapsed;
 
-            var line = new TextBlock
+            // EVERYTHING BELOW ONLY WHEN IT ACTUALLY CHANGED. This is asked on every ParamsChange the
+            // radio reports, and re-reading twelve macros and re-measuring the window at that rate,
+            // to arrive at the answer already showing, is work for nothing.
+            if (wasBlocked == _cannotKey) return;
+
+            // Left to RefreshButtonAvailability, which is the one that owns button opacity - it also
+            // dims a button whose macro cannot be sent, and two hands on the same property fight.
+            // Its own throttle is stood down for this one pass, which is a state change rather than
+            // the periodic look it was written for.
+            _availabilityAskedUtc = DateTime.MinValue;
+            RefreshButtonAvailability();
+
+            // The banner is a row appearing or disappearing after the window has already been sized,
+            // so the height it locked to is now the wrong one - LockMinimumHeight re-measures and
+            // re-locks. Before Loaded there is nothing to re-measure and the constructor's own pass
+            // does it, which is why the first call (from OpenCwKeyboard, before Show) can skip this.
+            if (IsLoaded) LockMinimumHeight();
+        }
+
+        private void ShowBlockBanner(string reason)
+        {
+            if (_blockBanner == null)
             {
-                Text = _cannotKeyReason,
-                FontSize = 16,
-                TextWrapping = TextWrapping.Wrap,
-                Margin = new Thickness(10, 8, 10, 0)
-            };
-            line.SetResourceReference(TextBlock.ForegroundProperty, "MutedTextBrush");
+                _blockBannerLine = new TextBlock
+                {
+                    FontSize = 16,
+                    TextWrapping = TextWrapping.Wrap,
+                    Margin = new Thickness(10, 8, 10, 0)
+                };
+                _blockBannerLine.SetResourceReference(TextBlock.ForegroundProperty, "MutedTextBrush");
 
-            var banner = new Border
-            {
-                BorderThickness = new Thickness(1),
-                Padding = new Thickness(6, 2, 6, 6),
-                Margin = new Thickness(10, 8, 10, 0),
-                Child = line
-            };
-            banner.SetResourceReference(Border.BorderBrushProperty, "MutedTextBrush");
+                _blockBanner = new Border
+                {
+                    BorderThickness = new Thickness(1),
+                    Padding = new Thickness(6, 2, 6, 6),
+                    Margin = new Thickness(10, 8, 10, 0),
+                    Child = _blockBannerLine
+                };
+                _blockBanner.SetResourceReference(Border.BorderBrushProperty, "MutedTextBrush");
 
-            DockPanel.SetDock(banner, Dock.Top);
+                DockPanel.SetDock(_blockBanner, Dock.Top);
 
-            // Under the title bar and above the typing line, where it is read before anything is
-            // typed rather than after.
-            if (_body != null && _body.Children.Count > 0) _body.Children.Insert(1, banner);
+                // Under the title bar and above the typing line, where it is read before anything is
+                // typed rather than after.
+                if (_body != null && _body.Children.Count > 0) _body.Children.Insert(1, _blockBanner);
+            }
 
-            // NOTHING IS DONE ABOUT THE HEIGHT HERE ON PURPOSE. Adding a row usually means raising
-            // Height and MinHeight by hand or the bottom is cut off - but this window sizes itself
-            // to its content on Loaded and locks its minimum to what it measured (LockMinimumHeight),
-            // and this line goes in before Show. Adding to Height as well would grow it twice.
+            _blockBannerLine.Text = reason;
+            _blockBanner.Visibility = Visibility.Visible;
         }
 
         // Only the characters a keyer can actually send. Anything else would be dropped by the radio
@@ -1435,7 +1491,6 @@ namespace HolyLogger
 
         private void RefreshButtonAvailability()
         {
-            if (_macroProblem == null) return;
             if (DateTime.UtcNow - _availabilityAskedUtc < AvailabilityEvery) return;
             _availabilityAskedUtc = DateTime.UtcNow;
 
@@ -1447,13 +1502,19 @@ namespace HolyLogger
                 string text = _buttonTexts[i] ?? string.Empty;
                 bool usable = true;
 
-                if (text.Trim().Length > 0)
+                // The missing-macro-checker used to turn this whole method back at the door, which
+                // would now take the block's dimming with it - so it is asked here, where only its
+                // own question depends on it.
+                if (_macroProblem != null && text.Trim().Length > 0)
                 {
                     try { usable = _macroProblem(text) == null; }
                     catch (Exception swallowed) { Log.Swallow(swallowed); }
                 }
 
-                double wanted = usable ? 1.0 : 0.5;
+                // Dimmed for either reason - the macro cannot be sent, or nothing can be sent at all
+                // (no keyable radio, or the radio is not in CW). One hand on this property: an
+                // earlier version had the block dim them and this line brighten them straight back.
+                double wanted = usable && !_cannotKey ? 1.0 : 0.5;
                 if (button.Opacity != wanted) button.Opacity = wanted;
             }
 

@@ -4156,10 +4156,16 @@ namespace HolyLogger
         // CwKeyboardWindow - see the note at the top of that file for how the pacing works and why the
         // typing is sent in chunks rather than letter by letter.
         //
-        // IT ONLY OPENS ON A RADIO THAT IS IN CW. Not because the program could not send otherwise,
-        // but because a CW keyer in front of a radio sitting on SSB is a trap: the operator types,
-        // presses nothing, and hears nothing. If the radio leaves CW while the window is open, the
-        // window goes with it (see UpdateVoiceMessageAvailabilityState).
+        // IT OPENS ON ANY MODE, AND IT STILL GOES WHEN THE RADIO LEAVES CW. Those are not in
+        // conflict, and the difference is who asked. The radio leaving CW takes the keyer with it,
+        // because a keyer standing in front of an SSB radio is a trap - the operator types, presses
+        // nothing, and hears nothing. But this window is also the ONLY place the twelve macros, the
+        // two banks, the button labels and the keyer's own settings can be written, and a man does
+        // that when he has a minute, which is not the minute he is calling CQ. So Ctrl+K and the View
+        // menu open it whatever the radio is doing, and it then says plainly that nothing will go
+        // out - the same answer already given for a radio that cannot be keyed by CAT at all (see
+        // CannotKey). Opened by hand it stays: the closing is on the EDGE out of CW, which has
+        // already passed (see UpdateVoiceMessageAvailabilityState).
         //
         // It also OPENS BY ITSELF the moment the radio goes to CW - the operator should not have to
         // remember Ctrl+K after every mode change. That path passes silent: true, because a warning
@@ -4193,13 +4199,6 @@ namespace HolyLogger
                     + "When CAT is working, the radio's name shows in green at the right of the "
                     + "status bar. Anything else there means it is not.",
                     "CW Keyer", this);
-                return;
-            }
-
-            if (!IsCwModeActive())
-            {
-                if (!silent) HolyMessageBox.ShowWarning("The radio is not in CW. Put it in CW and open the keyboard again.",
-                                                       "CW Keyer", this);
                 return;
             }
 
@@ -4278,6 +4277,11 @@ namespace HolyLogger
                     + "go out. Send CW from the radio's own memory keys."
                     + (string.IsNullOrEmpty(RigFileTrouble) ? string.Empty : "  " + RigFileTrouble)
                     + "  You can still write and edit the eight macros below - right-click one.");
+
+            // And the other reason nothing may go out, the one that comes and goes with the mode
+            // knob. Kept up to date from UpdateVoiceMessageAvailabilityState, which runs on every
+            // ParamsChange the radio reports.
+            cwKeyboard.SetCwMode(IsCwModeActive());
 
             // ONE OR THE OTHER. The lite keyer leaves the bar while this window is open: two places
             // to type CW into, both feeding one radio, is two half-sent messages.
@@ -5636,7 +5640,13 @@ namespace HolyLogger
                 // worse than a blank one.
                 string own = MsgButtonLabel(messageNumber);
                 string key = "F" + (messageNumber + 4);
-                bool keysAreOurs = cwKeyboard == null;
+
+                // "OURS" MEANS THE KEYER IS NOT USING THEM FOR CW. It takes F1-F12 for its own
+                // macros only while it is in front of a radio in CW - and only while it holds the
+                // focus at that. Now that it opens on any mode, an open keyer over an SSB radio
+                // takes nothing: these four keys still play the radio's voice messages from here,
+                // so the button goes on naming the key that presses it.
+                bool keysAreOurs = cwKeyboard == null || !isCw;
 
                 labelBlock.Text = own.Length > 0 ? own : (keysAreOurs ? key : string.Empty);
                 labelBlock.Foreground = System.Windows.Media.Brushes.Black;
@@ -8122,12 +8132,30 @@ namespace HolyLogger
             // returned, even with the radio sitting in CW the whole time.
             bool cwKeyboardWanted = isCw && isAvailable && !Properties.Settings.Default.isManualMode;
 
-            // The View menu says the same thing the window does: no CW, nothing to key.
-            if (CwKeyboardMenuItem != null) CwKeyboardMenuItem.IsEnabled = cwKeyboardWanted;
+            // THE MENU NO LONGER ASKS ABOUT THE MODE. The keyer opens on any mode now (see
+            // OpenCwKeyboard) because it is where the macros and the keyer's settings are written,
+            // so the only thing left that can stop it opening is the radio not being reachable at
+            // all - which is what OpenCwKeyboard itself refuses on, with a message saying why.
+            if (CwKeyboardMenuItem != null) CwKeyboardMenuItem.IsEnabled = isAvailable;
 
-            if (!cwKeyboardWanted)
+            // The window is told the mode either way, so one opened by hand outside CW says on its
+            // own face that nothing will go out - see CwKeyboardWindow.SetCwMode.
+            if (cwKeyboard != null) cwKeyboard.SetCwMode(isCw);
+
+            if (!isAvailable)
             {
                 CloseCwKeyboard();
+                _cwKeyboardWasWanted = false;
+            }
+            else if (!cwKeyboardWanted)
+            {
+                // LEAVING CW CLOSES IT, BUT ONLY THE LEAVING. This used to fire on the STATE - for as
+                // long as the radio was out of CW - and that is a window which cannot be opened: the
+                // operator pressed Ctrl+K to write a macro and the next ParamsChange, a fraction of a
+                // second later, shut it again. On the edge, the keyer goes as the radio leaves CW,
+                // and a keyer he then opens by hand stays open for as long as he wants it, because
+                // the radio only leaves CW once.
+                if (_cwKeyboardWasWanted) CloseCwKeyboard();
                 _cwKeyboardWasWanted = false;
             }
             else if (!_cwKeyboardWasWanted && IsLoaded && _startupWindowsReady)
