@@ -147,6 +147,14 @@ namespace HolyLogger
         TextBlock clusterCenterLineFreqText = null;   // live VFO frequency shown on the line
         System.Windows.Controls.Primitives.DataGridRowsPresenter clusterLiveScaleRowsHost = null;  // rows panel; carries the off-screen spacer margins
         int clusterLiveScaleAlignRetries = 0;         // guards the layout-not-ready retry loop of the scroll engine
+
+        // Dragging the scale by hand (see ClusterDragTo): armed on the button press, live once the
+        // pointer has moved far enough to mean it.
+        bool _clusterDragArmed = false;
+        bool _clusterDragging = false;
+        Point _clusterDragFrom;
+        double _clusterDragFromOffset = 0;
+        int _clusterDragLastIndex = -1;               // last row sent to the radio, so one send per row
         System.Windows.Threading.DispatcherTimer _centerLineRevealTimer = null;  // debounces revealing the Live Scale readout band until the table layout settles
         bool _centerLineRevealed = false;             // the band is shown only after its centered position has stabilized (no startup flash)
         string clusterPreLiveScaleBandFilterMode = null;  // band-filter mode to restore when Live Scale is turned off
@@ -1504,6 +1512,8 @@ namespace HolyLogger
                     clusterView.LiveSortingProperties.Add("IsNeededCountry");
             }
             spotsGrid.PreviewMouseLeftButtonDown += ClusterSpotsGrid_MouseLeftButtonDown;
+            spotsGrid.PreviewMouseLeftButtonUp += ClusterSpotsGrid_MouseLeftButtonUp;
+            spotsGrid.LostMouseCapture += (s, e) => ClusterDragEnd(false);
             spotsGrid.MouseMove += ClusterSpotsGrid_MouseMove;
             spotsGrid.MouseLeave += ClusterSpotsGrid_MouseLeave;
             // Right-click a spot: the menu that puts it on the Try Again list. PREVIEW, because the
@@ -2460,11 +2470,125 @@ namespace HolyLogger
             QueueWheelTune(target.Value);
         }
 
+        // ── Dragging the scale by hand ────────────────────────────────────────────────────────────
+        //
+        // In Live Scale the list is a frequency scale, so it can be taken hold of and pulled: whichever
+        // spot ends up in the red frame is the station the radio is set to. No pixels-per-kHz rule is
+        // invented for it - the list's own spacing IS the rule, so a crowded stretch of band moves the
+        // radio slowly and an empty one moves it fast, exactly as the list looks.
+        //
+        // NEAREST ROW WINS. Between two spots there is no station to go to, so the row whose center is
+        // closest to the frame is the one taken, and letting go snaps that row into the frame. A drag
+        // therefore always lands on a real spot; the wheel remains the fine tuning between them.
+        //
+        // The measurements come from the same three pieces the auto-scroll uses - the spacer pad on the
+        // rows panel, the row height, and the MEASURED position of the frame - so the row this puts in
+        // the frame is the row the auto-scroll will hold there when the radio reports back.
+        private bool TryClusterScaleGeometry(out ScrollViewer sv, out double pad, out double rowH, out double lineY)
+        {
+            sv = null; pad = 0; rowH = 0; lineY = 0;
+            if (clusterSpotsDataGrid == null) return false;
+
+            sv = clusterSpotsScrollViewer ?? FindVisualChild<ScrollViewer>(clusterSpotsDataGrid);
+            if (sv == null || sv.ViewportHeight <= 0 || sv.CanContentScroll) return false;
+
+            if (clusterLiveScaleRowsHost == null)
+                clusterLiveScaleRowsHost = FindVisualChild<System.Windows.Controls.Primitives.DataGridRowsPresenter>(clusterSpotsDataGrid);
+            if (clusterLiveScaleRowsHost == null) return false;
+            pad = clusterLiveScaleRowsHost.Margin.Top;
+
+            if (clusterSpotsDataGrid.ItemContainerGenerator.ContainerFromIndex(0) is DataGridRow r0 && r0.ActualHeight > 0)
+                rowH = r0.ActualHeight;
+            if (rowH <= 0) return false;
+
+            lineY = sv.ViewportHeight / 2.0;
+            var rowsViewport = FindVisualChild<ScrollContentPresenter>(clusterSpotsDataGrid);
+            if (rowsViewport != null && clusterCenterLineBand != null)
+            {
+                try
+                {
+                    lineY = clusterCenterLineBand.TransformToVisual(rowsViewport)
+                        .Transform(new Point(0, clusterCenterLineBand.ActualHeight / 2.0)).Y;
+                }
+                catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+            }
+            return true;
+        }
+
+        // The scroll offset that puts row i's center in the frame.
+        private double ClusterOffsetForRow(int i, double pad, double rowH, double lineY)
+        {
+            return pad + (i + 0.5) * rowH - lineY;
+        }
+
+        private bool ClusterDragCanStart()
+        {
+            return clusterLiveScaleOn && !_clusterBandHoverActive && CanTuneRadioByWheel();
+        }
+
+        private void ClusterDragTo(double dy, bool letGo)
+        {
+            ScrollViewer sv; double pad, rowH, lineY;
+            if (!TryClusterScaleGeometry(out sv, out pad, out rowH, out lineY)) return;
+
+            int n = clusterSpotsDataGrid.Items.Count;
+            if (n <= 0) return;
+
+            // The list does not run away past its own ends: the frame stays between the first and the
+            // last spot, so there is always a station in it to tune to.
+            double lowest = ClusterOffsetForRow(0, pad, rowH, lineY);
+            double highest = ClusterOffsetForRow(n - 1, pad, rowH, lineY);
+            double offset = _clusterDragFromOffset - dy;          // pull down -> earlier rows (higher kHz)
+            if (offset < lowest) offset = lowest;
+            if (offset > highest) offset = highest;
+            sv.ScrollToVerticalOffset(offset);
+
+            int index = (int)Math.Round((offset + lineY - pad) / rowH - 0.5);
+            if (index < 0) index = 0; else if (index > n - 1) index = n - 1;
+
+            if (letGo) sv.ScrollToVerticalOffset(ClusterOffsetForRow(index, pad, rowH, lineY));
+
+            if (index == _clusterDragLastIndex) return;
+            _clusterDragLastIndex = index;
+
+            var spot = clusterSpotsDataGrid.Items[index] as ClusterSpotViewItem;
+            if (spot == null || spot.FreqMhz <= 0) return;
+            QueueWheelTune(spot.FreqMhz * 1000.0);
+        }
+
+        private void ClusterDragEnd(bool snap)
+        {
+            if (_clusterDragging && snap)
+            {
+                ClusterDragTo(_clusterDragLastDy, true);
+            }
+            _clusterDragArmed = false;
+            _clusterDragging = false;
+            _clusterDragLastIndex = -1;
+            if (clusterSpotsDataGrid != null && clusterSpotsDataGrid.IsMouseCaptured)
+            {
+                clusterSpotsDataGrid.ReleaseMouseCapture();
+            }
+        }
+
+        private double _clusterDragLastDy = 0;
+
+        private void ClusterSpotsGrid_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            bool wasDragging = _clusterDragging;
+            ClusterDragEnd(true);
+            if (wasDragging) e.Handled = true;   // that press was a drag, not a click on a row
+        }
+
         private void ScrollClusterLiveScale()
         {
             // Paused while a band-hover preview owns the table (it shows that band as a normal list, not
             // the VFO-centered Live Scale view). The scroll is re-established when the hover ends.
             if (!clusterLiveScaleOn || _clusterBandHoverActive || clusterSpotsDataGrid == null) return;
+
+            // And paused while the hand is on the list: the operator is choosing where to go, and the
+            // radio's readback of the frequency he has already passed must not pull the list back.
+            if (_clusterDragging) return;
 
             if (clusterSpotsScrollViewer == null)
                 clusterSpotsScrollViewer = FindVisualChild<ScrollViewer>(clusterSpotsDataGrid);
@@ -3083,6 +3207,38 @@ namespace HolyLogger
                 return;
             }
 
+            // The hand on the scale comes first: while it is down, the list is being pulled and none of
+            // the hover work below applies.
+            if (_clusterDragArmed)
+            {
+                if (e.LeftButton != MouseButtonState.Pressed)
+                {
+                    ClusterDragEnd(true);
+                }
+                else
+                {
+                    double dy = e.GetPosition(dataGrid).Y - _clusterDragFrom.Y;
+                    if (!_clusterDragging && Math.Abs(dy) >= 4)
+                    {
+                        _clusterDragging = true;
+                        dataGrid.CaptureMouse();
+
+                        // This press is a drag, so it is not the click that opens QRZ.
+                        if (clusterSingleClickOpenQrzTimer != null) clusterSingleClickOpenQrzTimer.Stop();
+                        clusterPendingQrzCallsign = null;
+                        if (clusterHoverToolTip != null) clusterHoverToolTip.IsOpen = false;
+                        clusterLastHoverToolTipColumn = null;
+                    }
+
+                    if (_clusterDragging)
+                    {
+                        _clusterDragLastDy = dy;
+                        ClusterDragTo(dy, false);
+                        return;
+                    }
+                }
+            }
+
             if (!clusterHoverPopupEnabled)
             {
                 if (clusterHoverToolTip != null)
@@ -3219,6 +3375,24 @@ namespace HolyLogger
             }
 
             DataGridCell cell = FindVisualParent<DataGridCell>(e.OriginalSource as DependencyObject);
+
+            // A press on a spot may turn out to be a drag of the scale. It is only ARMED here - nothing
+            // moves until the pointer has travelled far enough to mean it (see ClusterSpotsGrid_MouseMove),
+            // so an ordinary click, and the double-click that sends the radio to a spot, are untouched.
+            if (cell != null && e.ClickCount == 1 && ClusterDragCanStart())
+            {
+                ScrollViewer sv; double pad, rowH, lineY;
+                if (TryClusterScaleGeometry(out sv, out pad, out rowH, out lineY))
+                {
+                    _clusterDragArmed = true;
+                    _clusterDragging = false;
+                    _clusterDragFrom = e.GetPosition(dataGrid);
+                    _clusterDragFromOffset = sv.VerticalOffset;
+                    _clusterDragLastDy = 0;
+                    _clusterDragLastIndex = -1;
+                }
+            }
+
             if (cell == null)
             {
                 return;
