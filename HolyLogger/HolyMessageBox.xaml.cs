@@ -27,6 +27,12 @@ namespace HolyLogger
         // caller that asks a plain question has to know this exists.
         public int Choice { get; private set; }
 
+        // CLOSED WITHOUT ANSWERING - the X or Esc, rather than any of the buttons. Starts true and is
+        // cleared by the button handlers, so a window that is simply shut is never read as a pressed
+        // button. Callers that ask a question with consequences (open another window, delete, upload)
+        // can then leave everything alone instead of doing what the last button would have done.
+        public bool Dismissed { get; private set; } = true;
+
         // **BOLD** in a message becomes bold on screen. Menu paths and button names have to stand out
         // from the sentence around them - "select Tools > Log Workshop and press Log Verifier" is three
         // things to find in a program, buried in prose - and a message box that takes only a flat
@@ -365,10 +371,10 @@ namespace HolyLogger
             return table;
         }
 
-        private void OkBtn_Click(object sender, RoutedEventArgs e) => Close();
-        private void YesBtn_Click(object sender, RoutedEventArgs e) { Confirmed = true; Choice = 1; Close(); }
-        private void ExtraBtn_Click(object sender, RoutedEventArgs e) { Confirmed = false; Choice = 2; Close(); }
-        private void NoBtn_Click(object sender, RoutedEventArgs e) { Confirmed = false; Choice = 0; Close(); }
+        private void OkBtn_Click(object sender, RoutedEventArgs e) { Dismissed = false; Close(); }
+        private void YesBtn_Click(object sender, RoutedEventArgs e) { Confirmed = true; Choice = 1; Dismissed = false; Close(); }
+        private void ExtraBtn_Click(object sender, RoutedEventArgs e) { Confirmed = false; Choice = 2; Dismissed = false; Close(); }
+        private void NoBtn_Click(object sender, RoutedEventArgs e) { Confirmed = false; Choice = 0; Dismissed = false; Close(); }
 
         // ── Static helpers ────────────────────────────────────────────────
 
@@ -407,6 +413,25 @@ namespace HolyLogger
             dlg.FitWidthToButtons();   // the words just set may need more room than the text did
 
             dlg.ShowDialog();
+            return dlg.Confirmed;
+        }
+
+        // THE SAME QUESTION, PLUS "HE DIDN'T ANSWER". Identical to ShowConfirm above, except that
+        // closing the window with the X or Esc is reported through dismissed instead of being folded
+        // into the No button. Use this whenever No does something on its own (opens a window, starts
+        // a job): shutting a question must be allowed to mean "nothing for now".
+        public static bool ShowConfirm(string message, string title, HolyMsgType type, Window owner,
+            out bool dismissed, string yesText = null, string noText = null, double width = 0)
+        {
+            var dlg = new HolyMessageBox(message, title, type, owner, confirm: true, width);
+
+            if (!string.IsNullOrWhiteSpace(yesText)) dlg.YesBtn.Content = yesText;
+            if (!string.IsNullOrWhiteSpace(noText)) dlg.NoBtn.Content = noText;
+
+            dlg.FitWidthToButtons();
+            dlg.ShowDialog();
+
+            dismissed = dlg.Dismissed;
             return dlg.Confirmed;
         }
 

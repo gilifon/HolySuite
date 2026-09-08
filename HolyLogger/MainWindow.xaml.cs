@@ -13514,6 +13514,11 @@ namespace HolyLogger
 
         private void TB_MyCallsign_LostFocus(object sender, RoutedEventArgs e)
         {
+            // Not inside CommitStationCallsignEdit: that one only runs when the callsign was actually
+            // changed, while an empty My Locator is worth filling on every leave of the box - e.g. the
+            // callsign was already set up long ago and the locator was cleared to be re-fetched.
+            FillMyLocatorFromQrz(TB_MyCallsign.Text);
+
             CommitStationCallsignEdit();
         }
 
@@ -13539,6 +13544,65 @@ namespace HolyLogger
             RefreshCallsignLockState();
 
             ShowStationCallsignServicesAlert(now);
+        }
+
+        // Fills My Locator from the station callsign's own QRZ.com record, and only while the box is
+        // still empty. This is for setting HolyLogger up: type My Callsign, and the grid square you
+        // published on QRZ is put in for you instead of being looked up by hand. A locator that is
+        // already there is never touched - what the operator typed always wins - and the box stays
+        // editable, so it can be corrected at any time. Silent by design: with no QRZ login (Options
+        // > QRZ Service) and with no network, the box is simply left empty, exactly as before.
+        private async void FillMyLocatorFromQrz(string myCall)
+        {
+            if (TB_MyLocator == null || TB_MyCallsign == null) return;
+            if (!string.IsNullOrWhiteSpace(TB_MyLocator.Text)) return;
+            if (string.IsNullOrWhiteSpace(myCall) || myCall.Trim().Length < 3) return;
+            if (!isNetworkAvailable) return;
+
+            myCall = myCall.Trim();
+
+            try
+            {
+                if (string.IsNullOrWhiteSpace(SessionKey))
+                    _SessionKey = await Helper.LoginToQRZAsync();
+                if (string.IsNullOrWhiteSpace(SessionKey)) return;
+
+                // Started on a background thread for the same reason as the DX-callsign lookup: on
+                // .NET Framework the proxy is resolved on the thread that STARTS the request, and
+                // with "automatically detect proxy settings" on that can stall the UI thread.
+                string bareCall = Services.getBareCallsign(myCall);
+                var response = await Task.Run(() => _sharedHttpClient.GetAsync(
+                    "https://xmldata.qrz.com/xml/current/?s=" + SessionKey + ";callsign=" + bareCall));
+                string body = await response.Content.ReadAsStringAsync();
+
+                XDocument xDoc = XDocument.Parse(body);
+                XNamespace ns = xDoc.Root.GetDefaultNamespace();
+                XElement gridEl = xDoc.Root.Descendants(ns + "grid").FirstOrDefault();
+                if (gridEl == null || string.IsNullOrWhiteSpace(gridEl.Value)) return;
+
+                // Same shape check the My Locator box itself applies (MaidenheadLocator.Legal), so a
+                // malformed QRZ grid is dropped rather than written into a field that would then
+                // fail its own validation the next time focus leaves it.
+                string grid = gridEl.Value.Trim().ToUpperInvariant();
+                if (!MaidenheadLocator.IsValidLocator(grid)) return;
+
+                // The operator may have typed a locator, or changed the callsign again, while the
+                // lookup was in flight. Either way, leave what is on screen alone.
+                if (!string.IsNullOrWhiteSpace(TB_MyLocator.Text)) return;
+                if (!string.Equals((TB_MyCallsign.Text ?? string.Empty).Trim(), myCall, StringComparison.OrdinalIgnoreCase)) return;
+
+                TB_MyLocator.Text = grid;
+
+                // The box writes back to its setting on LostFocus, and this set never moves focus, so
+                // push it to the setting by hand - otherwise the locator is gone on the next start.
+                var binding = TB_MyLocator.GetBindingExpression(System.Windows.Controls.TextBox.TextProperty);
+                if (binding != null) binding.UpdateSource();
+                try { Properties.Settings.Default.Save(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+            }
+            catch (System.Exception swallowed)
+            {
+                Log.Swallow(swallowed);   // no grid from QRZ -> the box just stays empty
+            }
         }
 
         // ── Station-callsign ↔ active-log identity guard ──────────────────────────────────────────
@@ -13583,13 +13647,31 @@ namespace HolyLogger
             // Two ways out, and both are here in the window: put this callsign into the log he is
             // already in, or go and find/create a log for it. Cancelling is closing the Log Manager
             // without choosing - the box simply stays locked until the question is answered.
+            bool dismissed;
             bool addHere = HolyMessageBox.ShowConfirm(
                 "The log you have open is for \"" + idCall + "\", and it has no QSOs made as \"" + now + "\".\n\n" +
                 "If " + now + " is your callsign now, add it to this log — the log keeps everything it " +
                 "already holds and " + now + " becomes the callsign it is for. If " + now + " belongs " +
                 "somewhere else, choose or create a log for it instead.",
                 "Which log is " + now + " logging into?", HolyMsgType.Warning, this,
+                out dismissed,
                 yesText: "Add " + now + " to this log", noText: "Choose a log…");
+
+            // CLOSED WITH THE X = NEITHER ANSWER. He is still deciding, or he mistyped the callsign
+            // and wants to correct it. Opening the Log Manager on top of that (what "Choose a log"
+            // does) takes the keyboard away from the box he was editing and buries the typo behind a
+            // second window. So nothing is opened, and the caret goes back to the callsign box. The DX
+            // box stays locked meanwhile - the question was not answered, only put off.
+            if (dismissed)
+            {
+                RefreshCallsignLockState();
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    TB_MyCallsign.Focus();
+                    TB_MyCallsign.CaretIndex = (TB_MyCallsign.Text ?? string.Empty).Length;
+                }), System.Windows.Threading.DispatcherPriority.Input);
+                return true;
+            }
 
             if (addHere)
             {
@@ -13832,9 +13914,12 @@ namespace HolyLogger
             }
             else
             {
-                // On a deliberate change, surface anything worth knowing — including the QRZ
-                // single-logbook caveat.
-                if (registered && !qrzOn) return;
+                // A DELIBERATE CHANGE IS JUDGED THE SAME WAY: only interrupt when a service in use
+                // cannot handle this callsign. The QRZ single-logbook caveat used to open this window
+                // on its own here, so every callsign change was answered by a window whose rows were
+                // all green except a standing note about how QRZ works - nothing was set up wrong. It
+                // still shows as a row whenever the window opens for a real gap.
+                if (registered) return;
             }
 
             string eqslMsg = !useEqsl
