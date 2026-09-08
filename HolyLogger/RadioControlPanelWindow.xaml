@@ -207,8 +207,16 @@
             <Grid x:Name="RttySlot" Grid.Column="0" VerticalAlignment="Center"/>
             <Grid x:Name="FmSlot" Grid.Column="2" VerticalAlignment="Center"/>
             <StackPanel Grid.Column="1" HorizontalAlignment="Center">
-                <TextBlock x:Name="TxRxLabel" Text="TX/RX" FontSize="14" FontWeight="Bold"
-                           HorizontalAlignment="Center" Foreground="{DynamicResource TextBrush}"/>
+                <!-- Three runs rather than one string, because the two words are coloured the way the
+                     lamp below colours them: TX in the lamp's red, RX in the lamp's green, the slash
+                     in the plain text colour. The runs sit on one line with no space between them -
+                     whitespace between Runs in XAML becomes a space in the rendered text, and the
+                     label has to read "TX/RX", not "TX / RX". Text and colours are set again in
+                     ShowTxRx, which is also what turns the whole thing into a red "NO RADIO". -->
+                <TextBlock x:Name="TxRxLabel" FontSize="14" FontWeight="Bold"
+                           HorizontalAlignment="Center" Foreground="{DynamicResource TextBrush}"><Run
+                           x:Name="TxWord" Text="TX" Foreground="#D32F2F"/><Run x:Name="TxRxSlash"
+                           Text="/"/><Run x:Name="RxWord" Text="RX" Foreground="#00A650"/></TextBlock>
                 <!-- No Width of its own: stretched inside a stack that is only as wide as the words
                      above it, the lamp comes out exactly the length of the label. -->
                 <Border x:Name="TxRxLamp" Height="14" CornerRadius="2" Margin="0,3,0,0"

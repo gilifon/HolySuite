@@ -5,6 +5,8 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+// For the Run elements inside the TX/RX label - Foreground is TextElement's, not TextBlock's.
+using System.Windows.Documents;
 using System.Windows.Input;
 
 namespace HolyLogger
@@ -368,15 +370,40 @@ namespace HolyLogger
 
             // With the window a fixed size there is no room for a line of explanation, so the label
             // itself carries it: a dark lamp over "NO RADIO" says why nothing in the panel answers.
-            TxRxLabel.Text = _rigOnline ? "TX/RX" : "NO RADIO";
-
-            // AND IT SAYS IT IN RED. A dark lamp is the absence of something, which is easy to look
-            // straight past; the words in the theme's own red are not. TX/RX goes back to the plain
-            // text colour - it is a heading over a working lamp, not a warning.
             //
-            // SetResourceReference rather than a brush taken once: the panel is open across scheme
-            // changes, and a colour copied out of the palette would keep the old scheme's red.
-            TxRxLabel.SetResourceReference(TextBlock.ForegroundProperty, _rigOnline ? "TextBrush" : "Danger");
+            // The label is three runs, not one string, so that each word wears its own state's
+            // colour - TX in the same red the lamp goes when transmitting, RX in the same green it
+            // goes when listening. The words are coloured always, not only when that state is
+            // current: they are a key to the lamp, and a key that only appears once you already
+            // know what the colour means is no key at all. Reusing TxLit/RxLit rather than a second
+            // pair of literals is what keeps the two agreeing after anyone retunes either.
+            if (_rigOnline)
+            {
+                TxWord.Text = "TX";
+                TxRxSlash.Text = "/";
+                RxWord.Text = "RX";
+
+                TxWord.Foreground = TxLit;
+                RxWord.Foreground = RxLit;
+
+                // Only the slash follows the theme - see below for why it is a resource reference.
+                TxRxSlash.SetResourceReference(Run.ForegroundProperty, "TextBrush");
+            }
+            else
+            {
+                // AND IT SAYS IT IN RED. A dark lamp is the absence of something, which is easy to
+                // look straight past; the words in the theme's own red are not. Emptying the other
+                // two runs rather than hiding them keeps the lamp exactly as wide as whichever
+                // wording is showing, which is the whole reason the label and lamp share a stack.
+                TxWord.Text = "NO RADIO";
+                TxRxSlash.Text = string.Empty;
+                RxWord.Text = string.Empty;
+
+                // SetResourceReference rather than a brush taken once: the panel is open across
+                // scheme changes, and a colour copied out of the palette would keep the old
+                // scheme's red.
+                TxWord.SetResourceReference(Run.ForegroundProperty, "Danger");
+            }
         }
 
         // ---- the operator presses something ------------------------------------------------
