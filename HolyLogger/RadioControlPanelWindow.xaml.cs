@@ -68,10 +68,67 @@ namespace HolyLogger
             new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x00, 0xA6, 0x50));
 
         // Lamp colours. Red is the same red as a lit CW button, green is the panel's own.
+        private static readonly System.Windows.Media.Color TxLitColor =
+            System.Windows.Media.Color.FromRgb(0xD3, 0x2F, 0x2F);
+        private static readonly System.Windows.Media.Color RxLitColor =
+            System.Windows.Media.Color.FromRgb(0x00, 0xA6, 0x50);
         private static readonly System.Windows.Media.Brush TxLit =
-            new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0xD3, 0x2F, 0x2F));
+            new System.Windows.Media.SolidColorBrush(TxLitColor);
         private static readonly System.Windows.Media.Brush RxLit =
-            new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x00, 0xA6, 0x50));
+            new System.Windows.Media.SolidColorBrush(RxLitColor);
+
+        // SAME COLOUR, DIFFERENT AMOUNT OF IT. The lamp is a solid fill and reaches its colour
+        // exactly. The two words above it are thin strokes, and most of a stroke's pixels are edges
+        // blended into whatever is behind them - so the SAME brush comes out lighter in the letters
+        // than in the bar. Rendered and measured: "RX" in #00A650 averages #2CB46E, a lighter and
+        // yellower green, which is why the label and the lamp read as two greens while being one.
+        //
+        // So the words are given a colour that AVERAGES to the lamp's rather than one that equals
+        // it. Coverage came out at about 0.83 of full for this font at this size and weight; the
+        // remaining 0.17 of each pixel is the background, which is why this READS the background
+        // instead of assuming it. The panel follows the colour scheme, and a compensation worked out
+        // against the light one would be wrong against the dark one - and wrong the other way round,
+        // too light instead of too dark.
+        private const double GlyphCoverage = 0.83;
+
+        private static System.Windows.Media.Color _wordBackground;
+        private static readonly System.Collections.Generic.Dictionary<System.Windows.Media.Color, System.Windows.Media.Brush> _wordBrushes =
+            new System.Collections.Generic.Dictionary<System.Windows.Media.Color, System.Windows.Media.Brush>();
+
+        private System.Windows.Media.Brush WordThatReadsAs(System.Windows.Media.Color target)
+        {
+            System.Windows.Media.Color background;
+            try { background = ThemeManager.Brush("WindowBg").Color; }
+            catch (Exception swallowed) { Log.Swallow(swallowed); return new System.Windows.Media.SolidColorBrush(target); }
+
+            // Worked out once per colour, not on every rig poll - but thrown away the moment the
+            // scheme changes, because every answer in it was computed against the old background.
+            if (background != _wordBackground)
+            {
+                _wordBackground = background;
+                _wordBrushes.Clear();
+            }
+
+            System.Windows.Media.Brush cached;
+            if (_wordBrushes.TryGetValue(target, out cached)) return cached;
+
+            var brush = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(
+                Compensate(target.R, background.R),
+                Compensate(target.G, background.G),
+                Compensate(target.B, background.B)));
+            brush.Freeze();
+            _wordBrushes[target] = brush;
+            return brush;
+        }
+
+        // rendered = coverage*ink + (1-coverage)*background, solved for the ink that renders as the
+        // target. Clamped, because a target far enough from the background cannot be reached at all
+        // through 83% coverage - there the honest answer is "as far as this channel goes".
+        private static byte Compensate(byte target, byte background)
+        {
+            double ink = (target - (1.0 - GlyphCoverage) * background) / GlyphCoverage;
+            return (byte)Math.Max(0, Math.Min(255, Math.Round(ink)));
+        }
 
         private RadioBandPreset _currentBand;
         private bool _rigOnline;
@@ -383,8 +440,9 @@ namespace HolyLogger
                 TxRxSlash.Text = "/";
                 RxWord.Text = "RX";
 
-                TxWord.Foreground = TxLit;
-                RxWord.Foreground = RxLit;
+                // NOT TxLit/RxLit THEMSELVES - a colour that READS as them. See WordThatReadsAs.
+                TxWord.Foreground = WordThatReadsAs(TxLitColor);
+                RxWord.Foreground = WordThatReadsAs(RxLitColor);
 
                 // Only the slash follows the theme - see below for why it is a resource reference.
                 TxRxSlash.SetResourceReference(Run.ForegroundProperty, "TextBrush");
