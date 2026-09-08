@@ -1839,7 +1839,14 @@
         <xctk:DateTimeUpDown x:Name="TP_Time" Format="Custom" FormatString="HH:mm" HorizontalAlignment="Left" TextAlignment="Left" Margin="496,86,0,0" Grid.Row="1" VerticalAlignment="Top" Width="64" FontSize="16" Height="28" IsTabStop="False" Background="{DynamicResource ControlBg}" Foreground="{DynamicResource TextBrush}" BorderBrush="#ABADB3" BorderThickness="1" />
 
 
-        <Border x:Name="ContestDividerLine" BorderBrush="Gray" BorderThickness="1" HorizontalAlignment="Left" Height="1" Margin="10,78,0,0" VerticalAlignment="Top" Width="657" Grid.Row="1" />
+        <!-- 2px thick, and 3px lower than it used to be. BorderThickness names the top edge only: at
+             Height="2" a plain "1" would draw a top AND a bottom hairline with nothing between them,
+             which is two thin lines rather than one thick one.
+             RUNS ALMOST THE FULL WIDTH OF THE FORM: FormFrame is 680 wide with a 3px border, so the
+             inside is x 3 to 677, and 5..675 leaves the same 2px breath at each end. It used to stop
+             10px short on the right and 7 on the left, which read as a line that had not been
+             finished rather than one drawn to the frame. -->
+        <Border x:Name="ContestDividerLine" BorderBrush="Gray" BorderThickness="0,2,0,0" HorizontalAlignment="Left" Height="2" Margin="5,81,0,0" VerticalAlignment="Top" Width="670" Grid.Row="1" />
         <!-- "You send" band: shown only in contest mode, in the strip freed when the divider drops. It
              mirrors the received frame — a coloured background panel (ContestSendBand) with a label
              (L_SendLabel) and the send cells (ContestTxPanel) laid on top. Background colour is
