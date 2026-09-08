@@ -346,6 +346,8 @@ namespace HolyLogger
             // reassuring thing the menu could possibly say, and the least true.
             catch (Exception ex) { Log.Swallow(ex); pending = 0; }
 
+            SyncUploadStateInMemory("eqsl", (q, v) => q.EqslStatus = v);
+
             if (SendQueueToEqslMenuItem != null)
             {
                 // Build the header with just the word "eQSL" in bold; always append the count
@@ -394,11 +396,53 @@ namespace HolyLogger
             }
         }
 
+        // THE ROWS ON SCREEN MUST SAY WHAT THE DATABASE SAYS.
+        //
+        // Queueing, clearing, dismissing, re-queueing and uploading all write the upload state straight
+        // to the database. The QSO objects the log table and the Log Workshop are holding know nothing
+        // about it, and the Workshop's "Uploaded to:" filter reads exactly those objects - so queueing a
+        // hundred QSOs, clearing the queue and searching for them again answered from a snapshot taken
+        // when the log was opened, and came back empty.
+        //
+        // Called from each service's menu-count refresh, which every one of those operations already
+        // ends with. It reads the two small state columns through their index - never the QSO rows - so
+        // being called often costs nothing worth measuring. Anything in neither set has been sent.
+        private void SyncUploadStateInMemory(string service, Action<QSO, int> put)
+        {
+            try
+            {
+                if (dal == null || Qsos == null || Qsos.Count == 0) return;
+
+                var waiting = dal.GetQsoIdsByUploadStatus(service, 0);
+                var notSent = dal.GetQsoIdsByUploadStatus(service, 2);
+
+                foreach (var q in Qsos)
+                {
+                    if (q == null) continue;
+                    put(q, waiting.Contains(q.id) ? 0 : notSent.Contains(q.id) ? 2 : 1);
+                }
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        // ANOTHER WINDOW CHANGED A QUEUE. The Log Workshop writes upload states straight to the database
+        // and has no way to tell this window about it, so the Tools menu went on showing the count it
+        // read at startup: 1,908 QSOs were queued and the menu still said 304. Each refresher also brings
+        // the QSOs on screen back in step, so one call settles both.
+        public void RefreshUploadQueueCounts()
+        {
+            try { UpdateLotwMenuCount(); } catch (Exception ex) { Log.Swallow(ex); }
+            try { UpdateQrzMenuCount(); } catch (Exception ex) { Log.Swallow(ex); }
+            try { UpdateEqslQueueIndicator(); } catch (Exception ex) { Log.Swallow(ex); }
+            try { UpdateClublogMenuCount(); } catch (Exception ex) { Log.Swallow(ex); }
+        }
+
         private void UpdateLotwMenuCount()
         {
             try
             {
-                int count = dal?.GetPendingLotwQsos()?.Count ?? 0;
+                int count = dal?.GetPendingLotwCount() ?? 0;
+                SyncUploadStateInMemory("lotw", (q, v) => q.LotwStatus = v);
                 var header = new System.Windows.Controls.TextBlock();
                 header.Inlines.Add(new System.Windows.Documents.Run("Upload Queue to "));
                 header.Inlines.Add(new System.Windows.Documents.Run("LoTW") { FontWeight = System.Windows.FontWeights.Bold });

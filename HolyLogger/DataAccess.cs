@@ -3123,7 +3123,7 @@ Environment.NewLine +
             {
             var list = new List<QSO>();
             if (con == null || con.State != ConnectionState.Open) return list;
-            string stm = "SELECT *, (SELECT name FROM logs WHERE logs.Id = qso.log_id) AS log_name FROM qso WHERE qrz_status = 0 ORDER BY date ASC, time ASC, Id ASC";
+            string stm = "SELECT *, (SELECT name FROM logs WHERE logs.Id = qso.log_id) AS log_name FROM qso WHERE qrz_status = 0 AND log_id = " + ActiveLogId + " ORDER BY date ASC, time ASC, Id ASC";
             using (SQLiteCommand cmd = new SQLiteCommand(stm, con))
             using (SQLiteDataReader rdr = cmd.ExecuteReader())
             {
@@ -3172,7 +3172,7 @@ Environment.NewLine +
             lock (_dbLock)
             {
             if (con == null || con.State != ConnectionState.Open) return 0;
-            using (SQLiteCommand cmd = new SQLiteCommand("SELECT count(Id) FROM qso WHERE qrz_status = 0", con))
+            using (SQLiteCommand cmd = new SQLiteCommand("SELECT count(Id) FROM qso WHERE qrz_status = 0 AND log_id = " + ActiveLogId, con))
                 return Convert.ToInt32(cmd.ExecuteScalar());
             }
         }
@@ -3203,7 +3203,7 @@ Environment.NewLine +
             {
             var list = new List<QSO>();
             if (con == null || con.State != ConnectionState.Open) return list;
-            string stm = "SELECT *, (SELECT name FROM logs WHERE logs.Id = qso.log_id) AS log_name FROM qso WHERE clublog_status = 0 ORDER BY date ASC, time ASC, Id ASC";
+            string stm = "SELECT *, (SELECT name FROM logs WHERE logs.Id = qso.log_id) AS log_name FROM qso WHERE clublog_status = 0 AND log_id = " + ActiveLogId + " ORDER BY date ASC, time ASC, Id ASC";
             using (SQLiteCommand cmd = new SQLiteCommand(stm, con))
             using (SQLiteDataReader rdr = cmd.ExecuteReader())
             {
@@ -3252,7 +3252,7 @@ Environment.NewLine +
             lock (_dbLock)
             {
             if (con == null || con.State != ConnectionState.Open) return 0;
-            using (SQLiteCommand cmd = new SQLiteCommand("SELECT count(Id) FROM qso WHERE clublog_status = 0", con))
+            using (SQLiteCommand cmd = new SQLiteCommand("SELECT count(Id) FROM qso WHERE clublog_status = 0 AND log_id = " + ActiveLogId, con))
                 return Convert.ToInt32(cmd.ExecuteScalar());
             }
         }
@@ -3283,7 +3283,7 @@ Environment.NewLine +
             // Not-yet-sent QSOs whose station callsign is in the eQSL accounts table (the opt-in list).
             // QSOs under a callsign that isn't in the table are intentionally left out (the user chose
             // not to upload them).
-            string stm = "SELECT *, (SELECT name FROM logs WHERE logs.Id = qso.log_id) AS log_name FROM qso WHERE eqsl_status = 0 AND my_callsign IN (SELECT callsign FROM eqsl_accounts) ORDER BY date ASC, time ASC, Id ASC";
+            string stm = "SELECT *, (SELECT name FROM logs WHERE logs.Id = qso.log_id) AS log_name FROM qso WHERE eqsl_status = 0 AND log_id = " + ActiveLogId + " AND my_callsign IN (SELECT callsign FROM eqsl_accounts) ORDER BY date ASC, time ASC, Id ASC";
             using (SQLiteCommand cmd = new SQLiteCommand(stm, con))
             using (SQLiteDataReader rdr = cmd.ExecuteReader())
             {
@@ -3332,7 +3332,7 @@ Environment.NewLine +
             lock (_dbLock)
             {
             if (con == null || con.State != ConnectionState.Open) return 0;
-            using (SQLiteCommand cmd = new SQLiteCommand("SELECT count(Id) FROM qso WHERE eqsl_status = 0 AND my_callsign IN (SELECT callsign FROM eqsl_accounts)", con))
+            using (SQLiteCommand cmd = new SQLiteCommand("SELECT count(Id) FROM qso WHERE eqsl_status = 0 AND log_id = " + ActiveLogId + " AND my_callsign IN (SELECT callsign FROM eqsl_accounts)", con))
                 return Convert.ToInt32(cmd.ExecuteScalar());
             }
         }
@@ -4926,6 +4926,11 @@ Environment.NewLine +
             catch (Exception ex) { Log.Swallow(ex); }   // optimization only
         }
 
+        // EVERY QUEUE IN THIS FILE IS THE ACTIVE LOG'S QUEUE. A queue counted across all logs told the
+        // operator he had 304 QSOs waiting while he was looking at a log that had none of them - they
+        // belonged to a log he had not opened for months, and could not be signed from where he stood.
+        // Pending lists, counts, clearing, dismissing and re-queueing all follow the log on screen.
+        //
         // Returns the QSOs still waiting to be uploaded to LoTW (status 0), oldest first.
         public List<QSO> GetPendingLotwQsos()
         {
@@ -4933,7 +4938,7 @@ Environment.NewLine +
             {
             var list = new List<QSO>();
             if (con == null || con.State != ConnectionState.Open) return list;
-            string stm = "SELECT *, (SELECT name FROM logs WHERE logs.Id = qso.log_id) AS log_name FROM qso WHERE lotw_status = 0 ORDER BY date ASC, time ASC, Id ASC";
+            string stm = "SELECT *, (SELECT name FROM logs WHERE logs.Id = qso.log_id) AS log_name FROM qso WHERE lotw_status = 0 AND log_id = " + ActiveLogId + " ORDER BY date ASC, time ASC, Id ASC";
             using (SQLiteCommand cmd = new SQLiteCommand(stm, con))
             using (SQLiteDataReader rdr = cmd.ExecuteReader())
             {
@@ -4982,11 +4987,91 @@ Environment.NewLine +
             lock (_dbLock)
             {
             if (con == null || con.State != ConnectionState.Open) return 0;
-            using (var cmd = new SQLiteCommand("SELECT count(Id) FROM qso WHERE date >= @d", con))
+            using (var cmd = new SQLiteCommand("SELECT count(Id) FROM qso WHERE date >= @d AND log_id = " + ActiveLogId, con))
             {
                 cmd.Parameters.Add(new SQLiteParameter("@d", fromDate));
                 return Convert.ToInt32(cmd.ExecuteScalar());
             }
+            }
+        }
+
+        // Puts many QSOs into one upload state in a SINGLE transaction. One UPDATE per QSO, each
+        // committed on its own, is what made queueing 1,908 QSOs from the Log Workshop take long enough
+        // to look stuck: SQLite pays for a commit every time. Returns how many rows were written.
+        public int SetUploadStatusForMany(IEnumerable<int> ids, string service, int status)
+        {
+            lock (_dbLock)
+            {
+            if (con == null || con.State != ConnectionState.Open || ids == null) return 0;
+
+            // The column is chosen here, from a fixed list, and never taken from the caller as text that
+            // reaches SQL.
+            string column;
+            switch ((service ?? string.Empty).ToLowerInvariant())
+            {
+                case "lotw": column = "lotw_status"; break;
+                case "qrz": column = "qrz_status"; break;
+                case "eqsl": column = "eqsl_status"; break;
+                case "clublog": column = "clublog_status"; break;
+                default: return 0;
+            }
+
+            int written = 0;
+            try
+            {
+                using (var transaction = con.BeginTransaction())
+                using (var cmd = new SQLiteCommand("UPDATE qso SET " + column + " = @s WHERE Id = @id", con, transaction))
+                {
+                    var idParam = new SQLiteParameter("@id", 0);
+                    cmd.Parameters.Add(new SQLiteParameter("@s", status));
+                    cmd.Parameters.Add(idParam);
+                    foreach (int id in ids)
+                    {
+                        idParam.Value = id;
+                        written += cmd.ExecuteNonQuery();
+                    }
+                    transaction.Commit();
+                }
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+            return written;
+            }
+        }
+
+        // The ids of every QSO in a given upload state for one service - 0 waiting, 1 sent, 2 taken out
+        // of the queue. Each of the four state columns is indexed, so this reads the index and never the
+        // QSO rows themselves: the whole point is that it can be called after every queue change without
+        // costing what re-reading a 28,000-QSO log costs.
+        public HashSet<int> GetQsoIdsByUploadStatus(string service, int status)
+        {
+            lock (_dbLock)
+            {
+            var ids = new HashSet<int>();
+            if (con == null || con.State != ConnectionState.Open) return ids;
+
+            // The column name is chosen here, from a fixed list, and never taken from the caller as text
+            // that reaches SQL.
+            string column;
+            switch ((service ?? string.Empty).ToLowerInvariant())
+            {
+                case "lotw": column = "lotw_status"; break;
+                case "qrz": column = "qrz_status"; break;
+                case "eqsl": column = "eqsl_status"; break;
+                case "clublog": column = "clublog_status"; break;
+                default: return ids;
+            }
+
+            try
+            {
+                using (var cmd = new SQLiteCommand("SELECT Id FROM qso WHERE " + column + " = @s AND log_id = " + ActiveLogId, con))
+                {
+                    cmd.Parameters.Add(new SQLiteParameter("@s", status));
+                    using (var rdr = cmd.ExecuteReader())
+                        while (rdr.Read()) ids.Add(Convert.ToInt32(rdr.GetValue(0)));
+                }
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+            return ids;
             }
         }
 
@@ -4996,7 +5081,7 @@ Environment.NewLine +
             lock (_dbLock)
             {
             if (con == null || con.State != ConnectionState.Open) return 0;
-            using (SQLiteCommand cmd = new SQLiteCommand("SELECT count(Id) FROM qso WHERE lotw_status = 0", con))
+            using (SQLiteCommand cmd = new SQLiteCommand("SELECT count(Id) FROM qso WHERE lotw_status = 0 AND log_id = " + ActiveLogId, con))
                 return Convert.ToInt32(cmd.ExecuteScalar());
             }
         }
@@ -5023,7 +5108,7 @@ Environment.NewLine +
             lock (_dbLock)
             {
             if (con == null || con.State != ConnectionState.Open) return 0;
-            using (SQLiteCommand cmd = new SQLiteCommand("UPDATE qso SET lotw_status = 0 WHERE date >= @d", con))
+            using (SQLiteCommand cmd = new SQLiteCommand("UPDATE qso SET lotw_status = 0 WHERE date >= @d AND log_id = " + ActiveLogId, con))
             {
                 cmd.Parameters.Add(new SQLiteParameter("@d", fromDate));
                 return cmd.ExecuteNonQuery();
@@ -5039,7 +5124,7 @@ Environment.NewLine +
             lock (_dbLock)
             {
             if (con == null || con.State != ConnectionState.Open) return 0;
-            using (SQLiteCommand cmd = new SQLiteCommand("UPDATE qso SET lotw_status = 2 WHERE lotw_status = 0", con))
+            using (SQLiteCommand cmd = new SQLiteCommand("UPDATE qso SET lotw_status = 2 WHERE lotw_status = 0 AND log_id = " + ActiveLogId, con))
                 return cmd.ExecuteNonQuery();
             }
         }
@@ -5053,7 +5138,7 @@ Environment.NewLine +
             {
             if (con == null || con.State != ConnectionState.Open) return 0;
             using (SQLiteCommand cmd = new SQLiteCommand(
-                "UPDATE qso SET eqsl_status = 2 WHERE eqsl_status = 0 AND my_callsign IN (SELECT callsign FROM eqsl_accounts)", con))
+                "UPDATE qso SET eqsl_status = 2 WHERE eqsl_status = 0 AND log_id = " + ActiveLogId + " AND my_callsign IN (SELECT callsign FROM eqsl_accounts)", con))
                 return cmd.ExecuteNonQuery();
             }
         }
@@ -5065,7 +5150,7 @@ Environment.NewLine +
             lock (_dbLock)
             {
             if (con == null || con.State != ConnectionState.Open) return 0;
-            using (SQLiteCommand cmd = new SQLiteCommand("UPDATE qso SET qrz_status = 2 WHERE qrz_status = 0", con))
+            using (SQLiteCommand cmd = new SQLiteCommand("UPDATE qso SET qrz_status = 2 WHERE qrz_status = 0 AND log_id = " + ActiveLogId, con))
                 return cmd.ExecuteNonQuery();
             }
         }
@@ -5077,7 +5162,7 @@ Environment.NewLine +
             lock (_dbLock)
             {
             if (con == null || con.State != ConnectionState.Open) return 0;
-            using (SQLiteCommand cmd = new SQLiteCommand("UPDATE qso SET clublog_status = 2 WHERE clublog_status = 0", con))
+            using (SQLiteCommand cmd = new SQLiteCommand("UPDATE qso SET clublog_status = 2 WHERE clublog_status = 0 AND log_id = " + ActiveLogId, con))
                 return cmd.ExecuteNonQuery();
             }
         }
@@ -5090,7 +5175,7 @@ Environment.NewLine +
             {
             var list = new List<QSO>();
             if (con == null || con.State != ConnectionState.Open) return list;
-            string stm = "SELECT Id, date, time, dx_callsign, band, mode, frequency, (SELECT name FROM logs WHERE logs.Id = qso.log_id) AS log_name FROM qso WHERE clublog_status = 2 ORDER BY date DESC, time DESC, Id DESC";
+            string stm = "SELECT Id, date, time, dx_callsign, band, mode, frequency, (SELECT name FROM logs WHERE logs.Id = qso.log_id) AS log_name FROM qso WHERE clublog_status = 2 AND log_id = " + ActiveLogId + " ORDER BY date DESC, time DESC, Id DESC";
             using (var cmd = new SQLiteCommand(stm, con))
             using (var rdr = cmd.ExecuteReader())
             {
@@ -5119,7 +5204,7 @@ Environment.NewLine +
             lock (_dbLock)
             {
             if (con == null || con.State != ConnectionState.Open) return 0;
-            using (var cmd = new SQLiteCommand("UPDATE qso SET clublog_status = 0 WHERE clublog_status = 2", con))
+            using (var cmd = new SQLiteCommand("UPDATE qso SET clublog_status = 0 WHERE clublog_status = 2 AND log_id = " + ActiveLogId, con))
                 return cmd.ExecuteNonQuery();
             }
         }
@@ -5132,7 +5217,7 @@ Environment.NewLine +
             {
             var list = new List<QSO>();
             if (con == null || con.State != ConnectionState.Open) return list;
-            string stm = "SELECT Id, date, time, dx_callsign, band, mode, frequency, (SELECT name FROM logs WHERE logs.Id = qso.log_id) AS log_name FROM qso WHERE lotw_status = 2 ORDER BY date DESC, time DESC, Id DESC";
+            string stm = "SELECT Id, date, time, dx_callsign, band, mode, frequency, (SELECT name FROM logs WHERE logs.Id = qso.log_id) AS log_name FROM qso WHERE lotw_status = 2 AND log_id = " + ActiveLogId + " ORDER BY date DESC, time DESC, Id DESC";
             using (var cmd = new SQLiteCommand(stm, con))
             using (var rdr = cmd.ExecuteReader())
             {
@@ -5160,7 +5245,7 @@ Environment.NewLine +
             lock (_dbLock)
             {
             if (con == null || con.State != ConnectionState.Open) return 0;
-            using (var cmd = new SQLiteCommand("UPDATE qso SET lotw_status = 0 WHERE lotw_status = 2", con))
+            using (var cmd = new SQLiteCommand("UPDATE qso SET lotw_status = 0 WHERE lotw_status = 2 AND log_id = " + ActiveLogId, con))
                 return cmd.ExecuteNonQuery();
             }
         }
@@ -5171,7 +5256,7 @@ Environment.NewLine +
             {
             var list = new List<QSO>();
             if (con == null || con.State != ConnectionState.Open) return list;
-            string stm = "SELECT Id, date, time, dx_callsign, band, mode, frequency, (SELECT name FROM logs WHERE logs.Id = qso.log_id) AS log_name FROM qso WHERE eqsl_status = 2 AND my_callsign IN (SELECT callsign FROM eqsl_accounts) ORDER BY date DESC, time DESC, Id DESC";
+            string stm = "SELECT Id, date, time, dx_callsign, band, mode, frequency, (SELECT name FROM logs WHERE logs.Id = qso.log_id) AS log_name FROM qso WHERE eqsl_status = 2 AND log_id = " + ActiveLogId + " AND my_callsign IN (SELECT callsign FROM eqsl_accounts) ORDER BY date DESC, time DESC, Id DESC";
             using (var cmd = new SQLiteCommand(stm, con))
             using (var rdr = cmd.ExecuteReader())
             {
@@ -5199,7 +5284,7 @@ Environment.NewLine +
             lock (_dbLock)
             {
             if (con == null || con.State != ConnectionState.Open) return 0;
-            using (var cmd = new SQLiteCommand("UPDATE qso SET eqsl_status = 0 WHERE eqsl_status = 2", con))
+            using (var cmd = new SQLiteCommand("UPDATE qso SET eqsl_status = 0 WHERE eqsl_status = 2 AND log_id = " + ActiveLogId, con))
                 return cmd.ExecuteNonQuery();
             }
         }
@@ -5210,7 +5295,7 @@ Environment.NewLine +
             {
             var list = new List<QSO>();
             if (con == null || con.State != ConnectionState.Open) return list;
-            string stm = "SELECT Id, date, time, dx_callsign, band, mode, frequency, (SELECT name FROM logs WHERE logs.Id = qso.log_id) AS log_name FROM qso WHERE qrz_status = 2 ORDER BY date DESC, time DESC, Id DESC";
+            string stm = "SELECT Id, date, time, dx_callsign, band, mode, frequency, (SELECT name FROM logs WHERE logs.Id = qso.log_id) AS log_name FROM qso WHERE qrz_status = 2 AND log_id = " + ActiveLogId + " ORDER BY date DESC, time DESC, Id DESC";
             using (var cmd = new SQLiteCommand(stm, con))
             using (var rdr = cmd.ExecuteReader())
             {
@@ -5238,7 +5323,7 @@ Environment.NewLine +
             lock (_dbLock)
             {
             if (con == null || con.State != ConnectionState.Open) return 0;
-            using (var cmd = new SQLiteCommand("UPDATE qso SET qrz_status = 0 WHERE qrz_status = 2", con))
+            using (var cmd = new SQLiteCommand("UPDATE qso SET qrz_status = 0 WHERE qrz_status = 2 AND log_id = " + ActiveLogId, con))
                 return cmd.ExecuteNonQuery();
             }
         }

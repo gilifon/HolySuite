@@ -609,23 +609,34 @@ namespace HolyLogger
             var done = new List<string>();
             try
             {
-                if (lotw) { dal.SetLotwStatus(qso.id, 0);    done.Add("LoTW"); }
-                if (qrz)  { dal.SetQrzStatus(qso.id, 0);     done.Add("QRZ"); }
-                if (eqsl) { dal.SetEqslStatus(qso.id, 0);    done.Add("eQSL"); }
-                if (club) { dal.SetClublogStatus(qso.id, 0); done.Add("Club Log"); }
+                // The QSO OBJECT is set as well as the database row: this window searches these very
+                // objects, so leaving them behind is how "Uploaded to: Not sent" went on listing a QSO
+                // that had just been queued - or stopped listing one after the queue was cleared.
+                if (lotw) { dal.SetLotwStatus(qso.id, 0);    qso.LotwStatus = 0;    done.Add("LoTW"); }
+                if (qrz)  { dal.SetQrzStatus(qso.id, 0);     qso.QrzStatus = 0;     done.Add("QRZ"); }
+                if (eqsl) { dal.SetEqslStatus(qso.id, 0);    qso.EqslStatus = 0;    done.Add("eQSL"); }
+                if (club) { dal.SetClublogStatus(qso.id, 0); qso.ClublogStatus = 0; done.Add("Club Log"); }
             }
             catch (Exception ex) { Log.Swallow(ex); }
 
             if (done.Count > 0)
+            {
                 HolyMessageBox.Show($"{qso.DXCall} queued for upload to: {string.Join(", ", done)}.",
                     "Upload queue", HolyMsgType.Info, this);
+                RunSearch();      // it is not "Not sent" any more, so it must not be listed as such
+                TellMainWindowQueuesChanged();
+            }
             else
                 HolyMessageBox.Show("Tick at least one logger first.", "Upload queue", HolyMsgType.Info, this);
         }
 
         // The same thing for a whole selection. One message at the end rather than one per QSO - fifty
         // dialogs to dismiss would be its own kind of failure.
-        private void QueueForUpload(List<QSO> qsos, bool lotw, bool qrz, bool eqsl, bool club)
+        //
+        // The writing happens off the UI thread, behind a busy sign, and the search is run again when it
+        // is done: the rows just queued are no longer "Not sent", so leaving them listed under that
+        // filter would be the window stating something it knows to be untrue.
+        private async void QueueForUpload(List<QSO> qsos, bool lotw, bool qrz, bool eqsl, bool club)
         {
             if (qsos == null || qsos.Count == 0) return;
             if (!lotw && !qrz && !eqsl && !club)
@@ -643,25 +654,77 @@ namespace HolyLogger
             if (eqsl) done.Add("eQSL");
             if (club) done.Add("Club Log");
 
-            int queued = 0, failed = 0;
-            foreach (var q in qsos)
-            {
-                try
-                {
-                    if (lotw) dal.SetLotwStatus(q.id, 0);
-                    if (qrz)  dal.SetQrzStatus(q.id, 0);
-                    if (eqsl) dal.SetEqslStatus(q.id, 0);
-                    if (club) dal.SetClublogStatus(q.id, 0);
-                    queued++;
-                }
-                // One bad QSO must not abandon the rest half-queued, but it is counted and reported
-                // rather than passed over in silence.
-                catch (Exception ex) { failed++; Log.Swallow(ex); }
-            }
+            var ids = qsos.Where(q => q != null).Select(q => q.id).ToList();
+            int queued = 0;
 
+            ShowBusy($"Adding {ids.Count:N0} QSO{(ids.Count == 1 ? "" : "s")} to the queue…");
+            try
+            {
+                await System.Threading.Tasks.Task.Run(() =>
+                {
+                    // One transaction per service rather than one per QSO - see SetUploadStatusForMany.
+                    if (lotw) queued = dal.SetUploadStatusForMany(ids, "lotw", 0);
+                    if (qrz)  queued = Math.Max(queued, dal.SetUploadStatusForMany(ids, "qrz", 0));
+                    if (eqsl) queued = Math.Max(queued, dal.SetUploadStatusForMany(ids, "eqsl", 0));
+                    if (club) queued = Math.Max(queued, dal.SetUploadStatusForMany(ids, "clublog", 0));
+                });
+
+                // The objects this window searches, brought in step with what was just written.
+                foreach (var q in qsos)
+                {
+                    if (q == null) continue;
+                    if (lotw) q.LotwStatus = 0;
+                    if (qrz)  q.QrzStatus = 0;
+                    if (eqsl) q.EqslStatus = 0;
+                    if (club) q.ClublogStatus = 0;
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Swallow(ex);
+                HideBusy();
+                HolyMessageBox.Show("These QSOs could not be queued.\n\n" + ex.Message,
+                    "Upload queue", HolyMsgType.Warning, this);
+                return;
+            }
+            HideBusy();
+
+            int failed = ids.Count - queued;
             string message = $"{queued:N0} QSO{(queued == 1 ? "" : "s")} queued for upload to: {string.Join(", ", done)}.";
             if (failed > 0) message += $"\n\n{failed:N0} could not be queued.";
             HolyMessageBox.Show(message, "Upload queue", failed > 0 ? HolyMsgType.Warning : HolyMsgType.Info, this);
+
+            RunSearch();          // the list now shows what is true after the queueing
+            UpdatePickState();
+            TellMainWindowQueuesChanged();
+        }
+
+        // The Tools menu counts the queues, and it counted them at startup. Queueing from here has to say
+        // so, or the menu keeps a number that stopped being true the moment OK was pressed.
+        private void TellMainWindowQueuesChanged()
+        {
+            try { (Application.Current?.MainWindow as MainWindow)?.RefreshUploadQueueCounts(); }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        // The busy sign over the results area. Shown for work that writes to the log and cannot be
+        // instant; the window stays on screen so the operator can see what is being worked on.
+        private void ShowBusy(string what)
+        {
+            try
+            {
+                BusyText.Text = what;
+                BusyOverlay.Visibility = Visibility.Visible;
+                // Painted before the work starts, or the sign appears only after the work it announces.
+                Dispatcher.Invoke(new Action(() => { }), System.Windows.Threading.DispatcherPriority.Render);
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        private void HideBusy()
+        {
+            try { BusyOverlay.Visibility = Visibility.Collapsed; }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
         }
 
         // Deleting a whole selection. One confirmation for the batch, and ONE undo step: undoing a

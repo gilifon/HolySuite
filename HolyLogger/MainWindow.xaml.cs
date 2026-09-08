@@ -6959,6 +6959,7 @@ namespace HolyLogger
             try
             {
                 int count = dal?.GetPendingClublogCount() ?? 0;
+                SyncUploadStateInMemory("clublog", (q, v) => q.ClublogStatus = v);
                 if (UploadQueueToClublogMenuItem == null) return;
                 var header = new System.Windows.Controls.TextBlock();
                 header.Inlines.Add(new System.Windows.Documents.Run("Upload Queue to "));
@@ -7030,6 +7031,7 @@ namespace HolyLogger
             try
             {
                 int count = dal?.GetPendingQrzCount() ?? 0;
+                SyncUploadStateInMemory("qrz", (q, v) => q.QrzStatus = v);
                 var header = new System.Windows.Controls.TextBlock();
                 header.Inlines.Add(new System.Windows.Documents.Run("Upload Queue to "));
                 header.Inlines.Add(new System.Windows.Documents.Run("QRZ") { FontWeight = System.Windows.FontWeights.Bold });

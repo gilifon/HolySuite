@@ -1009,6 +1009,22 @@
             </DataGrid.Columns>
         </DataGrid>
 
+        <!-- WHILE THE QUEUEING RUNS. Queueing a thousand QSOs takes seconds even in one transaction, and
+             a table that sits there saying nothing is a program the operator thinks has died. Covers the
+             results area only, so the filters above stay readable. -->
+        <Border x:Name="BusyOverlay" Panel.ZIndex="100" Visibility="Collapsed"
+                Background="#B0FFFFFF" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="0">
+            <Border Background="{DynamicResource PanelBg}" BorderBrush="{DynamicResource AccentBrush}"
+                    BorderThickness="2" CornerRadius="6" Padding="24,18"
+                    HorizontalAlignment="Center" VerticalAlignment="Center">
+                <StackPanel>
+                    <TextBlock x:Name="BusyText" FontSize="18" FontWeight="SemiBold"
+                               HorizontalAlignment="Center" Foreground="{DynamicResource TextBrush}"/>
+                    <ProgressBar IsIndeterminate="True" Height="6" Width="280" Margin="0,12,0,0"/>
+                </StackPanel>
+            </Border>
+        </Border>
+
         <!-- Spans the combined width of the LoTW..Paper QSL header group with one line of text - see
              ConfirmationStripHelper.cs for why an overlay is needed rather than per-column text. Kept
              non-hit-testable so clicks still reach the header underneath (e.g. to sort). -->
