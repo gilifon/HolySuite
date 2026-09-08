@@ -9852,6 +9852,9 @@ namespace HolyLogger
 
             if (fe == ContestSendBand) return -9;           // "You send" band sits in the freed top strip (~y73)
             if (fe == ContestTxPanel) return -7;            // send cells (RST S + send field) centered in the band
+            // Received cells: 41, not the 40 its row would give, so the 44px cell clears the frame's
+            // 1px border by 1px at the top and 1px at the bottom (frame y161..209, inside 162..208).
+            if (fe == ContestRxPanel) return 41;
             if (fe == L_SendLabel) return -2;               // "Exchange/send" 2-line label, centered in the band
             if (fe == ContestDividerLine) return 45;        // divider + DX Callsign row
 

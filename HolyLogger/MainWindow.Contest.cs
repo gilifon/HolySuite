@@ -305,18 +305,29 @@ namespace HolyLogger
         {
             var blue = new SolidColorBrush(Color.FromRgb(0x15, 0x65, 0xC0));
             var col = new StackPanel { Orientation = Orientation.Vertical, Margin = new Thickness(0, 0, 10, 0) };
+            // The cell has to fit inside the 48px coloured band (1px border, so 46px of room) with a
+            // pixel clear at the top and bottom, and the band cannot grow - the divider line is right
+            // under it. A natural 16px line is 21.3px, which with a 28px box made the cell 49.3 and
+            // left the boxes hanging out of the band's lower edge.
+            // So: LineHeight 17 (same tight-line idiom as L_RstSLabel/L_RstRLabel) + 1px of air + a
+            // 26px box = 44. The 1px of air is not decoration: measured, a 'g'/'y'/'q' tail still
+            // inks down to y=17 in a 17px line, so without it the box's top edge shaves the tail off
+            // labels like "Age" and "Holyland Square".
             col.Children.Add(new TextBlock
             {
                 Text = label,
                 FontSize = 16,
                 FontWeight = FontWeights.Bold,
                 Foreground = blue,
+                LineHeight = 17,
+                LineStackingStrategy = LineStackingStrategy.BlockLineHeight,
                 HorizontalAlignment = HorizontalAlignment.Center
             });
             var box = new TextBox
             {
                 Width = width,
-                Height = 28,
+                Height = 26,
+                Margin = new Thickness(0, 1, 0, 0),
                 FontSize = 16,
                 CharacterCasing = CharacterCasing.Upper,
                 VerticalContentAlignment = VerticalAlignment.Center,
