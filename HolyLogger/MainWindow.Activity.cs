@@ -262,10 +262,17 @@ namespace HolyLogger
 
             const double hintLeft = 335, gap = 6;
             double stopAt = 638;
-            if (Btn_TryAgain != null && Btn_TryAgain.Visibility == Visibility.Visible) stopAt = 436;
+            if (Btn_TryAgain != null && Btn_TryAgain.Visibility == Visibility.Visible)
+            {
+                // ITS REAL LEFT EDGE, NOT THE 436 IT WAS DRAWN AT. The key now carries the number of
+                // stations waiting and is made wider for it, growing leftwards (SizeTryAgainKey), so
+                // a fixed 436 here would let the hint run under a key that had moved.
+                double keyLeft = System.Windows.Controls.Canvas.GetLeft(Btn_TryAgain);
+                stopAt = double.IsNaN(keyLeft) ? 436 : keyLeft;
+            }
             else if (Btn_UndoMain != null && Btn_UndoMain.Visibility == Visibility.Visible) stopAt = 542;
 
-            TB_ActivitySigHint.MaxWidth = stopAt - hintLeft - gap;
+            TB_ActivitySigHint.MaxWidth = Math.Max(0, stopAt - hintLeft - gap);
         }
 
         // THE ONE LINE ON THE LIST THAT IS NOT A PROGRAM.

@@ -5874,10 +5874,18 @@ namespace HolyLogger
                 if (Btn_TryAgain != null)
                 {
                     // Hidden entirely at zero: the button's only job is to open a list, and an empty
-                    // list is not worth a trip. The count is in the TOOLTIP, not on the face - the row
-                    // is only 677px wide and a face wide enough for "Try Again (100)" ran over the
-                    // activity hint beside it.
+                    // list is not worth a trip.
                     Btn_TryAgain.Visibility = n > 0 ? Visibility.Visible : Visibility.Collapsed;
+
+                    // THE COUNT IS THE WHOLE QUESTION - how many are still waiting - so it is on the
+                    // face, not only in the tooltip. It used to be kept off because a wider key ran
+                    // into what is beside it; SizeTryAgainKey is the answer to that (see there).
+                    if (n > 0)
+                    {
+                        Btn_TryAgain.Content = "Try Again (" + n.ToString(CultureInfo.InvariantCulture) + ")";
+                        SizeTryAgainKey();
+                    }
+
                     UpdateActivityHintWidth();   // the activity hint beside it sizes to what is left
 
                     Btn_TryAgain.ToolTip = n == 1
@@ -5889,6 +5897,56 @@ namespace HolyLogger
                     _tryAgainWindow.ReloadList();
             }
             catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        // ── HOW WIDE THE TRY AGAIN KEY IS ALLOWED TO BE ─────────────────────────────────────────
+        //
+        // The row is a Canvas, so nothing moves out of another thing's way by itself - a key given
+        // more width simply paints over its neighbour. What is around it, left to right:
+        //
+        //     335   the activity hint's text starts here, and it is told where to stop
+        //     436   this key's left edge as drawn in the XAML
+        //     532   its right edge
+        //     542   Undo's left edge - the 10px between them is the gap that makes them a pair
+        //     638   Undo's right edge, and the right edge of the row
+        //
+        // So the number is paid for on the LEFT. The right edge stays at 532 whatever the key says,
+        // Undo is never touched, and the key grows towards the hint, which is text with an ellipsis
+        // that is told to stop sooner (UpdateActivityHintWidth reads this key's real left edge). The
+        // key stops growing 6px short of where the hint begins, so the hint is never wiped out.
+        private const double TryAgainRightEdge = 532;
+        private const double TryAgainMinWidth = 96;    // Undo's width: the pair reads as one size
+        private const double TryAgainLeftLimit = 341;  // hint starts at 335, plus its 6px of gap
+
+        private void SizeTryAgainKey()
+        {
+            try
+            {
+                if (Btn_TryAgain == null) return;
+
+                // Asked of the key itself rather than worked out from the font: the keycap template
+                // has a border and its own margins, and the button knows about those where a sum
+                // written here would only be a guess that goes stale when the template changes.
+                Btn_TryAgain.Width = double.NaN;
+                Btn_TryAgain.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+
+                double wanted = Math.Ceiling(Btn_TryAgain.DesiredSize.Width) + 10;   // a little air
+                double width = Math.Max(TryAgainMinWidth, wanted);
+                width = Math.Min(width, TryAgainRightEdge - TryAgainLeftLimit);
+
+                Btn_TryAgain.Width = width;
+                Canvas.SetLeft(Btn_TryAgain, TryAgainRightEdge - width);
+            }
+            catch (System.Exception swallowed)
+            {
+                Log.Swallow(swallowed);
+                // Whatever went wrong, leave a key that is at least the size it was drawn.
+                if (Btn_TryAgain != null && double.IsNaN(Btn_TryAgain.Width))
+                {
+                    Btn_TryAgain.Width = TryAgainMinWidth;
+                    Canvas.SetLeft(Btn_TryAgain, TryAgainRightEdge - TryAgainMinWidth);
+                }
+            }
         }
 
         private void Btn_TryAgain_Click(object sender, RoutedEventArgs e)
