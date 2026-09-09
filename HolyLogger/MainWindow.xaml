@@ -1628,11 +1628,25 @@
                        FontWeight="Normal" Foreground="{DynamicResource Danger}"/>
         </Border>
 
+        <!-- A second way to turn the same thing on: a plain checkbox, to the left of the button in
+             the same span the button used to have alone. Kept in step with the button in
+             ApplyCallsignSuggestionsEnabled, the one place that already owns the setting; neither
+             control raises the other's Click. -->
+        <CheckBox x:Name="CB_SuggestToggle" Grid.Row="1"
+                  HorizontalAlignment="Left" VerticalAlignment="Top" Margin="12,103,0,0"
+                  Width="18" Height="20" Focusable="False" Click="CB_SuggestToggle_Click"
+                  ToolTip="Show/hide the callsign suggestions dropdown"/>
+
         <!-- Suggest toggle: shows and controls the callsign-suggestions dropdown mode.
-             Looks pressed INTO the screen when ON (IsChecked), raised OUT when OFF. -->
+             Looks pressed INTO the screen when ON (IsChecked), raised OUT when OFF.
+             RIGHT-JUSTIFIED WITH THE LABEL ABOVE IT: "DX Callsign" (bold "DX" + " Callsign") measures
+             81.1px at this font and size, starting at the same x=12 the checkbox starts at - so its
+             right edge falls at x=93.1. 34 + 60 = 94, a pixel past it rather than short, and wider
+             than the 56 it was - room the button did not have before, with "Suggest" itself measured
+             at 45.3px so there is still slack on both sides of it. -->
         <ToggleButton x:Name="BtnSuggestToggle" Content="Suggest" Grid.Row="1"
-                      HorizontalAlignment="Left" VerticalAlignment="Top" Margin="12,101,0,0"
-                      Width="78" Height="20" FontSize="12" FontWeight="Bold" Foreground="#1E2A36"
+                      HorizontalAlignment="Left" VerticalAlignment="Top" Margin="34,101,0,0"
+                      Width="60" Height="20" FontSize="12" FontWeight="Bold" Foreground="#1E2A36"
                       Focusable="False" Click="BtnSuggestToggle_Click"
                       ToolTip="Show/hide the callsign suggestions dropdown">
             <ToggleButton.Template>

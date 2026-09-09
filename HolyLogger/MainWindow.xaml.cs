@@ -1483,9 +1483,12 @@ namespace HolyLogger
             ShowHomeMap();
             Log.Step("loaded: home map drawn");
 
-            // Reflect the persisted suggestions on/off state on the Suggest toggle button.
+            // Reflect the persisted suggestions on/off state on both controls that turn it on -
+            // the toggle button, and the checkbox beside it.
             if (BtnSuggestToggle != null)
                 BtnSuggestToggle.IsChecked = Properties.Settings.Default.CallsignSuggestionsEnabled;
+            if (CB_SuggestToggle != null)
+                CB_SuggestToggle.IsChecked = Properties.Settings.Default.CallsignSuggestionsEnabled;
 
             // Restore the active contest (if any) selected in a previous session, then reflect the
             // Contest Mode state in the Tools-menu header, trophy, and contest-name label.
@@ -13602,18 +13605,22 @@ namespace HolyLogger
             ApplyCallsignSuggestionsEnabled(!Properties.Settings.Default.CallsignSuggestionsEnabled);
         }
 
-        // Single entry point for setting the suggestions on/off state, used by both F4 and the
-        // Suggest (F4) toggle button. Persists the state, keeps the button's pressed/raised look in
-        // sync, and applies it immediately: closing the dropdown when off, or re-showing it for the
-        // current callsign text when turning back on.
+        // Single entry point for setting the suggestions on/off state, used by F4, the Suggest
+        // toggle button, and the plain checkbox beside it - two ways to turn on the same thing, so
+        // this is the one place that owns what "on" means. Persists the state, keeps both controls'
+        // look in sync, and applies it immediately: closing the dropdown when off, or re-showing it
+        // for the current callsign text when turning back on.
         private void ApplyCallsignSuggestionsEnabled(bool enabled)
         {
             Properties.Settings.Default.CallsignSuggestionsEnabled = enabled;
             Properties.Settings.Default.Save();
 
-            // Reflect on the toggle button (no-op / no recursion: Click isn't raised by code).
+            // Reflect on both controls (no-op / no recursion: Click isn't raised by code, so setting
+            // IsChecked here does not loop back into either control's own Click handler).
             if (BtnSuggestToggle != null && (BtnSuggestToggle.IsChecked == true) != enabled)
                 BtnSuggestToggle.IsChecked = enabled;
+            if (CB_SuggestToggle != null && (CB_SuggestToggle.IsChecked == true) != enabled)
+                CB_SuggestToggle.IsChecked = enabled;
 
             if (!enabled)
             {
@@ -13635,6 +13642,13 @@ namespace HolyLogger
         {
             // The ToggleButton has already flipped IsChecked by the time Click fires.
             ApplyCallsignSuggestionsEnabled(BtnSuggestToggle.IsChecked == true);
+        }
+
+        private void CB_SuggestToggle_Click(object sender, RoutedEventArgs e)
+        {
+            // Same idea, the other control: the CheckBox has already flipped IsChecked by the time
+            // Click fires.
+            ApplyCallsignSuggestionsEnabled(CB_SuggestToggle.IsChecked == true);
         }
 
         // Forwards function keys pressed while a secondary window (e.g. the Cluster window or the
