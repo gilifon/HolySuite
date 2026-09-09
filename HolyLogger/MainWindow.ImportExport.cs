@@ -129,11 +129,17 @@ namespace HolyLogger
 
             string adif = Services.GenerateAdif(qsos, Contests.ContestService.Active?.CabrilloName,
                                                 includeImportedFields: true);
-            var save = new SaveFileDialog { Filter = "ADIF File|*.adi", Title = "Export ADIF" };
+            var save = new SaveFileDialog
+            {
+                Filter = "ADIF File|*.adi",
+                Title = "Export ADIF",
+                InitialDirectory = ExportedLogsFolder.Current
+            };
             if (save.ShowDialog() != true) return;
             try
             {
                 System.IO.File.WriteAllText(save.FileName, adif);
+                ExportedLogsFolder.Remember(save.FileName);
                 HolyMessageBox.ShowSuccess("File created successfully!", "Export ADIF", owner);
             }
             catch (Exception ex) { HolyMessageBox.ShowError(
@@ -147,11 +153,17 @@ namespace HolyLogger
         public void ExportQsosToCsv(System.Collections.ObjectModel.ObservableCollection<QSO> qsos, Window owner)
         {
             string csv = Services.GenerateCSV(qsos);
-            var save = new SaveFileDialog { Filter = "CSV File|*.csv", Title = "Export CSV" };
+            var save = new SaveFileDialog
+            {
+                Filter = "CSV File|*.csv",
+                Title = "Export CSV",
+                InitialDirectory = ExportedLogsFolder.Current
+            };
             if (save.ShowDialog() != true) return;
             try
             {
                 System.IO.File.WriteAllText(save.FileName, csv);
+                ExportedLogsFolder.Remember(save.FileName);
                 HolyMessageBox.ShowSuccess("File created successfully!", "Export CSV", owner);
             }
             catch (Exception ex) { HolyMessageBox.ShowError(
@@ -208,11 +220,18 @@ namespace HolyLogger
             Contester c = new Contester { Contest = logContest?.CabrilloName ?? string.Empty };
             Contests.ContestHeaderStore.PopulateContester(c, values);
             string cabrillo = Services.GenerateCabrillo(qsos, c);
-            var save = new SaveFileDialog { Filter = "Cabrillo File (*.cbr)|*.cbr|Cabrillo Log (*.log)|*.log", DefaultExt = "cbr", Title = "Export Cabrillo" };
+            var save = new SaveFileDialog
+            {
+                Filter = "Cabrillo File (*.cbr)|*.cbr|Cabrillo Log (*.log)|*.log",
+                DefaultExt = "cbr",
+                Title = "Export Cabrillo",
+                InitialDirectory = ExportedLogsFolder.Current
+            };
             if (save.ShowDialog() != true) return;
             try
             {
                 System.IO.File.WriteAllText(save.FileName, cabrillo);
+                ExportedLogsFolder.Remember(save.FileName);
                 HolyMessageBox.ShowSuccess("File created successfully!", "Export Cabrillo", owner);
             }
             catch (Exception ex) { HolyMessageBox.ShowError(
@@ -2782,6 +2801,74 @@ namespace HolyLogger
             }
         }
 
+    }
+
+    // -- The Exported Logs folder -------------------------------------------------------------------
+    // File > Export (ADIF, Cabrillo, CSV) used to open wherever Windows last happened to remember -
+    // usually Documents, or wherever the last unrelated Save dialog in the whole system left off. The
+    // Save dialog now opens on a folder of this program's own, and remembers whichever folder the
+    // operator actually saves an export to, so the next export opens there instead.
+    //
+    // KEPT APART FROM THE DELETED LOGS FOLDER ON PURPOSE. That one exists for one job - a copy made
+    // automatically, seconds before a log is removed, as the last line of defence against a wrong
+    // click - and nothing an operator does on purpose should end up mixed into it.
+    public static class ExportedLogsFolder
+    {
+        public const string FolderName = "Exported Logs";
+
+        // The folder the next export dialog opens on: the one last used, if it still exists, else the
+        // default below. Created here if it is the default and does not exist yet, so the dialog opens
+        // showing a real folder rather than falling back to wherever Windows chooses on its own.
+        public static string Current
+        {
+            get
+            {
+                string last = Properties.Settings.Default.LastExportFolder;
+                if (!string.IsNullOrWhiteSpace(last) && Directory.Exists(last)) return last;
+
+                string folder = DefaultFolder;
+                try { Directory.CreateDirectory(folder); }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
+                return folder;
+            }
+        }
+
+        // Beside the database, next to Backups and Deleted Logs - one place holding everything this
+        // program keeps that is a copy of the log, rather than the log itself.
+        public static string DefaultFolder
+        {
+            get
+            {
+                try
+                {
+                    string data = DataAccess.GetInstance()?.DataFolder;
+                    if (!string.IsNullOrWhiteSpace(data)) return Path.Combine(data, FolderName);
+                }
+                catch (Exception ex) { Log.Swallow(ex); }
+
+                // Only if the database folder is somehow unknown. Documents always exists and is always
+                // writable, so the export still has somewhere to go.
+                return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
+                                    "HolyLogger " + FolderName);
+            }
+        }
+
+        // Remembered after every export that actually wrote a file - ADIF, Cabrillo or CSV alike, one
+        // shared folder for all three - and wherever the operator chose to put it, not only the
+        // default: he may keep his exports somewhere else entirely, and the next one should meet him
+        // there.
+        public static void Remember(string savedFilePath)
+        {
+            try
+            {
+                string folder = Path.GetDirectoryName(savedFilePath);
+                if (string.IsNullOrWhiteSpace(folder)) return;
+
+                Properties.Settings.Default.LastExportFolder = folder;
+                SettingsFlush.RequestSave();
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
     }
 
     // -- The Deleted Logs folder --------------------------------------------------------------------

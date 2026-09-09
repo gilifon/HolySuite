@@ -284,7 +284,7 @@ namespace HolyLogger
         public delegate void SpeedRange(out int low, out int high);
 
         // The ordinary editor: a title, the text, and the button's name to be edited beside it.
-        public delegate string TextEditor(string title, string text, ButtonName name);
+        public delegate string TextEditor(string title, string text, ButtonName name, KeyerKeyEdit keys);
 
         // Turns * and ! into callsigns. The stored text keeps the macro; only what goes on air is
         // expanded, so a button reads the same next year when the callsign in the form is different.
@@ -1966,7 +1966,7 @@ namespace HolyLogger
                     // A KEYCAP NAME ONLY FITS THE MACRO UNDER IT. The standard names are handed out on a
                     // fresh installation - where the macros are the standard ones too - and never over an
                     // operator's own texts, which would put "Exch" on a button that says something else.
-                    if (settingName == KeyerLabelsSetting && string.IsNullOrWhiteSpace(ReadBankJson(false)))
+                    if (settingName == KeyerLabelsSetting && string.IsNullOrWhiteSpace(ReadBankJson(Bank.Run)))
                         for (int i = 0; i < count && i < StandardLabels.Length; i++) labels[i] = StandardLabels[i];
 
                     return labels;
@@ -2022,20 +2022,92 @@ namespace HolyLogger
             return button != null ? button.ActualWidth : 0;
         }
 
+        // ONE KEY'S WHOLE ROW: what it holds in each of the three sets, and the two names that go
+        // with them. The set now showing is named so the editor can put that one in front.
+        private KeyerKeyEdit KeyRow(int index, ButtonName showingName)
+        {
+            var gen = LoadBank(Bank.Off);
+            var run = LoadBank(Bank.Run);
+            var sp = LoadBank(Bank.Sp);
+
+            var genLabels = LoadBankLabels(Bank.Off);
+            var contestLabels = LoadBankLabels(Bank.Run);
+
+            return new KeyerKeyEdit
+            {
+                Showing = ShowingBank,
+                GenText = index < gen.Length ? gen[index] : string.Empty,
+                RunText = index < run.Length ? run[index] : string.Empty,
+                SpText = index < sp.Length ? sp[index] : string.Empty,
+
+                GenName = new ButtonName
+                {
+                    Label = index < genLabels.Length ? genLabels[index] : string.Empty,
+                    BoxWidth = showingName.BoxWidth,
+                    FaceFontSize = showingName.FaceFontSize,
+                    FaceFontFamily = showingName.FaceFontFamily
+                },
+
+                ContestName = new ButtonName
+                {
+                    Label = index < contestLabels.Length ? contestLabels[index] : string.Empty,
+                    BoxWidth = showingName.BoxWidth,
+                    FaceFontSize = showingName.FaceFontSize,
+                    FaceFontFamily = showingName.FaceFontFamily
+                }
+            };
+        }
+
+        // AND BACK AGAIN, all three sets at once. Only this key's cell in each is touched; the other
+        // eleven are read and written back as they stand.
+        private void SaveKeyRow(int index, KeyerKeyEdit keys)
+        {
+            if (keys == null || index < 0 || index >= ButtonCount) return;
+
+            WriteOne(Bank.Off, index, keys.GenText);
+            WriteOne(Bank.Run, index, keys.RunText);
+            WriteOne(Bank.Sp, index, keys.SpText);
+
+            var genLabels = LoadBankLabels(Bank.Off);
+            genLabels[index] = (keys.GenName != null ? keys.GenName.Label : string.Empty) ?? string.Empty;
+            SaveLabels(LabelsSettingName(Bank.Off), genLabels, ButtonCount);
+
+            var contestLabels = LoadBankLabels(Bank.Run);
+            contestLabels[index] = (keys.ContestName != null ? keys.ContestName.Label : string.Empty) ?? string.Empty;
+            SaveLabels(LabelsSettingName(Bank.Run), contestLabels, ButtonCount);
+
+            // What this window is holding has to follow, or the face would be redrawn from the array
+            // it was opened with.
+            string mine = ShowingBank == Bank.Off ? keys.GenText
+                        : ShowingBank == Bank.Sp ? keys.SpText
+                        : keys.RunText;
+
+            if (index < _buttonTexts.Length) _buttonTexts[index] = mine ?? string.Empty;
+        }
+
+        private static void WriteOne(Bank bank, int index, string text)
+        {
+            var texts = LoadBank(bank);
+            if (index >= texts.Length) return;
+
+            texts[index] = (text ?? string.Empty).Trim();
+            SaveBank(texts, bank);
+        }
+
         // The name of ONE button, written back into the bank's own list without touching the other
         // eleven - which is what SaveLabels wants, so the list is read, changed and put back.
         private void SaveButtonLabel(int index, string label)
         {
             if (index < 0 || index >= ButtonCount) return;
 
-            var labels = ReadLabels(KeyerLabelsSetting, ButtonCount);
+            var labels = LoadBankLabels(ShowingBank);
             labels[index] = (label ?? string.Empty).Trim();
-            SaveLabels(KeyerLabelsSetting, labels, ButtonCount);
+            SaveLabels(LabelsSettingName(ShowingBank), labels, ButtonCount);
         }
 
         private string ButtonLabel(int index)
         {
-            var labels = ReadLabels(KeyerLabelsSetting, ButtonCount);
+            var labels = LoadBankLabels(ShowingBank);
 
             return index >= 0 && index < labels.Length ? (labels[index] ?? string.Empty).Trim() : string.Empty;
         }
@@ -2366,17 +2438,22 @@ namespace HolyLogger
 
             if (_editText == null) return;
 
-            // Named by the key that presses it, because that is how the operator thinks of it.
-            string title = "Edit CW Keyer Text " + (index + 1) + " (F" + (index + 1) + ")";
+            // Named by the key that presses it, because that is how the operator thinks of it - AND BY
+            // THE SET IT BELONGS TO. There are three sets behind these twelve keys now, and the window
+            // that opens looks the same whichever one is showing: an operator editing his Run text
+            // could not tell it from his everyday one, and would find the wrong button changed.
+            string title = "Edit CW Keyer Text " + (index + 1) + " (F" + (index + 1) + ")  -  "
+                         + BankName(ShowingBank);
 
             var name = NameOf(index);
+            var keys = KeyRow(index, name);
 
-            string updated = _editText(title, _buttonTexts[index] ?? string.Empty, name);
+            string updated = _editText(title, _buttonTexts[index] ?? string.Empty, name, keys);
             if (updated == null) return;
 
             _buttonTexts[index] = updated;
             SaveButtonText(index, updated);
-            SaveButtonLabel(index, name.Label);
+            SaveKeyRow(index, keys);
             RefreshButtonFace(index);
         }
 
@@ -2395,12 +2472,14 @@ namespace HolyLogger
                 if (_editText == null) return;
 
                 var onlyName = NameOf(0);
-                string only = _editText("Edit CW Keyer Text 1 (F1)", _buttonTexts[0] ?? string.Empty, onlyName);
+                var onlyKeys = KeyRow(0, onlyName);
+                string only = _editText("Edit CW Keyer Text 1 (F1)  -  " + BankName(ShowingBank),
+                                        _buttonTexts[0] ?? string.Empty, onlyName, onlyKeys);
                 if (only == null) return;
 
                 _buttonTexts[0] = only;
                 SaveButtonText(0, only);
-                SaveButtonLabel(0, onlyName.Label);
+                SaveKeyRow(0, onlyKeys);
                 RefreshButtonFace(0);
                 return;
             }
@@ -2411,8 +2490,10 @@ namespace HolyLogger
             var askingName = NameOf(0);
             askingName.Label = QrlLabel();
 
-            string cq = _editTwoTexts("Edit CW Keyer Text 1 (F1)", _buttonTexts[0] ?? string.Empty,
-                                      ref qrl, cqName, askingName);
+            var cqKeys = KeyRow(0, cqName);
+
+            string cq = _editTwoTexts("Edit CW Keyer Text 1 (F1)  -  " + BankName(ShowingBank),
+                                      _buttonTexts[0] ?? string.Empty, ref qrl, cqName, askingName, cqKeys);
             if (cq == null) return;
 
             // The question is one setting for the whole program; the call belongs to the bank showing.
@@ -2428,12 +2509,12 @@ namespace HolyLogger
 
             _buttonTexts[0] = cq;
             SaveButtonText(0, cq);
-            SaveButtonLabel(0, cqName.Label);
+            SaveKeyRow(0, cqKeys);
             RefreshButtonFace(0);
         }
 
         internal delegate string TwoTextEditor(string title, string mainText, ref string extraText,
-                                              ButtonName name, ButtonName askingName);
+                                              ButtonName name, ButtonName askingName, KeyerKeyEdit keys);
 
         internal TwoTextEditor EditTwoTexts { set { _editTwoTexts = value; } }
         private TwoTextEditor _editTwoTexts;
@@ -2453,18 +2534,134 @@ namespace HolyLogger
         // OFF KEEPS THE LAST ONE. The bar's Off is about the Enter key, not about which texts he wants
         // in front of him, so switching ESM off leaves the bank where it was. A keyer that has never
         // been switched shows Run.
-        internal static bool ShowingSpBank
+        // THREE SETS OF TWELVE, ONE FOR EACH WAY OF WORKING. Run and S&P were always two versions of
+        // the same contest job and share their keycap names. OFF IS A THIRD, and it is not contest
+        // working at all: it is the everyday keyer, and the man using it wants his own twelve texts
+        // AND his own names on them - a rag-chew set has nothing to do with a contest exchange.
+        //
+        // WHICH ONE IS SHOWING IS NOT A SETTING OF ITS OWN ANY MORE. It follows the Off / Run / S&P
+        // choice on the bar, because that choice IS the question "which way am I working now". The
+        // old CwKeyerBankSp is left where it is rather than removed, so a build going back does not
+        // find it missing.
+        // -- WHAT A KEYCAP CAN SHOW ---------------------------------------------------------------
+        //
+        // A name is worth only what the key can show, so the typing stops where the key does. Measured
+        // rather than counted: letters are not the same width, and a count is either mean (measured in
+        // the widest letter) or a lie (measured in an average one).
+        //
+        // ABOUT EIGHTY POINTS. The keyer is 560 wide, six buttons to a row, and each keeps a little
+        // for its margins and its padding - so this is what is left for the writing on the face.
+        internal const double KeycapRoom = 77;
+
+        internal static double TextWidth(string word, string family, double size, Visual dpiFrom)
         {
-            get
+            if (string.IsNullOrEmpty(word)) return 0;
+
+            try
             {
-                try { return Properties.Settings.Default.CwKeyerBankSp; }
-                catch (Exception swallowed) { Log.Swallow(swallowed); return false; }
+                var typeface = new Typeface(
+                    string.IsNullOrEmpty(family) ? SystemFonts.MessageFontFamily : new FontFamily(family),
+                    FontStyles.Normal, FontWeights.Normal, FontStretches.Normal);
+
+                return new FormattedText(word, System.Globalization.CultureInfo.CurrentCulture,
+                                         FlowDirection.LeftToRight, typeface, size, Brushes.Black,
+                                         VisualTreeHelper.GetDpi(dpiFrom).PixelsPerDip).Width;
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); return 0; }
+        }
+
+        // REFUSED, NOT TRIMMED AFTERWARDS. The last thing that fitted is put back and the caret with
+        // it, so a letter too many simply does not appear.
+        internal static void HoldToKeycap(TextBox box, double room, string family, double size, Visual dpiFrom)
+        {
+            if (box == null) return;
+
+            string lastThatFits = box.Text ?? string.Empty;
+            bool restoring = false;
+
+            box.TextChanged += (s, e) =>
+            {
+                if (restoring) return;
+
+                if (TextWidth(box.Text ?? string.Empty, family, size, dpiFrom) <= room)
+                {
+                    lastThatFits = box.Text;
+                    return;
+                }
+
+                restoring = true;
+                int caret = box.CaretIndex;
+                box.Text = lastThatFits;
+                box.CaretIndex = Math.Min(Math.Max(0, caret - 1), box.Text.Length);
+                restoring = false;
+                MainWindow.BeepRefusedKey();
+            };
+        }
+
+        public enum Bank { Off, Run, Sp }
+
+        // ONE KEY, ALL THREE OF ITS TEXTS. A right-click used to open the set that happened to be
+        // showing, and nothing else - so a man who wanted his Run text and his everyday text to say
+        // the same thing had to switch the bar, right-click again, and remember what he had written.
+        // The window carries the key's whole row now, and this is what goes in and comes back.
+        public class KeyerKeyEdit
+        {
+            public Bank Showing;
+
+            public string GenText;
+            public string RunText;
+            public string SpText;
+
+            public ButtonName GenName;        // the everyday set has its own name
+            public ButtonName ContestName;    // Run and S&P share one
+        }
+
+        // The set's name as it is written on the bar, so the editor's title says the same word the
+        // operator clicked to get there.
+        internal static string BankName(Bank bank)
+        {
+            switch (bank)
+            {
+                case Bank.Sp:  return "S&P";
+                case Bank.Run: return "Run";
+                default:       return "Gen";
             }
         }
 
-        internal static string BankSettingName(bool sp)
+        internal static Bank ShowingBank
         {
-            return sp ? "CwKeyerButtonsSpJson" : "CwKeyerButtonsJson";
+            get
+            {
+                try
+                {
+                    if (!Properties.Settings.Default.EsmEnabled) return Bank.Off;
+
+                    return Properties.Settings.Default.EsmSearchAndPounce ? Bank.Sp : Bank.Run;
+                }
+                catch (Exception swallowed) { Log.Swallow(swallowed); return Bank.Off; }
+            }
+        }
+
+        internal static bool ShowingSpBank
+        {
+            get { return ShowingBank == Bank.Sp; }
+        }
+
+        internal static string BankSettingName(Bank bank)
+        {
+            switch (bank)
+            {
+                case Bank.Sp:  return "CwKeyerButtonsSpJson";
+                case Bank.Off: return "CwKeyerButtonsOffJson";
+                default:       return "CwKeyerButtonsJson";
+            }
+        }
+
+        // The names on the keycaps. Run and S&P share one set - the same key doing the same job in
+        // two versions - and Off has its own, because its twelve are a different set of texts.
+        internal static string LabelsSettingName(Bank bank)
+        {
+            return bank == Bank.Off ? "CwKeyerLabelsOffJson" : KeyerLabelsSetting;
         }
 
         // WHAT THE BUTTONS HOLD BEFORE ANYBODY HAS WRITTEN ANYTHING. A new installation opens on the
@@ -2516,17 +2713,22 @@ namespace HolyLogger
             catch (Exception swallowed) { Log.Swallow(swallowed); }
         }
 
-        internal static string[] LoadBank(bool sp)
+        internal static string[] LoadBank(Bank bank)
         {
             var texts = new string[ButtonCount];
             for (int i = 0; i < ButtonCount; i++) texts[i] = string.Empty;
 
             try
             {
-                string json = ReadBankJson(sp);
+                string json = ReadBankJson(bank);
                 if (string.IsNullOrWhiteSpace(json))
                 {
-                    string[] standard = sp ? StandardSpTexts : StandardTexts;
+                    // NOTHING SAVED FOR OFF MEANS THE RUN SET, not the standard one. The everyday
+                    // keyer starts as a copy of what he already works with rather than as twelve
+                    // buttons he has never seen; from the first save the two go their own ways.
+                    if (bank == Bank.Off) return LoadBank(Bank.Run);
+
+                    string[] standard = bank == Bank.Sp ? StandardSpTexts : StandardTexts;
                     for (int i = 0; i < ButtonCount && i < standard.Length; i++) texts[i] = standard[i];
                     return texts;
                 }
@@ -2541,16 +2743,32 @@ namespace HolyLogger
             return texts;
         }
 
-        internal static string ReadBankJson(bool sp)
+        internal static string ReadBankJson(Bank bank)
         {
-            try { return (string)Properties.Settings.Default[BankSettingName(sp)]; }
+            try { return (string)Properties.Settings.Default[BankSettingName(bank)]; }
             catch (Exception swallowed) { Log.Swallow(swallowed); return string.Empty; }
+        }
+
+        // The names for one bank, with the same rule as its texts: an Off bank nobody has written
+        // yet wears the names the Run buttons wear.
+        internal static string[] LoadBankLabels(Bank bank)
+        {
+            if (bank == Bank.Off)
+            {
+                string saved = string.Empty;
+                try { saved = (string)Properties.Settings.Default[LabelsSettingName(Bank.Off)]; }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+                if (string.IsNullOrWhiteSpace(saved)) return ReadLabels(KeyerLabelsSetting, ButtonCount);
+            }
+
+            return ReadLabels(LabelsSettingName(bank), ButtonCount);
         }
 
         private string[] LoadButtonTexts()
         {
-            bool nothingSaved = string.IsNullOrWhiteSpace(ReadBankJson(ShowingSpBank));
-            string[] texts = LoadBank(ShowingSpBank);       // his own, or the standard set
+            bool nothingSaved = string.IsNullOrWhiteSpace(ReadBankJson(ShowingBank));
+            string[] texts = LoadBank(ShowingBank);         // his own, or the set it starts from
 
             // ONCE, AND ONLY WHERE HE HAS SAVED NOTHING. Until now the first four of these buttons WERE
             // the main window's four Msg texts, and the keyer's own setting kept those four slots blank.
@@ -2559,7 +2777,7 @@ namespace HolyLogger
             // a copy of what the Msg buttons hold, and HIS four win over the standard four. Copy, not
             // move: the four on the main window are untouched, and from here the two sets go their own
             // ways.
-            if (nothingSaved && !ShowingSpBank && _getSharedText != null)
+            if (nothingSaved && ShowingBank == Bank.Run && _getSharedText != null)
             {
                 var his = new string[EsmButtons];
                 bool copied = false;
@@ -2591,10 +2809,10 @@ namespace HolyLogger
 
         private static void SaveAllButtonTexts(string[] texts)
         {
-            SaveBank(texts, ShowingSpBank);
+            SaveBank(texts, ShowingBank);
         }
 
-        internal static void SaveBank(string[] texts, bool sp)
+        internal static void SaveBank(string[] texts, Bank bank)
         {
             var own = new string[ButtonCount];
             for (int i = 0; i < ButtonCount; i++)
@@ -2604,7 +2822,7 @@ namespace HolyLogger
 
             try
             {
-                Properties.Settings.Default[BankSettingName(sp)] = JsonConvert.SerializeObject(own);
+                Properties.Settings.Default[BankSettingName(bank)] = JsonConvert.SerializeObject(own);
                 Properties.Settings.Default.Save();
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
@@ -2634,7 +2852,11 @@ namespace HolyLogger
 
         private UIElement BuildEsmSelector()
         {
-            _esmOffBtn = EsmChoiceButton("Off", "Enter does what it always did.");
+            // GEN, NOT OFF. The word was about the Enter key alone, and this choice now carries a
+            // whole set of twelve with it - the everyday macros, as against the contest pair beside
+            // it. "General" is what that set is; "Off" said only what it was not.
+            _esmOffBtn = EsmChoiceButton("Gen",
+                "Your everyday twelve macros, and Enter does what it always did.");
             _esmRunBtn = EsmChoiceButton("Run",
                 "You are calling CQ. Enter sends button 1 (CQ); with a callsign in the form, button 2 "
                 + "(his call and your exchange); then button 3 (TU), which logs the QSO.");
@@ -2717,9 +2939,10 @@ namespace HolyLogger
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
 
-            // AND THE TWELVE FACES ARE HIS OTHER SET. Off is about the Enter key and leaves the bank
-            // alone; Run and S&P each bring their own texts up.
-            if (on) ShowBank(searchAndPounce);
+            // AND THE TWELVE FACES ARE THE SET THAT GOES WITH IT. Off used to leave the bank alone,
+            // because it was only about the Enter key; it has a set of its own now, so all three
+            // choices bring their own twelve up.
+            ShowBank(ShowingBank);
 
             // RUN AND S&P NO LONGER TAKE THE CHOICE AWAY. They used to put this window back on Type,
             // because Enter cannot be in two places at once - and now it need not be: with something
@@ -2730,16 +2953,15 @@ namespace HolyLogger
             _box.Focus();
         }
 
-        internal void ShowBank(bool sp)
-        {
-            if (ShowingSpBank == sp) return;
+        // Which of the three this window has drawn. The bank itself is not a setting - it follows the
+        // Off / Run / S&P choice - so what is remembered here is only what is on the screen, to save
+        // reloading twelve buttons that have not changed.
+        private Bank _bankShown = Bank.Run;
 
-            try
-            {
-                Properties.Settings.Default.CwKeyerBankSp = sp;
-                Properties.Settings.Default.Save();
-            }
-            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        internal void ShowBank(Bank bank)
+        {
+            if (_bankShown == bank) return;
+            _bankShown = bank;
 
             ReloadButtonTexts();
         }
@@ -3500,7 +3722,7 @@ namespace HolyLogger
             {
                 new[] { "F1 to F12",    "Press the twelve buttons, 1 to 12, while this window is open - even when you are typing in the main window." },
                 new[] { "Ctrl+K",       "Closes this window. On the main window it opens it." },
-                new[] { "Ctrl+M",       "Turns Enter Sends Message off and on - the Off / Run / S&P choice on this window's bar. It comes back on the side it was last used on." },
+                new[] { "Ctrl+M",       "Turns Enter Sends Message off and on - the Gen / Run / S&P choice on this window's bar. It comes back on the side it was last used on." },
                 new[] { "Escape",       "Stops the radio now and drops whatever has not gone out. What has already gone stays in the record." },
                 new[] { "Backspace",    "Takes back only what has not gone out yet." },
                 // "Mouse click" alone left the operator asking "click on what?" - the row named no

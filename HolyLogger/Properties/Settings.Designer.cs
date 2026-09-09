@@ -2838,6 +2838,18 @@ namespace HolyLogger.Properties {
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string LastExportFolder {
+            get {
+                return ((string)(this["LastExportFolder"]));
+            }
+            set {
+                this["LastExportFolder"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
         public string ExtraBackupFolder {
             get {
                 return ((string)(this["ExtraBackupFolder"]));
@@ -3203,6 +3215,30 @@ namespace HolyLogger.Properties {
             }
             set {
                 this["CwMsgLabelsJson"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string CwKeyerButtonsOffJson {
+            get {
+                return ((string)(this["CwKeyerButtonsOffJson"]));
+            }
+            set {
+                this["CwKeyerButtonsOffJson"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string CwKeyerLabelsOffJson {
+            get {
+                return ((string)(this["CwKeyerLabelsOffJson"]));
+            }
+            set {
+                this["CwKeyerLabelsOffJson"] = value;
             }
         }
 

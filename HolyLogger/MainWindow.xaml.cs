@@ -3131,6 +3131,57 @@ namespace HolyLogger
             }
         }
 
+        // A macro box like the window's own, for the two sets the operator did not come in for. Held
+        // to what a keyer can send, exactly as the main one is.
+        private static TextBox CwMacroBox(string text)
+        {
+            var box = new TextBox
+            {
+                Text = text ?? string.Empty,
+                FontSize = 16,
+                Height = 28,
+                VerticalContentAlignment = VerticalAlignment.Center,
+                Padding = new Thickness(4, 0, 4, 0),
+                CharacterCasing = CharacterCasing.Upper,
+                MaxLength = 120
+            };
+            CwMacroText.Guard(box);
+
+            return box;
+        }
+
+        // One line of the three: a heading over each half, the name box on the left and the macro on
+        // the right. The S&P line has no name of its own - it wears the contest name above it - so the
+        // left half is simply left empty rather than repeated.
+        private static void CwEditRow(Grid rows, int row, string nameHeading, string textHeading,
+                                      UIElement nameFace, TextBox textBox)
+        {
+            if (!string.IsNullOrEmpty(nameHeading))
+            {
+                var head = CwEditHeading(nameHeading);
+                Grid.SetRow(head, row);
+                Grid.SetColumn(head, 0);
+                rows.Children.Add(head);
+            }
+
+            var textHead = CwEditHeading(textHeading);
+            Grid.SetRow(textHead, row);
+            Grid.SetColumn(textHead, 2);
+            rows.Children.Add(textHead);
+
+            if (nameFace != null)
+            {
+                Grid.SetRow(nameFace, row + 1);
+                Grid.SetColumn(nameFace, 0);
+                rows.Children.Add(nameFace);
+            }
+
+            textBox.Margin = new Thickness(0, 0, 0, 10);
+            Grid.SetRow(textBox, row + 1);
+            Grid.SetColumn(textBox, 2);
+            rows.Children.Add(textBox);
+        }
+
         // A BOX THAT LOOKS LIKE THE KEYCAP IT NAMES, and stops the typing where the keycap's own face
         // runs out. Built twice now - once for the button's ordinary name, once for the name it wears
         // while it is asking QRL? - so it is built in one place.
@@ -3272,7 +3323,8 @@ namespace HolyLogger
                                              string mainHint,
                                              out string extraResult,
                                              CwKeyboardWindow.ButtonName name = null,
-                                             CwKeyboardWindow.ButtonName askingName = null)
+                                             CwKeyboardWindow.ButtonName askingName = null,
+                                             CwKeyboardWindow.KeyerKeyEdit keys = null)
         {
             extraResult = extraText;
             Window dialog = new Window
@@ -3302,6 +3354,15 @@ namespace HolyLogger
 
             TextBox nameBox = null;
             TextBox askingNameBox = null;
+            TextBox contestBox = null;
+            TextBox[] keyBoxes = null;
+
+            // WHICH BOX THE "Sends:" LINE IS ABOUT. With three macros in the window it has to be the
+            // one the caret is in, or it describes a text he is not looking at - which is what an
+            // operator saw: he typed in the Run box and the line under it went on showing the General
+            // one. Declared here because the boxes are built before the line that reads them.
+            TextBox previewFrom = null;
+            Action refreshPreview = null;
 
             Grid grid = new Grid { Margin = new Thickness(10) };
             // TWO ROWS, one under the other: what is typed, and what that would put on air. The
@@ -3390,11 +3451,98 @@ namespace HolyLogger
             // EMPTY IS A REAL ANSWER, and the buttons already know what to do with it: the keyer's
             // twelve fall back to the key that presses them, and the four on the main window show
             // their key while it is theirs and nothing while the keyer has taken it.
+            // WHAT WOULD GO ON AIR IS THE POINT OF THIS WINDOW, so it is not written in the grey kept
+            // for notes: bold blue in a white box of its own, under the macro it is about and the same
+            // width as it, so the eye reads the two as one thing. "Sends:" stands outside the box,
+            // because that word is not part of the message.
+            var preview = new TextBlock
+            {
+                FontSize = 16,
+                FontWeight = FontWeights.Bold,
+                TextWrapping = TextWrapping.Wrap,
+                FontFamily = new System.Windows.Media.FontFamily("Consolas"),
+                Foreground = new System.Windows.Media.SolidColorBrush(
+                    System.Windows.Media.Color.FromRgb(0x15, 0x65, 0xC0)),
+                MinHeight = 20
+            };
+
+            var previewBox = new Border
+            {
+                Background = System.Windows.Media.Brushes.White,
+                BorderThickness = new Thickness(1),
+                Padding = new Thickness(4, 2, 4, 2),
+                Child = preview
+            };
+            previewBox.SetResourceReference(Border.BorderBrushProperty, "MutedTextBrush");
+
+            var previewLabel = CwEditHint("Sends:");
+
             if (name == null)
             {
                 Grid.SetRow(tb, 0);
                 Grid.SetColumnSpan(tb, 3);
                 grid.Children.Add(tb);
+            }
+            else if (keys != null)
+            {
+                // -- ONE KEY, ALL THREE OF ITS SETS ---------------------------------------------
+                //
+                // A right-click used to open the set that happened to be showing and nothing else, so
+                // a man who wanted the same words on his everyday key and his Run key had to switch
+                // the bar, right-click again, and remember what he had written. The key's whole row
+                // is here now: General, Run and S&P, one under the other, with the set he came in
+                // from at the top and already selected.
+                //
+                // THE BOX HE CAME IN FOR IS THE ONE THE WINDOW ALREADY HAD - tb - so the preview line
+                // under it, the typing rule and the paste rule are the ones this window has always
+                // used. The other two are its equals, built here.
+                var rows = new Grid();
+                rows.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                rows.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(20) });
+                rows.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+                for (int r = 0; r < 7; r++) rows.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+
+                TextBox contestNameBox;
+                var genFace = KeycapNameBox(keys.GenName, out nameBox);
+                var contestFace = KeycapNameBox(keys.ContestName, out contestNameBox);
+
+                // Which box holds which set, and which of them is the one he right-clicked.
+                TextBox genBox = keys.Showing == CwKeyboardWindow.Bank.Off ? tb : CwMacroBox(keys.GenText);
+                TextBox runBox = keys.Showing == CwKeyboardWindow.Bank.Run ? tb : CwMacroBox(keys.RunText);
+                TextBox spBox  = keys.Showing == CwKeyboardWindow.Bank.Sp  ? tb : CwMacroBox(keys.SpText);
+
+                CwEditRow(rows, 0, "Button ID", "General macro", genFace, genBox);
+                CwEditRow(rows, 2, "Button ID (contest)", "Run macro", contestFace, runBox);
+                CwEditRow(rows, 4, null, "S&P macro", null, spBox);
+
+                // Hard against the box it belongs to. Left where the name boxes start it stood a
+                // column's width away and read as a heading for nothing in particular.
+                Grid.SetRow(previewLabel, 6);
+                Grid.SetColumn(previewLabel, 0);
+                Grid.SetColumnSpan(previewLabel, 2);
+                previewLabel.HorizontalAlignment = HorizontalAlignment.Right;
+                previewLabel.VerticalAlignment = VerticalAlignment.Center;
+                previewLabel.Margin = new Thickness(0, 0, 8, 0);
+                rows.Children.Add(previewLabel);
+
+                Grid.SetRow(previewBox, 6);
+                Grid.SetColumn(previewBox, 2);
+                rows.Children.Add(previewBox);
+
+                Grid.SetRow(rows, 0);
+                Grid.SetColumnSpan(rows, 3);
+                grid.Children.Add(rows);
+
+                keyBoxes = new[] { genBox, runBox, spBox };
+                contestBox = contestNameBox;
+
+                foreach (TextBox box in keyBoxes)
+                {
+                    TextBox mine = box;
+                    mine.GotFocus += (s2, e2) => { previewFrom = mine; if (refreshPreview != null) refreshPreview(); };
+                    mine.TextChanged += (s2, e2) => { previewFrom = mine; if (refreshPreview != null) refreshPreview(); };
+                }
             }
             else
             {
@@ -3476,25 +3624,25 @@ namespace HolyLogger
 
             // WHAT WOULD GO ON AIR, worked out again on every keystroke. A macro is only ever as good
             // as what is behind it, and until now the only way to find out was to press the button.
-            var preview = new TextBlock
+            // Where it goes: with three macros in the window it is a row of its own under them, in the
+            // macro column so it lines up with the boxes it describes. With one, it sits under that one.
+            if (keys == null)
             {
-                FontSize = 16,
-                TextWrapping = TextWrapping.Wrap,
-                FontFamily = new System.Windows.Media.FontFamily("Consolas")
-            };
-            Grid.SetRow(preview, 2);
-            Grid.SetColumnSpan(preview, 3);
-            grid.Children.Add(preview);
+                Grid.SetRow(previewBox, 2);
+                Grid.SetColumnSpan(previewBox, 3);
+                grid.Children.Add(previewBox);
+            }
 
-            Action refreshPreview = () =>
+            refreshPreview = () =>
             {
                 // NO REFUSAL HERE. A message is written long before it is sent, with the entry form
                 // empty and no contest running - that is the normal case, not a fault. Saying
                 // "cannot send" over a text being composed reads as though something is wrong with
                 // it. What is missing is named in its place instead, so the operator sees where the
                 // callsign will go. The refusal still stands at the moment of sending.
-                preview.SetResourceReference(TextBlock.ForegroundProperty, "MutedTextBrush");
-                preview.Text = "Sends: " + ExpandCwMacrosForPreview(tb.Text ?? string.Empty);
+                TextBox source = previewFrom ?? tb;
+
+                preview.Text = ExpandCwMacrosForPreview(source.Text ?? string.Empty);
             };
 
             tb.TextChanged += (s, e) => refreshPreview();
@@ -3603,6 +3751,16 @@ namespace HolyLogger
             if (nameBox != null && name != null) name.Label = (nameBox.Text ?? string.Empty).Trim();
             if (askingNameBox != null && askingName != null)
                 askingName.Label = (askingNameBox.Text ?? string.Empty).Trim();
+
+            if (keys != null && keyBoxes != null)
+            {
+                keys.GenText = (keyBoxes[0].Text ?? string.Empty).Trim();
+                keys.RunText = (keyBoxes[1].Text ?? string.Empty).Trim();
+                keys.SpText = (keyBoxes[2].Text ?? string.Empty).Trim();
+
+                if (keys.ContestName != null && contestBox != null)
+                    keys.ContestName.Label = (contestBox.Text ?? string.Empty).Trim();
+            }
             return tb.Text.Trim();
         }
 
@@ -4025,9 +4183,9 @@ namespace HolyLogger
 
             try
             {
-                // Whichever bank the keyer is showing - Run or Search and Pounce. ESM sends the set the
-                // operator is working with, which is the whole point of there being two.
-                string json = CwKeyboardWindow.ReadBankJson(CwKeyboardWindow.ShowingSpBank);
+                // Whichever bank the keyer is showing - Off, Run or Search and Pounce. ESM sends the
+                // set the operator is working with, which is the whole point of there being three.
+                string json = CwKeyboardWindow.ReadBankJson(CwKeyboardWindow.ShowingBank);
                 if (string.IsNullOrWhiteSpace(json)) return string.Empty;
 
                 var saved = Newtonsoft.Json.JsonConvert.DeserializeObject<string[]>(json);
@@ -4204,11 +4362,14 @@ namespace HolyLogger
         // already passed (see UpdateVoiceMessageAvailabilityState).
         //
         // It also OPENS BY ITSELF the moment the radio goes to CW - the operator should not have to
-        // remember Ctrl+K after every mode change. That path passes silent: true, because a warning
-        // box thrown up by a mode change nobody asked a question about is worse than no keyboard.
+        // The keyer window itself, while it is open.
         private CwKeyboardWindow cwKeyboard;
 
-        private void OpenCwKeyboard(bool silent = false)
+        // NOTHING TO SAY AND NOTHING TO SILENCE. This took a "silent" flag, because the auto-open
+        // used to meet a refusal - no CAT, radio offline - and had to swallow the message box that
+        // came with it. The window opens in all of those now and says on its own face why it cannot
+        // send, so there is no message to keep quiet.
+        private void OpenCwKeyboard()
         {
             if (cwKeyboard != null)
             {
@@ -4216,35 +4377,16 @@ namespace HolyLogger
                 return;
             }
 
-            if (!Properties.Settings.Default.EnableOmniRigCAT || OmniRigEngine == null || Rig == null)
-            {
-                if (!silent) HolyMessageBox.ShowWarning(
-                    "OmniRig CAT is not available.\n\n"
-                    + "Nothing was sent.\n\n"
-                    + "Tick Enable Omni-Rig CAT in Options → General, and check the radio is "
-                    + "powered and its cable connected.",
-                    "CW Keyer", this);
-                return;
-            }
-
-            if (Rig.Status != OmniRig.RigStatusX.ST_ONLINE)
-            {
-                if (!silent) HolyMessageBox.ShowWarning(
-                    "The radio is offline.\n\n"
-                    + "Nothing was sent.\n\n"
-                    + "When CAT is working, the radio's name shows in green at the right of the "
-                    + "status bar. Anything else there means it is not.",
-                    "CW Keyer", this);
-                return;
-            }
-
+            // NOTHING KEEPS THIS WINDOW SHUT ANY MORE - not a radio that cannot be keyed, not a mode
+            // other than CW, and not CAT being down. It refused to open on all three, and it was the
+            // wrong answer every time: the twelve macros, their names, the banks, the speed and the
+            // whole gear window are SETTINGS, and a man sets them when he has a minute - which is
+            // rarely the minute his radio is connected and in CW.
+            //
+            // What any of those takes away is SENDING, and only sending. WhyTheKeyerCannotSend says
+            // which of them it is, in the operator's own words, and the window puts that across its
+            // top and stops pretending it can key.
             string rigType = NormalizeRigType(Rig != null ? Rig.RigType : null);
-
-            // A RADIO THAT CANNOT BE KEYED NO LONGER CLOSES THE DOOR. The window used to refuse to
-            // open here, and took the operator's eight macros away with it - this is the only place
-            // they can be written. So it opens either way, and CannotKey below tells it to say why
-            // nothing will go out and to stop pretending it can send.
-            bool canKey = CanKeyCw(rigType);
 
             cwKeyboard = new CwKeyboardWindow(
                 chunk =>
@@ -4286,7 +4428,8 @@ namespace HolyLogger
                         cwWpmMeasured = true;
                     }
                 },
-                (title, text, name) => ShowCwTextEditDialog(title, text, name),
+                (title, text, name, keys) => ShowCwTextEditDialog(title, text, null, null, null, null, null,
+                                                                  out _, name, null, keys),
                 // Only so a keyer opening for the first time can take a COPY of the four Msg texts into
                 // its own first four - see LoadButtonTexts. After that the two sets are apart.
                 GetCwMessageText,
@@ -4307,12 +4450,7 @@ namespace HolyLogger
                 Icon = Icon
             };
 
-            if (!canKey)
-                cwKeyboard.CannotKey(
-                    "This radio (" + rigType + ") cannot be keyed by CAT, so nothing typed here will "
-                    + "go out. Send CW from the radio's own memory keys."
-                    + (string.IsNullOrEmpty(RigFileTrouble) ? string.Empty : "  " + RigFileTrouble)
-                    + "  You can still write and edit the eight macros below - right-click one.");
+            cwKeyboard.CannotKey(WhyTheKeyerCannotSend());
 
             // And the other reason nothing may go out, the one that comes and goes with the mode
             // knob. Kept up to date from UpdateVoiceMessageAvailabilityState, which runs on every
@@ -4336,7 +4474,8 @@ namespace HolyLogger
             // The CQ button holds two texts and is edited as two - see EditCqButton.
             cwKeyboard.EditTwoTexts = (string title, string mainText, ref string extraText,
                                        CwKeyboardWindow.ButtonName name,
-                                       CwKeyboardWindow.ButtonName askingName) =>
+                                       CwKeyboardWindow.ButtonName askingName,
+                                       CwKeyboardWindow.KeyerKeyEdit keys) =>
             {
                 string extra;
                 string result = ShowCwTextEditDialog(
@@ -4347,7 +4486,7 @@ namespace HolyLogger
                     + "on, or has sat on it too long without calling. Recommended: QRL?",
                     extraText,
                     "What the button sends once QRL was asked",
-                    out extra, name, askingName);
+                    out extra, name, askingName, keys);
 
                 extraText = extra;
                 return result;
@@ -4440,6 +4579,33 @@ namespace HolyLogger
                 try { Activate(); }
                 catch (System.Exception swallowed) { Log.Swallow(swallowed); }
             }), DispatcherPriority.Background);
+        }
+
+        // WHY NOTHING CAN GO OUT, OR NULL WHEN IT CAN. Three reasons and they are answered in the
+        // order the operator would meet them: no CAT at all, a radio that is not answering, and a
+        // radio no maker's command will key. The mode is NOT here - the keyer is told that separately
+        // (SetCwMode), because it comes and goes with a knob rather than with the equipment.
+        private string WhyTheKeyerCannotSend()
+        {
+            if (!Properties.Settings.Default.EnableOmniRigCAT || OmniRigEngine == null || Rig == null)
+                return "CAT is off, so nothing typed or pressed here will go out. Everything else "
+                     + "works: right-click a button to write its macro, and the gear holds the rest. "
+                     + "Tick Enable Omni-Rig CAT in Options > General to send.";
+
+            if (Rig.Status != OmniRig.RigStatusX.ST_ONLINE)
+                return "The radio is not answering, so nothing typed or pressed here will go out. "
+                     + "Everything else works. When CAT is working the radio's name shows in green at "
+                     + "the right of the status bar.";
+
+            string rigType = NormalizeRigType(Rig.RigType);
+
+            if (!CanKeyCw(rigType))
+                return "This radio (" + rigType + ") cannot be keyed by CAT, so nothing typed here "
+                     + "will go out. Send CW from the radio's own memory keys."
+                     + (string.IsNullOrEmpty(RigFileTrouble) ? string.Empty : "  " + RigFileTrouble)
+                     + "  You can still write and edit the macros below - right-click one.";
+
+            return null;
         }
 
         private void CloseCwKeyboard()
@@ -8213,15 +8379,20 @@ namespace HolyLogger
             // OpenCwKeyboard) because it is where the macros and the keyer's settings are written,
             // so the only thing left that can stop it opening is the radio not being reachable at
             // all - which is what OpenCwKeyboard itself refuses on, with a message saying why.
-            if (CwKeyboardMenuItem != null) CwKeyboardMenuItem.IsEnabled = isAvailable;
+            if (CwKeyboardMenuItem != null) CwKeyboardMenuItem.IsEnabled = true;
 
             // The window is told the mode either way, so one opened by hand outside CW says on its
             // own face that nothing will go out - see CwKeyboardWindow.SetCwMode.
             if (cwKeyboard != null) cwKeyboard.SetCwMode(isCw);
 
+            // AND WHY IT CANNOT SEND, kept current: CAT off, a silent radio, or one that cannot be
+            // keyed. It used to CLOSE the window when CAT went - the operator asked for it back, and
+            // he is right: he opened it to write his macros, and the radio going quiet is no reason
+            // to take that away from him.
+            if (cwKeyboard != null) cwKeyboard.CannotKey(WhyTheKeyerCannotSend());
+
             if (!isAvailable)
             {
-                CloseCwKeyboard();
                 _cwKeyboardWasWanted = false;
             }
             else if (!cwKeyboardWanted)
@@ -8244,7 +8415,7 @@ namespace HolyLogger
                 // The state still moves, so switching it back on does not open the keyer retrospectively
                 // for a mode change that happened while it was off: the next time he comes INTO CW is the
                 // next time it opens.
-                if (Properties.Settings.Default.OpenCwKeyerOnCw) OpenCwKeyboard(true);
+                if (Properties.Settings.Default.OpenCwKeyerOnCw) OpenCwKeyboard();
                 _cwKeyboardWasWanted = true;
             }
 

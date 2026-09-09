@@ -19,7 +19,6 @@ namespace HolyLogger
 
             callsign = (callsign ?? string.Empty).Trim();
             bool hasIdentity = callsign.Length > 0;
-            TB_Callsign.Text = hasIdentity ? callsign : "(not set yet)";
 
             // First item = "(don't copy)" sentinel (Id 0); then EVERY OTHER regular log. The copies may
             // go wherever the operator wants them - a log that receives QSOs made under another callsign

@@ -713,6 +713,9 @@
     <Setting Name="DeletedLogsFolder" Type="System.String" Scope="User">
       <Value Profile="(Default)" />
     </Setting>
+    <Setting Name="LastExportFolder" Type="System.String" Scope="User">
+      <Value Profile="(Default)" />
+    </Setting>
     <Setting Name="ExtraBackupPrompted" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">False</Value>
     </Setting>
@@ -801,6 +804,12 @@
       <Value Profile="(Default)" />
     </Setting>
     <Setting Name="CwMsgLabelsJson" Type="System.String" Scope="User">
+      <Value Profile="(Default)" />
+    </Setting>
+    <Setting Name="CwKeyerButtonsOffJson" Type="System.String" Scope="User">
+      <Value Profile="(Default)" />
+    </Setting>
+    <Setting Name="CwKeyerLabelsOffJson" Type="System.String" Scope="User">
       <Value Profile="(Default)" />
     </Setting>
     <Setting Name="CwKeyerButtonsSpJson" Type="System.String" Scope="User">
