@@ -3131,6 +3131,78 @@ namespace HolyLogger
             }
         }
 
+        // A BOX THAT LOOKS LIKE THE KEYCAP IT NAMES, and stops the typing where the keycap's own face
+        // runs out. Built twice now - once for the button's ordinary name, once for the name it wears
+        // while it is asking QRL? - so it is built in one place.
+        private Border KeycapNameBox(CwKeyboardWindow.ButtonName name, out TextBox box)
+        {
+            double boxWidth = name.BoxWidth > 0 ? name.BoxWidth : 60;
+            if (boxWidth < 44) boxWidth = 44;
+
+            double faceSize = name.FaceFontSize > 0 ? name.FaceFontSize : 16;
+            var faceFamily = string.IsNullOrEmpty(name.FaceFontFamily)
+                           ? SystemFonts.MessageFontFamily
+                           : new System.Windows.Media.FontFamily(name.FaceFontFamily);
+
+            double faceRoom = boxWidth - 8;
+            if (faceRoom < 20) faceRoom = 20;
+
+            var idBox = new TextBox
+            {
+                Text = name.Label ?? string.Empty,
+                FontSize = 16,
+                Height = 28,
+                Width = Math.Max(boxWidth, faceRoom * (16.0 / faceSize) + 14),
+                HorizontalAlignment = HorizontalAlignment.Left,
+                VerticalContentAlignment = VerticalAlignment.Center,
+                Padding = new Thickness(4, 0, 4, 0),
+                MaxLength = 24,
+                Background = System.Windows.Media.Brushes.Transparent,
+                Foreground = System.Windows.Media.Brushes.Black,
+                BorderThickness = new Thickness(0),
+                CaretBrush = System.Windows.Media.Brushes.Black,
+                ToolTip = "What this button is called. The typing stops where the button's own face "
+                        + "runs out." + Environment.NewLine + Environment.NewLine
+                        + "Leave it empty and the button shows the key that presses it."
+            };
+
+            string lastThatFits = idBox.Text;
+            bool restoring = false;
+
+            idBox.TextChanged += (s2, e2) =>
+            {
+                if (restoring) return;
+
+                if (MeasuredWidth(idBox.Text ?? string.Empty, faceFamily, faceSize) <= faceRoom)
+                {
+                    lastThatFits = idBox.Text;
+                    return;
+                }
+
+                restoring = true;
+                int caret = idBox.CaretIndex;
+                idBox.Text = lastThatFits;
+                idBox.CaretIndex = Math.Min(Math.Max(0, caret - 1), idBox.Text.Length);
+                restoring = false;
+                BeepRefusedKey();
+            };
+
+            box = idBox;
+
+            return new Border
+            {
+                CornerRadius = new CornerRadius(5),
+                Background = new System.Windows.Media.SolidColorBrush(
+                    System.Windows.Media.Color.FromRgb(0x7F, 0xFE, 0xFF)),
+                BorderBrush = new System.Windows.Media.SolidColorBrush(
+                    System.Windows.Media.Color.FromRgb(0x00, 0x9A, 0x9C)),
+                BorderThickness = new Thickness(1),
+                Padding = new Thickness(2, 0, 2, 0),
+                HorizontalAlignment = HorizontalAlignment.Left,
+                Child = idBox
+            };
+        }
+
         // How wide a word really is in a given font, asked of WPF rather than guessed at from a
         // character count. Bold is not asked for: the keycaps are not bold, and a measurement taken in
         // a heavier face would refuse names that fit.
@@ -3199,7 +3271,8 @@ namespace HolyLogger
                                              string extraHeading, string extraHint, string extraText,
                                              string mainHint,
                                              out string extraResult,
-                                             CwKeyboardWindow.ButtonName name = null)
+                                             CwKeyboardWindow.ButtonName name = null,
+                                             CwKeyboardWindow.ButtonName askingName = null)
         {
             extraResult = extraText;
             Window dialog = new Window
@@ -3228,6 +3301,7 @@ namespace HolyLogger
             };
 
             TextBox nameBox = null;
+            TextBox askingNameBox = null;
 
             Grid grid = new Grid { Margin = new Thickness(10) };
             // TWO ROWS, one under the other: what is typed, and what that would put on air. The
@@ -3324,91 +3398,10 @@ namespace HolyLogger
             }
             else
             {
-                double boxWidth = name.BoxWidth > 0 ? name.BoxWidth : 60;
-                if (boxWidth < 44) boxWidth = 44;      // narrower than this and no name is readable
-
-                // AS MUCH AS THE BUTTON CAN SHOW, AND NOT ONE LETTER MORE.
-                //
-                // A COUNT OF CHARACTERS CANNOT DO THIS. Counted in the widest letter it stopped the
-                // operator at three where his button plainly held "Mycall"; counted in an average one
-                // it would let six M's through and cut them off on the keycap. Letters are not all the
-                // same width, so what is measured is the WORD - the one he is actually typing, in the
-                // font the button writes in - and it is refused at the moment it would no longer fit.
-                //
-                // THE BOX IS BIGGER THAN THE BUTTON WHERE THE BUTTON WRITES SMALLER. The four on the
-                // main window write at 11 point and this box at 16, so the same name needs half as
-                // much room again here; a box the button's exact width would trim what the button
-                // itself shows in full - which is what the operator saw and reported.
-                double faceSize = name.FaceFontSize > 0 ? name.FaceFontSize : 16;
-                var faceFamily = string.IsNullOrEmpty(name.FaceFontFamily)
-                               ? SystemFonts.MessageFontFamily
-                               : new System.Windows.Media.FontFamily(name.FaceFontFamily);
-
-                // What is left of the keycap once its own padding is taken off.
-                double faceRoom = boxWidth - 8;
-                if (faceRoom < 20) faceRoom = 20;
-
-                Func<string, double> onTheButton = word => MeasuredWidth(word, faceFamily, faceSize);
-
-                var idBox = new TextBox
-                {
-                    Text = name.Label ?? string.Empty,
-                    FontSize = 16,
-                    Height = 28,
-                    Width = Math.Max(boxWidth, faceRoom * (16.0 / faceSize) + 14),
-                    HorizontalAlignment = HorizontalAlignment.Left,
-                    VerticalContentAlignment = VerticalAlignment.Center,
-                    Padding = new Thickness(4, 0, 4, 0),
-                    MaxLength = 24,
-
-                    // IT LOOKS LIKE THE THING IT NAMES. The cyan of a CW keycap and its rounded
-                    // corners, so what he types is plainly the writing on the button rather than one
-                    // more white box on a form. A text box cannot round its own corners, so the box
-                    // itself is made invisible and a Border carries the face - see below.
-                    Background = System.Windows.Media.Brushes.Transparent,
-                    Foreground = System.Windows.Media.Brushes.Black,
-                    BorderThickness = new Thickness(0),
-                    CaretBrush = System.Windows.Media.Brushes.Black,
-                    ToolTip = "What this button is called. The typing stops where the button's own "
-                            + "face runs out." + Environment.NewLine + Environment.NewLine
-                            + "Leave it empty and the button shows the key that presses it."
-                };
-
-                var idFace = new Border
-                {
-                    CornerRadius = new CornerRadius(5),
-                    Background = new System.Windows.Media.SolidColorBrush(
-                        System.Windows.Media.Color.FromRgb(0x7F, 0xFE, 0xFF)),   // the CW keycap's own
-                    BorderBrush = new System.Windows.Media.SolidColorBrush(
-                        System.Windows.Media.Color.FromRgb(0x00, 0x9A, 0x9C)),
-                    BorderThickness = new Thickness(1),
-                    Padding = new Thickness(2, 0, 2, 0),
-                    HorizontalAlignment = HorizontalAlignment.Left,
-                    Child = idBox
-                };
-
-                // REFUSED, NOT TRIMMED AFTERWARDS. The last thing that fitted is put back and the
-                // caret with it, so a letter too many simply does not appear.
-                string lastThatFits = idBox.Text;
-                bool restoring = false;
-
-                idBox.TextChanged += (s2, e2) =>
-                {
-                    if (restoring) return;
-
-                    if (onTheButton(idBox.Text ?? string.Empty) <= faceRoom)
-                    {
-                        lastThatFits = idBox.Text;
-                        return;
-                    }
-
-                    restoring = true;
-                    int caret = idBox.CaretIndex;
-                    idBox.Text = lastThatFits;
-                    idBox.CaretIndex = Math.Min(Math.Max(0, caret - 1), idBox.Text.Length);
-                    restoring = false;
-                    BeepRefusedKey();
-                };
+                // ONE BUILDER FOR BOTH NAME BOXES - this one and the one over the QRL? question -
+                // so the keycap look, the width, and the rule that stops the typing where the
+                // button's own face runs out cannot drift apart between them. See KeycapNameBox.
+                var idFace = KeycapNameBox(name, out nameBox);
 
                 var pair = new Grid();
                 pair.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -3444,7 +3437,6 @@ namespace HolyLogger
                 Grid.SetColumnSpan(pair, 3);
                 grid.Children.Add(pair);
 
-                nameBox = idBox;
             }
 
             // THE PAIR SITS IN THE MIDDLE, Save on the left, the way the rest of the program's windows
@@ -3539,8 +3531,50 @@ namespace HolyLogger
                 };
 
                 var above = new StackPanel { Margin = new Thickness(10, 10, 10, 0) };
-                above.Children.Add(CwEditHeading(extraHeading));
-                above.Children.Add(extraBox);
+
+                // THE QUESTION HAS A NAME TOO. A button that says CQ and sends QRL? is telling the
+                // operator something untrue at the one moment it matters, so the question may carry
+                // its own name for the keycap to wear while the next press would ask. Laid out like
+                // the pair above it: the name on the left, the words on the right, each under its own
+                // heading.
+                if (askingName == null)
+                {
+                    above.Children.Add(CwEditHeading(extraHeading));
+                    above.Children.Add(extraBox);
+                }
+                else
+                {
+                    var askBox = KeycapNameBox(askingName, out askingNameBox);
+
+                    var askPair = new Grid();
+                    askPair.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                    askPair.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(30) });
+                    askPair.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                    askPair.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                    askPair.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+
+                    var askHead = CwEditHeading("Button ID while asking");
+                    Grid.SetRow(askHead, 0);
+                    Grid.SetColumn(askHead, 0);
+                    askPair.Children.Add(askHead);
+
+                    var wordsHead = CwEditHeading(extraHeading);
+                    Grid.SetRow(wordsHead, 0);
+                    Grid.SetColumn(wordsHead, 2);
+                    askPair.Children.Add(wordsHead);
+
+                    Grid.SetRow(askBox, 1);
+                    Grid.SetColumn(askBox, 0);
+                    askPair.Children.Add(askBox);
+
+                    Grid.SetRow(extraBox, 1);
+                    Grid.SetColumn(extraBox, 2);
+                    extraBox.HorizontalAlignment = HorizontalAlignment.Left;
+                    askPair.Children.Add(extraBox);
+
+                    above.Children.Add(askPair);
+                }
+
                 if (!string.IsNullOrEmpty(extraHint)) above.Children.Add(CwEditHint(extraHint));
 
                 // With a name box in the window the macro's own heading already stands over it, so
@@ -3567,6 +3601,8 @@ namespace HolyLogger
 
             if (extraBox != null) extraResult = (extraBox.Text ?? string.Empty).Trim();
             if (nameBox != null && name != null) name.Label = (nameBox.Text ?? string.Empty).Trim();
+            if (askingNameBox != null && askingName != null)
+                askingName.Label = (askingNameBox.Text ?? string.Empty).Trim();
             return tb.Text.Trim();
         }
 
@@ -4287,6 +4323,10 @@ namespace HolyLogger
             // to type CW into, both feeding one radio, is two half-sent messages.
             if (cwLiteKeyer != null) cwLiteKeyer.KeyerWindowOpen = true;
 
+            // Enter with nothing waiting in the keyer's row walks the contact from there, the same
+            // walk the main window's own Enter does - see TryHandleEsmEnter.
+            cwKeyboard.EsmEnter = TryHandleEsmEnter;
+
             // The readout follows the radio's own knob from here on - see BuildCwSpeedReadCommand.
             cwKeyboard.AskSpeed = AskRadioCwSpeed;
 
@@ -4295,7 +4335,8 @@ namespace HolyLogger
 
             // The CQ button holds two texts and is edited as two - see EditCqButton.
             cwKeyboard.EditTwoTexts = (string title, string mainText, ref string extraText,
-                                       CwKeyboardWindow.ButtonName name) =>
+                                       CwKeyboardWindow.ButtonName name,
+                                       CwKeyboardWindow.ButtonName askingName) =>
             {
                 string extra;
                 string result = ShowCwTextEditDialog(
@@ -4306,7 +4347,7 @@ namespace HolyLogger
                     + "on, or has sat on it too long without calling. Recommended: QRL?",
                     extraText,
                     "What the button sends once QRL was asked",
-                    out extra, name);
+                    out extra, name, askingName);
 
                 extraText = extra;
                 return result;
@@ -5639,6 +5680,15 @@ namespace HolyLogger
                 // that key for its own macros: a button naming a key that would do something else is
                 // worse than a blank one.
                 string own = MsgButtonLabel(messageNumber);
+
+                // THE CQ BUTTON HAS A SECOND NAME while the next press would ask QRL? rather than
+                // call - see CwKeyboardWindow.QrlLabel. Only where he has given it one.
+                if (messageNumber == 1 && ShouldAskQrlNow())
+                {
+                    string asking = CwKeyboardWindow.QrlLabel();
+                    if (asking.Length > 0) own = asking;
+                }
+
                 string key = "F" + (messageNumber + 4);
 
                 // "OURS" MEANS THE KEYER IS NOT USING THEM FOR CW. It takes F1-F12 for its own
@@ -5677,6 +5727,15 @@ namespace HolyLogger
         {
             string qrl = CwKeyboardWindow.QrlText();
 
+            // The same keycap, named for the other thing it does - see CwKeyboardWindow.QrlLabel.
+            var askingName = new CwKeyboardWindow.ButtonName
+            {
+                Label = CwKeyboardWindow.QrlLabel(),
+                BoxWidth = name.BoxWidth,
+                FaceFontSize = name.FaceFontSize,
+                FaceFontFamily = name.FaceFontFamily
+            };
+
             string extra;
             string result = ShowCwTextEditDialog(
                 "Edit CW Text 1 (F5)", GetCwMessageText(1),
@@ -5686,9 +5745,11 @@ namespace HolyLogger
                 + "on, or has sat on it too long without calling. Recommended: QRL?",
                 qrl,
                 "What the button sends once QRL was asked",
-                out extra, name);
+                out extra, name, askingName);
 
             if (result == null) return null;
+
+            CwKeyboardWindow.SaveQrlLabel(askingName.Label);
 
             // The question is one setting for the whole program - the keyer's first button asks with
             // the same words - so it is saved whichever editor was used to change it.
@@ -5722,6 +5783,9 @@ namespace HolyLogger
         // the radio's frequency, and the answer cannot change faster than a hand can turn the dial.
         private static readonly System.Windows.Media.Brush QrlWarningBrush = MakeQrlWarningBrush();
 
+        // The name the CQ button is wearing at this moment - see PaintCqMessageButton.
+        private string _qrlNameShown = string.Empty;
+
         private static System.Windows.Media.Brush MakeQrlWarningBrush()
         {
             var brush = new System.Windows.Media.SolidColorBrush(
@@ -5744,6 +5808,17 @@ namespace HolyLogger
             // The colour is put on by the one painter that owns it; this only asks it to look again,
             // because the answer can change with the dial and nothing else would tell it.
             UpdateVoiceMessageButtonHighlight(button, 1);
+
+            // AND THE NAME WITH IT, whenever the name it should wear has changed - the state turning
+            // over, the words edited in the keyer's own editor, or the name taken away again. Asking
+            // "is there a name?" was not enough: clearing one left the old word on the keycap.
+            string wantedName = ShouldAskQrlNow() ? CwKeyboardWindow.QrlLabel() : string.Empty;
+
+            if (!string.Equals(wantedName, _qrlNameShown, StringComparison.Ordinal))
+            {
+                _qrlNameShown = wantedName;
+                UpdateMessageButtonLabel(button, 1, IsCwModeActive());
+            }
 
             if (ShouldAskQrlNow())
             {

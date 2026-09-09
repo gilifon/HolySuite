@@ -129,6 +129,12 @@ namespace HolyLogger
         internal Action<int> SetSpeed { set { _setSpeed = value; } }
         private Action<int> _setSpeed;
 
+        // ENTER, WHEN THE ROW HAS NOTHING WAITING IN IT. The key then belongs to the contact - it
+        // calls, sends the exchange, sends TU - and that walk lives on the main window, so this window
+        // asks for it rather than doing it. True when ESM had something to send.
+        internal Func<bool> EsmEnter { set { _esmEnter = value; } }
+        private Func<bool> _esmEnter;
+
         // Where the radio is listening, in Hz. Null on a radio that cannot be asked, and then the QRL
         // rule below simply never applies.
         internal Func<double> RadioFrequencyHz { set { _rxFrequencyHz = value; } }
@@ -174,6 +180,37 @@ namespace HolyLogger
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); return QrlDefaultText; }
         }
+        // AND WHAT THE KEYCAP IS CALLED WHILE IT ASKS. A button that says CQ and sends QRL? is a
+        // button telling the operator something untrue at the one moment it matters, and the red face
+        // alone does not say WHAT it will send instead. So the question may carry a name of its own -
+        // QRL?, or ? , or whatever he calls it - and the keycap wears that name for as long as the
+        // next press would ask.
+        //
+        // ONE SETTING FOR THE WHOLE PROGRAM, like the question's own words: it is the same CQ button
+        // whether it is pressed in this window or on the main one.
+        //
+        // EMPTY IS THE ORDINARY ANSWER, and then nothing changes: the button keeps the name it wears
+        // the rest of the time, which is what it did before this existed.
+        internal static string QrlLabel()
+        {
+            try
+            {
+                string text = Properties.Settings.Default.CwKeyerQrlLabel;
+                return string.IsNullOrWhiteSpace(text) ? string.Empty : text.Trim();
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); return string.Empty; }
+        }
+
+        internal static void SaveQrlLabel(string label)
+        {
+            try
+            {
+                Properties.Settings.Default.CwKeyerQrlLabel = (label ?? string.Empty).Trim();
+                Properties.Settings.Default.Save();
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
         // ONE MARK FOR THE WHOLE PROGRAM, not one per window. The CQ can now be sent from two places -
         // this window's first button and the main window's first Msg button - and they are the same
         // CQ on the same radio. Kept apart, a CQ called from one of them left the other still
@@ -845,13 +882,30 @@ namespace HolyLogger
 
             if (e.Key == Key.Enter)
             {
-                // HOLDING FOR ENTER, THIS IS THE MOMENT. Everything written so far is released to the
-                // radio; anything typed after it waits for the next Enter. Typing straight onto the air
-                // there is nothing for the key to do - what is typed is already on its way out - and in
-                // neither case may it close the window: the operator keeps typing.
-                if (HoldForEnter) ReleaseTypedText();
-
+                // ONE KEY, AND WHAT IS IN THE ROW DECIDES WHOSE IT IS.
+                //
+                // Something written and not yet released: THIS IS THE MOMENT. Everything so far goes to
+                // the radio; anything typed after it waits for the next Enter.
+                //
+                // Nothing waiting: the key belongs to the contact, and Run or S&P walks it from here
+                // exactly as it does from the main window - call, exchange, TU. That used to be
+                // impossible: choosing Run or S&P forced this window back to Type, because one key
+                // doing two jobs with no rule to tell them apart is a trap. The rule is the row.
+                //
+                // Either way the key is ours: it must never reach the button behind it and close the
+                // window while he is typing.
                 e.Handled = true;
+
+                string row = _box.Text ?? string.Empty;
+
+                if (HoldForEnter && row.Length > Math.Max(0, Math.Min(_releasedUpTo, row.Length)))
+                {
+                    ReleaseTypedText();
+                    return;
+                }
+
+                try { if (_esmEnter != null) _esmEnter(); }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
                 return;
             }
 
@@ -1530,6 +1584,10 @@ namespace HolyLogger
         // ASKED ONCE A SECOND, not on every tick: it is a question that leaves the program for the
         // radio's frequency, and the answer cannot change faster than a hand can turn the dial.
         private static readonly Brush QrlWarningBrush = MakeQrlWarningBrush();
+
+        // The name the first keycap is wearing at this moment, so PaintCqButton can tell whether the
+        // face still says what it should. Empty means it is wearing its ordinary name.
+        private string _qrlNameShown = string.Empty;
         private DateTime _qrlCheckedUtc = DateTime.MinValue;
         private bool _qrlNext;
 
@@ -1558,6 +1616,23 @@ namespace HolyLogger
             if (button == null) return;
 
             RefreshQrlNext();
+
+            // THE FACE IS DRAWN AGAIN WHEN THE NAME IT SHOULD WEAR HAS CHANGED - which is not the same
+            // as when the STATE has changed, and that was the fault: the name was edited on the main
+            // window's own CQ button while this one was already red, so the state never turned over
+            // and this window went on wearing the old name until something else redrew it.
+            //
+            // Comparing the name itself covers every way it can change: the state turning over, the
+            // words edited in either window, or the name taken away again. And it costs nothing while
+            // nothing has changed, which matters - this runs once a second for as long as the window
+            // is open.
+            string wantedName = _qrlNext ? QrlLabel() : string.Empty;
+
+            if (!string.Equals(wantedName, _qrlNameShown, StringComparison.Ordinal))
+            {
+                _qrlNameShown = wantedName;
+                RefreshButtonFace(0);
+            }
 
             if (_qrlNext)
             {
@@ -1983,6 +2058,14 @@ namespace HolyLogger
             string text = _buttonTexts[index] ?? string.Empty;
             string label = ButtonLabel(index);
 
+            // THE CQ BUTTON HAS A SECOND NAME while the next press would ask QRL? rather than call -
+            // see QrlLabel. Only when he has given it one; otherwise the button reads as it always did.
+            if (index == 0 && _qrlNext)
+            {
+                string asking = QrlLabel();
+                if (asking.Length > 0) label = asking;
+            }
+
             // His own name for the key where he has given one; otherwise as much of the macro as the
             // button can hold, with an ellipsis where it runs out. Nothing at all when the key is empty:
             // the F-key underneath already says which one it is, so a number here would be it twice.
@@ -2324,7 +2407,12 @@ namespace HolyLogger
 
             string qrl = QrlText();
             var cqName = NameOf(0);
-            string cq = _editTwoTexts("Edit CW Keyer Text 1 (F1)", _buttonTexts[0] ?? string.Empty, ref qrl, cqName);
+
+            var askingName = NameOf(0);
+            askingName.Label = QrlLabel();
+
+            string cq = _editTwoTexts("Edit CW Keyer Text 1 (F1)", _buttonTexts[0] ?? string.Empty,
+                                      ref qrl, cqName, askingName);
             if (cq == null) return;
 
             // The question is one setting for the whole program; the call belongs to the bank showing.
@@ -2335,13 +2423,17 @@ namespace HolyLogger
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
 
+            // The name it wears while asking is one setting too - see QrlLabel.
+            SaveQrlLabel(askingName.Label);
+
             _buttonTexts[0] = cq;
             SaveButtonText(0, cq);
             SaveButtonLabel(0, cqName.Label);
             RefreshButtonFace(0);
         }
 
-        internal delegate string TwoTextEditor(string title, string mainText, ref string extraText, ButtonName name);
+        internal delegate string TwoTextEditor(string title, string mainText, ref string extraText,
+                                              ButtonName name, ButtonName askingName);
 
         internal TwoTextEditor EditTwoTexts { set { _editTwoTexts = value; } }
         private TwoTextEditor _editTwoTexts;
@@ -2629,11 +2721,10 @@ namespace HolyLogger
             // alone; Run and S&P each bring their own texts up.
             if (on) ShowBank(searchAndPounce);
 
-            // RUN AND S&P ARE TYPE. They are contest working: the macros do the talking, Enter walks
-            // the QSO from the callsign box, and there is no long sentence to compose. Holding the line
-            // back for an Enter that belongs to the other window would only be a trap, so choosing
-            // either of them puts the pair back on Type - and sends anything already written.
-            if (on && HoldForEnter) SetHoldForEnter(false);
+            // RUN AND S&P NO LONGER TAKE THE CHOICE AWAY. They used to put this window back on Type,
+            // because Enter cannot be in two places at once - and now it need not be: with something
+            // written in the row Enter sends the row, and with the row empty Enter walks the contact.
+            // See Box_PreviewKeyDown, where that rule lives.
 
             RefreshEsmChoice();
             _box.Focus();
@@ -2765,21 +2856,17 @@ namespace HolyLogger
             PaintEsmChoice(_sendNowBtn, !hold);
             PaintEsmChoice(_sendOnEnterBtn, hold);
 
-            // ENTER IS NOT ON OFFER WHILE ESM IS. In Run or S&P the Enter key belongs to the QSO - it
-            // walks the contact from the callsign box - so a mode here that waits for Enter is a mode
-            // that would never be released. Switching ESM on already puts this pair back on Type; this
-            // stops him choosing it the other way round and wondering why nothing goes out.
-            bool esmOn = false;
-            try { esmOn = Properties.Settings.Default.EsmEnabled; }
-            catch (Exception swallowed) { Log.Swallow(swallowed); }
-
-            _sendOnEnterBtn.IsEnabled = !esmOn;
-            _sendOnEnterBtn.Opacity = esmOn ? 0.45 : 1.0;
-            _sendOnEnterBtn.ToolTip = esmOn
-                ? "Not while Run or S&P is on: there the Enter key walks the QSO from the callsign box. "
-                  + "Switch to Off to write a message and send it with Enter."
-                : "Nothing goes out while you write. Type it, put macros in it, correct it - and the "
-                  + "whole line goes when you press Enter.";
+            // ENTER IS ON OFFER IN EVERY MODE NOW. It was refused while Run or S&P was on, because
+            // the Enter key there walks the contact and a row waiting for it would never be released.
+            // What decides is no longer the mode but the row: something written in it goes when Enter
+            // is pressed, and with the row empty the same key walks the contact as before.
+            _sendOnEnterBtn.IsEnabled = true;
+            _sendOnEnterBtn.Opacity = 1.0;
+            _sendOnEnterBtn.ToolTip = "Nothing goes out while you write. Type it, put macros in it, "
+                                    + "correct it - and the whole line goes when you press Enter."
+                                    + Environment.NewLine + Environment.NewLine
+                                    + "With Run or S&P on and nothing written, Enter walks the contact "
+                                    + "as it always does.";
         }
 
         // Our own caption: the title, then the gear, then the X. The gear is the way in to anything
