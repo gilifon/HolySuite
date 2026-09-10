@@ -2028,12 +2028,14 @@ namespace HolyLogger
         internal const string VoiceMsgLabelsSetting = "VoiceMsgLabelsJson";
 
         // THE NAMES THE FOUR MSG BUTTONS ARRIVE WITH - see ReadLabels, which hands them out on a fresh
-        // installation and never over a name the operator has saved. Short on purpose: these keycaps
-        // are 44 wide and write at 11, which is room for four or five letters and no more, so "Call"
-        // rather than the keyer's roomier "My Call".
+        // installation and never over a name the operator has saved. They are the operator's own words
+        // for the four texts CwMsgText1..4 ship with: the CQ, what he sends back, the TU, and his call.
         //
-        // They match CwMsgText1..4 as shipped: CQ TEST, the exchange, TU, and the bare callsign.
-        internal static readonly string[] StandardMsgLabels = { "CQ", "Exch", "TU", "Call" };
+        // ALL FOUR ARE MEASURED, not judged by eye. These keycaps are 44 wide and write at 11 in the
+        // system font, which leaves 36 for the word; the longest of these, Mycall, takes 31.2 - a shade
+        // wider than the "Msg1" the XAML has always printed on the same face at 27.0. Anything longer
+        // wants measuring the same way before it goes here.
+        internal static readonly string[] StandardMsgLabels = { "CQ", "DE", "TU", "Mycall" };
 
         // Voice keeps the name these four buttons have always worn - it is what the keycaps said before
         // any of them could be named at all, and it fits: the XAML shipped "Msg1" on a 44-wide face.

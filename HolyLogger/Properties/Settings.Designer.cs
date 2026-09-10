@@ -2549,7 +2549,7 @@ namespace HolyLogger.Properties {
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("CQ TEST {MYCALL} {MYCALL} TEST")]
+        [global::System.Configuration.DefaultSettingValueAttribute("CQ CQ DE * * K")]
         public string CwMsgText1 {
             get {
                 return ((string)(this["CwMsgText1"]));
@@ -2561,7 +2561,7 @@ namespace HolyLogger.Properties {
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("{CALL} {SENTRST} {EXCH}")]
+        [global::System.Configuration.DefaultSettingValueAttribute("DE * K")]
         public string CwMsgText2 {
             get {
                 return ((string)(this["CwMsgText2"]));
@@ -2573,7 +2573,7 @@ namespace HolyLogger.Properties {
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("TU {MYCALL} TEST {LOG}")]
+        [global::System.Configuration.DefaultSettingValueAttribute("TU 73 !")]
         public string CwMsgText3 {
             get {
                 return ((string)(this["CwMsgText3"]));

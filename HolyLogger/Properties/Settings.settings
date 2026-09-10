@@ -624,13 +624,13 @@
       <Value Profile="(Default)"></Value>
     </Setting>
     <Setting Name="CwMsgText1" Type="System.String" Scope="User">
-      <Value Profile="(Default)">CQ TEST {MYCALL} {MYCALL} TEST</Value>
+      <Value Profile="(Default)">CQ CQ DE * * K</Value>
     </Setting>
     <Setting Name="CwMsgText2" Type="System.String" Scope="User">
-      <Value Profile="(Default)">{CALL} {SENTRST} {EXCH}</Value>
+      <Value Profile="(Default)">DE * K</Value>
     </Setting>
     <Setting Name="CwMsgText3" Type="System.String" Scope="User">
-      <Value Profile="(Default)">TU {MYCALL} TEST {LOG}</Value>
+      <Value Profile="(Default)">TU 73 !</Value>
     </Setting>
     <Setting Name="CwMsgText4" Type="System.String" Scope="User">
       <Value Profile="(Default)">{MYCALL}</Value>
