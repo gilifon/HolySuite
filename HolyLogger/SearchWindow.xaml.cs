@@ -1479,12 +1479,26 @@ namespace HolyLogger
         // need, measured from the real rendered layout rather than a guessed pixel number - so it stays
         // correct if the theme font, DPI, or the filters themselves ever change. +20 is the search bar
         // Border's own Padding="10,8" (left+right); +8 is a small rounding safety margin.
+        //
+        // WHAT THE PANEL WANTS, NOT WHAT IT WAS GIVEN. This used to read FiltersPanel.ActualWidth, and
+        // that is the width the panel was ALLOWED - if the window is too narrow for a row, the panel has
+        // already been cut down to the window by the time this asks, so it reported the narrow width,
+        // found nothing to fix, and left the row hanging off the right edge. Measured: the panel wanted
+        // 1294 and reported 1003, and the Notes box ended 270px past the window's edge with the Comment
+        // box beside it half gone. Measuring against an unbounded width is the only way to ask "how wide
+        // does this actually need to be", and the panel is then invalidated so its parent measures it
+        // again properly for the layout the operator sees.
         private void LockMinWidthToContent()
         {
             try
             {
                 if (FiltersPanel == null || !FiltersPanel.IsArrangeValid) return;
-                double required = FiltersPanel.ActualWidth + 20 + 8;
+
+                FiltersPanel.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+                double wanted = FiltersPanel.DesiredSize.Width;
+                FiltersPanel.InvalidateMeasure();
+
+                double required = wanted + 20 + 8;
                 if (required > MinWidth) MinWidth = required;
                 if (ActualWidth < MinWidth) Width = MinWidth;
             }
