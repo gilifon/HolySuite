@@ -1969,6 +1969,28 @@ namespace HolyLogger
                     if (settingName == KeyerLabelsSetting && string.IsNullOrWhiteSpace(ReadBankJson(Bank.Run)))
                         for (int i = 0; i < count && i < StandardLabels.Length; i++) labels[i] = StandardLabels[i];
 
+                    // THE FOUR MSG BUTTONS ARRIVE NAMED. A new operator used to meet four keycaps
+                    // saying F5 to F8 and nothing else - the key he could already see on his keyboard -
+                    // with no sign that a button HAS a name, let alone that it is his to change. They
+                    // come named now, and the key still shows under the name.
+                    //
+                    // CW's names are only handed out over the CW text this program shipped, one button
+                    // at a time: a man who has rewritten button 2 is not told it says Exch.
+                    else if (settingName == MsgLabelsSetting)
+                    {
+                        for (int b = 0; b < count && b < StandardMsgLabels.Length; b++)
+                            if (IsShippedMsgText(b + 1)) labels[b] = StandardMsgLabels[b];
+                    }
+
+                    // Voice needs no such test. What a voice button plays is the radio's own memory of
+                    // that number, whatever the operator recorded into it, so naming it after that
+                    // memory is true on every radio and cannot go stale.
+                    else if (settingName == VoiceMsgLabelsSetting)
+                    {
+                        for (int b = 0; b < count && b < StandardVoiceMsgLabels.Length; b++)
+                            labels[b] = StandardVoiceMsgLabels[b];
+                    }
+
                     return labels;
                 }
 
@@ -2004,6 +2026,34 @@ namespace HolyLogger
         // mode too. Voice keeps its own file now: the four buttons are one keycap each, but what each
         // is CALLED is a separate choice per mode, same as the text under it always was.
         internal const string VoiceMsgLabelsSetting = "VoiceMsgLabelsJson";
+
+        // THE NAMES THE FOUR MSG BUTTONS ARRIVE WITH - see ReadLabels, which hands them out on a fresh
+        // installation and never over a name the operator has saved. Short on purpose: these keycaps
+        // are 44 wide and write at 11, which is room for four or five letters and no more, so "Call"
+        // rather than the keyer's roomier "My Call".
+        //
+        // They match CwMsgText1..4 as shipped: CQ TEST, the exchange, TU, and the bare callsign.
+        internal static readonly string[] StandardMsgLabels = { "CQ", "Exch", "TU", "Call" };
+
+        // Voice plays the radio's own message memories, and every radio's front panel numbers them.
+        internal static readonly string[] StandardVoiceMsgLabels = { "M1", "M2", "M3", "M4" };
+
+        // Is this Msg button's CW text still the one the program shipped? A keycap name only fits the
+        // macro under it, so a standard name goes out only where the standard text is still there.
+        private static bool IsShippedMsgText(int messageNumber)
+        {
+            try
+            {
+                string setting = "CwMsgText" + messageNumber;
+                string now = Properties.Settings.Default[setting] as string;
+                string shipped = Properties.Settings.Default.Properties[setting].DefaultValue as string;
+
+                return string.Equals((now ?? string.Empty).Trim(), (shipped ?? string.Empty).Trim(),
+                                     StringComparison.OrdinalIgnoreCase);
+            }
+            // An unreadable setting means the text cannot be vouched for, so no name is put on it.
+            catch (Exception swallowed) { Log.Swallow(swallowed); return false; }
+        }
 
         // Everything the editor needs to know about the keycap being named: what it is called now, how
         // wide it is, and what it writes in - see RefreshButtonFace, which is where that 16 comes from.
