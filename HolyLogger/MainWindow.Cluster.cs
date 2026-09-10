@@ -1005,6 +1005,12 @@ namespace HolyLogger
             // template squeezes/clips this 24px icon. Use the default template like before dark mode.
             undoButton.Style = null;
 
+            // THE TOOLTIP HAS TO WORK WHILE THE BUTTON IS GREY. This button starts disabled and only
+            // wakes up once there is a tune to undo, and WPF shows no tooltip on a disabled control -
+            // so the one moment the operator asks "what is this greyed-out arrow for?" was the one
+            // moment nothing answered.
+            ToolTipService.SetShowOnDisabled(undoButton, true);
+
             return undoButton;
         }
 
@@ -1385,11 +1391,12 @@ namespace HolyLogger
             dxColumnTemplate.VisualTree = dxTextBlockFactory;
             var dxHeaderStyle = new Style(typeof(DataGridColumnHeader), clusterColumnHeaderStyle);
             dxHeaderStyle.Setters.Add(new Setter(Control.HorizontalContentAlignmentProperty, HorizontalAlignment.Center));
+            dxHeaderStyle = HeaderStyleWithTip(dxHeaderStyle, "The station that was spotted.");
             var dxColumn = new DataGridTemplateColumn { Header = "DX", HeaderStyle = dxHeaderStyle, CellTemplate = dxColumnTemplate, SortMemberPath = "DXCallsign", Width = new DataGridLength(83) };
 
             // Spotter / Country columns
-            var spotterColumn = new DataGridTextColumn { Header = "Spotter", HeaderStyle = clusterColumnHeaderStyle, Binding = new System.Windows.Data.Binding("SpotterCallsign"), Width = new DataGridLength(61) };
-            var countryColumn = new DataGridTextColumn { Header = "Country", HeaderStyle = clusterColumnHeaderStyle, Binding = new System.Windows.Data.Binding("Country"), Width = new DataGridLength(76) };
+            var spotterColumn = new DataGridTextColumn { Header = "Spotter", HeaderStyle = HeaderStyleWithTip(clusterColumnHeaderStyle, "Who reported the spot."), Binding = new System.Windows.Data.Binding("SpotterCallsign"), Width = new DataGridLength(61) };
+            var countryColumn = new DataGridTextColumn { Header = "Country", HeaderStyle = HeaderStyleWithTip(clusterColumnHeaderStyle, "Where the spotted station is."), Binding = new System.Windows.Data.Binding("Country"), Width = new DataGridLength(76) };
 
             // Freq column with band color
             var freqHeaderStyle = new Style(typeof(DataGridColumnHeader), clusterColumnHeaderStyle);
@@ -1416,6 +1423,7 @@ namespace HolyLogger
             freqTextBlockFactory.SetValue(TextBlock.FontWeightProperty, FontWeights.Bold);
             freqColumnTemplate.VisualTree = freqTextBlockFactory;
 
+            freqHeaderStyle = HeaderStyleWithTip(freqHeaderStyle, "The frequency the spot was reported on. Click a spot to tune there.");
             var freqColumn = new DataGridTemplateColumn { Header = freqHeaderText, HeaderStyle = freqHeaderStyle, CellTemplate = freqColumnTemplate, SortMemberPath = "FreqMhz", Width = DataGridLength.Auto };
 
             // UTC column
@@ -1424,6 +1432,7 @@ namespace HolyLogger
             var utcTextStyle = new Style(typeof(TextBlock));
             utcTextStyle.Setters.Add(new Setter(TextBlock.TextAlignmentProperty, TextAlignment.Center));
             utcTextStyle.Setters.Add(new Setter(TextBlock.HorizontalAlignmentProperty, HorizontalAlignment.Center));
+            utcHeaderStyle = HeaderStyleWithTip(utcHeaderStyle, "When the spot arrived, in UTC.");
             var utcColumn = new DataGridTextColumn { Header = "UTC", HeaderStyle = utcHeaderStyle, ElementStyle = utcTextStyle, Binding = new System.Windows.Data.Binding("TimeUtc"), Width = new DataGridLength(ClusterLastMinutesDropdownWidth), CanUserResize = false };
 
             // Mode column
@@ -1437,11 +1446,13 @@ namespace HolyLogger
             modeTextFactory.SetValue(TextBlock.TextAlignmentProperty, TextAlignment.Center);
             modeTextFactory.SetValue(TextBlock.HorizontalAlignmentProperty, HorizontalAlignment.Center);
             modeTemplate.VisualTree = modeTextFactory;
+            modeHeaderStyle = HeaderStyleWithTip(modeHeaderStyle, "The mode the spotter reported.");
             var modeColumn = new DataGridTemplateColumn { Header = "Mode", HeaderStyle = modeHeaderStyle, CellTemplate = modeTemplate, Width = DataGridLength.Auto };
 
             // Comment column (auto-width, so a centered header drifts with the widest comment — keep it left)
             var commentHeaderStyle = new Style(typeof(DataGridColumnHeader), clusterColumnHeaderStyle);
             commentHeaderStyle.Setters.Add(new Setter(Control.HorizontalContentAlignmentProperty, HorizontalAlignment.Left));
+            commentHeaderStyle = HeaderStyleWithTip(commentHeaderStyle, "What the spotter wrote.");
             var commentColumn = new DataGridTextColumn { Header = "Comment", HeaderStyle = commentHeaderStyle, Binding = new System.Windows.Data.Binding("Comment"), MinWidth = 60, Width = DataGridLength.Auto };
 
             // Flag column
@@ -1455,6 +1466,7 @@ namespace HolyLogger
             flagImageFactory.SetValue(System.Windows.Controls.Image.StretchProperty, System.Windows.Media.Stretch.Uniform);
             flagImageFactory.SetValue(System.Windows.Controls.Image.HorizontalAlignmentProperty, HorizontalAlignment.Center);
             flagTemplate.VisualTree = flagImageFactory;
+            flagHeaderStyle = HeaderStyleWithTip(flagHeaderStyle, "The flag of the spotted station's country.");
             var flagColumn = new DataGridTemplateColumn { Header = "Flag", HeaderStyle = flagHeaderStyle, CellTemplate = flagTemplate, Width = DataGridLength.Auto, CanUserResize = false };
 
             // Store references needed by other methods
@@ -1860,6 +1872,21 @@ namespace HolyLogger
             return row;
         }
 
+        // Said in two places - on the "Last" label and on the dropdown beside it - because they are two
+        // controls and the operator will point at either one.
+        private const string ClusterAgeFilterTip =
+            "How old a spot may be and still be shown. Anything older drops off the list.";
+
+        // A column-header style with a tooltip added. The header styles here are SHARED between columns
+        // (Spotter and Country use the same one), so the tip cannot be set on the style itself: each
+        // column that wants its own gets a style of its own, based on whichever it was already using.
+        private static Style HeaderStyleWithTip(Style baseStyle, string tip)
+        {
+            var withTip = new Style(typeof(DataGridColumnHeader), baseStyle);
+            withTip.Setters.Add(new Setter(FrameworkElement.ToolTipProperty, tip));
+            return withTip;
+        }
+
         private StackPanel BuildClusterLegendItem(Brush color, string text, bool useTextBackground = false, Thickness? itemMargin = null)
         {
             var itemPanel = new StackPanel
@@ -1886,6 +1913,29 @@ namespace HolyLogger
             if (string.Equals(text, "New Country", StringComparison.Ordinal))
             {
                 clusterNewCountryLegendText = itemText;
+            }
+
+            // WHAT THE COLOUR MEANS, said in words. The legend is itself the explanation of the colours
+            // in the list, but it explains them only to somebody who already knows what "unconfirmed"
+            // is counting. Kept here, keyed on the line's own text, so all five read as one set rather
+            // than being spread over five call sites.
+            switch (text)
+            {
+                case "New Country":
+                    itemPanel.ToolTip = "Red: a country you have never worked.";
+                    break;
+                case "Unconfirmed":
+                    itemPanel.ToolTip = "Orange: you have worked the country, but nobody has confirmed it.";
+                    break;
+                case "Worked Before":
+                    itemPanel.ToolTip = "Blue: you have worked this callsign before.";
+                    break;
+                case "Worked Country":
+                    itemPanel.ToolTip = "Plain text: the country is worked and confirmed.";
+                    break;
+                case "On My Radio Freq":
+                    itemPanel.ToolTip = "Green background: the spot is on the frequency your radio is tuned to now.";
+                    break;
             }
 
             return itemPanel;
@@ -2030,6 +2080,7 @@ namespace HolyLogger
 
             var activeBandIndicator = new TextBlock
             {
+                ToolTip = "The band your radio is on now. Red means the frequency is not inside a ham band.",
                 Text = FormatClusterBandDisplay(TB_Band != null ? TB_Band.Text : string.Empty),
                 Foreground = isActiveModeNow
                     ? new SolidColorBrush(Color.FromRgb(0, 190, 0))
@@ -2044,9 +2095,9 @@ namespace HolyLogger
             clusterActiveBandIndicatorText = activeBandIndicator;
             UpdateClusterActiveBandIndicatorText();   // band in green/gray, or red "out of band"
 
-            var btnAllBands = new Button { Content = "All Bands", HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(4, 2, 2, 4), Style = MakeClusterBandFilterBtnStyle(string.Equals(currentFilterMode, "All", StringComparison.OrdinalIgnoreCase)) };
-            var btnPreSelected = new Button { Content = "Selected", HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(4, 2, 2, 4), Style = MakeClusterBandFilterBtnStyle(string.Equals(currentFilterMode, "PreSelected", StringComparison.OrdinalIgnoreCase)) };
-            var btnActiveBand = new Button { Content = "Active Band", HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(4, 2, 2, 4), Style = MakeClusterBandFilterBtnStyle(string.Equals(currentFilterMode, "Active", StringComparison.OrdinalIgnoreCase)) };
+            var btnAllBands = new Button { Content = "All Bands", ToolTip = "Show spots from every band.", HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(4, 2, 2, 4), Style = MakeClusterBandFilterBtnStyle(string.Equals(currentFilterMode, "All", StringComparison.OrdinalIgnoreCase)) };
+            var btnPreSelected = new Button { Content = "Selected", ToolTip = "Show only the bands ticked on the right.", HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(4, 2, 2, 4), Style = MakeClusterBandFilterBtnStyle(string.Equals(currentFilterMode, "PreSelected", StringComparison.OrdinalIgnoreCase)) };
+            var btnActiveBand = new Button { Content = "Active Band", ToolTip = "Show only the band the radio is on now.", HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(4, 2, 2, 4), Style = MakeClusterBandFilterBtnStyle(string.Equals(currentFilterMode, "Active", StringComparison.OrdinalIgnoreCase)) };
 
             clusterBandFilterAllBtn = btnAllBands;
             clusterBandFilterPreSelectedBtn = btnPreSelected;
@@ -2779,6 +2830,7 @@ namespace HolyLogger
         {
             var lastMinutesLabel = new TextBlock
             {
+                ToolTip = ClusterAgeFilterTip,
                 Text = "Last",
                 FontSize = 12,
                 FontWeight = FontWeights.Bold,
@@ -2790,6 +2842,7 @@ namespace HolyLogger
 
             var lastMinutesCombo = new ComboBox
             {
+                ToolTip = ClusterAgeFilterTip,
                 Width = ClusterLastMinutesDropdownWidth,
                 Height = 22,
                 HorizontalAlignment = HorizontalAlignment.Left,
@@ -2828,6 +2881,7 @@ namespace HolyLogger
             // UpdateClusterActiveBandIndicatorPosition). The dropdown itself stays attached to UTC.
             clusterSpotCountBadge = new Border
             {
+                ToolTip = "How many spots are in the list now.",
                 Width = 30,
                 Height = 30,
                 CornerRadius = new CornerRadius(15),

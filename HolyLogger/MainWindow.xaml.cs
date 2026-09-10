@@ -11965,6 +11965,8 @@ namespace HolyLogger
             }
         }
 
+        // The tick and its label are one control to the operator, so the tooltip goes on the pair (the
+        // panel this returns) rather than on the 15px box alone.
         private StackPanel BuildModeCheckBox(string mode, bool isChecked)
         {
             var modeText = new TextBlock
@@ -12036,10 +12038,12 @@ namespace HolyLogger
             };
             modeIndicator.Children.Add(modeText);
             modeIndicator.Children.Add(checkBox);
+            modeIndicator.ToolTip = "Tick to show " + mode + " spots.";
 
             return modeIndicator;
         }
 
+        // See BuildModeCheckBox for why the tooltip sits on the panel.
         private StackPanel BuildBandCheckBox(string band, Color color, bool isChecked)
         {
             var bandText = new TextBlock
@@ -12217,6 +12221,13 @@ namespace HolyLogger
                 e.Handled = true;
                 EditBandColor(band);
             };
+
+            // "20 m", but "SHF" - the three microwave entries are names, not wavelengths, and "SHF m"
+            // would be nonsense.
+            bool isWavelength = band.Length > 0 && char.IsDigit(band[0]);
+            bandIndicator.ToolTip = "Tick to show " + band + (isWavelength ? " m" : "")
+                                  + " spots. The red number under it is how many that band has now."
+                                  + "\nRight-click to change the band's colour.";
 
             return bandIndicator;
         }
