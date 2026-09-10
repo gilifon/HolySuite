@@ -64,9 +64,21 @@ namespace HolyLogger
         const double FlickerFractionOfBoundary = 0.35;
         const int ShortestElementEver = 5;
 
-        // How long a character separator must hold before the character is written out.
+        // How long a character separator must hold before the character is written out. Three steps
+        // is deliberately short: the character separator is what carries the reading forward, and
+        // making it wait only puts letters on screen late. Measured - 6 was the same, 9 lost letters
+        // and 12 lost most of them.
         const int SeparatorSteps = 3;
-        const int WordSeparatorSteps = 6;
+
+        // A WORD SEPARATOR MUST HOLD FAR LONGER - about two and a half dits' worth.
+        //
+        // This one number was the whole of the fragmenting. The network asserts a word separator
+        // whenever a gap runs long, and on the air gaps between letters wander: at six steps the
+        // real band came out as "AU P L AI S SR E T BONN E S OIR" - every letter correct and a space
+        // thrown in between most of them. Measured against a recording of a real station: six and
+        // twelve steps both scattered, twenty gave "AU PLAISSR ET BONNE SOIR", and thirty began
+        // swallowing the real spaces. Twenty it is.
+        const int WordSeparatorSteps = 20;
 
         readonly CwNeuralFrontEnd _front;
         readonly CwNeuralNet _net;
