@@ -3030,6 +3030,18 @@ namespace HolyLogger.Properties {
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string CwDecodeInputDevice {
+            get {
+                return ((string)(this["CwDecodeInputDevice"]));
+            }
+            set {
+                this["CwDecodeInputDevice"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
         public string LotwLastNewJson {
             get {
                 return ((string)(this["LotwLastNewJson"]));

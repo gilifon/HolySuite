@@ -1,0 +1,76 @@
+<Window x:Class="HolyLogger.CwDecodeWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="CW Decode" Height="400" MinHeight="360" Width="660" MinWidth="560"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False" ResizeMode="CanResize"
+        Icon="Images/crown.png"
+        Background="{DynamicResource WindowBg}"
+        Foreground="{DynamicResource TextBrush}"
+        Closing="Window_Closing">
+    <Grid Margin="14">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- WHAT THIS WINDOW IS FOR TODAY. There is no decoding yet - this is the ear on its own,
+             and it has to be proved before anything is built on top of it. The words say what the
+             operator can actually do here, not what the window will do one day. -->
+        <TextBlock Grid.Row="0" FontSize="16" TextWrapping="Wrap" Margin="0,0,0,12"
+                   Foreground="{DynamicResource MutedTextBrush}"><Run Text="Pick where the radio's audio comes into this computer, then press Listen."/><LineBreak/><Run Text="The bar shows what is arriving. Set the radio's USB output level until it sits in the middle on a signal."/></TextBlock>
+
+        <Grid Grid.Row="1" Margin="0,0,0,12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock Grid.Column="0" Text="Listen to:" FontSize="16" VerticalAlignment="Center"
+                       Margin="0,0,10,0" Foreground="{DynamicResource TextBrush}"/>
+            <ComboBox Grid.Column="1" x:Name="CB_Device" FontSize="16" Height="32"
+                      VerticalContentAlignment="Center"
+                      ToolTip="The recording device the radio's audio arrives on"
+                      SelectionChanged="CB_Device_SelectionChanged"/>
+            <Button Grid.Column="2" x:Name="BtnRefresh" Content="Refresh" FontSize="16"
+                    Height="32" Width="96" Margin="10,0,0,0" Cursor="Hand"
+                    ToolTip="Look for devices again - use it after switching the radio on"
+                    Click="BtnRefresh_Click"/>
+        </Grid>
+
+        <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,0,0,14">
+            <Button x:Name="BtnListen" Content="Listen" FontSize="16" Height="34" Width="120"
+                    Cursor="Hand" Click="BtnListen_Click"/>
+            <Button x:Name="BtnStop" Content="Stop" FontSize="16" Height="34" Width="120"
+                    Margin="10,0,0,0" Cursor="Hand" IsEnabled="False" Click="BtnStop_Click"/>
+        </StackPanel>
+
+        <Grid Grid.Row="3" Margin="0,0,0,10">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock Grid.Column="0" Text="Level:" FontSize="16" VerticalAlignment="Center"
+                       Margin="0,0,10,0" Foreground="{DynamicResource TextBrush}"/>
+            <ProgressBar Grid.Column="1" x:Name="LevelBar" Height="28" Minimum="0" Maximum="100"
+                         Value="0"/>
+            <TextBlock Grid.Column="2" x:Name="LevelWords" Text="" FontSize="16" FontWeight="Bold"
+                       VerticalAlignment="Center" Margin="10,0,0,0" MinWidth="110"/>
+        </Grid>
+
+        <!-- Kept empty for now. The decoded text goes here once there is a decoder to write it. -->
+        <Border Grid.Row="4" Margin="0,4,0,10" BorderThickness="1" CornerRadius="4"
+                BorderBrush="{DynamicResource MutedTextBrush}">
+            <TextBlock x:Name="DecodedText" FontSize="16" Margin="10" TextWrapping="Wrap"
+                       Foreground="{DynamicResource MutedTextBrush}"
+                       Text="The decoded text will appear here. Nothing decodes yet - this step is the listening only."/>
+        </Border>
+
+        <TextBlock Grid.Row="5" x:Name="StatusText" FontSize="16" TextWrapping="Wrap"
+                   Foreground="{DynamicResource MutedTextBrush}" Text="Not listening."/>
+    </Grid>
+</Window>

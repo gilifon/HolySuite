@@ -704,6 +704,24 @@
                             </Viewbox>
                         </MenuItem.Icon>
                     </MenuItem>
+                    <!-- Never greyed, unlike the keyer above it: decoding listens to a sound card and
+                         asks the radio for nothing, so it is just as useful on a rig HolyLogger
+                         cannot reach at all. -->
+                    <MenuItem x:Name="CwDecodeMenuItem" Header="CW Decode" ToolTip="Listen to the radio's audio and read the CW being received" Click="CwDecodeMenuItem_Click">
+                        <MenuItem.Icon>
+                            <!-- An ear for the audio: three arcs growing away from a dot, the sign
+                                 every radio uses for listening. Drawn here like the key above -
+                                 no file, no licence, and it takes the theme's text colour. -->
+                            <Viewbox Width="16" Height="16">
+                                <Canvas Width="24" Height="24">
+                                    <Ellipse Canvas.Left="4" Canvas.Top="10" Width="4" Height="4" Fill="{DynamicResource TextBrush}"/>
+                                    <Path Data="M 10,7 A 6,6 0 0 1 10,17" Stroke="{DynamicResource TextBrush}" StrokeThickness="1.8" Fill="Transparent"/>
+                                    <Path Data="M 13.5,4.5 A 9.5,9.5 0 0 1 13.5,19.5" Stroke="{DynamicResource TextBrush}" StrokeThickness="1.8" Fill="Transparent"/>
+                                    <Path Data="M 17,2 A 13,13 0 0 1 17,22" Stroke="{DynamicResource TextBrush}" StrokeThickness="1.8" Fill="Transparent"/>
+                                </Canvas>
+                            </Viewbox>
+                        </MenuItem.Icon>
+                    </MenuItem>
                     <MenuItem x:Name="RadioControlPanelMenuItem" Header="Radio Control Panel" ToolTip="Open the radio control panel - frequency, bands and mode" Click="RadioControlPanelMenuItem_Click">
                         <MenuItem.Icon>
                             <!-- A front panel seen head on: a knob and two sliders. Drawn here rather

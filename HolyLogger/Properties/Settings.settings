@@ -758,6 +758,9 @@
     <Setting Name="SoundOutputDevice" Type="System.String" Scope="User">
       <Value Profile="(Default)" />
     </Setting>
+    <Setting Name="CwDecodeInputDevice" Type="System.String" Scope="User">
+      <Value Profile="(Default)" />
+    </Setting>
     <Setting Name="LotwLastNewJson" Type="System.String" Scope="User">
       <Value Profile="(Default)" />
     </Setting>

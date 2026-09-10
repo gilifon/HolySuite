@@ -324,6 +324,11 @@
     <Compile Include="UdpPortsWindow.xaml.cs">
       <DependentUpon>UdpPortsWindow.xaml</DependentUpon>
     </Compile>
+    <Compile Include="CwDecodeWindow.xaml.cs">
+      <DependentUpon>CwDecodeWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="WaveInRecorder.cs" />
+    <Compile Include="MainWindow.CwDecode.cs" />
     <Compile Include="ClusterSettingsWindow.xaml.cs">
       <DependentUpon>ClusterSettingsWindow.xaml</DependentUpon>
     </Compile>
@@ -630,6 +635,10 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="UdpPortsWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="CwDecodeWindow.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
