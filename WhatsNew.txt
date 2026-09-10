@@ -1,22 +1,47 @@
 ﻿== 8.9.7 ==
 
 New
-- A log you delete is kept. Before it goes, its QSOs are written to an ADIF file in a
-  Deleted Logs folder, so a log deleted by mistake can be brought back. If that file
-  cannot be written, nothing is deleted and your log is untouched.
-- The question asked before a delete says which log it is, how many QSOs are in it, and
-  where the copy will be saved.
-- Deleted Logs, in the Log Manager, opens that folder.
-- Import Deleted Log, the yellow button beside Import ADIF, shows what is in that folder
-  and brings back the log you pick.
-- Backups & Restore holds the folder too: open it, or put it somewhere else. Move it and
-  the files already saved move with it, so they stay in one place.
-- Deleting a big log shows a spinner while it works, instead of looking frozen.
+- A log you delete is kept: its QSOs are written to an ADIF file first, so it can be brought back.
+- Deleted Logs, in the Log Manager, opens that folder. Import Deleted Log brings a log back.
+- Backups & Restore can move that folder, and the files already saved move with it.
+- Notes: the ADIF note a QSO was imported with now has a column of its own.
+- It is in the log table, in Full View & Edit, and in the Log Workshop, where you can search it.
+- Name and Comment can be sorted by.
+- Cluster: drag the Live Scale list to tune the radio.
+- Cluster: a new-country spot is announced out loud.
+- Cluster: every button, tick and column now says what it is when you hover it.
+- The Msg buttons arrive named: CQ, Exch, TU and Call on CW, Msg1-Msg4 on voice.
+- The CQ button can be named for the question it asks, and Enter works in every mode.
+- Export to ADIF, Cabrillo or CSV opens on a folder of its own and remembers where you put it.
+- The Try Again key shows how many are waiting on its face.
+- My Locator fills itself from QRZ.com once the station callsign is set.
+- Each log has its own upload queue.
+- LoTW: the program finds TQSL by itself.
+- The Log Workshop can search by what was uploaded.
+- Radio Control Panel: a tick per band, an RTTY column, three more bands, RTTY, AM and FM.
+- The CW keyer opens on any mode and Ctrl+K keeps it open.
+- The macro editor holds both halves of a button: its name and its text.
+- Grid locators of 10 characters are accepted and checked against the country.
+- The log shows the QSO time with seconds.
+- Import ADIF is one flow with fewer windows, and you decide every change.
+- The Options page list is striped like the log table.
 
 Fixed
-- Deleting a log, and exporting one to ADIF, were slow however small the log: the program
-  read the carried ADIF fields of every QSO in the database each time. It now reads only
-  the log it was asked for.
+- Full View & Edit: Contest ID, County and Credit Granted were thrown away on Save.
+- Re-importing a file now fills in notes, and Undo no longer empties the carried ADIF.
+- The Log Workshop opened too narrow: the end of a filter row was off the right edge.
+- "Received Confirmation" was cut off top and bottom.
+- Backspace could take back a letter the radio already had, and the keyer went deaf.
+- Clear stopped promising F9 while the keyer owns it.
+- The DX callsign is never framed in red, and Update fits its own name.
+- Contest: the exchange cells fit inside their coloured bars.
+- Cabrillo times are back to HHMM.
+- Cluster: a plain arrow over the column headings, not a hand.
+
+Faster
+- The start no longer freezes for 13 seconds: a one-time repair of old notes ran on every start.
+- Deleting a log, and exporting one, no longer read every QSO in the database.
+- The Log Workshop ticks rows quickly again.
 
 == 8.9.6 ==
 
@@ -239,6 +264,75 @@ Fixed
   appeared in the Log Workshop and stayed wrong in the main window behind it.
 - Ticking the Fix box in the table header was a coffee break on a big log. It is immediate.
 - Clearing the Workshop left the Country box grey instead of white.
+- Custom image: choosing it no longer throws the file explorer open by itself.
+- Options: the Browse button was too short for its own text.
+- CW: the program worked out the length of a Morse message about a seventh too long, so the
+  keying speed it showed was too fast and the moving cursor reached the last letter after you
+  had already heard it. Both are fixed, on the Msg buttons as well.
+- What's New: shown on the first run after every install, whatever the version number.
+- Windows: one that is not in the taskbar can no longer be minimised out of sight.
+- Import: Stop really stops, and undoes what it had done.
+- Import: one report instead of several.
+- Import: replacing a log can no longer lose it.
+- Import: the list of skipped repeats is capped, and the count is right.
+- Import: the spinner no longer stutters.
+- Callsign list: it can no longer shrink by itself.
+- Prefixes: typing SV1 is no longer treated as an unsaved QSO.
+- OmniRig: you are now told when radio control cannot start.
+- Remove Duplicates: you are told if a QSO could not be removed.
+- Backups: capped by size, so they cannot fill the disk.
+- Maps: no longer need the internet for their own program files.
+- The update question: says the program will close and will not start again by itself, and
+  shows your version beside the new one.
+
+Faster
+- Startup pause: the seven to eight seconds a moment after the window opens are gone.
+- Opening a log: 28,000 QSOs in under two seconds instead of five and a half.
+- The main window: appears in about half the time.
+- Idle: much less processor used while you leave the program alone.
+- Radio polling: no longer twice a second.
+- Scrolling the log: lighter.
+
+== 8.9.1 ==
+
+New
+- Ask an AI: right-click a QSO and choose Ask AI to check this QSO. It reads the fields and
+  writes back what it makes of them.
+- Check with AI: in the Log Fixer, the QSOs where cty.dat and Club Log disagree can be put to
+  an AI. It never changes anything - the line it believes turns green, the other turns grey.
+- The AI must name its evidence: the prefix rule or the Club Log dates it used. The report
+  keeps what it said, why, and which model said it.
+- Options > AI Service: set it up in one place - credit, key and model - with a picture for
+  every step. It is paid, on your own OpenRouter account: prepaid, a few cents a run, and no
+  card is kept.
+- CW Keyer: the keycaps are cyan, and View > CW Keyer opens it.
+- Help > Visit HolyLogger site.
+- What's New: every item starts with a bold subject, so the eye finds the one it wants.
+- Send CW by typing: put the radio in CW and the CW Keyer opens by itself. What you type goes
+  out as you type it. Ctrl+K opens and closes it at any time.
+- Two rows: what is still to be sent on top, what has already gone below it in blue. The text
+  turns blue letter by letter as the radio keys it.
+- One line per send: each thing you send becomes its own line, pushing the earlier lines down.
+- Typing too slowly: the radio falls silent in the middle of a word, which the listener hears
+  as two words. When that happens a space is written into the line so you can see it.
+- Keying speed: the title bar shows the speed the program has measured from your radio.
+- Eight buttons: along the bottom, for the things you send over and over. Left-click sends,
+  right-click edits. The first four are the same texts as the Msg buttons.
+- Short marks: filled in when you send - * your Station Callsign, ! the DX Callsign, # the
+  serial number, $ the rest of your sent exchange. The last two need contest mode. The editor
+  shows a second row with exactly what will go on air.
+- The keyer remembers: where you put it and how wide you made it.
+- Try Again: keep the stations you meant to come back to, until you work them.
+- Log Workshop: a window of its own.
+- Undo: an edit in the main window can be taken back.
+- Verify: checks a QSO and writes down what it found, as a table.
+- Cluster: A, K and SFI bars.
+- File > Compact the Database: gives back the space deleted QSOs leave behind.
+- Statistics: answers "worked, but not confirmed".
+- Splash screen: a spinner and the seconds.
+- Sun and propagation: the figures now come from IARC.
+
+Fixed
 - Custom image: choosing it no longer throws the file explorer open by itself.
 - Options: the Browse button was too short for its own text.
 - CW: the program worked out the length of a Morse message about a seventh too long, so the
