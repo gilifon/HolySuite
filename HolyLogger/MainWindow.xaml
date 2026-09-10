@@ -2295,7 +2295,7 @@
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
-                <DataGridTemplateColumn Header="Name" IsReadOnly="True" CanUserSort="False">
+                <DataGridTemplateColumn Header="Name" IsReadOnly="True" SortMemberPath="Name">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <TextBlock Text="{Binding Name}" HorizontalAlignment="Center" Padding="5,0,5,0" />
@@ -2351,7 +2351,7 @@
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
 
-                <DataGridTemplateColumn Header="Comment" IsReadOnly="True" Width="Auto" CanUserSort="False">
+                <DataGridTemplateColumn Header="Comment" IsReadOnly="True" Width="Auto" SortMemberPath="Comment">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <TextBlock Text="{Binding Comment}" HorizontalAlignment="Center" Padding="5,0,5,0" />
