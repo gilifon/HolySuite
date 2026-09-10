@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -9,22 +10,29 @@ using System.Windows.Threading;
 namespace HolyLogger
 {
     /// <summary>
-    /// The ear for the CW decoder: pick the recording device the radio's audio arrives on, listen to
-    /// it, and watch a meter that proves the sound is really there.
+    /// Reads the CW being received: pick the recording device the radio's audio arrives on, listen,
+    /// and watch the letters appear.
     ///
-    /// THE METER EXISTS BEFORE THE DECODER ON PURPOSE. Every "the decoder does not work" report on
-    /// every program of this kind starts as a level problem - the wrong device picked, the radio's
-    /// USB output at zero, or another program already holding the codec. With a bar on screen the
-    /// operator settles all three himself in a few seconds, and whatever is built on top starts from
-    /// audio that is known to be good.
+    /// THE METER EARNED ITS PLACE BEFORE THE DECODER DID. Every "it does not decode" report of this
+    /// kind starts as a level problem - the wrong device picked, the radio's USB output at zero, or
+    /// another program already holding the codec - and with a bar on screen the operator settles all
+    /// three himself in seconds. The very first silence here turned out to be a muted recording
+    /// input in Windows, nothing to do with the radio or with this program.
     ///
-    /// Nothing here is particular to any radio: see the note at the top of WaveInRecorder.
+    /// The listening knows nothing about any radio (see WaveInRecorder) and the decoding knows
+    /// nothing about any radio either (see CwDecoder): it follows the note in the passband, so it
+    /// works the same on a rig HolyLogger cannot even reach over CAT.
     /// </summary>
     public partial class CwDecodeWindow : Window
     {
         // Sentinel dropdown entry for "use the Windows default device"; stored as an empty setting.
         // Same word and same rule as the sound-output picker in Options.
         const string SystemDefaultDevice = "System default";
+
+        // Long enough to scroll back through a QSO, short enough that the box never becomes the
+        // reason the window is slow. Trimmed from the front, so the newest text is always kept.
+        const int MostCharactersKept = 20000;
+        const int CharactersTrimmedAtOnce = 5000;
 
         static readonly Brush QuietBrush = new SolidColorBrush(Color.FromRgb(0x9E, 0x9E, 0x9E));
         static readonly Brush GoodBrush = new SolidColorBrush(Color.FromRgb(0x2E, 0xA8, 0x4D));
@@ -40,7 +48,15 @@ namespace HolyLogger
         }
 
         readonly WaveInRecorder _recorder = new WaveInRecorder();
-        readonly DispatcherTimer _meterTimer;
+        readonly DispatcherTimer _screenTimer;
+
+        CwDecoder _decoder;
+
+        // Letters arrive on the capture thread, one or two at a time, and are collected here for the
+        // screen timer to put on show in one go. A Dispatcher call per letter would be a thousand
+        // hops a minute for something the eye cannot see happening that fast anyway.
+        readonly StringBuilder _pending = new StringBuilder();
+        readonly object _pendingGate = new object();
 
         // The bar falls back gently instead of snapping to zero between characters. Without it the
         // meter flickers on CW - which is silence half the time - and cannot be read at all.
@@ -53,14 +69,15 @@ namespace HolyLogger
             InitializeComponent();
 
             _recorder.Failed += OnRecorderFailed;
+            _recorder.Samples += OnSamples;
 
             LoadDevices();
 
-            _meterTimer = new DispatcherTimer(DispatcherPriority.Background)
+            _screenTimer = new DispatcherTimer(DispatcherPriority.Background)
             {
                 Interval = TimeSpan.FromMilliseconds(50)
             };
-            _meterTimer.Tick += MeterTimer_Tick;
+            _screenTimer.Tick += ScreenTimer_Tick;
         }
 
         void LoadDevices()
@@ -124,10 +141,32 @@ namespace HolyLogger
             StartListening();
         }
 
+        /// <summary>
+        /// Starts listening without the operator pressing anything. Used when the window opens by
+        /// itself because the radio went to CW.
+        /// </summary>
+        public void StartListeningNow()
+        {
+            StartListening();
+        }
+
         void BtnStop_Click(object sender, RoutedEventArgs e)
         {
             StopListening();
             StatusText.Text = "Not listening.";
+        }
+
+        // Empties the text AND makes the decoder forget the speed and the note it had settled on.
+        // Both belong to the station that has just gone; keeping them would only slow down the lock
+        // onto the next one.
+        void BtnClear_Click(object sender, RoutedEventArgs e)
+        {
+            lock (_pendingGate) _pending.Clear();
+            DecodedText.Clear();
+
+            var decoder = _decoder;
+            if (decoder != null) decoder.Reset();
+            ToneAndSpeed.Text = string.Empty;
         }
 
         void StartListening()
@@ -142,6 +181,12 @@ namespace HolyLogger
                 return;
             }
 
+            // Built here rather than in the constructor because it has to be told the rate the device
+            // actually opened at, which is not known until it opens.
+            var decoder = new CwDecoder(_recorder.ActualSampleRate);
+            decoder.Text += OnDecodedText;
+            _decoder = decoder;
+
             StatusText.Foreground = (Brush)FindResource("MutedTextBrush");
             StatusText.Text = "Listening to " + _recorder.ActualDeviceName
                             + " at " + _recorder.ActualSampleRate.ToString("N0") + " samples a second.";
@@ -149,23 +194,73 @@ namespace HolyLogger
             BtnListen.IsEnabled = false;
             BtnStop.IsEnabled = true;
             _shownLevel = 0;
-            _meterTimer.Start();
+            _screenTimer.Start();
         }
 
         void StopListening()
         {
-            _meterTimer.Stop();
+            _screenTimer.Stop();
             try { _recorder.Stop(); }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+            var decoder = _decoder;
+            _decoder = null;
+            if (decoder != null) decoder.Text -= OnDecodedText;
+
+            // Whatever the decoder had already handed over still belongs on screen.
+            FlushPendingText();
 
             BtnListen.IsEnabled = true;
             BtnStop.IsEnabled = false;
             LevelBar.Value = 0;
             LevelWords.Text = string.Empty;
+            ToneAndSpeed.Text = string.Empty;
             _shownLevel = 0;
         }
 
-        void MeterTimer_Tick(object sender, EventArgs e)
+        // On the capture thread. Hand the block straight to the decoder - it is a few thousand
+        // multiplications, far less than the 100 ms of audio it represents.
+        void OnSamples(short[] samples, int count)
+        {
+            var decoder = _decoder;
+            if (decoder == null) return;
+
+            try { decoder.Process(samples, count); }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        // Also on the capture thread: collect, do not touch the screen.
+        void OnDecodedText(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return;
+            lock (_pendingGate) _pending.Append(text);
+        }
+
+        void ScreenTimer_Tick(object sender, EventArgs e)
+        {
+            FlushPendingText();
+            UpdateMeter();
+            UpdateToneAndSpeed();
+        }
+
+        void FlushPendingText()
+        {
+            string text;
+            lock (_pendingGate)
+            {
+                if (_pending.Length == 0) return;
+                text = _pending.ToString();
+                _pending.Clear();
+            }
+
+            if (DecodedText.Text.Length > MostCharactersKept)
+                DecodedText.Text = DecodedText.Text.Substring(CharactersTrimmedAtOnce);
+
+            DecodedText.AppendText(text);
+            DecodedText.ScrollToEnd();
+        }
+
+        void UpdateMeter()
         {
             double peak = _recorder.Level;
 
@@ -206,6 +301,21 @@ namespace HolyLogger
             }
         }
 
+        void UpdateToneAndSpeed()
+        {
+            var decoder = _decoder;
+            if (decoder == null) { ToneAndSpeed.Text = string.Empty; return; }
+
+            if (!decoder.SignalPresent)
+            {
+                ToneAndSpeed.Text = "Waiting for a signal.";
+                return;
+            }
+
+            ToneAndSpeed.Text = "Note " + Math.Round(decoder.ToneHz).ToString("N0") + " Hz"
+                              + "     Speed " + Math.Round(decoder.Wpm).ToString("N0") + " WPM";
+        }
+
         // The recorder gave up on its own thread - the radio was switched off, or the device was
         // taken away. Back onto the UI thread before touching anything on screen.
         void OnRecorderFailed(string message)
@@ -221,6 +331,7 @@ namespace HolyLogger
         void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
         {
             _recorder.Failed -= OnRecorderFailed;
+            _recorder.Samples -= OnSamples;
             StopListening();
             try { _recorder.Dispose(); }
             catch (Exception swallowed) { Log.Swallow(swallowed); }

@@ -8441,6 +8441,11 @@ namespace HolyLogger
             }
 
             bool isCw = IsCwModeActive();
+
+            // The CW decode window follows the mode from here too - this is where every mode change
+            // already arrives. The whole rule lives in MainWindow.CwDecode.cs.
+            FollowCwModeForDecode();
+
             bool isVoiceAvailable = TryGetVoiceMessageAvailability(out _, out string errorMessage);
             bool isAvailable = isVoiceAvailable || (isCw && Properties.Settings.Default.EnableOmniRigCAT && OmniRigEngine != null && Rig != null && Rig.Status == OmniRig.RigStatusX.ST_ONLINE);
 

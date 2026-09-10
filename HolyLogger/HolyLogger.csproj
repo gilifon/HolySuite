@@ -328,6 +328,7 @@
       <DependentUpon>CwDecodeWindow.xaml</DependentUpon>
     </Compile>
     <Compile Include="WaveInRecorder.cs" />
+    <Compile Include="CwDecoder.cs" />
     <Compile Include="MainWindow.CwDecode.cs" />
     <Compile Include="ClusterSettingsWindow.xaml.cs">
       <DependentUpon>ClusterSettingsWindow.xaml</DependentUpon>
