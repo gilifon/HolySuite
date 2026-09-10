@@ -105,13 +105,34 @@ namespace HolyLogger
             return WAVE_MAPPER;
         }
 
+        // A short gap between repeats. Back to back the words run into each other and sound like
+        // one long noise instead of three clear alerts.
+        internal const int RepeatGapMs = 300;
+
         // Plays a PCM WAV file to the given device on a background thread (never blocks the UI).
         public static void Play(string wavPath, uint deviceId)
         {
+            Play(wavPath, deviceId, 1, null);
+        }
+
+        // times > 1 plays the file again as soon as it finishes, which is how the spoken alerts say
+        // "New country" three times. onFinished runs after the LAST one, on the background thread,
+        // so the caller can tell when the whole run is over. It always runs, even when playback
+        // fails, or a caller waiting on it would wait for ever.
+        public static void Play(string wavPath, uint deviceId, int times, Action onFinished)
+        {
             Task.Run(() =>
             {
-                try { PlayBlocking(wavPath, deviceId); }
+                try
+                {
+                    for (int i = 0; i < Math.Max(1, times); i++)
+                    {
+                        if (i > 0) System.Threading.Thread.Sleep(RepeatGapMs);
+                        PlayBlocking(wavPath, deviceId);
+                    }
+                }
                 catch (Exception swallowed) { Log.Swallow(swallowed); }
+                finally { if (onFinished != null) onFinished(); }
             });
         }
 

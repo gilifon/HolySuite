@@ -93,6 +93,10 @@ namespace HolyLogger
 
             // ---- Accent + stateful highlights -----------------------------------------------------
             { "AccentBrush",      new[] { "#1565C0", "#3B82F6", "#4C8DFF" } }, // primary accent (blue)
+            // The IARC diamond on the "Send Log to IARC" menu item. The club's own blue is a pale
+            // one that vanishes against a white menu, so the light scheme draws the logo in a dark
+            // blue instead; the dark schemes keep it light, where a dark blue would disappear.
+            { "IarcLogoBrush",    new[] { "#0B3C8C", "#8FBEFF", "#8FBEFF" } },
             { "ContestNameBrush", new[] { "#1565C0", "#22D3EE", "#22D3EE" } }, // status-bar contest name: bright cyan reads far better on dark status bars than the plain accent blue
             // The word "Contest" in the Activity list. Green, because it is the one line there that is
             // not an activity and does not get logged - it opens an explanation instead. Dark green on
@@ -175,6 +179,7 @@ namespace HolyLogger
             new TokenInfo("ContestNameBrush", "Borders and accents", "Contest name",  "The active contest's name in the status bar."),
             new TokenInfo("ContestWordBrush", "Borders and accents", "Contest word",  "The word \"Contest\" in the Activity list on the main window."),
             new TokenInfo("Danger",           "Borders and accents", "Errors and warnings", "Error text and warning markers (the red)."),
+            new TokenInfo("IarcLogoBrush",    "Borders and accents", "IARC logo",     "The club diamond next to \"Send Log to IARC\" in the File menu."),
         };
     }
 }

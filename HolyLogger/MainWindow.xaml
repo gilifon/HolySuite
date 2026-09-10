@@ -604,10 +604,18 @@
                     <Separator />
                     <MenuItem x:Name="UploadMenuItem" Header="Send Log to IARC" ToolTip="Sends the log to the contest manager" Click="UploadMenuItem_Click">
                         <MenuItem.Icon>
-                            <!-- Tint the dark PNG via OpacityMask so it shows in dark mode (theme text color). -->
-                            <Rectangle Width="16" Height="16" Fill="{DynamicResource TextBrush}">
+                            <!-- The IARC diamond. It is line art in a single colour, so the PNG is used
+                                 only as a shape (OpacityMask) and the colour comes from the theme: dark
+                                 blue on a light menu, light blue on a dark one, where dark blue would
+                                 disappear. Deliberately much larger than the other menu icons - 47 tall
+                                 against their 16 - because sending the log to the club is what people come
+                                 to this menu for, and a thin outline at 16 was barely there. The width is
+                                 34 because that is the menu's icon column (IconCol in Themes/Controls.xaml);
+                                 the diamond is tall and narrow, so height is where it can grow, and the two
+                                 numbers have to move together or the extra height is simply ignored. -->
+                            <Rectangle Width="34" Height="47" Fill="{DynamicResource IarcLogoBrush}">
                                 <Rectangle.OpacityMask>
-                                    <ImageBrush ImageSource="Images/upload_log.png" Stretch="Uniform"/>
+                                    <ImageBrush ImageSource="Images/iarc.png" Stretch="Uniform"/>
                                 </Rectangle.OpacityMask>
                             </Rectangle>
                         </MenuItem.Icon>

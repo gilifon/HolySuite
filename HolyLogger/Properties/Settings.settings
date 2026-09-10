@@ -728,6 +728,9 @@
     <Setting Name="ClusterNewCountrySound" Type="System.String" Scope="User">
       <Value Profile="(Default)">Chime</Value>
     </Setting>
+    <Setting Name="ClusterVoiceName" Type="System.String" Scope="User">
+      <Value Profile="(Default)" />
+    </Setting>
     <Setting Name="ClusterAlertCallsigns" Type="System.String" Scope="User">
       <Value Profile="(Default)" />
     </Setting>

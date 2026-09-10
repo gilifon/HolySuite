@@ -5193,13 +5193,36 @@ namespace HolyLogger
             return item.UnixTime >= _clusterConnectedUnix;
         }
 
+        // A SPOKEN new-country alert says the words THREE TIMES, then stops. Once is easy to miss
+        // across the room or under headphones; three is enough to turn your head, and a fixed count
+        // means it never nags. A chime keeps its single ring - three chimes carry no more meaning
+        // than one, they are just louder for longer.
+        const int NewCountrySpokenRepeats = 3;
+
+        // 0/1 rather than a bool because the flag is cleared from the playback thread: while a run
+        // of three is in the air, further new-country spots do NOT start a second run on top of it.
+        // The run finishes, and the next new country after that gets its own three.
+        static int _newCountrySpeaking;
+
         // One ring per burst: a batch (or reconnect backlog) with several needed spots plays once.
         private void PlayNewCountrySpotAlert()
         {
+            string sound = Properties.Settings.Default.ClusterNewCountrySound;
+
+            if (VoiceAlerts.IsVoiceName(sound))
+            {
+                if (System.Threading.Interlocked.CompareExchange(ref _newCountrySpeaking, 1, 0) != 0)
+                    return;   // still speaking the last one
+
+                PlayClusterAlertSound(sound, NewCountrySpokenRepeats,
+                    () => System.Threading.Interlocked.Exchange(ref _newCountrySpeaking, 0));
+                return;
+            }
+
             var now = DateTime.UtcNow;
             if ((now - _lastNewCountryAlertUtc).TotalSeconds < 3) return;
             _lastNewCountryAlertUtc = now;
-            PlayClusterAlertSound(Properties.Settings.Default.ClusterNewCountrySound);
+            PlayClusterAlertSound(sound);
         }
 
         // Same arrival test as the new-country alert, but for a worked-but-unconfirmed-on-LoTW spot.
@@ -5526,10 +5549,18 @@ namespace HolyLogger
         internal static void PlayClusterAlertSound(string name)
             => PlayClusterAlertSound(name, Properties.Settings.Default.SoundOutputDevice);
 
+        // times: how many times the sound is played, one after the other. onFinished (may be null)
+        // runs once the last one has finished, on a background thread.
+        internal static void PlayClusterAlertSound(string name, int times, Action onFinished)
+            => PlayClusterAlertSound(name, Properties.Settings.Default.SoundOutputDevice, times, onFinished);
+
         // deviceName empty/default -> the Windows default device (original behavior). A specific device
         // (e.g. the speakers, chosen so alerts don't go down a USB radio codec) needs a WAV to target it,
         // so a system-sound name is mapped to a comparable Windows\Media WAV in that case.
         internal static void PlayClusterAlertSound(string name, string deviceName)
+            => PlayClusterAlertSound(name, deviceName, 1, null);
+
+        internal static void PlayClusterAlertSound(string name, string deviceName, int times, Action onFinished)
         {
             try
             {
@@ -5540,8 +5571,17 @@ namespace HolyLogger
                 if (specificDevice)
                 {
                     string wav = ResolveAlertWavPath(n);
-                    if (wav != null) { WaveOutPlayer.Play(wav, deviceId); return; }
+                    if (wav != null) { WaveOutPlayer.Play(wav, deviceId, times, onFinished); return; }
                     // No WAV available -> fall through to default-device playback below.
+                }
+
+                // A spoken alert ("New country") is a WAV in the program's own data folder, made
+                // on first use by Windows' speech engine. If this PC has no usable voice we fall
+                // through to the chime below rather than letting the alert go silent.
+                if (VoiceAlerts.IsVoiceName(n))
+                {
+                    string voice = VoiceAlerts.WavPathFor(n);
+                    if (voice != null) { PlayWavOnDefaultDevice(voice, times, onFinished); return; }
                 }
 
                 if (n.EndsWith(".wav", StringComparison.OrdinalIgnoreCase))
@@ -5550,8 +5590,7 @@ namespace HolyLogger
                         Environment.GetFolderPath(Environment.SpecialFolder.Windows), "Media", n);
                     if (System.IO.File.Exists(path))
                     {
-                        _clusterAlertWavPlayer = new System.Media.SoundPlayer(path);
-                        _clusterAlertWavPlayer.Play();   // async; no blocking of the UI thread
+                        PlayWavOnDefaultDevice(path, times, onFinished);
                         return;
                     }
                     // fall through to the default chime if the file vanished
@@ -5564,8 +5603,47 @@ namespace HolyLogger
                     case "Critical": System.Media.SystemSounds.Hand.Play(); break;
                     default: System.Media.SystemSounds.Asterisk.Play(); break;   // "Chime"
                 }
+                if (onFinished != null) onFinished();   // nothing to wait for; release the caller
             }
-            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+            catch (System.Exception swallowed)
+            {
+                Log.Swallow(swallowed);
+                // The caller may be holding a "still playing" flag on the strength of this call.
+                // Releasing it here is what stops one failed alert from silencing all the rest.
+                if (onFinished != null) onFinished();
+            }
+        }
+
+        // Plays a WAV on the Windows default device, optionally several times over. One play with
+        // nothing waiting on it keeps the old fire-and-forget path; a repeat run needs a thread of
+        // its own, because waiting for each play to end is the only way to start the next one
+        // cleanly and that must not happen on the UI thread.
+        static void PlayWavOnDefaultDevice(string path, int times, Action onFinished)
+        {
+            if (times <= 1 && onFinished == null)
+            {
+                _clusterAlertWavPlayer = new System.Media.SoundPlayer(path);
+                _clusterAlertWavPlayer.Play();   // async; no blocking of the UI thread
+                return;
+            }
+
+            System.Threading.Tasks.Task.Run(() =>
+            {
+                try
+                {
+                    using (var player = new System.Media.SoundPlayer(path))
+                    {
+                        player.Load();
+                        for (int i = 0; i < Math.Max(1, times); i++)
+                        {
+                            if (i > 0) System.Threading.Thread.Sleep(WaveOutPlayer.RepeatGapMs);
+                            player.PlaySync();
+                        }
+                    }
+                }
+                catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+                finally { if (onFinished != null) onFinished(); }
+            });
         }
 
         // A playable WAV path for a sound name, or null if none exists. A *.wav name resolves in
@@ -5573,6 +5651,9 @@ namespace HolyLogger
         // can still be routed to a chosen device (System.Media system sounds can't target a device).
         static string ResolveAlertWavPath(string n)
         {
+            // The spoken alerts live in our own folder, not Windows\Media.
+            if (VoiceAlerts.IsVoiceName(n)) return VoiceAlerts.WavPathFor(n);
+
             string mediaDir = System.IO.Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.Windows), "Media");
             string file;
@@ -5697,6 +5778,15 @@ namespace HolyLogger
 
         private async void StartClusterConnectionAsync()
         {
+            // Speaking the words takes about a second, far too long to do when the spot arrives,
+            // so the files are made now, in the background, before the first spot can land.
+            if (VoiceAlerts.IsVoiceName(Properties.Settings.Default.ClusterNewCountrySound) ||
+                VoiceAlerts.IsVoiceName(Properties.Settings.Default.ClusterAlertCallSound) ||
+                VoiceAlerts.IsVoiceName(Properties.Settings.Default.ClusterUnconfirmedSound))
+            {
+                VoiceAlerts.PrepareInBackground();
+            }
+
             if (clusterVisibleSpots == null)
             {
                 clusterVisibleSpots = new BulkObservableCollection<ClusterSpotViewItem>();

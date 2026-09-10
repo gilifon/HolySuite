@@ -126,6 +126,7 @@
       <HintPath>..\packages\System.Runtime.InteropServices.RuntimeInformation.4.3.0\lib\net45\System.Runtime.InteropServices.RuntimeInformation.dll</HintPath>
     </Reference>
     <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Speech" />
     <Reference Include="System.Security" />
     <Reference Include="System.Xml" />
     <Reference Include="System.Xml.Linq" />
@@ -262,6 +263,7 @@
     <Compile Include="EqslConfirmationService.cs" />
     <Compile Include="QrzLogbookService.cs" />
     <Compile Include="WaveOutPlayer.cs" />
+    <Compile Include="VoiceAlerts.cs" />
     <Compile Include="TqslStationData.cs" />
     <Compile Include="Enums.cs" />
     <Compile Include="CompactDatabaseWindow.xaml.cs">
@@ -828,6 +830,7 @@
     <Resource Include="Images\openrouter_keylimit.png" />
     <Resource Include="Images\openrouter_copykey.png" />
     <Resource Include="Images\upload_log.png" />
+    <Resource Include="Images\iarc.png" />
     <Resource Include="Images\qrz_mini_icon.png" />
     <Resource Include="Images\sign.png" />
     <Resource Include="Images\empty20.png" />
@@ -1140,6 +1143,12 @@
     <Content Include="Data\callsigns_merged_big.txt">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <!-- Recorded voice for the spoken cluster alerts. A wildcard, because the folder is normally
+         empty: recordings can be dropped in later without anyone editing this file again. -->
+    <Content Include="Voice\*.wav">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <None Include="Voice\README.txt" />
     <Resource Include="Image1.png" />
     <Content Include="Server\AddLog.php" />
     <Content Include="Server\addParticipant.php" />

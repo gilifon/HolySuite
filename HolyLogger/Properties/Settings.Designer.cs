@@ -2910,6 +2910,18 @@ namespace HolyLogger.Properties {
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string ClusterVoiceName {
+            get {
+                return ((string)(this["ClusterVoiceName"]));
+            }
+            set {
+                this["ClusterVoiceName"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
         public string ClusterAlertCallsigns {
             get {
                 return ((string)(this["ClusterAlertCallsigns"]));

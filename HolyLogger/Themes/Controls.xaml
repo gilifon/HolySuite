@@ -586,7 +586,11 @@
                                 <ColumnDefinition Width="Auto"/>
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
-                            <Grid Grid.Column="0" x:Name="IconCol" Width="22" Margin="2,0,2,0">
+                            <!-- 34 wide, not the usual 22: the IARC diamond on "Send Log to IARC" is
+                                 drawn deliberately larger than the other icons, and this is the box it
+                                 has to fit in. Every icon stays centred here, so widening the column
+                                 indents all menu text equally instead of knocking one item out of line. -->
+                            <Grid Grid.Column="0" x:Name="IconCol" Width="34" Margin="2,0,2,0">
                                 <ContentPresenter x:Name="Icon" ContentSource="Icon" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                                 <TextBlock x:Name="Check" Text="&#x2713;" FontWeight="Bold" VerticalAlignment="Center" HorizontalAlignment="Center" Visibility="Collapsed" Foreground="{TemplateBinding Foreground}"/>
                             </Grid>

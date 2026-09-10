@@ -59,8 +59,28 @@ namespace HolyLogger
                 CB_UnconfirmedSound.ItemsSource = new List<string>(sounds);
                 CB_UnconfirmedSound.SelectedItem = PickSound(sounds, s.ClusterUnconfirmedSound);
                 CBX_UnconfirmedSound.IsChecked = s.ClusterUnconfirmedSoundOn;
+
+                // The voice picker only earns its space when it can still decide something: it is
+                // gone once every phrase has a real recording, and on a PC with fewer than two
+                // voices to choose between.
+                var voices = VoiceAlerts.InstalledVoiceNames();
+                if (VoiceAlerts.AllPhrasesAreRecorded())
+                {
+                    PNL_Voice.Visibility = Visibility.Collapsed;
+                    TXT_RecordedVoice.Visibility = Visibility.Visible;
+                }
+                else if (voices.Count > 1)
+                {
+                    CB_Voice.ItemsSource = voices;
+                    CB_Voice.SelectedItem = VoiceAlerts.SelectedVoice();
+                }
+                else PNL_Voice.Visibility = Visibility.Collapsed;
             }
             finally { _loading = false; }
+
+            // Making the spoken WAVs takes about a second each, so it happens now, quietly, while
+            // the operator reads the window -- the Test button then plays instantly.
+            VoiceAlerts.PrepareInBackground();
 
             Closing += (a, b) => SaveBounds_();
         }
@@ -68,7 +88,10 @@ namespace HolyLogger
         // Named system sounds + every Windows\Media *.wav, same choices the Options page offered.
         private static List<string> BuildSoundList()
         {
-            var sounds = new List<string>(BuiltInSounds);
+            // The spoken alerts come first: a beep tells the operator only THAT something
+            // happened, these tell him which of the three it was without looking at the screen.
+            var sounds = new List<string>(VoiceAlerts.Names);
+            sounds.AddRange(BuiltInSounds);
             try
             {
                 string mediaDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "Media");
@@ -197,6 +220,25 @@ namespace HolyLogger
                 Save(Properties.Settings.Default);
             }
         }
+
+        // A new voice makes the cached WAVs wrong, so they are thrown away and spoken again in the
+        // background -- otherwise the alerts would keep the old voice until the folder was cleared
+        // by hand.
+        private void CB_Voice_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_loading) return;
+            if (CB_Voice.SelectedItem is string name)
+            {
+                Properties.Settings.Default.ClusterVoiceName = name;
+                Save(Properties.Settings.Default);
+                VoiceAlerts.ClearCache();
+                VoiceAlerts.PrepareInBackground();
+            }
+        }
+
+        // Speaks the new-country words so the operator can compare voices without leaving the row.
+        private void BTN_TestVoice_Click(object sender, RoutedEventArgs e)
+            => MainWindow.PlayClusterAlertSound(VoiceAlerts.Names[0]);
 
         // Test buttons use the app-wide output device (chosen in Options > General > Sounds).
         private void BTN_TestNewCountry_Click(object sender, RoutedEventArgs e)
