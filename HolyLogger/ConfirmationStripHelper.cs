@@ -24,7 +24,12 @@ namespace HolyLogger
     {
         private const string LabelText = "Received Confirmation";
         private const double EdgeInset = 2;    // keeps the first/last letter off the strip's very edges
-        private const double Lift = 2;         // nudges the line up so it sits centred in the green band
+        private const double Lift = 1;         // one pixel. The caption is sized to FIT the green band
+                                               // (11 - see the overlay in either window's XAML), so it
+                                               // would centre on its own; this sits it a pixel higher,
+                                               // which is where it looks right against the column names
+                                               // below. It was 2 back when the band was too short for
+                                               // 16 and the line had to be pushed up out of trouble.
         private const double Spread = 0.5;     // fraction of the leftover width used as letter spacing;
                                                // 1.0 fills the strip edge to edge, which reads too airy
 

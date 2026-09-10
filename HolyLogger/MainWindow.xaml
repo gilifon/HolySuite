@@ -2471,7 +2471,14 @@
              non-hit-testable so clicks still reach the header underneath (e.g. to sort). -->
         <Border x:Name="ConfirmationStripLabel" IsHitTestVisible="False" Panel.ZIndex="50"
                 HorizontalAlignment="Left" VerticalAlignment="Top" Background="Transparent"
-                TextElement.FontSize="16" TextElement.FontWeight="Bold" TextElement.Foreground="#1A1A1A">
+                TextElement.FontSize="11" TextElement.FontWeight="Bold" TextElement.Foreground="#1A1A1A">
+            <!-- 11, NOT 16, AND THE GREEN STRIP IS NOT ALLOWED TO GROW. The strip is the upper half of
+                 the column header, and the header measures 30, so the strip is 15 pixels. Measured in a
+                 real window: one line needs 21 at 16, 20 at 15, 17 at 13 and 15 at 11 - so 11 is the
+                 largest size that fits, and at 16 the caption was cut off top and bottom. It also
+                 matches the 11 the five column names below it are set in. The operator asked for the
+                 strip to stay the height it is; the only other way to fit 16 would be a taller header
+                 row on both log tables. -->
             <!-- The letters are created by ConfirmationStripHelper (they are spread apart at runtime to
                  fill the strip's width), and inherit the font settings above. -->
         </Border>
