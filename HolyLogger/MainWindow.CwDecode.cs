@@ -58,6 +58,41 @@ namespace HolyLogger
             catch (Exception swallowed) { Log.Swallow(swallowed); }
         }
 
+        /// <summary>
+        /// A callsign double-clicked in the decoded text goes into the DX Callsign box - the same
+        /// box he would have typed it into, so everything downstream follows on its own: {CALL} in
+        /// a keyer macro reads from there, and so does Add.
+        ///
+        /// TYPED IN, NOT LOGGED. It is put in the box and no further: the decoder gets characters
+        /// wrong, and a callsign that arrived by machine deserves the same look-over as one typed by
+        /// hand before it goes in the log.
+        /// </summary>
+        void TakeCallsignFromDecode(string callsign)
+        {
+            if (string.IsNullOrWhiteSpace(callsign)) return;
+
+            try
+            {
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    try
+                    {
+                        if (TB_DXCallsign == null) return;
+
+                        TB_DXCallsign.Text = callsign.Trim().ToUpperInvariant();
+                        TB_DXCallsign.CaretIndex = TB_DXCallsign.Text.Length;
+
+                        // The focus goes with it: the next thing he does is nearly always to fill in
+                        // the rest of the contact, and a callsign that lands in a box he then has to
+                        // click into has saved him nothing.
+                        TB_DXCallsign.Focus();
+                    }
+                    catch (Exception swallowed) { Log.Swallow(swallowed); }
+                }));
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
         private void CwDecodeMenuItem_Click(object sender, RoutedEventArgs e)
         {
             // Modeless, and only ever one of it: the operator watches the decode while he works the
@@ -82,6 +117,7 @@ namespace HolyLogger
                 cwDecodeWindow = new CwDecodeWindow();
                 try { cwDecodeWindow.Owner = this; } catch (Exception swallowed) { Log.Swallow(swallowed); }
                 cwDecodeWindow.Closed += (s, args) => { cwDecodeWindow = null; cwDecodeOpenedItself = false; };
+                cwDecodeWindow.CallsignChosen += TakeCallsignFromDecode;
                 cwDecodeWindow.Show();
             }
             catch (Exception ex)

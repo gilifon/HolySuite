@@ -707,17 +707,24 @@
                     <!-- Never greyed, unlike the keyer above it: decoding listens to a sound card and
                          asks the radio for nothing, so it is just as useful on a rig HolyLogger
                          cannot reach at all. -->
-                    <MenuItem x:Name="CwDecodeMenuItem" Header="CW Decode" ToolTip="Listen to the radio's audio and read the CW being received" Click="CwDecodeMenuItem_Click">
+                    <MenuItem x:Name="CwDecodeMenuItem" Header="CW Decoder" ToolTip="Listen to the radio's audio and read the CW being received" Click="CwDecodeMenuItem_Click">
                         <MenuItem.Icon>
-                            <!-- An ear for the audio: three arcs growing away from a dot, the sign
-                                 every radio uses for listening. Drawn here like the key above -
-                                 no file, no licence, and it takes the theme's text colour. -->
-                            <Viewbox Width="16" Height="16">
+                            <!-- A SIGNAL BECOMING MORSE: the spike of a received pulse on the left,
+                                 turning into dit dit dah on the right. It says what this window does
+                                 in one glance - sound in, code out - where the ear that was here
+                                 before only said "listening".
+                                 Drawn here rather than fetched from a file, like the key above: it
+                                 costs four shapes, carries no licence to honour, and takes the
+                                 theme's text colour so it sits with the other menu icons. -->
+                            <Viewbox Width="20" Height="20">
                                 <Canvas Width="24" Height="24">
-                                    <Ellipse Canvas.Left="4" Canvas.Top="10" Width="4" Height="4" Fill="{DynamicResource TextBrush}"/>
-                                    <Path Data="M 10,7 A 6,6 0 0 1 10,17" Stroke="{DynamicResource TextBrush}" StrokeThickness="1.8" Fill="Transparent"/>
-                                    <Path Data="M 13.5,4.5 A 9.5,9.5 0 0 1 13.5,19.5" Stroke="{DynamicResource TextBrush}" StrokeThickness="1.8" Fill="Transparent"/>
-                                    <Path Data="M 17,2 A 13,13 0 0 1 17,22" Stroke="{DynamicResource TextBrush}" StrokeThickness="1.8" Fill="Transparent"/>
+                                    <Path Data="M 1,12 L 3.5,12 L 5,5.5 L 6.5,18.5 L 8,9.5 L 9.5,12 L 11,12"
+                                          Stroke="{DynamicResource TextBrush}" StrokeThickness="1.7"
+                                          StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                          Fill="Transparent"/>
+                                    <Ellipse Canvas.Left="12.6" Canvas.Top="10.6" Width="2.8" Height="2.8" Fill="{DynamicResource TextBrush}"/>
+                                    <Ellipse Canvas.Left="16.4" Canvas.Top="10.6" Width="2.8" Height="2.8" Fill="{DynamicResource TextBrush}"/>
+                                    <Rectangle Canvas.Left="20.2" Canvas.Top="10.6" Width="3.4" Height="2.8" RadiusX="1.4" RadiusY="1.4" Fill="{DynamicResource TextBrush}"/>
                                 </Canvas>
                             </Viewbox>
                         </MenuItem.Icon>

@@ -95,7 +95,7 @@
                             Click="BTN_RefreshCwDecodeDevices_Click"/>
                 </StackPanel>
                 <TextBlock TextWrapping="Wrap" Margin="0,6,0,0" FontSize="16" Foreground="Gray"
-                           Text="Where the received CW comes in. The decode window opens by itself when the radio is in CW."/>
+                           Text="The device in your computer that listens to the audio coming from the radio."/>
             </StackPanel>
         </GroupBox>
 

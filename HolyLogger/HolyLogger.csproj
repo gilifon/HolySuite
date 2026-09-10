@@ -325,10 +325,12 @@
       <DependentUpon>UdpPortsWindow.xaml</DependentUpon>
     </Compile>
     <Compile Include="CwDecodeWindow.cs" />
+    <Compile Include="CwDecodedText.cs" />
     <Compile Include="WaveInRecorder.cs" />
     <Compile Include="CwDecoder.cs" />
     <Compile Include="CwNeuralNet.cs" />
     <Compile Include="CwNeuralFrontEnd.cs" />
+    <Compile Include="CwNeuralDecoder.cs" />
     <Compile Include="MainWindow.CwDecode.cs" />
     <Compile Include="ClusterSettingsWindow.xaml.cs">
       <DependentUpon>ClusterSettingsWindow.xaml</DependentUpon>
