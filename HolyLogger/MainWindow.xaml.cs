@@ -3071,7 +3071,7 @@ namespace HolyLogger
             // text and get the plain one.
             var name = new CwKeyboardWindow.ButtonName
             {
-                Label = MsgButtonLabel(messageNumber),
+                Label = MsgButtonLabel(messageNumber, isCw: true),
                 BoxWidth = GetMessageButton(messageNumber) != null ? GetMessageButton(messageNumber).ActualWidth : 0,
 
                 // The keycap's own writing - see the label TextBlock in the XAML. Eleven point in the
@@ -3086,11 +3086,82 @@ namespace HolyLogger
                                                   GetCwMessageText(messageNumber), name);
             if (updated == null) return;
 
-            SaveMsgButtonLabel(messageNumber, name.Label);
+            SaveMsgButtonLabel(messageNumber, name.Label, isCw: true);
             SetCwMessageText(messageNumber, updated);
             UpdateMessageButtonLabel(GetMessageButton(messageNumber), messageNumber, isCw: true);
 
             // The keyer shows these same four along its bottom row. Edited here, redrawn there.
+        }
+
+        // VOICE MODE'S RIGHT-CLICK. There is no macro text to open here - what a voice button sends is
+        // a fixed command to the radio's own memory, not anything typed in this program - so this asks
+        // for only the one thing that IS his to set from this side: the name. CW AND VOICE EACH KEEP
+        // THEIR OWN NAME (VoiceMsgLabelsSetting vs. CwKeyboardWindow.MsgLabelsSetting) - one keycap can
+        // mean two different things depending on the mode the radio is in, same as its text already did,
+        // so naming it here must not rename what CW mode shows for the same physical key.
+        private void ShowMsgButtonRenameDialog(int messageNumber)
+        {
+            var name = new CwKeyboardWindow.ButtonName
+            {
+                Label = MsgButtonLabel(messageNumber, isCw: false),
+                BoxWidth = GetMessageButton(messageNumber) != null ? GetMessageButton(messageNumber).ActualWidth : 0,
+
+                // Same face the keycap itself wears - see ShowCwMessageEditDialog above.
+                FaceFontSize = 11,
+                FaceFontFamily = null
+            };
+
+            Border face = KeycapNameBox(name, out TextBox nameBox);
+
+            string key = "F" + (messageNumber + 4);
+            var dialog = new Window
+            {
+                Title = "Name Msg " + messageNumber + " (" + key + ")",
+                Width = 340,
+                SizeToContent = SizeToContent.Height,
+                ResizeMode = ResizeMode.NoResize,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                ShowInTaskbar = false,
+                Owner = this,
+                Icon = Icon
+            };
+
+            var panel = new StackPanel { Margin = new Thickness(14) };
+            panel.Children.Add(CwEditHeading("Button name"));
+            panel.Children.Add(face);
+            panel.Children.Add(CwEditHint("What this button is called. Leave it empty and the button "
+                                         + "shows the key that presses it (" + key + ")."));
+
+            Button btnSave = new Button
+            {
+                Content = "Save", FontSize = 16, Width = 90, Height = 32,
+                Margin = new Thickness(0, 14, 10, 0), IsDefault = true
+            };
+            Button btnCancel = new Button
+            {
+                Content = "Cancel", FontSize = 16, Width = 90, Height = 32,
+                Margin = new Thickness(0, 14, 0, 0), IsCancel = true
+            };
+            var buttonRow = new StackPanel
+            {
+                Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center
+            };
+            buttonRow.Children.Add(btnSave);
+            buttonRow.Children.Add(btnCancel);
+            panel.Children.Add(buttonRow);
+
+            dialog.Content = panel;
+
+            btnSave.Click += (s, e) => { dialog.DialogResult = true; };
+            btnCancel.Click += (s, e) => { dialog.DialogResult = false; };
+
+            nameBox.SelectAll();
+            nameBox.Focus();
+
+            if (dialog.ShowDialog() != true) return;
+
+            SaveMsgButtonLabel(messageNumber, (nameBox.Text ?? string.Empty).Trim(), isCw: false);
+            UpdateMessageButtonLabel(GetMessageButton(messageNumber), messageNumber, isCw: false);
         }
 
         // ONE EDITOR FOR EVERY STORED CW TEXT - the four Msg buttons here and the eight in the keyer.
@@ -4348,23 +4419,27 @@ namespace HolyLogger
             try { Properties.Settings.Default.Save(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
         }
 
-        // The name the operator has given one of the four, and the way to change just that one.
-        private static string MsgButtonLabel(int messageNumber)
+        // The name the operator has given one of the four, and the way to change just that one. CW and
+        // voice keep separate names now - see VoiceMsgLabelsSetting - so which file this reads and
+        // writes depends on the mode the name was given (or is being given) in.
+        private static string MsgButtonLabel(int messageNumber, bool isCw)
         {
-            string[] labels = CwKeyboardWindow.ReadLabels(CwKeyboardWindow.MsgLabelsSetting, 4);
+            string setting = isCw ? CwKeyboardWindow.MsgLabelsSetting : CwKeyboardWindow.VoiceMsgLabelsSetting;
+            string[] labels = CwKeyboardWindow.ReadLabels(setting, 4);
 
             return messageNumber >= 1 && messageNumber <= labels.Length
                  ? (labels[messageNumber - 1] ?? string.Empty).Trim()
                  : string.Empty;
         }
 
-        private static void SaveMsgButtonLabel(int messageNumber, string label)
+        private static void SaveMsgButtonLabel(int messageNumber, string label, bool isCw)
         {
             if (messageNumber < 1 || messageNumber > 4) return;
 
-            string[] labels = CwKeyboardWindow.ReadLabels(CwKeyboardWindow.MsgLabelsSetting, 4);
+            string setting = isCw ? CwKeyboardWindow.MsgLabelsSetting : CwKeyboardWindow.VoiceMsgLabelsSetting;
+            string[] labels = CwKeyboardWindow.ReadLabels(setting, 4);
             labels[messageNumber - 1] = (label ?? string.Empty).Trim();
-            CwKeyboardWindow.SaveLabels(CwKeyboardWindow.MsgLabelsSetting, labels, 4);
+            CwKeyboardWindow.SaveLabels(setting, labels, 4);
         }
 
         private Button GetMessageButton(int messageNumber)
@@ -5881,7 +5956,7 @@ namespace HolyLogger
                 // carries the key that presses it, and nothing at all while the CW keyer has taken
                 // that key for its own macros: a button naming a key that would do something else is
                 // worse than a blank one.
-                string own = MsgButtonLabel(messageNumber);
+                string own = MsgButtonLabel(messageNumber, isCw);
 
                 // THE CQ BUTTON HAS A SECOND NAME while the next press would ask QRL? rather than
                 // call - see CwKeyboardWindow.QrlLabel. Only where he has given it one.
@@ -18096,10 +18171,13 @@ namespace HolyLogger
             if (sender is Button button && int.TryParse(button.Tag?.ToString(), out int messageNumber))
             {
                 e.Handled = true;
-                // Right-click edits the CW text only while the buttons are in their CW ("Txt") look. In
-                // voice ("Msg") mode the buttons play radio audio files, so there's no CW text to edit.
+                // Right-click opens the full editor - text and name together - only while the buttons
+                // are in their CW ("Txt") look. In voice ("Msg") mode the buttons play the radio's own
+                // memory, so there's no text to edit here, but the name is still his to give.
                 if (IsCwModeActive())
                     ShowCwMessageEditDialog(messageNumber);
+                else
+                    ShowMsgButtonRenameDialog(messageNumber);
             }
         }
     }

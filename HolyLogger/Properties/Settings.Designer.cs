@@ -3233,6 +3233,18 @@ namespace HolyLogger.Properties {
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string VoiceMsgLabelsJson {
+            get {
+                return ((string)(this["VoiceMsgLabelsJson"]));
+            }
+            set {
+                this["VoiceMsgLabelsJson"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
         public string CwKeyerButtonsOffJson {
             get {
                 return ((string)(this["CwKeyerButtonsOffJson"]));

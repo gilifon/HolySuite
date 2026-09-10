@@ -1999,6 +1999,12 @@ namespace HolyLogger
         internal const string KeyerLabelsSetting = "CwKeyerLabelsJson";
         internal const string MsgLabelsSetting = "CwMsgLabelsJson";
 
+        // A name given to a Msg button while the radio is on SSB used to land in the setting above -
+        // the same one the CW side reads - so naming a button in voice mode silently renamed it in CW
+        // mode too. Voice keeps its own file now: the four buttons are one keycap each, but what each
+        // is CALLED is a separate choice per mode, same as the text under it always was.
+        internal const string VoiceMsgLabelsSetting = "VoiceMsgLabelsJson";
+
         // Everything the editor needs to know about the keycap being named: what it is called now, how
         // wide it is, and what it writes in - see RefreshButtonFace, which is where that 16 comes from.
         private ButtonName NameOf(int index)

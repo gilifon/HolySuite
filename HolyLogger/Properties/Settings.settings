@@ -809,6 +809,9 @@
     <Setting Name="CwMsgLabelsJson" Type="System.String" Scope="User">
       <Value Profile="(Default)" />
     </Setting>
+    <Setting Name="VoiceMsgLabelsJson" Type="System.String" Scope="User">
+      <Value Profile="(Default)" />
+    </Setting>
     <Setting Name="CwKeyerButtonsOffJson" Type="System.String" Scope="User">
       <Value Profile="(Default)" />
     </Setting>
