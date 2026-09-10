@@ -1473,9 +1473,6 @@ namespace HolyLogger
             SizeComboToSample(CB_State,   LongestItem(CB_State),   maxWidth: 80);
             SizeComboToSample(CB_Square,  LongestItem(CB_Square),  maxWidth: 92);
 
-            // Last: it measures where Band and Submode ended up, so they must already be their final
-            // size. Re-run here rather than only at load, because a rebuild can change those widths.
-            AlignCommentBox();
         }
 
         // Raises MinWidth (and Width, if it is currently smaller) to whatever the filter rows actually
@@ -1723,7 +1720,7 @@ namespace HolyLogger
             TB_Name.Text = ""; TB_Operator.Text = ""; TB_Freq.Text = "";
             TB_MyGrid.Text = ""; TB_MySquare.Text = "";
             TB_PropMode.Text = ""; TB_SatName.Text = ""; TB_Soapbox.Text = "";
-            TB_Time.Text = ""; TB_Qth.Text = "";
+            TB_Time.Text = ""; TB_Qth.Text = ""; TB_Notes.Text = "";
             // The dropdowns built from the log: back to "(any)".
             foreach (var cb in new[] { CB_Submode, CB_CqZone, CB_ItuZone, CB_State, CB_Square, CB_Continent })
                 if (cb.Items.Count > 0) cb.SelectedIndex = 0;
@@ -1777,6 +1774,7 @@ namespace HolyLogger
                               !string.IsNullOrEmpty(TB_Soapbox.Text) ||
                               !string.IsNullOrEmpty(TB_Time.Text) ||
                               !string.IsNullOrEmpty(TB_Qth.Text) ||
+                              !string.IsNullOrEmpty(TB_Notes.Text) ||
                               SelectedFilter(CB_State) != null ||
                               SelectedFilter(CB_Qrz) != null ||
                               SelectedFilter(CB_Eqsl) != null ||
@@ -1869,49 +1867,13 @@ namespace HolyLogger
             return string.IsNullOrEmpty(v) || v == AnyItem ? null : v;
         }
 
-        // Lines the Comment BOX up with the dropdowns above it: left edge under Band's dropdown, right
-        // edge under Mode's.
-        //
-        // Measured rather than written as fixed numbers, because everything to the left of those
-        // dropdowns is sized by label TEXT - "Country:", "Holyland Square:" - whose width depends on
-        // the theme font. Hard-coded values would line up on one machine and be visibly out on the next.
-        //
-        // Runs after layout, since nothing has a position before then.
-        private void AlignCommentBox()
-        {
-            Dispatcher.BeginInvoke(new Action(() =>
-            {
-                try
-                {
-                    if (CB_Band == null || CB_Submode == null || TB_Comment == null ||
-                        CommentGroup == null || FiltersPanel == null) return;
-                    if (!CB_Band.IsArrangeValid || !CB_Submode.IsArrangeValid || !TB_Comment.IsArrangeValid) return;
-
-                    double LeftOf(FrameworkElement e) =>
-                        e.TransformToAncestor(FiltersPanel).Transform(new Point(0, 0)).X;
-
-                    double bandLeft      = LeftOf(CB_Band);
-                    double submodeRight  = LeftOf(CB_Submode) + CB_Submode.ActualWidth;
-                    double boxLeft       = LeftOf(TB_Comment);
-
-                    // Shift the whole group right so the BOX (not its label) starts under Band. Only
-                    // ever rightwards: if the fields ahead of Comment already reach past Band, pulling
-                    // left would drag the box over its neighbour, so the left edge is left as it falls
-                    // and only the right edge is made to line up.
-                    double indent = bandLeft - boxLeft;
-                    if (indent > 0)
-                    {
-                        CommentGroup.Margin = new Thickness(indent, 0, 0, 0);
-                        boxLeft = bandLeft;
-                    }
-
-                    // Stretch to Submode's right edge (the last item on row 1). The floor keeps the box
-                    // usable if the row is ever so crowded that there is almost nothing left.
-                    TB_Comment.Width = Math.Max(60, submodeRight - boxLeft);
-                }
-                catch (Exception swallowed) { Log.Swallow(swallowed); }
-            }), System.Windows.Threading.DispatcherPriority.Loaded);
-        }
+        // (AlignCommentBox lived here, and is gone. It lined the Comment box up with the dropdowns on
+        // row 1 - left edge under Band, right edge stretched out to under Submode - which was worth
+        // doing while Comment was the only free-text box on its row with nothing to the right of it.
+        // The cost was that Comment became the widest thing in the window, and through
+        // LockMinWidthToContent it decided how wide the window had to open. Comment and Notes are both
+        // 160 in the XAML now: they read as the pair they are, and the row ends where its own content
+        // ends rather than where row 1 does.)
 
         // Room a ComboBox needs beyond its text for the drop-down arrow and the gap before it.
         private const double dropDownArrow = 26;
@@ -2136,6 +2098,7 @@ namespace HolyLogger
             string soapbox   = TB_Soapbox.Text.Trim();
             string time      = TB_Time.Text.Trim();
             string qth       = TB_Qth.Text.Trim();
+            string notes     = TB_Notes.Text.Trim();
             string qrz       = SelectedFilter(CB_Qrz);
             string eqsl      = SelectedFilter(CB_Eqsl);
             string clublog   = SelectedFilter(CB_Clublog);
@@ -2267,6 +2230,10 @@ namespace HolyLogger
             // distinct towns, which is not a list anyone picks from. "Contains", so haifa finds Haifa Bay.
             if (!string.IsNullOrEmpty(qth))
                 results = results.Where(q => q.Qth != null && q.Qth.IndexOf(qth, StringComparison.OrdinalIgnoreCase) >= 0);
+            // Free text for the same reason as QTH, and "contains" for a stronger one: a note is a
+            // sentence somebody wrote, so the words worth finding are in the middle of it.
+            if (!string.IsNullOrEmpty(notes))
+                results = results.Where(q => q.Notes != null && q.Notes.IndexOf(notes, StringComparison.OrdinalIgnoreCase) >= 0);
 
             // The other confirmation sources, same "confirmed / not confirmed" logic as LoTW.
             if (qrz != null)     { bool w = qrz == LotwConfirmed;     results = results.Where(q => (q.QrzQslRcvd == 1) == w); }

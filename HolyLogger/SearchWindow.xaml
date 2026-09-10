@@ -361,47 +361,59 @@
                   </StackPanel>
                   </Border>
 
-                  <!-- Row 5 (as displayed): prop mode, sat name, soapbox, time, QTH, comment - gray. -->
+                  <!-- Row 5 (as displayed): prop mode, sat name, soapbox, time, QTH, comment, notes.
+                       THE BOXES BEFORE COMMENT ARE DELIBERATELY TIGHT - 10px between groups instead of
+                       20, and each box cut to what its field actually holds (a prop mode is 2-3 letters,
+                       a time is 6 digits). That is what pays for Notes at the end of the row: the room
+                       comes out of padding nobody was using, not out of the window's width. -->
                   <Border Background="#E3E3E3" CornerRadius="4" Padding="6,5" Margin="0,6,0,0">
                   <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,20,0">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,10,0">
                       <TextBlock Text="Prop mode:" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                      <TextBox x:Name="TB_PropMode" Width="80" FontSize="16" VerticalAlignment="Center" CharacterCasing="Upper"
+                      <TextBox x:Name="TB_PropMode" Width="70" FontSize="16" VerticalAlignment="Center" CharacterCasing="Upper"
                                TextChanged="SearchField_TextChanged" KeyDown="SearchField_KeyDown"/>
                     </StackPanel>
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,20,0">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,10,0">
                       <TextBlock Text="Sat name:" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                      <TextBox x:Name="TB_SatName" Width="100" FontSize="16" VerticalAlignment="Center" CharacterCasing="Upper"
+                      <TextBox x:Name="TB_SatName" Width="90" FontSize="16" VerticalAlignment="Center" CharacterCasing="Upper"
                                TextChanged="SearchField_TextChanged" KeyDown="SearchField_KeyDown"/>
                     </StackPanel>
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,20,0">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,10,0">
                       <TextBlock Text="Soapbox:" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                      <TextBox x:Name="TB_Soapbox" Width="150" FontSize="16" VerticalAlignment="Center"
+                      <TextBox x:Name="TB_Soapbox" Width="110" FontSize="16" VerticalAlignment="Center"
                                TextChanged="SearchField_TextChanged" KeyDown="SearchField_KeyDown"/>
                     </StackPanel>
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,20,0">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,10,0">
                       <TextBlock Text="Time:" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"
                                  ToolTip="Any part of the QSO time (UTC), e.g. 20 or 2034"/>
-                      <TextBox x:Name="TB_Time" Width="80" FontSize="16" VerticalAlignment="Center"
+                      <TextBox x:Name="TB_Time" Width="70" FontSize="16" VerticalAlignment="Center"
                                TextChanged="SearchField_TextChanged" KeyDown="SearchField_KeyDown"/>
                     </StackPanel>
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,20,0">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,10,0">
                       <TextBlock Text="QTH:" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"
                                  ToolTip="The worked station's town, e.g. Haifa"/>
-                      <TextBox x:Name="TB_Qth" Width="120" FontSize="16" VerticalAlignment="Center"
+                      <TextBox x:Name="TB_Qth" Width="100" FontSize="16" VerticalAlignment="Center"
                                TextChanged="SearchField_TextChanged" KeyDown="SearchField_KeyDown"/>
                     </StackPanel>
-                    <!-- COMMENT LIVES HERE, not on the identity row above. It is the one box worth having
-                         room to read, and AlignCommentBox stretches it to end exactly under Submode - so
-                         wherever it sits, its row runs the full width of the panel. On the row above that
-                         made every coloured bar as wide as Name + ... + Square + a 288px Comment; here the
-                         longest row is row 1, and the bars end just past the Submode box.
-                         KEEP IT LAST on this row: AlignCommentBox measures from its left edge outwards. -->
+                    <!-- COMMENT LIVES HERE, not on the identity row above, and it is 160 wide - the
+                         same as Notes beside it. It used to be stretched at runtime to end under the
+                         Submode box on row 1, which made it the longest thing in the window and set how
+                         wide the window had to be. Two boxes of the same size read as a pair, and the
+                         row now ends where its content ends. NOTES FOLLOWS IT, and anything added later
+                         goes after Notes. -->
                     <StackPanel x:Name="CommentGroup" Orientation="Horizontal" VerticalAlignment="Center">
                       <TextBlock Text="Comment:" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"
                                  ToolTip="Any part of the QSO's comment text"/>
-                      <TextBox x:Name="TB_Comment" Width="288" FontSize="16" VerticalAlignment="Center"
+                      <TextBox x:Name="TB_Comment" Width="160" FontSize="16" VerticalAlignment="Center"
                                ToolTip="Any part of the QSO's comment text"
+                               TextChanged="SearchField_TextChanged" KeyDown="SearchField_KeyDown"/>
+                    </StackPanel>
+                    <StackPanel x:Name="NotesGroup" Orientation="Horizontal" VerticalAlignment="Center"
+                                Margin="10,0,0,0">
+                      <TextBlock Text="Notes:" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"
+                                 ToolTip="Any part of the note carried with the QSO (ADIF NOTES)"/>
+                      <TextBox x:Name="TB_Notes" Width="160" FontSize="16" VerticalAlignment="Center"
+                               ToolTip="Any part of the note carried with the QSO (ADIF NOTES)"
                                TextChanged="SearchField_TextChanged" KeyDown="SearchField_KeyDown"/>
                     </StackPanel>
                   </StackPanel>
@@ -1003,6 +1015,19 @@
                         <DataTemplate>
                             <TextBlock Text="{Binding DxccCodeText}" Padding="5,0,5,0"
                                        ToolTip="The ARRL DXCC entity number for this country"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <!-- ADIF NOTES: the free text the QSO was imported with. Far right, so no column an
+                     operator has learned the position of moves. Left-aligned, unlike its neighbours -
+                     it is read as a sentence, not glanced at as a code - and the whole of it is in the
+                     tooltip, since a long note cannot fit a cell. -->
+                <DataGridTemplateColumn Header="Notes" IsReadOnly="True" SortMemberPath="Notes"
+                                        Width="Auto" MinWidth="60">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding Notes}" HorizontalAlignment="Left" Padding="5,0,5,0"
+                                       ToolTip="{Binding Notes}"/>
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>

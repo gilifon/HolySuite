@@ -3947,7 +3947,10 @@ Environment.NewLine +
         {
             "extra_adif", "state", "iota", "sota_ref", "pota_ref", "wwff_ref", "sig", "sig_info",
             "credit_granted", "cnty", "qsl_via", "qsl_rdate", "qsl_sent", "contest_id", "time_off",
-            "date_off", "qth"
+            // notes is LAST, and new columns go after it: the bit a column sits on is its place in this
+            // list, and an undo record written before today names the old places. Appending leaves every
+            // one of them where it was; inserting would make an old undo clear the wrong column.
+            "date_off", "qth", "notes"
         };
 
         // The biggest QSO Id in a log, or 0 for a log with no QSOs. Taken before an import so a stopped
@@ -4117,6 +4120,41 @@ Environment.NewLine +
                     return unmatched;
                 }
 
+                // WHICH QSOs IN THIS LOG HAVE NO CARRIED ADIF OF THEIR OWN, asked of the database
+                // rather than of the QSOs in memory.
+                //
+                // Every other field below is judged by IsEmpty(target.<field>), and for every other
+                // field that is right. extra_adif is the exception: GetQSOsForLog deliberately does not
+                // read it - it is the biggest column in the file and the log table never shows it - so
+                // target.ExtraAdif is null on EVERY QSO here, and "was it empty before?" answered from
+                // memory always says yes. The UPDATE itself is unharmed, because its CASE asks the
+                // database the same question. The UNDO is not: it clears the columns the fill mask
+                // names, so a QSO that already had carried ADIF was recorded as having been given it,
+                // and undoing the import would have emptied the carried ADIF it came with.
+                //
+                // One query, ids only, taken BEFORE the transaction - which is exactly the state an
+                // undo has to put back.
+                // Asked whenever an undo OR the report needs it - both read the same answer, and the
+                // report is collected on imports that record no undo.
+                var emptyExtra = new HashSet<long>();
+                if (undo != null || filledNotes != null)
+                {
+                    try
+                    {
+                        using (var ee = new SQLiteCommand(
+                            "SELECT Id FROM qso WHERE log_id = @lid AND (extra_adif IS NULL OR extra_adif = '')", con))
+                        {
+                            ee.Parameters.AddWithValue("@lid", logId);
+                            using (var rdr = ee.ExecuteReader())
+                                while (rdr.Read()) emptyExtra.Add(Convert.ToInt64(rdr["Id"]));
+                        }
+                    }
+                    // Best-effort, and it fails SAFE: an empty set means no QSO is recorded as having
+                    // been given carried ADIF, so an undo puts back less than it might have - never
+                    // more. Emptying a column that was full is the failure worth avoiding.
+                    catch (Exception swallowed) { Log.Swallow(swallowed); }
+                }
+
                 // Only ever writes into a column that is currently EMPTY, so anything the operator has
                 // typed, corrected or downloaded since the first import survives untouched.
                 const string sql =
@@ -4137,7 +4175,8 @@ Environment.NewLine +
                     "contest_id     = CASE WHEN contest_id     IS NULL OR contest_id     = '' THEN @cid   ELSE contest_id     END, " +
                     "time_off       = CASE WHEN time_off       IS NULL OR time_off       = '' THEN @toff  ELSE time_off       END, " +
                     "date_off       = CASE WHEN date_off       IS NULL OR date_off       = '' THEN @doff  ELSE date_off       END, " +
-                    "qth            = CASE WHEN qth            IS NULL OR qth            = '' THEN @qth   ELSE qth            END " +
+                    "qth            = CASE WHEN qth            IS NULL OR qth            = '' THEN @qth   ELSE qth            END, " +
+                    "notes          = CASE WHEN notes          IS NULL OR notes          = '' THEN @notes ELSE notes          END " +
                     "WHERE Id = @id";
 
                 using (SQLiteTransaction tx = con.BeginTransaction())
@@ -4145,7 +4184,7 @@ Environment.NewLine +
                 {
                     foreach (string p in new[] { "@extra", "@state", "@iota", "@sota", "@pota", "@wwff", "@sig",
                                                  "@siginfo", "@cg", "@cnty", "@qvia", "@qslrd", "@qsent", "@cid",
-                                                 "@toff", "@doff", "@qth", "@id" })
+                                                 "@toff", "@doff", "@qth", "@notes", "@id" })
                         cmd.Parameters.Add(new SQLiteParameter(p));
 
                     foreach (QSO p in parsed)
@@ -4213,7 +4252,8 @@ Environment.NewLine +
                         cmd.Parameters[14].Value = Blank(p.TimeOff);
                         cmd.Parameters[15].Value = Blank(p.DateOff);
                         cmd.Parameters[16].Value = Blank(p.Qth);
-                        cmd.Parameters[17].Value = target.id;
+                        cmd.Parameters[17].Value = Blank(p.Notes);
+                        cmd.Parameters[18].Value = target.id;
 
                         // WORKED OUT BEFORE THE WRITE, because afterwards there is no way to tell what
                         // was empty. The same test the SQL uses - empty here, something in the record -
@@ -4226,7 +4266,7 @@ Environment.NewLine +
                         int fillMask = 0;
                         if (undo != null)
                         {
-                            if (IsEmpty(target.ExtraAdif)      && !IsEmpty(p.ExtraAdif))      fillMask |= 1 << 0;
+                            if (emptyExtra.Contains(target.id) && !IsEmpty(p.ExtraAdif))    fillMask |= 1 << 0;
                             if (IsEmpty(target.State)          && !IsEmpty(p.State))          fillMask |= 1 << 1;
                             if (IsEmpty(target.Iota)           && !IsEmpty(p.Iota))           fillMask |= 1 << 2;
                             if (IsEmpty(target.SotaRef)        && !IsEmpty(p.SotaRef))        fillMask |= 1 << 3;
@@ -4243,6 +4283,7 @@ Environment.NewLine +
                             if (IsEmpty(target.TimeOff)        && !IsEmpty(p.TimeOff))        fillMask |= 1 << 14;
                             if (IsEmpty(target.DateOff)        && !IsEmpty(p.DateOff))        fillMask |= 1 << 15;
                             if (IsEmpty(target.Qth)            && !IsEmpty(p.Qth))            fillMask |= 1 << 16;
+                            if (IsEmpty(target.Notes)          && !IsEmpty(p.Notes))          fillMask |= 1 << 17;
                         }
 
                         MergeNote note = null;
@@ -4265,9 +4306,13 @@ Environment.NewLine +
                             AddFill(note, "TIME_OFF", target.TimeOff, p.TimeOff);
                             AddFill(note, "DATE_OFF", target.DateOff, p.DateOff);
                             AddFill(note, "QTH", target.Qth, p.Qth);
+                            AddFill(note, "NOTES", target.Notes, p.Notes);
                             // Not printed value-by-value: it is every ADIF field this program has no
                             // column of its own for, and on a Log4OM record that is hundreds of bytes.
-                            if (IsEmpty(target.ExtraAdif) && !IsEmpty(p.ExtraAdif))
+                            // The same question, asked the same way - a report that says carried
+                            // ADIF was kept from the file, for a QSO that already had its own, is
+                            // telling the operator something that did not happen.
+                            if (emptyExtra.Contains(target.id) && !IsEmpty(p.ExtraAdif))
                                 note.Fields.Add(new KeyValuePair<string, string>(
                                     "other ADIF fields", "kept from the file"));
                         }
@@ -4326,7 +4371,8 @@ Environment.NewLine +
                 || !string.IsNullOrWhiteSpace(p.Cnty) || !string.IsNullOrWhiteSpace(p.QslVia)
                 || !string.IsNullOrWhiteSpace(p.QslRDate) || !string.IsNullOrWhiteSpace(p.QslSent)
                 || !string.IsNullOrWhiteSpace(p.ContestId) || !string.IsNullOrWhiteSpace(p.TimeOff)
-                || !string.IsNullOrWhiteSpace(p.DateOff) || !string.IsNullOrWhiteSpace(p.Qth);
+                || !string.IsNullOrWhiteSpace(p.DateOff) || !string.IsNullOrWhiteSpace(p.Qth)
+                || !string.IsNullOrWhiteSpace(p.Notes);
         }
 
         // WHAT MAKES TWO RECORDS THE SAME CONTACT, for the whole program: callsign, date, band, mode and
