@@ -2035,8 +2035,9 @@ namespace HolyLogger
         // They match CwMsgText1..4 as shipped: CQ TEST, the exchange, TU, and the bare callsign.
         internal static readonly string[] StandardMsgLabels = { "CQ", "Exch", "TU", "Call" };
 
-        // Voice plays the radio's own message memories, and every radio's front panel numbers them.
-        internal static readonly string[] StandardVoiceMsgLabels = { "M1", "M2", "M3", "M4" };
+        // Voice keeps the name these four buttons have always worn - it is what the keycaps said before
+        // any of them could be named at all, and it fits: the XAML shipped "Msg1" on a 44-wide face.
+        internal static readonly string[] StandardVoiceMsgLabels = { "Msg1", "Msg2", "Msg3", "Msg4" };
 
         // Is this Msg button's CW text still the one the program shipped? A keycap name only fits the
         // macro under it, so a standard name goes out only where the standard text is still there.
