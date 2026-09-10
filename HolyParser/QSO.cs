@@ -331,6 +331,11 @@ namespace HolyParser
         public string TimeOff { get; set; }
         public string DateOff { get; set; }
 
+        // ADIF NOTES: free text about the contact, from whatever program logged it before - an award
+        // granted, a QSL note, anything the operator himself wrote down. Multi-line in the ADIF spec, and
+        // carried exactly as it arrived; nothing here interprets it.
+        public string Notes { get; set; }
+
         // EVERY OTHER ADIF FIELD OF THE IMPORTED RECORD THAT HOLYLOGGER HAS NO COLUMN FOR, kept verbatim as the
         // raw "<field:len>value" text in the order the source program wrote it.
         //

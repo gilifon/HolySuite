@@ -2442,6 +2442,19 @@
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
+                <!-- ADIF NOTES: free text carried in from whatever program logged the QSO before this
+                     one - an award granted, a QSL note, whatever the operator himself wrote down. After
+                     Country Code, at the far right, for the same reason it sits there: nothing an
+                     operator has learned the position of moves. Left-aligned rather than centred like
+                     its neighbours - it is read as a sentence, not glanced at as a code. -->
+                <DataGridTemplateColumn Header="Notes" IsReadOnly="True" SortMemberPath="Notes" Width="Auto">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding Notes}" HorizontalAlignment="Left" Padding="5,0,5,0"
+                                       ToolTip="{Binding Notes}"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
             </DataGrid.Columns>
         </DataGrid>
 

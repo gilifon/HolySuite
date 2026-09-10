@@ -8,6 +8,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 namespace HolyLogger
@@ -1293,7 +1294,7 @@ Environment.NewLine +
             int processedQso = 0;
 
             using (SQLiteTransaction transaction = con.BeginTransaction())
-            using (SQLiteCommand insertSQL = new SQLiteCommand("INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,prop_mode,sat_name,soapbox,cq_zone,itu_zone,eqsl_status,qrz_status,lotw_status,clublog_status,lotw_qsl_rcvd,lotw_qsl_rdate,lotw_deleted_entity,qrz_qsl_rcvd,qrz_qsl_rdate,qrz_deleted_entity,eqsl_qsl_rcvd,eqsl_qsl_rdate,eqsl_deleted_entity,clublog_qsl_rcvd,clublog_qsl_rdate,clublog_deleted_entity,paper_qsl_rcvd,state,iota,sota_ref,pota_ref,wwff_ref,sig,sig_info,credit_granted,cnty,qsl_via,qsl_rdate,qsl_sent,contest_id,time_off,date_off,extra_adif,qth,dxcc,log_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,1,?,1,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?," + ActiveLogId + ")", con, transaction))
+            using (SQLiteCommand insertSQL = new SQLiteCommand("INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,prop_mode,sat_name,soapbox,cq_zone,itu_zone,eqsl_status,qrz_status,lotw_status,clublog_status,lotw_qsl_rcvd,lotw_qsl_rdate,lotw_deleted_entity,qrz_qsl_rcvd,qrz_qsl_rdate,qrz_deleted_entity,eqsl_qsl_rcvd,eqsl_qsl_rdate,eqsl_deleted_entity,clublog_qsl_rcvd,clublog_qsl_rdate,clublog_deleted_entity,paper_qsl_rcvd,state,iota,sota_ref,pota_ref,wwff_ref,sig,sig_info,credit_granted,cnty,qsl_via,qsl_rdate,qsl_sent,contest_id,time_off,date_off,extra_adif,qth,dxcc,notes,log_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,1,?,1,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?," + ActiveLogId + ")", con, transaction))
             {
                 insertSQL.Parameters.Add(new SQLiteParameter("my_callsign"));
                 insertSQL.Parameters.Add(new SQLiteParameter("operator"));
@@ -1361,6 +1362,9 @@ Environment.NewLine +
                 insertSQL.Parameters.Add(new SQLiteParameter("qth"));
 
                 insertSQL.Parameters.Add(new SQLiteParameter("dxcc"));
+                // ADIF NOTES, appended at the end rather than beside the other carried fields above - these
+                // parameters are POSITIONAL, and adding it there would shift every index below it.
+                insertSQL.Parameters.Add(new SQLiteParameter("notes"));
 
                 foreach (var qso in qsos)
                 {
@@ -1421,6 +1425,7 @@ Environment.NewLine +
                     insertSQL.Parameters[54].Value = Blank(qso.Qth);
 
                     insertSQL.Parameters[55].Value = qso.DxccCode > 0 ? (object)qso.DxccCode : DBNull.Value;
+                    insertSQL.Parameters[56].Value = Blank(qso.Notes);
 
                     try
                     {
@@ -1685,6 +1690,7 @@ Environment.NewLine +
             if ((o = Ordinal(rdr, "contest_id")) >= 0) q.ContestId = rdr.GetValue(o) as string;
             if ((o = Ordinal(rdr, "time_off")) >= 0) q.TimeOff = rdr.GetValue(o) as string;
             if ((o = Ordinal(rdr, "date_off")) >= 0) q.DateOff = rdr.GetValue(o) as string;
+            if ((o = Ordinal(rdr, "notes")) >= 0) q.Notes = rdr.GetValue(o) as string;
             if ((o = Ordinal(rdr, "extra_adif")) >= 0) q.ExtraAdif = UnpackCarriedAdif(rdr.GetValue(o));
             // ADIF QTH (the worked station's town). Read here, in the one place every reader in this file
             // goes through, rather than repeated per query the way state is - a field that is written but
@@ -1716,10 +1722,10 @@ Environment.NewLine +
         // The award / QSL record plus the raw remainder. Kept as one named group with one binder, so the
         // statements that write a whole QSO (undo-delete, copy-to-log) cannot list a different set of
         // columns from the values they bind - the failure mode that quietly empties a field.
-        private const string CarriedColumns = "credit_granted,cnty,qsl_via,qsl_rdate,qsl_sent,contest_id,time_off,date_off,extra_adif";
+        private const string CarriedColumns = "credit_granted,cnty,qsl_via,qsl_rdate,qsl_sent,contest_id,time_off,date_off,notes,extra_adif";
         // NB @qslrd, not @qrd: @qrd is already the QRZ confirmation date in the undo-delete statement, and
         // two parameters of one name would silently bind the same value to both columns.
-        private const string CarriedValues = "@cg,@cnty,@qvia,@qslrd,@qsent,@cid,@toff,@doff,@extra";
+        private const string CarriedValues = "@cg,@cnty,@qvia,@qslrd,@qsent,@cid,@toff,@doff,@notes,@extra";
 
         private static void AddCarriedParams(SQLiteCommand cmd, QSO qso)
         {
@@ -1731,7 +1737,129 @@ Environment.NewLine +
             cmd.Parameters.Add(new SQLiteParameter("@cid", Blank(qso.ContestId)));
             cmd.Parameters.Add(new SQLiteParameter("@toff", Blank(qso.TimeOff)));
             cmd.Parameters.Add(new SQLiteParameter("@doff", Blank(qso.DateOff)));
+            cmd.Parameters.Add(new SQLiteParameter("@notes", Blank(qso.Notes)));
             cmd.Parameters.Add(new SQLiteParameter("@extra", PackCarriedAdif(Blank(qso.ExtraAdif))));
+        }
+
+        // ── FILLING IN NOTES FOR QSOs THAT CARRIED IT BEFORE THERE WAS A COLUMN ──────────────────
+        //
+        // NOTES joined credit_granted, cnty and the rest as a column of its own after already having
+        // been carried, unreadable, inside extra_adif for however many imports came before it. This
+        // reads it back out for the QSOs that already have it sitting there, the same way
+        // BackfillEntityCodes fills in the DXCC number for QSOs logged before that column existed.
+        //
+        // NOTHING IS REMOVED FROM extra_adif. GenerateAdif's own de-duplication (AppendImportedFields)
+        // already skips a field the record has already written under its own column, so a QSO backfilled
+        // here is not written out twice on the next export - and the raw text is left alone rather than
+        // edited on a guess about what else might be reading it.
+        //
+        // Only ever touches a row whose notes is still empty, so it can be interrupted, run again, and
+        // never do the same row twice.
+        //
+        // ONCE PER FILE, NOT ONCE PER START. The SEARCH is what costs, not the filling: extra_adif holds
+        // the whole raw record, no index can answer a LIKE against the middle of it, so the database
+        // reads every QSO's carried text off the disk - measured at 13.3 seconds on a log of this size,
+        // finding nothing, with _dbLock held for all of it and the window unable to answer a mouse wheel
+        // for twelve of them. And it is a repair of what was imported BEFORE the column existed: every
+        // import since writes NOTES into its own column (HolyLogParser fills QSO.Notes, AddCarriedParams
+        // stores it, and "notes" is on the list of fields not re-stashed into extra_adif), so once the
+        // file has been read through there is nothing a second pass could find. The mark is kept in
+        // db_state, which travels with the file: restore a backup made before the column existed and it
+        // is repaired again, which is right.
+        private const string NotesBackfilledKey = "notes_backfilled";
+
+        public int BackfillNotesFromExtraAdif(Action<int, int> progress = null)
+        {
+            if (GetDbState(NotesBackfilledKey) == "1") return 0;
+
+            var sinceCalled = System.Diagnostics.Stopwatch.StartNew();
+            lock (_dbLock)
+            {
+                Log.Warn("STARTUP  notes backfill: got the database after "
+                         + sinceCalled.ElapsedMilliseconds + " ms");
+                if (con == null || con.State != ConnectionState.Open) return 0;
+
+                var rows = new List<KeyValuePair<long, string>>();
+                try
+                {
+                    // SQLite's LIKE is case-insensitive over ASCII by default, so this catches "notes",
+                    // "NOTES" and anything in between without needing to know which case an old import
+                    // happened to write.
+                    using (var cmd = new SQLiteCommand(
+                        "SELECT Id, extra_adif FROM qso WHERE (notes IS NULL OR notes = '') "
+                        + "AND extra_adif LIKE '%<notes:%'", con))
+                    using (var rdr = cmd.ExecuteReader())
+                        while (rdr.Read())
+                        {
+                            string extra = rdr["extra_adif"] as string;
+                            if (string.IsNullOrEmpty(extra)) continue;
+                            rows.Add(new KeyValuePair<long, string>(Convert.ToInt64(rdr["Id"]), extra));
+                        }
+                }
+                catch (Exception swallowed) { Log.Swallow(swallowed); return 0; }
+
+                Log.Warn("STARTUP  notes backfill: " + rows.Count + " QSO(s) to fill, found in "
+                         + sinceCalled.ElapsedMilliseconds + " ms");
+                // A search that finds nothing is a finished job, not a job to try again tomorrow - it is
+                // the whole file read through, which is exactly what the mark records.
+                if (rows.Count == 0) { SetDbState(NotesBackfilledKey, "1"); return 0; }
+
+                int filled = 0, done = 0;
+                bool wentAllTheWay = false;
+                try
+                {
+                    using (var tx = con.BeginTransaction())
+                    using (var upd = new SQLiteCommand("UPDATE qso SET notes = @n WHERE Id = @id", con, tx))
+                    {
+                        upd.Parameters.Add(new SQLiteParameter("@n"));
+                        upd.Parameters.Add(new SQLiteParameter("@id"));
+                        foreach (var row in rows)
+                        {
+                            done++;
+                            string note = ExtractAdifField(row.Value, "notes");
+                            if (!string.IsNullOrEmpty(note))
+                            {
+                                upd.Parameters[0].Value = note;
+                                upd.Parameters[1].Value = row.Key;
+                                try { if (upd.ExecuteNonQuery() > 0) filled++; }
+                                catch (Exception swallowed) { Log.Swallow(swallowed); }
+                            }
+
+                            if (progress != null && (done % 500 == 0 || done == rows.Count))
+                                progress(done, rows.Count);
+                        }
+                        tx.Commit();
+                        wentAllTheWay = true;
+                    }
+                }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+                // Only a pass that reached the end is marked done. One that threw halfway has left rows
+                // unread, and must be free to run again on the next start.
+                if (wentAllTheWay) SetDbState(NotesBackfilledKey, "1");
+
+                Log.Warn("STARTUP  notes backfill: DONE, held the database for "
+                         + sinceCalled.ElapsedMilliseconds + " ms in all");
+                return filled;
+            }
+        }
+
+        // One "<field:len>value" tag out of a raw carried-ADIF fragment, read the same way
+        // HolyLogParser.AdifValue reads it - duplicated here in miniature rather than exposed across the
+        // assembly boundary for this one, one-time use.
+        private static string ExtractAdifField(string raw, string field)
+        {
+            if (string.IsNullOrEmpty(raw)) return null;
+
+            var m = Regex.Match(raw, "<" + field + @":(\d{1,7})(?::[a-zA-Z])?>", RegexOptions.IgnoreCase);
+            if (!m.Success) return null;
+
+            int len;
+            if (!int.TryParse(m.Groups[1].Value, out len) || len < 0) return null;
+            int start = m.Index + m.Length;
+            if (start >= raw.Length) return string.Empty;
+            if (start + len > raw.Length) len = raw.Length - start;
+            return raw.Substring(start, len);
         }
 
         // ── FILLING IN THE ENTITY NUMBER FOR QSOs LOGGED BEFORE THERE WAS A COLUMN ────────────────
@@ -6051,6 +6179,12 @@ Environment.NewLine +
             AddColToTable("qso", "contest_id", "nvarchar(50) NULL");
             AddColToTable("qso", "time_off", "nvarchar(20) NULL");
             AddColToTable("qso", "date_off", "nvarchar(20) NULL");
+            // ADIF NOTES: free text about the contact, imported from whatever program logged it before -
+            // an award granted, a QSL note, whatever the operator himself wrote down. It used to be
+            // dropped into extra_adif with everything else HolyLogger has no column for, unreadable
+            // without opening the raw export; it is a column of its own now, the same promotion the
+            // fields above it were given. No length limit, for the same reason extra_adif has none.
+            AddColToTable("qso", "notes", "text NULL");
             // LOSSLESS IMPORT: every ADIF field of an imported record that HolyLogger has no column of
             // its own for, kept verbatim and written back out on export. Untyped text with no length
             // limit on purpose - it holds whatever the operator's previous program wrote, which is not

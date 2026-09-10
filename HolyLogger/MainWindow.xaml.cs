@@ -1258,6 +1258,38 @@ namespace HolyLogger
             });
         }
 
+        // Same idea as the entity backfill above, and started the same way - five seconds after the
+        // window is up, off the UI thread, so an operator with a big log is never made to wait on it.
+        private void StartNotesBackfill()
+        {
+            var start = new System.Windows.Threading.DispatcherTimer
+            {
+                Interval = TimeSpan.FromSeconds(5)
+            };
+            start.Tick += (s, e) =>
+            {
+                start.Stop();
+                RunNotesBackfill();
+            };
+            start.Start();
+        }
+
+        private void RunNotesBackfill()
+        {
+            Task.Run(() =>
+            {
+                try
+                {
+                    var dal = DataAccess.GetInstance();
+                    if (dal == null) return;
+                    int filled = dal.BackfillNotesFromExtraAdif();
+                    if (filled > 0)
+                        Log.Warn($"Notes filled in for {filled:N0} QSO(s) that carried it before the column existed.");
+                }
+                catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+            });
+        }
+
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
             Log.Warn("STARTUP " + Log.SinceLaunch() + "  main window: loaded, running its startup work");
@@ -1323,6 +1355,7 @@ namespace HolyLogger
 
             // Old QSOs have no entity number; this fills them in, once, quietly, in the background.
             StartEntityCodeBackfill();
+            StartNotesBackfill();
             Log.Step("loaded: entity backfill started");
 
             // The country count, skipped during the start, worked out now the window is up.

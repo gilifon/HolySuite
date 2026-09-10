@@ -834,6 +834,7 @@ namespace HolyParser
             qso_row.ContestId     = Trimmed(AdifValue(row, "contest_id"));
             qso_row.TimeOff       = Trimmed(AdifValue(row, "time_off"));
             qso_row.DateOff       = Trimmed(AdifValue(row, "qso_date_off"));
+            qso_row.Notes         = Trimmed(AdifValue(row, "notes"));
 
             // Everything else in the record - every field HolyLogger has no column for - kept verbatim so
             // the operator's log survives the import intact. See QSO.ExtraAdif.
@@ -965,7 +966,7 @@ namespace HolyParser
             "qth",
             // The award / QSL record, each in a column of its own since 8.8.4.
             "credit_granted", "cnty", "qsl_via", "qslrdate", "qsl_sent", "contest_id",
-            "time_off", "qso_date_off",
+            "time_off", "qso_date_off", "notes",
             // Header fields. They belong to the FILE, not to a QSO, so they are never carried onto one -
             // a record picked up from a file with no <eoh> would otherwise drag the header along with it.
             "adif_ver", "programid", "programversion",

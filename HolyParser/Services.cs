@@ -292,6 +292,11 @@ namespace HolyParser
                     string cid = qso.ContestId.Trim();
                     adif.AppendFormat("<contest_id:{0}>{1}", cid.Length, cid);
                 }
+                if (!string.IsNullOrWhiteSpace(qso.Notes))
+                {
+                    string notes = qso.Notes.Trim();
+                    adif.AppendFormat("<notes:{0}>{1}", notes.Length, notes);
+                }
 
                 // Last in the record: everything this QSO arrived with that HolyLogger has no column for.
                 AppendImportedFields(adif, recordStart, imported);
