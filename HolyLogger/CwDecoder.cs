@@ -607,7 +607,7 @@ namespace HolyLogger
             // operator asked for silence instead, and silence is also the honest answer - we did not
             // hear a letter.
             string letter;
-            if (FromMorse.TryGetValue(pattern, out letter)) Output(letter);
+            if (FromMorseTable.TryGetValue(pattern, out letter)) Output(letter);
         }
 
         // EVERY LETTER GOES THROUGH HERE, and until the sending has been recognised as Morse it is
@@ -644,7 +644,8 @@ namespace HolyLogger
 
         // Pattern to character. The letters, figures and the punctuation that actually turns up in a
         // QSO, plus the prosigns sent as one run of dits and dahs.
-        static readonly Dictionary<string, string> FromMorse = new Dictionary<string, string>
+        // Shared with the neural reader, which spells its characters out of the same table.
+        internal static readonly Dictionary<string, string> FromMorseTable = new Dictionary<string, string>
         {
             {".-","A"},   {"-...","B"}, {"-.-.","C"}, {"-..","D"},  {".","E"},    {"..-.","F"},
             {"--.","G"},  {"....","H"}, {"..","I"},   {".---","J"}, {"-.-","K"},  {".-..","L"},
