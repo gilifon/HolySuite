@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -25,9 +25,19 @@ namespace HolyLogger
     /// </summary>
     public partial class CwDecodeWindow : Window
     {
-        // Sentinel dropdown entry for "use the Windows default device"; stored as an empty setting.
-        // Same word and same rule as the sound-output picker in Options.
-        const string SystemDefaultDevice = "System default";
+        /// <summary>
+        /// Raised when the recording device is changed in Options, so a window already listening
+        /// moves to the new one instead of going on with the old until it is closed and reopened.
+        /// </summary>
+        public static event Action InputDeviceChanged;
+
+        internal static void RaiseInputDeviceChanged()
+        {
+            var handler = InputDeviceChanged;
+            if (handler == null) return;
+            try { handler(); }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
 
         // Long enough to scroll back through a QSO, short enough that the box never becomes the
         // reason the window is slow. Trimmed from the front, so the newest text is always kept.
@@ -62,78 +72,120 @@ namespace HolyLogger
         // meter flickers on CW - which is silence half the time - and cannot be read at all.
         double _shownLevel;
 
-        bool _loading;
-
         public CwDecodeWindow()
         {
             InitializeComponent();
 
             _recorder.Failed += OnRecorderFailed;
             _recorder.Samples += OnSamples;
-
-            LoadDevices();
+            InputDeviceChanged += OnInputDeviceChanged;
 
             _screenTimer = new DispatcherTimer(DispatcherPriority.Background)
             {
                 Interval = TimeSpan.FromMilliseconds(50)
             };
             _screenTimer.Tick += ScreenTimer_Tick;
-        }
 
-        void LoadDevices()
+            RestoreWindowBounds();
+        }
+        // ---- where the window was left last time ----
+        //
+        // Same rule as the Cluster Alerts window: the saved spot is checked against the WHOLE desktop
+        // - every monitor - before it is used. Checking only the main screen is how a window on the
+        // second monitor gets restored somewhere the operator cannot reach it, and if the saved spot
+        // is not on any screen any more the window simply opens centred instead.
+
+        void RestoreWindowBounds()
         {
-            _loading = true;
             try
             {
-                string saved = Properties.Settings.Default.CwDecodeInputDevice;
+                var s = Properties.Settings.Default;
+                if (s.CwDecodeWindowWidth >= MinWidth) Width = s.CwDecodeWindowWidth;
+                if (s.CwDecodeWindowHeight >= MinHeight) Height = s.CwDecodeWindowHeight;
 
-                var devices = new List<string> { SystemDefaultDevice };
-                try { devices.AddRange(WaveInRecorder.GetInputDeviceNames()); }
-                catch (Exception swallowed) { Log.Swallow(swallowed); }
-
-                CB_Device.ItemsSource = devices;
-                CB_Device.SelectedItem =
-                    (!string.IsNullOrWhiteSpace(saved) && devices.Contains(saved, StringComparer.OrdinalIgnoreCase))
-                        ? devices.First(d => string.Equals(d, saved, StringComparison.OrdinalIgnoreCase))
-                        : SystemDefaultDevice;
-
-                // Said plainly rather than left to be discovered: a radio that is switched off has no
-                // codec, so its name is simply not in the list.
-                if (devices.Count == 1)
-                    StatusText.Text = "This computer has no recording device. Switch the radio on, then press Refresh.";
-            }
-            finally { _loading = false; }
-        }
-
-        // The saved device string: empty for "System default", else the device name.
-        string SelectedDeviceSetting()
-        {
-            string d = CB_Device.SelectedItem as string;
-            return string.Equals(d, SystemDefaultDevice, StringComparison.Ordinal) ? string.Empty : (d ?? string.Empty);
-        }
-
-        void BtnRefresh_Click(object sender, RoutedEventArgs e)
-        {
-            bool wasRunning = _recorder.IsRunning;
-            if (wasRunning) StopListening();
-            LoadDevices();
-            if (wasRunning) StartListening();
-        }
-
-        // Switching device mid-listen moves the ear straight over rather than making him press Stop
-        // and Listen again - that is what picking a different device means.
-        void CB_Device_SelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
-            if (_loading) return;
-
-            try
-            {
-                Properties.Settings.Default.CwDecodeInputDevice = SelectedDeviceSetting();
-                Properties.Settings.Default.Save();
+                if (IsPositionOnScreen(s.CwDecodeWindowLeft, s.CwDecodeWindowTop))
+                {
+                    WindowStartupLocation = WindowStartupLocation.Manual;
+                    Left = s.CwDecodeWindowLeft;
+                    Top = s.CwDecodeWindowTop;
+                }
+                else
+                {
+                    WindowStartupLocation = WindowStartupLocation.CenterOwner;
+                }
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
 
-            if (_recorder.IsRunning) { StopListening(); StartListening(); }
+        void SaveWindowBounds()
+        {
+            try
+            {
+                var b = WindowState == WindowState.Normal
+                    ? new Rect(Left, Top, Width, Height)
+                    : RestoreBounds;
+
+                var s = Properties.Settings.Default;
+                if (!double.IsNaN(b.Left) && !double.IsInfinity(b.Left) &&
+                    !double.IsNaN(b.Top) && !double.IsInfinity(b.Top))
+                {
+                    s.CwDecodeWindowLeft = b.Left;
+                    s.CwDecodeWindowTop = b.Top;
+                }
+                if (b.Width > 0) s.CwDecodeWindowWidth = b.Width;
+                if (b.Height > 0) s.CwDecodeWindowHeight = b.Height;
+                s.Save();
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        // A saved spot on a monitor that has since been unplugged must not strand the window where
+        // it cannot be reached.
+        static bool IsPositionOnScreen(double left, double top)
+        {
+            if (double.IsNaN(left) || double.IsNaN(top) ||
+                double.IsInfinity(left) || double.IsInfinity(top))
+                return false;
+
+            double vsLeft = SystemParameters.VirtualScreenLeft;
+            double vsTop = SystemParameters.VirtualScreenTop;
+            double vsRight = vsLeft + SystemParameters.VirtualScreenWidth;
+            double vsBottom = vsTop + SystemParameters.VirtualScreenHeight;
+
+            return left >= vsLeft - 10 && top >= vsTop - 10 &&
+                   left <= vsRight - 100 && top <= vsBottom - 60;
+        }
+
+        // The status line is for TROUBLE ONLY - a device another program is holding, a radio switched
+        // off, a device that vanished. With nothing wrong it takes no room at all, rather than
+        // sitting there stating the obvious under a level bar that already shows it.
+        void SetStatus(string trouble)
+        {
+            if (string.IsNullOrEmpty(trouble))
+            {
+                StatusText.Text = string.Empty;
+                StatusText.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            StatusText.Text = trouble;
+            StatusText.Foreground = TooLoudBrush;
+            StatusText.Visibility = Visibility.Visible;
+        }
+
+        // Which device to listen to is set in Options (General > CW Decode) and simply read here.
+        static string ChosenDevice()
+        {
+            try { return Properties.Settings.Default.CwDecodeInputDevice ?? string.Empty; }
+            catch (Exception swallowed) { Log.Swallow(swallowed); return string.Empty; }
+        }
+
+        // Changed in Options while this window is listening: move the ear across at once.
+        void OnInputDeviceChanged()
+        {
+            if (!_recorder.IsRunning) return;
+            StopListening();
+            StartListening();
         }
 
         void BtnListen_Click(object sender, RoutedEventArgs e)
@@ -153,7 +205,7 @@ namespace HolyLogger
         void BtnStop_Click(object sender, RoutedEventArgs e)
         {
             StopListening();
-            StatusText.Text = "Not listening.";
+            SetStatus(null);
         }
 
         // Empties the text AND makes the decoder forget the speed and the note it had settled on.
@@ -174,10 +226,9 @@ namespace HolyLogger
             if (_recorder.IsRunning) return;
 
             string error;
-            if (!_recorder.Start(SelectedDeviceSetting(), out error))
+            if (!_recorder.Start(ChosenDevice(), out error))
             {
-                StatusText.Text = error;
-                StatusText.Foreground = TooLoudBrush;
+                SetStatus(error);
                 return;
             }
 
@@ -187,9 +238,10 @@ namespace HolyLogger
             decoder.Text += OnDecodedText;
             _decoder = decoder;
 
-            StatusText.Foreground = (Brush)FindResource("MutedTextBrush");
-            StatusText.Text = "Listening to " + _recorder.ActualDeviceName
-                            + " at " + _recorder.ActualSampleRate.ToString("N0") + " samples a second.";
+            // Nothing said when all is well. Which device it is and how fast it samples were only
+            // ever of interest while this was being built; on the air they are a line of room taken
+            // from the decoded text for ever, to say what the moving level bar already says.
+            SetStatus(null);
 
             BtnListen.IsEnabled = false;
             BtnStop.IsEnabled = true;
@@ -323,15 +375,16 @@ namespace HolyLogger
             Dispatcher.BeginInvoke(new Action(() =>
             {
                 StopListening();
-                StatusText.Foreground = TooLoudBrush;
-                StatusText.Text = message + " Press Refresh, then Listen again.";
+                SetStatus(message + " Check the device in Options, then press Listen again.");
             }));
         }
 
         void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
         {
+            SaveWindowBounds();
             _recorder.Failed -= OnRecorderFailed;
             _recorder.Samples -= OnSamples;
+            InputDeviceChanged -= OnInputDeviceChanged;
             StopListening();
             try { _recorder.Dispose(); }
             catch (Exception swallowed) { Log.Swallow(swallowed); }

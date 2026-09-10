@@ -19,35 +19,41 @@ namespace HolyLogger
         bool cwDecodeOpenedItself;
 
         /// <summary>
-        /// Opens the decode window when the radio goes to CW and closes it again when it leaves.
-        /// Called from UpdateVoiceMessageAvailabilityState, which is where every mode change already
-        /// arrives - the same place that decides whether the keyer may open.
+        /// Opens the decode window alongside the CW keyer, listening from the moment it appears.
+        /// Called when the keyer window is shown.
+        ///
+        /// TIED TO THE KEYER, NOT TO THE RADIO'S MODE. It followed CW mode first, which looked right
+        /// and was not: a rig left sitting in CW all evening is not an operator working CW, and the
+        /// window kept opening - and holding the sound card - when nobody was using it. Opening the
+        /// keyer is the moment he actually starts, and closing it is the moment he stops.
         /// </summary>
-        internal void FollowCwModeForDecode()
+        internal void OpenCwDecodeWithKeyer()
         {
             try
             {
-                if (IsCwModeActive())
-                {
-                    if (cwDecodeWindow != null) return;
+                if (cwDecodeWindow != null) return;
 
-                    OpenCwDecodeWindow();
-                    cwDecodeOpenedItself = true;
+                OpenCwDecodeWindow();
+                cwDecodeOpenedItself = true;
 
-                    // Opened by itself, so it starts listening by itself too. Being handed a window
-                    // that then waits to be told to listen would make the whole point of opening it
-                    // automatically pointless.
-                    if (cwDecodeWindow != null) cwDecodeWindow.StartListeningNow();
-                    return;
-                }
+                // Opened by itself, so it listens by itself too. Being handed a window that then
+                // waits to be told to listen would waste the point of opening it automatically.
+                if (cwDecodeWindow != null) cwDecodeWindow.StartListeningNow();
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
 
-                // Not CW any more. The audio device is given back as the window closes, which matters
-                // on a station where another program wants the same codec.
-                if (cwDecodeWindow != null && cwDecodeOpenedItself)
-                {
-                    cwDecodeOpenedItself = false;
-                    cwDecodeWindow.Close();
-                }
+        /// <summary>
+        /// Closes the decode window when the keyer closes - but only if it opened itself. The sound
+        /// card is given back as it goes, which matters where another program wants the same codec.
+        /// </summary>
+        internal void CloseCwDecodeIfItOpenedItself()
+        {
+            try
+            {
+                if (cwDecodeWindow == null || !cwDecodeOpenedItself) return;
+                cwDecodeOpenedItself = false;
+                cwDecodeWindow.Close();
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
         }

@@ -14,14 +14,16 @@ namespace HolyLogger
     // operator works a station: he tunes somebody in and wants to know what that somebody is
     // sending. Reading several at once is a different program and can come later if he wants it.
     //
-    // How it works, in four steps:
-    //   1. Every 10 ms, measure how much energy sits at each of a row of frequencies across the
-    //      passband (a Goertzel filter each - a one-frequency Fourier transform, a few lines long).
-    //   2. The frequency that has held the most energy over the last second or so IS the note being
-    //      sent. Nobody has to type in the pitch, and it follows him when he tunes.
-    //   3. That one frequency's energy over time is the key going up and down. A threshold that
+    // How it works, in five steps:
+    //   1. Every 5 ms, measure how loud each of a row of frequencies across the passband is over the
+    //      last 20 ms (a Goertzel filter each - a one-frequency Fourier transform, a few lines long).
+    //   2. The frequency that has been loudest over the last second or so IS the note being sent.
+    //      Nobody has to type in the pitch, and it follows him when he tunes.
+    //   3. Is it a station at all? Only if it stands well above the SAME note's neighbours a hundred
+    //      Hz away, and only if the key really takes the tone away rather than rippling it.
+    //   4. That one frequency's loudness over time is the key going up and down. A threshold that
     //      moves with the noise turns it into on and off.
-    //   4. Lengths of the on and off stretches become dits, dahs, letter gaps and word gaps. The
+    //   5. Lengths of the on and off stretches become dits, dahs, letter gaps and word gaps. The
     //      speed is learned from what arrives, so nothing has to be set for a fast or slow operator.
     public class CwDecoder
     {
@@ -31,13 +33,17 @@ namespace HolyLogger
         // readings to a dit and the measurement is never what limits the accuracy.
         const double FrameMilliseconds = 5.0;
 
-        // BUT EACH READING LOOKS AT 15 ms OF SOUND, the last three hops, overlapping. The width of
+        // BUT EACH READING LOOKS AT 20 ms OF SOUND, the last four hops, overlapping. The width of
         // the filter is set by how much sound it looks at and nothing else: 5 ms of audio can only
         // be measured to about 200 Hz, which lets in a great deal of band noise and most of the
-        // station next door, while 15 ms narrows that to about 65 Hz. Overlapping is what allows
-        // both - a narrow filter AND timing measured to 5 ms - where a plain run of 15 ms blocks
+        // station next door, while 20 ms narrows that to about 50 Hz. Overlapping is what allows
+        // both - a narrow filter AND timing measured to 5 ms - where a plain run of 20 ms blocks
         // would have to give one up for the other.
-        const int HopsPerWindow = 3;
+        //
+        // 20 ms was measured, not chosen: 15 scored 185 of 224, 20 scored 190, 25 scored 187 and
+        // 35 scored 182. Longer is a quieter filter but it smears a fast operator's dits, and this
+        // is where the two meet.
+        const int HopsPerWindow = 4;
 
         // The band of notes we look in. Nobody listens to CW below 300 Hz or above 1200; a wider
         // search would only offer more chances to lock onto the wrong thing.
@@ -92,6 +98,9 @@ namespace HolyLogger
         // operator who changes speed, or a new station taking over the frequency.
         const int MarkMemory = 24;
 
+        // How many 5 ms readings the loudness is averaged over - see the note where it is used.
+        const int ReadingsAveraged = 6;
+
         readonly int _sampleRate;
         readonly int _hopSamples;
         readonly int _windowSamples;
@@ -102,7 +111,7 @@ namespace HolyLogger
         readonly double[] _binSorted;       // scratch for finding the middle of the band
         readonly double[] _window;          // the last _windowSamples of audio, oldest first
         readonly double[] _taper;           // smooths the ends of the window
-        readonly double[] _recentLevels = new double[3];
+        readonly double[] _levelHistory = new double[ReadingsAveraged];
         int _windowFill;
         int _levelIndex;
 
@@ -175,7 +184,7 @@ namespace HolyLogger
         {
             Array.Clear(_binAverage, 0, _binAverage.Length);
             Array.Clear(_window, 0, _window.Length);
-            Array.Clear(_recentLevels, 0, _recentLevels.Length);
+            Array.Clear(_levelHistory, 0, _levelHistory.Length);
             _windowFill = 0; _levelIndex = 0;
             _noiseFloor = 0; _peak = 0; _levelsSeeded = false;
             _keyDown = false; _stateMs = 0;
@@ -242,11 +251,32 @@ namespace HolyLogger
             // narrow band around its own average, where a threshold can be set above it honestly.
             double level = Math.Sqrt(_binPower[_bestBin]);
 
-            // Averaged over the last three readings as well. A single reading of noise can be twice
-            // its neighbours; three in a row cannot, so this alone removes most of the false dits.
-            _recentLevels[_levelIndex] = level;
-            _levelIndex = (_levelIndex + 1) % _recentLevels.Length;
-            double smoothed = (_recentLevels[0] + _recentLevels[1] + _recentLevels[2]) / 3.0;
+            // AVERAGED OVER THE LAST SIX READINGS - 30 ms of sound.
+            //
+            // Averaging is how noise is beaten: a single reading of noise can be twice its
+            // neighbours, six in a row cannot. It costs sharpness at the ends of a mark, which is
+            // why it cannot simply be made longer and longer.
+            //
+            // SIX WAS MEASURED, and the obvious clever idea lost. Tying the length of the average to
+            // the speed being heard - a quarter of a dit, so a slow operator gets a longer average
+            // than a fast one - sounds right and scored 190 of 224. A plain fixed six scored 210,
+            // and seven the same. Eight and ten fell away again. The reason a fixed length wins is
+            // that the speed is not known when it is needed: early on, and on exactly the weak
+            // signals this is meant to help, the learned speed is still wrong, so tying the average
+            // to it makes the average wrong in the same direction.
+            _levelHistory[_levelIndex] = level;
+            _levelIndex = (_levelIndex + 1) % _levelHistory.Length;
+
+            int readings = ReadingsAveraged;
+
+            double sum = 0;
+            for (int i = 1; i <= readings; i++)
+            {
+                int at = _levelIndex - i;
+                if (at < 0) at += _levelHistory.Length;
+                sum += _levelHistory[at];
+            }
+            double smoothed = sum / readings;
 
             if (!_levelsSeeded) { _noiseFloor = smoothed; _peak = smoothed; _levelsSeeded = true; }
 
@@ -629,8 +659,13 @@ namespace HolyLogger
             {"..--.-","_"},  {"...-..-","$"},{"-.-.--","!"},  {".-..-.","\""},
             // Prosigns, written the way an operator writes them down. KN and the opening bracket are
             // the same run of dits and dahs; on the air it is always KN, so that is what it says.
-            {".-.-","<AA>"}, {".-...","<AS>"}, {".-.-.","<AR>"}, {"...-.-","<SK>"},
-            {"-.--.","<KN>"}, {"........","<HH>"}, {"...-.","<SN>"},
+            //
+            // ONLY THE ONES REALLY SENT. AA, HH and SN were here too and were taken out: they are
+            // almost never sent on purpose, and what they nearly always are is two ordinary letters
+            // that ran into each other and were read as one. Leaving them in meant every merged pair
+            // came out as a prosign, which reads as though something meaningful was heard when
+            // nothing was. Unknown runs print nothing at all, and these now do the same.
+            {".-...","<AS>"}, {".-.-.","<AR>"}, {"...-.-","<SK>"}, {"-.--.","<KN>"},
         };
     }
 }

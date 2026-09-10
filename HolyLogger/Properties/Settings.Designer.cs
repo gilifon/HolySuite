@@ -3041,6 +3041,54 @@ namespace HolyLogger.Properties {
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("NaN")]
+        public double CwDecodeWindowLeft {
+            get {
+                return ((double)(this["CwDecodeWindowLeft"]));
+            }
+            set {
+                this["CwDecodeWindowLeft"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("NaN")]
+        public double CwDecodeWindowTop {
+            get {
+                return ((double)(this["CwDecodeWindowTop"]));
+            }
+            set {
+                this["CwDecodeWindowTop"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("NaN")]
+        public double CwDecodeWindowWidth {
+            get {
+                return ((double)(this["CwDecodeWindowWidth"]));
+            }
+            set {
+                this["CwDecodeWindowWidth"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("NaN")]
+        public double CwDecodeWindowHeight {
+            get {
+                return ((double)(this["CwDecodeWindowHeight"]));
+            }
+            set {
+                this["CwDecodeWindowHeight"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("")]
         public string LotwLastNewJson {
             get {
