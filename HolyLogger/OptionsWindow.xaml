@@ -8,6 +8,54 @@
         mc:Ignorable="d"
         Title="Properties" Height="920" MinHeight="400" Width="970" MinWidth="960" ResizeMode="CanResize" Icon="Images/properties.png" SizeChanged="Window_SizeChanged" KeyDown="Window_KeyDown"
         Background="White">
+    <Window.Resources>
+        <!-- THE PAGE LIST, STRIPED LIKE THE LOG TABLE. One row white, the next grey, so the eye can
+             follow a line across to the page it wants.
+
+             THE COLOURS ARE WRITTEN OUT, not taken from the theme's GridRowBg / GridAltRowBg tokens
+             they copy (#FFFFFF and #F5F5F5, the light theme's values). This window is deliberately
+             always light - see App.xaml.cs, none of its settings panels were ever made theme-aware -
+             so a token that turns near-black in dark mode would stripe this list against black text.
+
+             A TEMPLATE OF ITS OWN, rather than just a Background: the stock TreeViewItem keeps a 19px
+             column on the left for the expander arrow and paints no background behind it, which would
+             have left every grey row with a white notch down its left-hand side. These eleven items
+             have no children and no arrow, so the row is simply a border with the header in it.
+             An item given children would need the ItemsPresenter this template leaves out. -->
+        <Style x:Key="OptionsNavItem" TargetType="TreeViewItem">
+            <Setter Property="Background" Value="#FFFFFF"/>
+            <Setter Property="Padding" Value="6,4,6,4"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TreeViewItem">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}"
+                                Padding="{TemplateBinding Padding}" SnapsToDevicePixels="True">
+                            <ContentPresenter ContentSource="Header"
+                                              HorizontalAlignment="Left" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#CCE4F7"/>
+                            </Trigger>
+                            <MultiTrigger>
+                                <MultiTrigger.Conditions>
+                                    <Condition Property="IsMouseOver" Value="True"/>
+                                    <Condition Property="IsSelected" Value="False"/>
+                                </MultiTrigger.Conditions>
+                                <Setter TargetName="Bd" Property="Background" Value="#E8F1FB"/>
+                            </MultiTrigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="ItemsControl.AlternationIndex" Value="1">
+                    <Setter Property="Background" Value="#F5F5F5"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+    </Window.Resources>
     <Grid>
         <Grid.ColumnDefinitions>
             <!-- 210, not 180: the list was set to the program's smallest allowed size of 16 and
@@ -17,7 +65,8 @@
         </Grid.ColumnDefinitions>
 
         <DockPanel x:Name="TreeViewPanel" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Grid.Column="0">
-            <TreeView x:Name="treeView" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" FontSize="16">
+            <TreeView x:Name="treeView" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" FontSize="16"
+                      AlternationCount="2" ItemContainerStyle="{StaticResource OptionsNavItem}">
                 <TreeViewItem x:Name="GeneralItem" Header="General" Selected="GeneralItem_Selected" />
                 <TreeViewItem x:Name="UlItem" Header="User Interface" Selected="UserInterfaceItem_Selected" />
                 <TreeViewItem x:Name="PersonalInfoItem" Header="Personal Info" Selected="PersonalInfoItem_Selected" />
