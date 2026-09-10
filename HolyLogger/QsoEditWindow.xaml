@@ -225,10 +225,15 @@
                  their own rather than squeezed into the rows above: those measure 700, which is the
                  width of the window, so a column added to any of them would have pushed it wider. -->
             <Grid Margin="12,2,12,4">
+                <!-- Credit Granted gave up 270 of its 440 to Notes. It holds an award list -
+                     "DXCC,WAS" - which is short, and had far more room than it ever used; Notes is a
+                     sentence somebody wrote, and wants every pixel it can get. The four still add up to
+                     700, the width of the window, so nothing here pushes the window wider. -->
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="140"/>
                     <ColumnDefinition Width="120"/>
-                    <ColumnDefinition Width="440"/>
+                    <ColumnDefinition Width="170"/>
+                    <ColumnDefinition Width="270"/>
                 </Grid.ColumnDefinitions>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
@@ -238,6 +243,7 @@
                 <TextBlock Grid.Row="0" Grid.Column="0" Text="Contest ID"     Style="{StaticResource Hdr}"/>
                 <TextBlock Grid.Row="0" Grid.Column="1" Text="County"         Style="{StaticResource Hdr}"/>
                 <TextBlock Grid.Row="0" Grid.Column="2" Text="Credit Granted" Style="{StaticResource Hdr}"/>
+                <TextBlock Grid.Row="0" Grid.Column="3" Text="Notes"          Style="{StaticResource Hdr}"/>
 
                 <TextBox Grid.Row="1" Grid.Column="0" x:Name="TB_ContestId" Style="{StaticResource Cell}" CharacterCasing="Upper"
                          ToolTip="The contest this QSO was made in, as the contest robots name it (ADIF CONTEST_ID), e.g. CQ-WW-CW"/>
@@ -247,6 +253,14 @@
                 <TextBox Grid.Row="1" Grid.Column="2" x:Name="TB_Credit"    Style="{StaticResource Cell}" CharacterCasing="Upper"
                          HorizontalContentAlignment="Left"
                          ToolTip="Awards this QSO has been credited towards (ADIF CREDIT_GRANTED), e.g. DXCC,WAS"/>
+                <!-- Left-aligned and NOT upper-cased: this is somebody's own sentence, and shouting it
+                     back at him is not showing him what he wrote. One line, like the log table's Notes
+                     column - a note written across several lines in another program keeps its line
+                     breaks in the text and is handed back unchanged, because a box without AcceptsReturn
+                     shows them on one line without eating them. -->
+                <TextBox Grid.Row="1" Grid.Column="3" x:Name="TB_Notes"     Style="{StaticResource Cell}"
+                         HorizontalContentAlignment="Left"
+                         ToolTip="Free text carried with this QSO (ADIF NOTES) - an award, a QSL note, whatever was written down"/>
             </Grid>
 
             <!-- ACTIVITY PROGRAMS. Four have a field of their own in ADIF; every other program -

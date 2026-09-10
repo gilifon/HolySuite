@@ -194,6 +194,7 @@ namespace HolyLogger
             TB_ContestId.Text = S(_qso.ContestId);
             TB_Cnty.Text      = S(_qso.Cnty);
             TB_Credit.Text    = S(_qso.CreditGranted);
+            TB_Notes.Text     = S(_qso.Notes);
             TB_PropMode.Text  = S(_qso.PROP_MODE);
             TB_SatName.Text   = S(_qso.SAT_NAME);
 
@@ -398,6 +399,7 @@ namespace HolyLogger
                 _qso.ContestId = TB_ContestId.Text.Trim();
                 _qso.Cnty      = TB_Cnty.Text.Trim();
                 _qso.CreditGranted = TB_Credit.Text.Trim();
+                _qso.Notes     = TB_Notes.Text.Trim();
                 _qso.PROP_MODE = TB_PropMode.Text.Trim();
                 _qso.SAT_NAME  = TB_SatName.Text.Trim();
                 // MyCall is deliberately NOT written back: the station callsign is the log's identity and

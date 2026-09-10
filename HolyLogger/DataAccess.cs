@@ -1516,7 +1516,7 @@ Environment.NewLine +
                 // suspect - the edit lands on this QSO and its copy in the other log keeps the old text.
                 catch (Exception ex) { Log.Swallow(ex); }
 
-                const string sql = "UPDATE qso SET my_callsign = @my_callsign ,operator = @operator ,my_square = @my_square,my_locator = @my_locator,dx_locator = @dx_locator,frequency = @frequency,band = @band,dx_callsign = @dx_callsign,rst_rcvd = @rst_rcvd,rst_sent = @rst_sent,date = @date,time = @time,mode = @mode,submode = @submode,exchange = @exchange,comment = @comment,name = @name,country = @country,continent = @continent,cq_zone = @cq_zone,itu_zone = @itu_zone,state = @state,qth = @qth,dxcc = @dxcc,prop_mode = @prop_mode,sat_name = @sat_name, soapbox = @soapbox,iota = @iota,sota_ref = @sota_ref,pota_ref = @pota_ref,wwff_ref = @wwff_ref,sig = @sig,sig_info = @sig_info WHERE id = @id";
+                const string sql = "UPDATE qso SET my_callsign = @my_callsign ,operator = @operator ,my_square = @my_square,my_locator = @my_locator,dx_locator = @dx_locator,frequency = @frequency,band = @band,dx_callsign = @dx_callsign,rst_rcvd = @rst_rcvd,rst_sent = @rst_sent,date = @date,time = @time,mode = @mode,submode = @submode,exchange = @exchange,comment = @comment,name = @name,country = @country,continent = @continent,cq_zone = @cq_zone,itu_zone = @itu_zone,state = @state,qth = @qth,dxcc = @dxcc,prop_mode = @prop_mode,sat_name = @sat_name, soapbox = @soapbox,iota = @iota,sota_ref = @sota_ref,pota_ref = @pota_ref,wwff_ref = @wwff_ref,sig = @sig,sig_info = @sig_info,notes = @notes,contest_id = @contest_id,cnty = @cnty,credit_granted = @credit_granted WHERE id = @id";
                 try
                 {
                     foreach (var uid in ids)
@@ -1550,6 +1550,22 @@ Environment.NewLine +
                         insertSQL.Parameters.Add(new SQLiteParameter("@prop_mode", qso.PROP_MODE));
                         insertSQL.Parameters.Add(new SQLiteParameter("@sat_name", qso.SAT_NAME));
                         insertSQL.Parameters.Add(new SQLiteParameter("@soapbox", qso.SOAPBOX));
+                        // ADIF NOTES. The edit window shows it, so this statement has to write it -
+                        // a box that takes what is typed and drops it is worse than no box at all.
+                        insertSQL.Parameters.Add(new SQLiteParameter("@notes", Blank(qso.Notes)));
+                        // THE SAME THREE, FOR THE SAME REASON. Contest ID, County and Credit Granted have
+                        // had boxes in the edit window since the row was added, and this statement never
+                        // named their columns: the window took what was typed, wrote it onto the QSO in
+                        // memory, and the next read of the log brought the old value back. Safe to write
+                        // from here because every reader that produces a QSO for this method selects the
+                        // whole row (SELECT *, or every column but extra_adif) and ReadActivityFields
+                        // fills all three - so an unedited QSO writes back what it already held.
+                        // extra_adif is deliberately NOT here: it is the one column the main log read
+                        // leaves out, so a QSO from the table carries none of it and writing it would
+                        // empty the carried ADIF of every contact edited.
+                        insertSQL.Parameters.Add(new SQLiteParameter("@contest_id", Blank(qso.ContestId)));
+                        insertSQL.Parameters.Add(new SQLiteParameter("@cnty", Blank(qso.Cnty)));
+                        insertSQL.Parameters.Add(new SQLiteParameter("@credit_granted", Blank(qso.CreditGranted)));
                         AddActivityParams(insertSQL, qso, "@");
                         insertSQL.Parameters.Add(new SQLiteParameter("@id", uid));
                         insertSQL.ExecuteNonQuery();
