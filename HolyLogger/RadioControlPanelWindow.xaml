@@ -55,7 +55,7 @@
                                      dims it right along with everything else the template draws -
                                      nothing extra to keep in step when a band is unchecked on Options. -->
                                 <Path x:Name="CornerMark" Fill="Transparent"
-                                      Data="M0,9 L9,9 L9,0 Z" Width="9" Height="9" Stretch="Fill"
+                                      Data="M0,9 L9,9 L9,0 Z" Width="18" Height="18" Stretch="Fill"
                                       HorizontalAlignment="Right" VerticalAlignment="Bottom"
                                       Margin="0,0,2,2" IsHitTestVisible="False"/>
                             </Grid>
