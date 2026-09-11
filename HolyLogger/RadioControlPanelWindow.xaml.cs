@@ -309,6 +309,21 @@ namespace HolyLogger
                 Tag = band
             };
             button.Click += BandButton_Click;
+
+            // The band's own colour, same source as the Cluster's band checkboxes (MainWindow.
+            // GetBandBrush); 8m and 4m are not among the Cluster's own bands, so both are marked
+            // white instead of its shared fallback orange. No Binding and no attached property here -
+            // both were tried, and neither one ever actually painted anything, for reasons that never
+            // showed themselves even under an isolated reproduction of the same markup. Forcing the
+            // template to exist (ApplyTemplate) and reaching directly into it by name (FindName) does
+            // not depend on any binding resolving at all - it just sets Fill on the actual Path.
+            var cornerFill = (band.Name == "8m" || band.Name == "4m")
+                ? System.Windows.Media.Brushes.White
+                : MainWindow.GetBandBrush(band.Name);
+            button.ApplyTemplate();
+            if (button.Template.FindName("CornerMark", button) is System.Windows.Shapes.Path cornerMark)
+                cornerMark.Fill = cornerFill;
+
             _bandButtons.Add(button);
             return button;
         }
@@ -367,7 +382,8 @@ namespace HolyLogger
 
             // Not every radio covers every band this panel offers. A band unchecked on the Options
             // page stays disabled and grey no matter what the radio itself is doing - it never comes
-            // back with the rig, the way every other button does.
+            // back with the rig, the way every other button does. The corner mark dims right along
+            // with it for free: it is part of the same template, under the same IsEnabled trigger.
             foreach (var button in _bandButtons)
             {
                 var band = button.Tag as RadioBandPreset;

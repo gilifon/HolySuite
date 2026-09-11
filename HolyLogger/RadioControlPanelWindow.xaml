@@ -43,7 +43,22 @@
                                 BorderThickness="2"
                                 BorderBrush="{DynamicResource ThemeBorderBrush}"
                                 Background="{TemplateBinding Background}">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            <Grid>
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                <!-- A band's colour mark, bottom-right - part of the template itself
+                                     rather than something laid over the button from outside, which
+                                     never actually rendered. Named, not bound: MakeBandButton finds
+                                     this part by name after applying the template and sets Fill on it
+                                     directly in code - no Binding, no attached property, nothing for
+                                     either to fail silently on. A mode button never touches it, so it
+                                     stays at its Transparent default there. IsEnabled/Opacity above
+                                     dims it right along with everything else the template draws -
+                                     nothing extra to keep in step when a band is unchecked on Options. -->
+                                <Path x:Name="CornerMark" Fill="Transparent"
+                                      Data="M0,9 L9,9 L9,0 Z" Width="9" Height="9" Stretch="Fill"
+                                      HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                                      Margin="0,0,2,2" IsHitTestVisible="False"/>
+                            </Grid>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
