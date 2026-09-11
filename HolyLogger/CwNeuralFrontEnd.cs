@@ -43,7 +43,7 @@ namespace HolyLogger
         readonly int _sampleRate;
 
         double[] _slice;            // the samples one slice looks at
-        double[] _taper;            // the raised cosine over the slice
+        double[] _taper;            // the Tukey taper over the slice - see BuildTukey
         double[] _coefficients;     // one per frequency being measured
         int _sliceSamples;          // nperseg - how much sound a slice looks at
         int _hopSamples;            // how far the slices step
@@ -66,6 +66,7 @@ namespace HolyLogger
 
         /// <summary>One envelope number, 0 to 1, every time a slice is finished.</summary>
         public event Action<float> Envelope;
+
 
         public CwNeuralFrontEnd(int sampleRate)
         {
@@ -108,9 +109,7 @@ namespace HolyLogger
             _hopSamples = hop;
 
             _slice = new double[_sliceSamples];
-            _taper = new double[_sliceSamples];
-            for (int i = 0; i < _sliceSamples; i++)
-                _taper[i] = 0.5 - 0.5 * Math.Cos(2.0 * Math.PI * i / (_sliceSamples - 1));
+            _taper = BuildTukey(_sliceSamples, 0.25);
 
             // The three frequencies: the transform's own spacing is the sample rate over nfft, and
             // the note is rounded to the nearest of them, exactly as the original rounds its bin.
@@ -167,6 +166,39 @@ namespace HolyLogger
 
                 RaiseEnvelope(MeasureSlice());
             }
+        }
+
+        // THE TAPER IS A TUKEY, NOT A HANN - and getting this wrong is what made the network useless
+        // on real signals while it stayed perfect on made-up ones.
+        //
+        // MorseAngel prepares its audio with scipy's spectrogram and does not name a window, so it
+        // gets scipy's default. I assumed that default was a Hann, because that is what almost every
+        // other spectrogram uses. It is not: scipy's is ('tukey', 0.25) - flat across the middle
+        // three quarters with a short cosine taper at each end, which is a quite different shape and
+        // lets through a quite different amount of the note.
+        //
+        // It was found by running MorseAngel's own Python over one of the operator's recordings and
+        // comparing its numbers with mine: they agreed on every size - transform 128, overlap 78,
+        // step 50 - and then correlated at 0.25, which is to say not at all.
+        static double[] BuildTukey(int length, double alpha)
+        {
+            var window = new double[length];
+            if (length == 1) { window[0] = 1; return window; }
+
+            double n = length - 1;
+            double taper = alpha * n / 2.0;
+
+            for (int i = 0; i < length; i++)
+            {
+                if (i < taper)
+                    window[i] = 0.5 * (1 + Math.Cos(Math.PI * (2.0 * i / (alpha * n) - 1)));
+                else if (i <= n - taper)
+                    window[i] = 1.0;
+                else
+                    window[i] = 0.5 * (1 + Math.Cos(Math.PI * (2.0 * i / (alpha * n) - 2.0 / alpha + 1)));
+            }
+
+            return window;
         }
 
         double MeasureSlice()
@@ -234,7 +266,24 @@ namespace HolyLogger
             Array.Sort(_sorted, 0, _recentCount);
 
             _quietest = _sorted[_recentCount / 4];
-            _loudest = _sorted[_recentCount - 1 - _recentCount / 5];
+
+            // THE SCALE IS THE LOUDEST OF THE RECENT PAST, NOT A PERCENTILE OF IT.
+            //
+            // MorseAngel divides by max(block)/1.5, and the network was taught on what that
+            // produces. I used the eightieth percentile instead, to be safe against a crash of
+            // static - and that is a much smaller number than the maximum, so everything came out
+            // larger and clipped at 1. The network was being shown a flat, saturated shape it had
+            // never seen while learning.
+            //
+            // Proved by running MorseAngel's own Python over one of the operator's recordings: the
+            // two transforms agree to a correlation of 1.0000 - identical - and the two ENVELOPES
+            // correlated at 0.27. Everything between them was this one number.
+            //
+            // The static crash that drove me to a percentile is still handled, because the maximum
+            // is taken over a bounded window of the last two seconds rather than over all time.
+            // A crash spoils the scale for two seconds and then it recovers, which is what their
+            // per-block version does too.
+            _loudest = _sorted[_recentCount - 1];
 
             // NOTHING IS FED UNTIL THE SCALE IS KNOWN - AND THEN THE WAIT IS FED TOO.
             //

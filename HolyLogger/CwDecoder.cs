@@ -103,7 +103,17 @@ namespace HolyLogger
         const int GapMemory = 32;
 
         // How many 5 ms readings the loudness is averaged over - see the note where it is used.
-        const int ReadingsAveraged = 6;
+        //
+        // SIX WAS TOO MANY FOR A FAST OPERATOR, and it took a real station to show it. A dit at
+        // 35 WPM is 34 ms, so an average over 30 ms spans almost the whole of it: a lone dit gets
+        // flattened, and a weak one drops under the threshold and disappears entirely. The dahs,
+        // three times longer, sail through. That is why L (.-..) kept arriving as D (-..) - always
+        // the SHORT element lost, always on a FAST station.
+        //
+        // Found because the operator noticed the same callsign coming out as LY2PX and DY2PX and
+        // asked which was right. Adding fast weak stations to the bench then measured it: fifteen
+        // ms scored 217 of 256, twenty 231, twenty-five 241, thirty 235.
+        const int ReadingsAveraged = 5;
 
         readonly int _sampleRate;
         readonly int _hopSamples;
@@ -512,6 +522,24 @@ namespace HolyLogger
             }
             else impliedDit = isDah ? lengthMs / 3.0 : lengthMs;
 
+            // THE MARKS AND THE GAPS ARE WRONG BY THE SAME AMOUNT IN OPPOSITE DIRECTIONS, so the
+            // two together give a dit that neither gives alone.
+            //
+            // A mark is measured between the moments its loudness crosses the threshold, which is
+            // some way up the rising edge and some way down the falling one - so every mark measures
+            // SHORT by roughly twice that. The gap either side of it is bounded by the same two
+            // crossings, so every gap measures LONG by the same amount. Marks short by 2d, gaps long
+            // by 2d, and the average of the two has no d in it at all.
+            //
+            // It shows in the data. On a recording that decoded well the gaps inside characters sat
+            // at 0.85 of the learned dit; on one that decoded badly they sat at 1.0 to 1.5 and
+            // crowded the line that ends a character - the dit estimate running short, exactly as
+            // this predicts, and exactly what splits a character in two.
+            // MEASURED AND REJECTED. Averaging the mark-derived dit with the gap-derived one was
+            // tried and changed NOTHING - the gap histogram in units of the learned dit came out
+            // identical to the last gap, because the two estimates already agree. So the threshold
+            // does not pull marks and gaps apart the way the reasoning above says it should, and
+            // there is no bias here to cancel.
             _ditMs = _ditMs * 0.5 + impliedDit * 0.5;
             if (_ditMs < FastestDitMs) _ditMs = FastestDitMs;
             if (_ditMs > SlowestDitMs) _ditMs = SlowestDitMs;
@@ -615,6 +643,14 @@ namespace HolyLogger
             if (_gapCount < GapMemory) _gapCount++;
         }
 
+        // THE MARKS AND THE GAPS ARE NOT WRONG IN OPPOSITE DIRECTIONS - measured, not assumed.
+        //
+        // The reasoning said they must be: a mark is measured between the moments its loudness
+        // crosses the threshold, some way up the rising edge and some way down the falling one, so
+        // marks should read short and the gaps either side of them long by the same amount - and
+        // averaging the two would cancel it. It was built, and the gap histogram in units of the
+        // learned dit came out IDENTICAL to the last gap. The two estimates already agree. Left
+        // written down so the idea is not had twice.
         double LetterGapMs()
         {
             // MEASURED AND REJECTED - TWICE. Two dits of the learned dit length is what this returns,

@@ -226,6 +226,36 @@ namespace HolyLogger
             return note || speed;
         }
 
+        // NO AMATEUR CALLSIGN BEGINS WITH TWO DIGITS. A prefix is letters, or a letter and a digit,
+        // or a digit and a letter - 4Z5SL, 9A1A, 2E0ABC - but never digit-digit, because no such
+        // prefix has ever been allocated.
+        //
+        // The program's own callsign test does not know that, and it is right not to: it exists to
+        // tell a callsign from a LoTW username, where being generous costs nothing. Here it costs
+        // something, because run-together words get offered for the log. "73 TU EE" arriving glued
+        // as "73TUEE" reads as prefix 7, digit 3, suffix TUE-E - a perfectly good callsign shape.
+        //
+        // This is the extra question, asked only here, and it turns that whole family down without
+        // touching what the rest of the program believes. The underlying fault is still the missing
+        // spaces; this only stops them being offered as somebody's call.
+        static bool CouldStartACallsign(string call)
+        {
+            string s = (call ?? string.Empty).TrimStart('<');
+            if (s.Length < 2) return false;
+
+            return !(char.IsDigit(s[0]) && char.IsDigit(s[1]));
+        }
+
+        // Ends the line here and now, with nothing further to prove.
+        void BreakLineNow()
+        {
+            if (_atLineStart) return;
+
+            _paragraph.Inlines.Add(new LineBreak());
+            _atLineStart = true;
+            _handedOverAt = DateTime.MinValue;
+        }
+
         // Closes the word being gathered without writing a space - used at the two edges of a
         // prosign, which has no spaces around it but is a word all the same.
         void EndWordHere()
@@ -244,7 +274,16 @@ namespace HolyLogger
         // letter as well as a signal, and KM72OR and TNX FER QSO OM both hold one without anybody
         // handing over. A CQ call ends in K too - that is an invitation to everybody rather than to
         // one station, but it is still the end of a turn, so it earns its new line just the same.
-        static readonly string[] HandOver = { "K", "<KN>", "<AR>", "<SK>", "BK" };
+        // A PROSIGN NEEDS NO PROOF. These are not letters - <SK> is six elements run together, and
+        // nobody sends one by accident or decodes one out of noise. When one arrives the turn is
+        // over, and the line breaks there and then.
+        static readonly string[] ProsignHandOver = { "<KN>", "<AR>", "<SK>", "<AS>" };
+
+        // THESE DO need proof, because they are ordinary letters as well as signals. A bare K turns
+        // up inside spaced-out sending and in a callsign read back letter by letter; BK is two
+        // common letters. So they only note that a turn MIGHT have ended, and the line breaks later
+        // if the next letter comes from a different man - see the note at the top of this file.
+        static readonly string[] LetterHandOver = { "K", "BK" };
 
         // A word has ended: decide whether it is a callsign worth offering, and whether it hands the
         // frequency over. Returns true when the turn is finished.
@@ -256,10 +295,14 @@ namespace HolyLogger
 
             string call = word.Text.Trim();
 
-            foreach (string over in HandOver)
+            foreach (string over in ProsignHandOver)
+                if (string.Equals(call, over, StringComparison.Ordinal)) { BreakLineNow(); return false; }
+
+            foreach (string over in LetterHandOver)
                 if (string.Equals(call, over, StringComparison.Ordinal)) return true;
 
             if (!CallsignIdentity.LooksLikeCallsign(call)) return false;
+            if (!CouldStartACallsign(call)) return false;
 
             // Never his own, and never a stroke variant of it either - a man does not log himself.
             string mine = null;
