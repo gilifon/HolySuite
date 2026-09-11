@@ -48,11 +48,11 @@ namespace HolyLogger
         // InterpolatedNote in CwDecoder, which fits a curve through the strongest filter and its two
         // neighbours instead of rounding to the nearest 25 - so fifteen is comfortably outside what
         // the measurement itself can wobble by, and well inside how far apart two operators net.
-        const double DifferentNoteHz = 15.0;
+        const double DifferentNoteHz = 25.0;
 
         // And a speed this much apart, as a fraction. Operators an eighth apart in speed are not the
         // same operator; the same operator does not change by an eighth in one second.
-        const double DifferentSpeedFraction = 0.12;
+        const double DifferentSpeedFraction = 0.20;
 
         // With the note and speed both unchanged - two stations truly nose to nose - there is
         // nothing left but the gap. Long, because a gap this size inside one transmission would be
@@ -60,9 +60,14 @@ namespace HolyLogger
         static readonly TimeSpan SilenceThatProvesOver = TimeSpan.FromSeconds(2.0);
 
         // How long a pause has to be, counted in dits so it follows the speed, before it can be the
-        // turnaround between two stations rather than a gap between two words. A word gap is seven
-        // dits; twelve is clear of it at any speed and still short enough for a smart turnaround.
-        const double PauseInDits = 12.0;
+        // turnaround between two stations rather than a gap between two words.
+        //
+        // TWELVE WAS FAR TOO EAGER. A word gap is seven dits, so twelve leaves almost no margin: at
+        // 32 WPM it is 450 milliseconds against a word gap of 262, and an operator who pauses to
+        // think beats it every time. Lines were breaking three and four times inside one
+        // transmission - after "BE", after "EE", after a lone C. Thirty is about a second at 32 WPM
+        // and over a second and a half at 20, which is a turnaround and not a hesitation.
+        const double PauseInDits = 30.0;
 
         // WHITE ON BLUE, not blue text. A callsign in the middle of decoded text has to be findable
         // at a glance while the operator is listening, and a coloured word among black ones is easy

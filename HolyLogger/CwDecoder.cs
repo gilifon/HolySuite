@@ -147,6 +147,8 @@ namespace HolyLogger
         readonly List<double> _letterMarks = new List<double>(12);
         double _boundaryMs = 104.0;         // the dit/dah dividing line, until sending sets it
         bool _looksLikeMorse;               // is what we are hearing built of dits and dahs at all?
+        string _heldLone;                   // a lone E or T waiting to see whether a word follows it
+        bool _atWordStart = true;
         int _morseScore;
         double _onLevel, _offLevel;         // how loud the note is with the key down, and up
         readonly StringBuilder _held = new StringBuilder();
@@ -215,6 +217,7 @@ namespace HolyLogger
             _boundaryMs = 104.0;
             _looksLikeMorse = false;
             _morseScore = 0;
+            _heldLone = null; _atWordStart = true;
             _onLevel = 0; _offLevel = 0;
             _held.Clear();
             _letterPending = false; _wordPending = false;
@@ -713,12 +716,14 @@ namespace HolyLogger
         // ordinary gap has already written its last letter out long before this runs.
         void FinishAnythingPending()
         {
+            DropHeldLone();
             _letterMarks.Clear();
             _symbols.Clear();
             _letterPending = false;
             _wordPending = false;
             _looksLikeMorse = false;
             _morseScore = 0;
+            _heldLone = null; _atWordStart = true;
             _onLevel = 0; _offLevel = 0;
             _held.Clear();
         }
@@ -753,7 +758,67 @@ namespace HolyLogger
         // them would mean the decoder was always right and always started with "Q DE" instead of
         // "CQ DE". Held, they arrive a moment late and whole. If the signal turns out to be noise
         // after all, they are never shown at all.
+        // A SINGLE E OR T STANDING ALONE AS A WORD IS NOISE, and dropping it is the biggest single
+        // gain left in this decoder.
+        //
+        // One dit, or one dah, with a word gap either side of it. Nobody sends that: no word in a
+        // QSO is one letter long, and E and T are the two characters a single blip of noise decodes
+        // to. Six of the fifteen bench failures were the whole message read PERFECTLY and then a
+        // stray E after it - "CQ DE 4Z5SL K E" - the station having stopped and the noise carrying
+        // on. A decoder that weighs whole characters would never catch these, because E is a
+        // perfectly good character; what gives it away is standing alone.
+        //
+        // So it is held rather than printed, and it is only printed if a letter follows it inside
+        // the same word. Nothing else is delayed - a lone E is the only thing that waits.
+        static bool IsLoneNoiseLetter(string text)
+        {
+            return text == "E" || text == "T";
+        }
+
+        void ReleaseHeldLone()
+        {
+            if (_heldLone == null) return;
+            string lone = _heldLone;
+            _heldLone = null;
+            Output(lone);
+        }
+
+        void DropHeldLone()
+        {
+            _heldLone = null;
+        }
+
         void Output(string text)
+        {
+            // A letter following the held one, with no word gap between: it was part of a word after
+            // all, so both go out.
+            if (_heldLone != null && text != " ")
+            {
+                string lone = _heldLone;
+                _heldLone = null;
+                Output(lone);
+            }
+            else if (_heldLone != null && text == " ")
+            {
+                // A word gap after it: it WAS a word on its own. Dropped, and the space with it -
+                // two spaces round nothing would leave a hole where the noise was.
+                _heldLone = null;
+                return;
+            }
+
+            if (_atWordStart && IsLoneNoiseLetter(text))
+            {
+                _heldLone = text;
+                _atWordStart = false;
+                return;
+            }
+
+            _atWordStart = text == " ";
+
+            OutputNow(text);
+        }
+
+        void OutputNow(string text)
         {
             if (_looksLikeMorse) { Raise(text); return; }
 
