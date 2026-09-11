@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
@@ -28,6 +28,42 @@ namespace HolyLogger
         const int MostBlocks = 400;
         const int BlocksTrimmedAtOnce = 100;
 
+        // WHAT PROVES A "K" MEANT "OVER".
+        //
+        // Not the K. K is a letter as much as a signal - it turns up alone in spaced-out sending, in
+        // a callsign read back letter by letter, and in whatever the decoder makes of a burst of
+        // noise. Breaking the line on the K alone chops transmissions in half.
+        //
+        // Silence after it was the second guess and it was wrong too, for the opposite reason: when
+        // a K really does mean over, the other station comes straight back, often inside a second.
+        // Waiting for a long quiet misses exactly the handovers it was meant to catch.
+        //
+        // WHAT ACTUALLY CHANGES IS THE STATION. A different operator is on a slightly different note
+        // - nobody zero-beats exactly - and sends at a different speed. Both are already measured,
+        // every moment, by the decoder feeding this window. So the question "did the turn change?"
+        // is answered by "is this a different man sending?", which is the same question and a far
+        // easier one.
+        //
+        // A tone this far apart is a different station. The note is now measured to a few Hz - see
+        // InterpolatedNote in CwDecoder, which fits a curve through the strongest filter and its two
+        // neighbours instead of rounding to the nearest 25 - so fifteen is comfortably outside what
+        // the measurement itself can wobble by, and well inside how far apart two operators net.
+        const double DifferentNoteHz = 15.0;
+
+        // And a speed this much apart, as a fraction. Operators an eighth apart in speed are not the
+        // same operator; the same operator does not change by an eighth in one second.
+        const double DifferentSpeedFraction = 0.12;
+
+        // With the note and speed both unchanged - two stations truly nose to nose - there is
+        // nothing left but the gap. Long, because a gap this size inside one transmission would be
+        // remarkable, and a wrong break costs more than a missed one.
+        static readonly TimeSpan SilenceThatProvesOver = TimeSpan.FromSeconds(2.0);
+
+        // How long a pause has to be, counted in dits so it follows the speed, before it can be the
+        // turnaround between two stations rather than a gap between two words. A word gap is seven
+        // dits; twelve is clear of it at any speed and still short enough for a smart turnaround.
+        const double PauseInDits = 12.0;
+
         // WHITE ON BLUE, not blue text. A callsign in the middle of decoded text has to be findable
         // at a glance while the operator is listening, and a coloured word among black ones is easy
         // to miss; a filled patch is not. It also reads the same on every colour scheme, where blue
@@ -45,6 +81,20 @@ namespace HolyLogger
         readonly RichTextBox _box;
         readonly Paragraph _paragraph;
         Run _word;
+        bool _atLineStart = true;
+        DateTime _handedOverAt = DateTime.MinValue;
+        double _noteAtHandover, _speedAtHandover;
+        bool _lastWasProsignEnd;
+        DateTime _lastLetterAt = DateTime.MinValue;
+        double _lastNote, _lastSpeed;
+
+        /// <summary>
+        /// The note and speed the decoder is hearing right now. Set by the window before each
+        /// Append, and used to tell a new station from the same one carrying on - see the note above
+        /// DifferentNoteHz.
+        /// </summary>
+        public double ToneHz { get; set; }
+        public double Wpm { get; set; }
 
         /// <summary>A callsign the operator double-clicked, ready for the log.</summary>
         public event Action<string> CallsignChosen;
@@ -67,6 +117,10 @@ namespace HolyLogger
         {
             _paragraph.Inlines.Clear();
             _word = null;
+            _atLineStart = true;
+            _handedOverAt = DateTime.MinValue;
+            _noteAtHandover = 0; _speedAtHandover = 0;
+            _lastLetterAt = DateTime.MinValue; _lastNote = 0; _lastSpeed = 0;
         }
 
         /// <summary>Adds newly decoded text, colouring any callsign as its last letter arrives.</summary>
@@ -76,12 +130,79 @@ namespace HolyLogger
 
             foreach (char c in text)
             {
+                // A PROSIGN IS A WORD OF ITS OWN, whatever is written against it. They arrive with no
+                // space around them - "E74MW<SK>EE" is what came off the air - so without this the
+                // callsign, the prosign and whatever follows are one long word: not a callsign, so
+                // not offered for the log, and not <SK>, so the turn never ended. The brackets are
+                // the boundary, because only a prosign has them.
+                if (c == '<') EndWordHere();
+                if (_lastWasProsignEnd) { EndWordHere(); _lastWasProsignEnd = false; }
+                _lastWasProsignEnd = c == '>';
+
                 if (c == ' ' || c == '\r' || c == '\n')
                 {
-                    FinishWord();
+                    // A TURN ENDS, SO THE LINE ENDS - but the K alone does not prove the turn ended.
+                    // Noted here, and acted on below only if he really did stop.
+                    EndWordHere();
+
+                    // No run of blank space at the start of a fresh line.
+                    if (_atLineStart) continue;
+
                     _paragraph.Inlines.Add(new Run(c.ToString()));
                     continue;
                 }
+
+                // IS THIS THE SAME MAN STILL SENDING, OR THE ONE ANSWERING HIM? That is the whole
+                // question, and it is asked HERE - as the next letter arrives after a K - rather
+                // than at the K itself, because the K alone proves nothing. The two rules that were
+                // tried before this one, and why each was wrong, are at the top of this file.
+                // A TURN CHANGES WHETHER OR NOT THE "K" SURVIVED THE DECODING.
+                //
+                // Waiting for a clean K is too fragile: it arrives welded to whatever came before -
+                // "E74MW<SK>EE", "-HW?BK" - because the space in front of it was never decoded, and
+                // sometimes it is simply misread. So the K is no longer the only way in.
+                //
+                // The other way needs no K at all: a PAUSE, and then a DIFFERENT MAN sending. Both
+                // halves are required. A pause alone is just a gap between words; a different note
+                // alone is the signal drifting or fading. Together they are somebody else taking the
+                // frequency, which is exactly what a new line is for.
+                if (_handedOverAt == DateTime.MinValue && _lastLetterAt != DateTime.MinValue)
+                {
+                    double dit = Wpm > 0 ? 1200.0 / Wpm : 60.0;
+                    bool realPause = (DateTime.UtcNow - _lastLetterAt).TotalMilliseconds > dit * PauseInDits;
+
+                    if (realPause && SomebodyElse(_lastNote, _lastSpeed) && !_atLineStart)
+                    {
+                        _paragraph.Inlines.Add(new LineBreak());
+                        _atLineStart = true;
+                        EndWordHere();
+                    }
+                }
+
+                _lastLetterAt = DateTime.UtcNow;
+                if (ToneHz > 0) _lastNote = ToneHz;
+                if (Wpm > 0) _lastSpeed = Wpm;
+
+                if (_handedOverAt != DateTime.MinValue)
+                {
+                    bool differentNote = _noteAtHandover > 0 && ToneHz > 0
+                                         && Math.Abs(ToneHz - _noteAtHandover) >= DifferentNoteHz;
+
+                    bool differentSpeed = _speedAtHandover > 0 && Wpm > 0
+                                          && Math.Abs(Wpm - _speedAtHandover)
+                                             >= _speedAtHandover * DifferentSpeedFraction;
+
+                    bool longEnoughGap = DateTime.UtcNow - _handedOverAt >= SilenceThatProvesOver;
+
+                    if ((differentNote || differentSpeed || longEnoughGap) && !_atLineStart)
+                    {
+                        _paragraph.Inlines.Add(new LineBreak());
+                        _atLineStart = true;
+                    }
+                    _handedOverAt = DateTime.MinValue;
+                }
+
+                _atLineStart = false;
 
                 if (_word == null)
                 {
@@ -95,22 +216,57 @@ namespace HolyLogger
             _box.ScrollToEnd();
         }
 
-        // A word has ended: decide whether it is a callsign worth offering.
-        void FinishWord()
+        // Is this a different operator from the one who was sending a moment ago? The same two
+        // tests as after a K - the note he nets on and the speed of his fist.
+        bool SomebodyElse(double wasNote, double wasSpeed)
+        {
+            bool note = wasNote > 0 && ToneHz > 0 && Math.Abs(ToneHz - wasNote) >= DifferentNoteHz;
+            bool speed = wasSpeed > 0 && Wpm > 0
+                         && Math.Abs(Wpm - wasSpeed) >= wasSpeed * DifferentSpeedFraction;
+            return note || speed;
+        }
+
+        // Closes the word being gathered without writing a space - used at the two edges of a
+        // prosign, which has no spaces around it but is a word all the same.
+        void EndWordHere()
+        {
+            if (_word == null || _word.Text.Length == 0) return;
+
+            if (FinishWord())
+            {
+                _handedOverAt = DateTime.UtcNow;
+                _noteAtHandover = ToneHz;
+                _speedAtHandover = Wpm;
+            }
+        }
+
+        // THE WORDS THAT MEAN "OVER TO YOU". Only when one of them stands ALONE as a word: K is a
+        // letter as well as a signal, and KM72OR and TNX FER QSO OM both hold one without anybody
+        // handing over. A CQ call ends in K too - that is an invitation to everybody rather than to
+        // one station, but it is still the end of a turn, so it earns its new line just the same.
+        static readonly string[] HandOver = { "K", "<KN>", "<AR>", "<SK>", "BK" };
+
+        // A word has ended: decide whether it is a callsign worth offering, and whether it hands the
+        // frequency over. Returns true when the turn is finished.
+        bool FinishWord()
         {
             var word = _word;
             _word = null;
-            if (word == null || word.Text.Length == 0) return;
+            if (word == null || word.Text.Length == 0) return false;
 
             string call = word.Text.Trim();
-            if (!CallsignIdentity.LooksLikeCallsign(call)) return;
+
+            foreach (string over in HandOver)
+                if (string.Equals(call, over, StringComparison.Ordinal)) return true;
+
+            if (!CallsignIdentity.LooksLikeCallsign(call)) return false;
 
             // Never his own, and never a stroke variant of it either - a man does not log himself.
             string mine = null;
             try { mine = Properties.Settings.Default.my_callsign; }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
 
-            if (!string.IsNullOrWhiteSpace(mine) && CallsignIdentity.Same(call, mine)) return;
+            if (!string.IsNullOrWhiteSpace(mine) && CallsignIdentity.Same(call, mine)) return false;
 
             word.Foreground = CallsignInk;
             word.Background = CallsignPatch;
@@ -118,6 +274,7 @@ namespace HolyLogger
             word.Tag = call;
             word.Cursor = System.Windows.Input.Cursors.Hand;
             word.ToolTip = "Double-click to put " + call + " in the DX Callsign box";
+            return false;
         }
 
         // Anything the operator double-clicks that was marked as a callsign goes to the log. A

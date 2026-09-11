@@ -101,6 +101,7 @@ namespace HolyLogger
         CwDecodedText _networkText;
         Border _networkFrame;
         TextBlock _plainLabel, _networkLabel;
+        RowDefinition _networkRow;
 
         // Letters arrive on the capture thread, one or two at a time, and are collected here for the
         // screen timer to put on show in one go. A Dispatcher call per letter would be a thousand
@@ -195,7 +196,8 @@ namespace HolyLogger
             boxes.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             boxes.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
             boxes.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            boxes.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+            _networkRow = new RowDefinition { Height = new GridLength(1, GridUnitType.Star) };
+            boxes.RowDefinitions.Add(_networkRow);
 
             Grid.SetRow(_plainLabel, 0);
             Grid.SetRow(frame, 1);
@@ -442,11 +444,20 @@ namespace HolyLogger
         // In Both, the second reader gets a box of its own under the first, each named. One box with
         // the two run together would be unreadable - and reading them side by side is the whole
         // point of Both: it is how the operator finds out which he trusts on HIS signals.
+        //
+        // WITH ONE READER, THE ONE BOX TAKES THE WHOLE WINDOW. Hiding the second box is not enough
+        // and this was got wrong at first: a collapsed thing in a row set to share the space still
+        // has its share of the space kept for it, so the text sat in the top half of the window with
+        // an empty half under it. The row itself has to be closed, not just the box in it.
         void ApplyShowLayout()
         {
             bool both = Showing == Reader.Both;
+
             _networkFrame.Visibility = both ? Visibility.Visible : Visibility.Collapsed;
+            _networkLabel.Visibility = both ? Visibility.Visible : Visibility.Collapsed;
             _plainLabel.Visibility = both ? Visibility.Visible : Visibility.Collapsed;
+
+            _networkRow.Height = both ? new GridLength(1, GridUnitType.Star) : new GridLength(0);
         }
 
         static void PaintChoice(Button button, bool chosen)
@@ -772,6 +783,17 @@ namespace HolyLogger
                 network = _pendingNetwork.ToString();
                 _pendingPlain.Clear();
                 _pendingNetwork.Clear();
+            }
+
+            // The readers are told the note and the speed before they are given the letters: it is
+            // how they tell a new station answering from the same one carrying on - see CwDecodedText.
+            var heard = _decoder;
+            if (heard != null)
+            {
+                double note = heard.SignalPresent ? heard.ToneHz : 0;
+                double speed = heard.SignalPresent ? heard.Wpm : 0;
+                _text.ToneHz = note; _text.Wpm = speed;
+                if (_networkText != null) { _networkText.ToneHz = note; _networkText.Wpm = speed; }
             }
 
             // In Plain and Network the one on show writes into the top box; in Both each has its

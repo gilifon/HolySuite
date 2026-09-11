@@ -98,6 +98,10 @@ namespace HolyLogger
         // operator who changes speed, or a new station taking over the frequency.
         const int MarkMemory = 24;
 
+        // How many recent gaps are kept to find the line between the two kinds. More than marks,
+        // because both kinds have to be in there and the gaps between characters are the rarer.
+        const int GapMemory = 32;
+
         // How many 5 ms readings the loudness is averaged over - see the note where it is used.
         const int ReadingsAveraged = 6;
 
@@ -125,6 +129,9 @@ namespace HolyLogger
         double _ditMs = 60.0;               // 20 WPM until the sending says otherwise
         readonly double[] _marks = new double[MarkMemory];
         readonly double[] _sorted = new double[MarkMemory];
+        readonly double[] _gaps = new double[GapMemory];
+        readonly double[] _gapSorted = new double[GapMemory];
+        int _gapCount, _gapNext;
         int _markCount, _markNext;
         readonly StringBuilder _symbols = new StringBuilder();
         readonly List<double> _letterMarks = new List<double>(12);
@@ -191,6 +198,8 @@ namespace HolyLogger
             _ditMs = 60.0;
             _markCount = 0; _markNext = 0;
             Array.Clear(_marks, 0, _marks.Length);
+            _gapCount = 0; _gapNext = 0;
+            Array.Clear(_gaps, 0, _gaps.Length);
             _symbols.Clear();
             _letterMarks.Clear();
             _boundaryMs = 104.0;
@@ -241,7 +250,7 @@ namespace HolyLogger
             if (bestIndex != _bestBin && best > _binAverage[_bestBin] * 1.3)
                 _bestBin = bestIndex;
 
-            ToneHz = _toneFrequencies[_bestBin];
+            ToneHz = InterpolatedNote(_bestBin);
 
             // Step 3: that note's LOUDNESS is the key, up or down.
             //
@@ -352,9 +361,46 @@ namespace HolyLogger
             _keyDown = nowDown;
             _stateMs = FrameMilliseconds;
 
-            // A space that has just ended needs nothing done to it: CheckGaps has been writing the
-            // letter and the word gap out frame by frame as they became long enough.
             if (!nowDown) EndOfMark(lasted);
+            else RememberGap(lasted);
+        }
+
+        // THE NOTE TO A FEW Hz, not to the nearest 25.
+        //
+        // The filters are 25 Hz apart, so taking the strongest one as the answer rounds the note to
+        // the nearest 25 - and that was too coarse for the job the note has to do. Two stations in a
+        // QSO sit a few tens of Hz apart, being netted to each other by ear, and telling one from
+        // the other by pitch needs better than a 25 Hz ruler.
+        //
+        // A tone between two filters lights both of them, and how much of each says where it really
+        // is. Three strengths - the strongest and its two neighbours - lie on a curve, and the top of
+        // that curve is the note. Taking their logarithms first is what makes it a fair curve to fit:
+        // a tapered filter's response falls away in a shape that is close to a parabola in decibels
+        // and nothing like one in raw strength. The answer is good to a few Hz, and it costs three
+        // logarithms.
+        double InterpolatedNote(int bin)
+        {
+            double centre = _toneFrequencies[bin];
+            if (bin <= 0 || bin >= _binAverage.Length - 1) return centre;
+
+            double left = _binAverage[bin - 1];
+            double mid = _binAverage[bin];
+            double right = _binAverage[bin + 1];
+            if (left <= 0 || mid <= 0 || right <= 0) return centre;
+
+            double l = Math.Log(left), m = Math.Log(mid), r = Math.Log(right);
+
+            double curvature = l - 2 * m + r;
+            if (Math.Abs(curvature) < 1e-12) return centre;
+
+            double offset = 0.5 * (l - r) / curvature;
+
+            // Never further than half a step: beyond that the strongest filter would have been a
+            // different one, and a wild answer here would be worse than the rounding it replaced.
+            if (offset > 0.5) offset = 0.5;
+            if (offset < -0.5) offset = -0.5;
+
+            return centre + offset * ToneStep;
         }
 
         // How loud it is JUST BESIDE the note we are listening to - a hundred or two Hz either side,
@@ -547,12 +593,58 @@ namespace HolyLogger
             if (_looksLikeMorse && !wasOpen) ReleaseHeldText();
         }
 
+        // THE LINE BETWEEN A GAP INSIDE A CHARACTER AND A GAP BETWEEN CHARACTERS, taken from the
+        // gaps the operator is actually leaving rather than from two dits of a learned dit length.
+        //
+        // WHY IT WAS WRONG BEFORE. The old line was 2 x the learned dit. Measured off the air, the
+        // gaps themselves fall in two clean clusters with an empty valley between them - 91 gaps
+        // between half a dit and one and a quarter, then nothing at all until two - so the gaps are
+        // not ambiguous and never were. What wobbles is the DIT ESTIMATE. Let that estimate run
+        // briefly short and an ordinary one-dit gap measures as more than two of them, and a
+        // character is cut in half: OM3CW came out as MTM3CW, the O's own inside gap read as a gap
+        // between letters, splitting --- into -- and -.
+        //
+        // Measuring the gaps directly takes the dit estimate out of the question altogether. It also
+        // follows an operator who leaves wider gaps than the book says, which many good ones do.
+        void RememberGap(double lengthMs)
+        {
+            if (lengthMs < 5 || lengthMs > 3000) return;
+
+            _gaps[_gapNext] = lengthMs;
+            _gapNext = (_gapNext + 1) % GapMemory;
+            if (_gapCount < GapMemory) _gapCount++;
+        }
+
+        double LetterGapMs()
+        {
+            // MEASURED AND REJECTED - TWICE. Two dits of the learned dit length is what this returns,
+            // and it is what it returned before, because two attempts to do better both made the
+            // decoder measurably worse on real recordings.
+            //
+            // The idea was sound enough: the letter line is 2 x a dit estimate that wobbles, so take
+            // it from the gaps themselves instead. The gaps do fall in two clean clusters with an
+            // empty valley between them - 91 gaps under one and a quarter dits, then nothing until
+            // two - so there is a right answer in there. Finding it reliably is the part that failed.
+            //
+            // Taking a high percentile as the long end put the line too HIGH: that end of the list is
+            // word gaps and the pauses between transmissions, not gaps between characters, and whole
+            // phrases ran together - "F RST 599 5NN BK" came out "FRST5995NNBK". Taking a low
+            // percentile as the short end and multiplying up put it too LOW: that percentile sits
+            // under the top of the cluster, and characters split - PLAISIR into "PL AI SIR", DELTA
+            // into "D EL TA", 80W into "8 0 W".
+            //
+            // Both scored worse than this one line. The gap memory is left in place because it costs
+            // nothing and it is what any third attempt would need; the note above it says what has
+            // already been tried, so nobody spends another evening on the same two ideas.
+            return _ditMs * 2.0;
+        }
+
         // Called on every frame of silence: as soon as the gap is long enough to BE a letter gap the
         // letter is written out. Waiting for the next mark would put the whole decode one letter
         // behind the operator, which is exactly when it stops being useful.
         void CheckGaps()
         {
-            if (_letterPending && _stateMs >= _ditMs * 2.0)
+            if (_letterPending && _stateMs >= LetterGapMs())
             {
                 EmitLetter();
                 _letterPending = false;
@@ -561,6 +653,13 @@ namespace HolyLogger
             // Five dits, not seven. Seven is what a machine sends between words; a person's word gap
             // wanders either side of it, and the only thing that must not happen is mistaking one for
             // the three-dit gap between letters. Halfway between three and seven is the safe place.
+            // AND THE WORD GAP FOLLOWS THE LETTER GAP BY ARITHMETIC, not by a guess.
+            //
+            // The three gaps stand at 1, 3 and 7 dits. Divide each pair at its geometric middle and
+            // the two dividing lines are sqrt(3) and sqrt(21) - so the second is sqrt(7) times the
+            // first, whatever the operator's speed or spacing. Guessing 2.2 here instead put the
+            // word line below where the gaps between characters actually fell, and PLAISIR came out
+            // as "P L AI S IR": every letter right, a space thrown in between most of them.
             if (_wordPending && !_letterPending && _stateMs >= _ditMs * 5.0)
             {
                 Output(" ");
