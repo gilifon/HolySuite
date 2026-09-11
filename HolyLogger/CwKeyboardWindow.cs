@@ -707,9 +707,16 @@ namespace HolyLogger
         private Border _blockBanner;
         private TextBlock _blockBannerLine;
 
+        // NULL MEANS THERE IS NOTHING WRONG, and it has to stay null.
+        //
+        // This read "reason ?? string.Empty", and an empty string is not null - so a caller saying
+        // "nothing is wrong" was recorded as "blocked, and the reason is nothing". ApplySendingBlock
+        // asks `reason != null`, so the keyer sat there permanently blocked on a radio that was
+        // online and in CW: twelve dimmed buttons, a read-only typing row, and an F-key answering
+        // with a warning box that had no words in it.
         internal void CannotKey(string reason)
         {
-            _blockedBecauseRadio = reason ?? string.Empty;
+            _blockedBecauseRadio = string.IsNullOrEmpty(reason) ? null : reason;
             ApplySendingBlock();
         }
 
