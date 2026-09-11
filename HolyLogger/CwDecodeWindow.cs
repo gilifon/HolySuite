@@ -574,6 +574,16 @@ namespace HolyLogger
         // second monitor gets restored somewhere the operator cannot reach it, and if the saved spot
         // is not on any screen any more the window simply opens centred instead.
 
+        // PUT BACK WHERE HE LEFT IT - AND THE MOMENT MATTERS.
+        //
+        // The size and the choice of Manual are settled in the constructor, because WPF reads
+        // WindowStartupLocation when the window is shown and it must already say Manual by then.
+        //
+        // THE POSITION IS SET LATER, when the window's handle exists. Setting Left and Top in the
+        // constructor looked right and did not hold: at that point there is no window yet, the owner
+        // has not even been attached, and what WPF does with those numbers on the way to the screen
+        // is its own business. SourceInitialized is the first moment there is a real window to move,
+        // and early enough that nothing is ever seen in the wrong place.
         void RestoreWindowBounds()
         {
             try
@@ -582,16 +592,25 @@ namespace HolyLogger
                 if (s.CwDecodeWindowWidth >= MinWidth) Width = s.CwDecodeWindowWidth;
                 if (s.CwDecodeWindowHeight >= MinHeight) Height = s.CwDecodeWindowHeight;
 
-                if (IsPositionOnScreen(s.CwDecodeWindowLeft, s.CwDecodeWindowTop))
-                {
-                    WindowStartupLocation = WindowStartupLocation.Manual;
-                    Left = s.CwDecodeWindowLeft;
-                    Top = s.CwDecodeWindowTop;
-                }
-                else
+                if (!IsPositionOnScreen(s.CwDecodeWindowLeft, s.CwDecodeWindowTop))
                 {
                     WindowStartupLocation = WindowStartupLocation.CenterOwner;
+                    return;
                 }
+
+                WindowStartupLocation = WindowStartupLocation.Manual;
+
+                SourceInitialized += (sender, e) =>
+                {
+                    try
+                    {
+                        Left = s.CwDecodeWindowLeft;
+                        Top = s.CwDecodeWindowTop;
+                        if (s.CwDecodeWindowWidth >= MinWidth) Width = s.CwDecodeWindowWidth;
+                        if (s.CwDecodeWindowHeight >= MinHeight) Height = s.CwDecodeWindowHeight;
+                    }
+                    catch (Exception swallowed) { Log.Swallow(swallowed); }
+                };
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
         }
