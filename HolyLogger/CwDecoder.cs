@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Text;
 
@@ -130,6 +130,7 @@ namespace HolyLogger
         int _levelIndex;
 
         int _bestBin;
+        volatile bool _forgetAsked;         // the window has seen the turn change - see ForgetTheOperator
         double _noiseFloor;
         double _peak;
         bool _levelsSeeded;
@@ -243,6 +244,10 @@ namespace HolyLogger
 
         void AnalyseWindow()
         {
+            // The window may have decided the turn changed while we were between readings. Acting on
+            // it here, before anything is started, is what makes it safe - see ForgetTheOperator.
+            if (_forgetAsked) { _forgetAsked = false; ForgetNow(); }
+
             // Step 1: how strong each candidate note is in the last 20 ms.
             double best = 0;
             int bestIndex = _bestBin;
@@ -337,6 +342,24 @@ namespace HolyLogger
                 _stateMs = 0;
                 return;
             }
+
+            // MEASURED AND THROWN OUT: SPOTTING A NEW STATION BY A JUMP IN STRENGTH.
+            //
+            // The reasoning was good. Off the air, one station handing over to another went from
+            // standing out six times above the noise beside it to three hundred and forty-four,
+            // while the note moved all of eighteen Hz - so loudness looked like a far better tell
+            // than pitch, and it would have fired at the first mark instead of waiting for the
+            // letters to come out wrong.
+            //
+            // It fired ZERO times, on all six recordings, in both forms it was tried: against the
+            // reading 5 ms earlier, and against a five-second trailing average. The reason is above
+            // this line - _binAverage is already smoothed over half a second, so even a station
+            // arriving out of nowhere climbs there smoothly and never multiplies by eight against
+            // any reference. Lowering the eight far enough to fire would have fired on ordinary
+            // fading as well, which throws away a speed that was worth keeping.
+            //
+            // The score falling to nothing catches the same handover a second or two later, and
+            // does it honestly. Not worth a test that costs work and never triggers.
 
             // Two thresholds, not one: a signal hovering on a single threshold would chatter on and
             // off many times inside one dit. They sit well apart for the same reason.
@@ -611,9 +634,28 @@ namespace HolyLogger
         // couple of characters and stays there; noise and carriers rattle around the bottom.
         void Score(bool fitsMorse)
         {
+            int was = _morseScore;
+
             _morseScore += fitsMorse ? 1 : -2;
             if (_morseScore < 0) _morseScore = 0;
             if (_morseScore > MorseScoreCeiling) _morseScore = MorseScoreCeiling;
+
+            // THE SPEED BELONGS TO THE STATION, AND THE STATION HAS JUST CHANGED.
+            //
+            // When one operator stops and another starts, the two dozen remembered marks are still
+            // the old man's. He may have been sending at 40 words a minute and the new one at 14,
+            // and until his marks are flushed out one by one every dit of the new station measures
+            // longer than the old dit/dah line and is read as a dah. Measured off the air: at 38
+            // seconds into a recording a 14 WPM station began while the decoder still held a 32 ms
+            // dit and a 63 ms line, and four seconds of him came out as "GT TOATTT TTTT 4T". By the
+            // time the memory had crawled up to an 86 ms dit he was being read perfectly.
+            //
+            // Falling to nothing is the decoder saying, in its own words, that what it is hearing is
+            // not built of dits and dahs at all - which is exactly when the remembered lengths are
+            // worth nothing. So they go, and the new station is measured from his own sending.
+            // Only on the way down: sitting at nothing must not keep wiping the memory, or it could
+            // never gather the eight marks it needs to believe in anybody.
+            if (was > 0 && _morseScore == 0) ForgetNow();
 
             bool wasOpen = _looksLikeMorse;
 
@@ -714,6 +756,36 @@ namespace HolyLogger
         // all, and the half letter that blip started got printed as an E. A letter cut short by the
         // signal disappearing was never trustworthy anyway. When a station simply stops sending, the
         // ordinary gap has already written its last letter out long before this runs.
+        /// <summary>
+        /// Throw away the speed learned from the operator who was sending, and measure the next one
+        /// from his own sending instead.
+        ///
+        /// The remembered marks are the only thing dropped. The note, the levels and the letter
+        /// being spelled out are left alone: the frequency has not moved and the letter in hand may
+        /// well be the new man's first.
+        ///
+        /// Called from three places, each of which knows the turn has changed for its own reason -
+        /// the score falling to nothing, the signal jumping in strength, and the window telling us
+        /// it has just broken the line on a K, a BK or a prosign.
+        ///
+        /// ASKED FOR HERE, DONE ON THE SOUND THREAD. The window calls this from the screen thread,
+        /// and emptying the marks from under the sound thread stopped the decoder dead: it was in
+        /// the middle of AddMark, had already copied the marks out to sort them, and asked for the
+        /// one a fifth of the way in from the end of nothing - which is item minus one. The sound
+        /// thread died on it and no letter ever appeared again. So the answer is left as a note and
+        /// picked up at the top of the next reading, where nothing is half done.
+        /// </summary>
+        public void ForgetTheOperator()
+        {
+            _forgetAsked = true;
+        }
+
+        void ForgetNow()
+        {
+            _markCount = 0;
+            _markNext = 0;
+        }
+
         void FinishAnythingPending()
         {
             DropHeldLone();

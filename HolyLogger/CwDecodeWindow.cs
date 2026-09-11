@@ -176,6 +176,17 @@ namespace HolyLogger
         void BuildContent()
         {
             _text = MakeTextBox();
+
+            // WHAT THE WINDOW WORKS OUT, THE DECODER IS TOLD. The K, the BK, the prosign and the
+            // pause-then-somebody-else are all judged where the text is laid out, because that is
+            // where whole words can be seen. Until now the decoder never heard the answer and went
+            // on using the old operator's speed on the new one - see ForgetTheOperator.
+            _text.TurnChanged += () =>
+            {
+                var decoder = _decoder;
+                if (decoder != null) decoder.ForgetTheOperator();
+            };
+
             var frame = Paper(_text.Box);
 
             // The second reader's box, shown only in Both.

@@ -104,6 +104,24 @@ namespace HolyLogger
         /// <summary>A callsign the operator double-clicked, ready for the log.</summary>
         public event Action<string> CallsignChosen;
 
+        /// <summary>
+        /// The turn has changed hands - raised at the same moment the line breaks, and for the same
+        /// reasons: a proven K, BK or prosign, or a pause followed by somebody else sending.
+        ///
+        /// This window is where the handover is worked out, and until now the decoder never heard
+        /// about it: it went on using the old operator's speed and misread the first seconds of the
+        /// new one. So what is decided here is told back to it - see ForgetTheOperator.
+        /// </summary>
+        public event Action TurnChanged;
+
+        void TurnHasChanged()
+        {
+            _paragraph.Inlines.Add(new LineBreak());
+            _atLineStart = true;
+            var told = TurnChanged;
+            if (told != null) told();
+        }
+
         public RichTextBox Box { get { return _box; } }
 
         public CwDecodedText(RichTextBox box)
@@ -178,8 +196,7 @@ namespace HolyLogger
 
                     if (realPause && SomebodyElse(_lastNote, _lastSpeed) && !_atLineStart)
                     {
-                        _paragraph.Inlines.Add(new LineBreak());
-                        _atLineStart = true;
+                        TurnHasChanged();
                         EndWordHere();
                     }
                 }
@@ -200,10 +217,7 @@ namespace HolyLogger
                     bool longEnoughGap = DateTime.UtcNow - _handedOverAt >= SilenceThatProvesOver;
 
                     if ((differentNote || differentSpeed || longEnoughGap) && !_atLineStart)
-                    {
-                        _paragraph.Inlines.Add(new LineBreak());
-                        _atLineStart = true;
-                    }
+                        TurnHasChanged();
                     _handedOverAt = DateTime.MinValue;
                 }
 
@@ -243,12 +257,57 @@ namespace HolyLogger
         // This is the extra question, asked only here, and it turns that whole family down without
         // touching what the rest of the program believes. The underlying fault is still the missing
         // spaces; this only stops them being offered as somebody's call.
+        // AND NO PREFIX HAS THREE LETTERS BEFORE ITS FIRST DIGIT. Every prefix ever allocated is one
+        // letter, two letters, a letter and a digit, or a digit and a letter - G3, LY2, 4Z5, 2E0 -
+        // so the run of letters at the front of a callsign is never longer than two.
+        //
+        // This is the same fault as the two digits above wearing a different hat: run-together words
+        // arriving with the space missed. "N H EEE 50" came off the air glued as "EEE50", which has
+        // the shape of prefix EEE, digit 5, suffix 0 - and was offered for the log. Three letters
+        // then a digit turns the whole family down.
+        // A STROKE CALL IS TESTED PIECE BY PIECE. "BW/JA1APE" is a Japanese operator in Taiwan, and
+        // reading it as one run makes "BW/JA" four letters before the digit - so the rule threw out
+        // three thousand perfectly good calls in his own list until each side of the stroke was
+        // asked separately. Only a piece that has a digit in it is a callsign; the others are the
+        // country he is in or the /M and /P that say how, and they prove nothing either way.
         static bool CouldStartACallsign(string call)
         {
             string s = (call ?? string.Empty).TrimStart('<');
             if (s.Length < 2) return false;
 
-            return !(char.IsDigit(s[0]) && char.IsDigit(s[1]));
+            bool foundTheCallsign = false;
+
+            foreach (string piece in s.Split('/'))
+            {
+                bool hasALetter = false, hasADigit = false;
+                foreach (char c in piece)
+                {
+                    if (char.IsDigit(c)) hasADigit = true;
+                    else if (char.IsLetter(c)) hasALetter = true;
+                }
+
+                // "BW", "M", "P" - where he is and how. "1", "70" - which call area. Neither is the
+                // callsign, and neither says anything about whether this is one.
+                if (!hasALetter || !hasADigit) continue;
+
+                foundTheCallsign = true;
+                if (!IsCallsignShaped(piece)) return false;
+            }
+
+            return foundTheCallsign;
+        }
+
+        static bool IsCallsignShaped(string piece)
+        {
+            if (piece.Length < 2) return false;
+
+            // No prefix has ever been allocated as digit-digit.
+            if (char.IsDigit(piece[0]) && char.IsDigit(piece[1])) return false;
+
+            // And none has three letters in front of its first digit.
+            int letters = 0;
+            while (letters < piece.Length && !char.IsDigit(piece[letters])) letters++;
+            return letters <= 2;
         }
 
         // Ends the line here and now, with nothing further to prove.
