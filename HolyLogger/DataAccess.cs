@@ -5639,10 +5639,24 @@ Environment.NewLine +
             lock (_dbLock)
             {
             string call = (callsign ?? string.Empty).Trim().ToUpperInvariant();
-            if (call.Length == 0 || con == null || con.State != ConnectionState.Open) return false;
-
             string freq = (freqText ?? string.Empty).Trim();
             string md = (mode ?? string.Empty).Trim().ToUpperInvariant();
+
+            // A FREQUENCY WITH NO CALLSIGN IS A REAL ENTRY. It comes from right-clicking the
+            // frequency box in the main window: the operator has heard somebody worth coming back
+            // to and cannot read who it is yet, which is the ordinary case on a weak signal or a
+            // pile-up. The frequency alone is enough to find him again.
+            //
+            // So what an entry must have is a frequency OR a callsign, not a callsign. The empty
+            // string still satisfies the column's NOT NULL, and everything downstream already
+            // copes: no flag, no country, and a blank DX box when Try is pressed - which is
+            // correct, because we genuinely do not know who he is.
+            //
+            // The empty call_base that goes with it is what keeps these rows safe from
+            // RemoveTryAgainForCallsign - no callsign can ever be logged as blank, so the sweep
+            // that clears a station when he is worked can never match one of these.
+            if (con == null || con.State != ConnectionState.Open) return false;
+            if (call.Length == 0 && freq.Length == 0) return false;
             try
             {
                 using (var dup = new SQLiteCommand(
@@ -6437,6 +6451,23 @@ Environment.NewLine +
         public string Band { get; set; }
         // Stored as "yyyyMMdd HHmmss" UTC - sortable as plain text, which is what the list is ordered on.
         public string AddedUtc { get; set; }
+
+        // WHAT TO CALL A ROW THAT HAS NO CALLSIGN. An entry made by right-clicking the frequency box
+        // has only a frequency: the operator heard somebody worth returning to and could not read
+        // who. A blank in the callsign column would look like a fault, and "Delete " with nothing
+        // after it reads like one, so both use this instead.
+        //
+        // A QUESTION MARK, not "Unknown" or "No callsign". It is the shortest true thing, it does
+        // not stretch the column, and it is what an operator writes on paper in exactly this
+        // situation.
+        public string DisplayCall
+        {
+            get
+            {
+                string call = (DXCallsign ?? string.Empty).Trim();
+                return call.Length > 0 ? call : "?";
+            }
+        }
 
         // The country's flag and its name, for the callsign column. NOT columns in the try_again table
         // and deliberately so: they are worked out from the callsign each time the list is read, so a

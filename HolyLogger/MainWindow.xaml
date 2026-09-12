@@ -1359,6 +1359,7 @@
                         Cursor="ScrollNS" MouseLeftButtonUp="FreqLed_MouseLeftButtonUp"
                         PreviewMouseWheel="FreqLed_PreviewMouseWheel"
                         MouseMove="FreqLed_MouseMove" MouseLeave="FreqLed_MouseLeave"
+                        PreviewMouseRightButtonUp="FreqBox_PreviewMouseRightButtonUp"
                         ToolTip="Working frequency in kHz — click to edit, or roll the mouse wheel to move the radio 1 kHz">
                     <Grid Margin="4,1,4,2">
                         <TextBlock x:Name="FreqLedGhost" FontFamily="./Fonts/#DSEG7 Classic" FontWeight="Bold"
@@ -1384,7 +1385,8 @@
                 </Border>
                 <Border x:Name="FreqNoCatBezel" Margin="0,1,2,1"
                         Background="White" CornerRadius="4" BorderBrush="#D32F2F" BorderThickness="2"
-                        Visibility="Hidden" HorizontalAlignment="Stretch">
+                        Visibility="Hidden" HorizontalAlignment="Stretch"
+                        PreviewMouseRightButtonUp="FreqBox_PreviewMouseRightButtonUp">
                     <!-- Same three layers as the control panel's box: the band underneath, the text
                          box over it with nothing of its own painted, so the band shows through. -->
                     <Grid>

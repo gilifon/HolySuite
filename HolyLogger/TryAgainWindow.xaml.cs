@@ -161,7 +161,7 @@ namespace HolyLogger
                 var menu = new ContextMenu { Style = (Style)FindResource("HolyCtxMenu") };
                 var del = new MenuItem
                 {
-                    Header = "Delete " + (entry.DXCallsign ?? string.Empty),
+                    Header = "Delete " + entry.DisplayCall,
                     Style = (Style)FindResource("HolyCtxItemDanger"),
                     Icon = new TextBlock
                     {
