@@ -226,7 +226,7 @@
                                         Margin="6,3" ToolTip="{Binding Country}">
                                 <Image Source="{Binding FlagPath}" Width="24" Height="16"
                                        Stretch="Uniform" VerticalAlignment="Center"/>
-                                <TextBlock Text="{Binding DXCallsign}" FontWeight="Bold" FontSize="16"
+                                <TextBlock Text="{Binding DisplayCall}" FontWeight="Bold" FontSize="16"
                                            VerticalAlignment="Center" Margin="6,0,0,0"/>
                             </StackPanel>
                         </DataTemplate>
