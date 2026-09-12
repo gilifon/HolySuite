@@ -887,7 +887,35 @@ namespace HolyLogger
         {
             if (_letterMarks.Count == 0) return;
 
-
+            // MEASURED AND THROWN OUT: FITTING THE WHOLE CHARACTER'S TIMING AT ONCE.
+            //
+            // One line judges every mark on its own and cannot know that the marks of one letter
+            // came from one operator inside a fifth of a second. An operator running long, or
+            // fading, moves ALL his elements together, so a reading where the dit is a tenth longer
+            // ought sometimes to explain a whole letter better than the standing line does. This is
+            // what ggmorse does - it weighs timing candidates against a cost - and it is the obvious
+            // next idea after the level tracker.
+            //
+            // Built: try dit lengths from 0.65 to 1.55 of the learned one, score each by how far
+            // every mark lands from the nearer of one dit and three, as a FRACTION so a dah is not
+            // punished three times over for the same proportional error, and read the letter against
+            // the winner. Pulled gently back towards the learned dit so a one-element letter cannot
+            // invent a scale (at any scale a single mark is exactly one dit, and E would become T).
+            //
+            // NOT A SINGLE POINT MOVED. 247 of 256 generated and 29 of 31 real, identical, at every
+            // strength of that pull from 0.5 down to nothing at all.
+            //
+            // WHY, and this is the finding worth having. Counted directly: across the ten recordings
+            // the fit reads only 34 elements differently out of 824 letters - four per cent - and
+            // those changes are a wash, some better and some worse. The classification is scale
+            // free: stretch the dit and the dit/dah line stretches with it, so a well separated
+            // letter reads the same however the scale is chosen, and one that is not well separated
+            // is not separated at any scale either.
+            //
+            // WHAT IT PROVES ABOUT EVERYTHING ELSE. The errors left in this decoder are NOT misjudged
+            // dits and dahs. They are elements that were never detected, and elements that ran into
+            // each other. No amount of re-scoring what was detected can recover what was not, and
+            // that is where any further work has to go.
             _symbols.Clear();
             for (int i = 0; i < _letterMarks.Count; i++)
                 _symbols.Append(_letterMarks[i] > _boundaryMs ? '-' : '.');
