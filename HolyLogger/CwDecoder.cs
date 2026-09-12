@@ -372,6 +372,32 @@ namespace HolyLogger
             double onThreshold = _noiseFloor + span * 0.55;
             double offThreshold = _noiseFloor + span * 0.35;
 
+            // MEASURED AND THROWN OUT: A LOWER LINE FOR AN ELEMENT INSIDE A LETTER.
+            //
+            // WHY IT LOOKED RIGHT, and the diagnosis behind it is sound and worth keeping. Traced
+            // on the air, on the L of LY2PX at 19.1 seconds into ly2px.wav: the fourth dit WAS
+            // there and reached 0.324, while the line to start a mark stood at 0.386 because the
+            // same station had been at 0.53 a fifth of a second earlier. It fell a sixth short, so
+            // ".-.." came out as ".-." and the callsign read RY2PX. And 0.324 is well above the
+            // 0.286 needed to KEEP a mark going - the decoder would happily have carried that
+            // element, it simply refused to begin it. The reasoning followed: in mid-letter we
+            // already know a man is sending, so the high line is guarding against nothing.
+            //
+            // IT WORKED, AND IT STILL LOST. At the full drop to the lower line it found LY2PX twice
+            // and BONNE, the two words this decoder had never got - and broke MERCI, POUR CE, 73 GL
+            // and LB2WD, which it had. Swept, both benches, and the line is straight:
+            //
+            //     mid-letter line   generated   real signals
+            //     span * 0.35         232/256       21/25
+            //     span * 0.40         232           22
+            //     span * 0.45         241           22
+            //     span * 0.50         246           22
+            //     span * 0.55         247           23      <- no change at all
+            //
+            // There is no level at which it pays. An element that starts too easily also fails to
+            // END where it should, so two elements bridge into one, and that costs more characters
+            // than the fading dit wins. DO NOT RETRY without a way to catch the weak element that
+            // does not also weaken the gap - the gap and the mark are the same threshold here.
             bool nowDown = _keyDown ? smoothed > offThreshold : smoothed > onThreshold;
 
             // HOW DEEPLY THE NOTE ACTUALLY SWITCHES OFF. Kept only to judge what we are hearing -
