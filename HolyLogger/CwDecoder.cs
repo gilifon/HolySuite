@@ -340,6 +340,38 @@ namespace HolyLogger
             _noiseFloor += (smoothed < _noiseFloor) ? (smoothed - _noiseFloor) * 0.05 : (smoothed - _noiseFloor) * 0.005;
             _peak += (smoothed > _peak) ? (smoothed - _peak) * 0.05 : (smoothed - _peak) * 0.005;
 
+            // MEASURED AND THROWN OUT, TWICE NOW, AND THIS IS THE SECOND AND BETTER ATTEMPT.
+            //
+            // The complaint is real and the diagnosis is not in doubt: these two chase the extremes
+            // and both lag, the peak coming down at half a percent a reading, so a station that
+            // fades keeps a threshold set by how loud he WAS. That is what left the fourth dit of
+            // LY2PX at 0.324 under a line standing at 0.386, and it is why a callsign is mangled
+            // while CQ stays readable - one lost element ruins a callsign and CQ can spare one.
+            //
+            // WHAT WAS BUILT. CW sits in two places and almost nowhere in between, so a window of
+            // recent readings sorted into order should show a low cluster (band noise, key up) and
+            // a high one (the tone, key down), and a percentile in from each end names them. Unlike
+            // the attempt before it - which learned the two levels separately and died at 40 WPM
+            // because a 30 ms mark is too little to learn from - this learns from every reading
+            // whatever the key is doing, so a fast operator gives it as much to work with as a slow
+            // one. The reasoning was sound and it is still sound.
+            //
+            // IT LOST BADLY, at every setting swept - three window lengths against four percentiles:
+            //
+            //     window   1/4    1/10   1/20   1/50      (real-signal score, 29 is the standing one)
+            //       2s      11     14     16     16
+            //       4s      13     12     12     12
+            //       8s      12      9      8     10
+            //
+            // WHY, and this is the part worth keeping. A percentile follows the CONTENT as well as
+            // the signal: a run of dahs, a long word gap, a pause between overs all move it, and it
+            // moves the threshold under a station who has not changed at all. The slow floor-and-
+            // peak pair is deaf to that by construction, and its deafness turns out to be worth far
+            // more than its lag costs. Being slow is the feature.
+            //
+            // So the lag stays a known weakness. A third attempt must not replace this pair - it has
+            // now beaten two replacements - and must find some other way to catch the element that
+            // falls just under the line. DO NOT rebuild the level tracker again.
             double span = _peak - _noiseFloor;
 
             // IS THERE A SIGNAL AT ALL? Asking whether this one note is loud compared with its own
