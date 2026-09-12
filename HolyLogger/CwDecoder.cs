@@ -85,7 +85,32 @@ namespace HolyLogger
 
         // The running score that decides whether this is Morse at all - see Score below.
         const int MorseScoreCeiling = 12;
-        const int MorseScoreToOpen = 8;
+
+        // HOW LONG THE OPERATOR STARES AT AN EMPTY WINDOW. This was eight, and eight is what he
+        // complained about: he could hear the station perfectly well and the text arrived several
+        // seconds later. It was not imagined and it was worse than it looked - measured across the
+        // recordings, the wait from the first mark to the first letter averaged 6.5 seconds and
+        // reached 20 on a weak one. Twenty seconds of sending is more than the forty characters
+        // held back while waiting, so on the worst of them text was not merely late, it was gone.
+        //
+        // Four costs nothing. Swept over all three measures - the 256 generated cases, the
+        // real-signal word score, and the wait itself - and the quality does not move at all
+        // between eight and one:
+        //
+        //     score to open   generated   real   wait avg   worst
+        //          8            247/256    26      6.5s     20.2s
+        //          6            247        26      4.6s      9.6s
+        //          4            247        26      3.2s      6.9s
+        //          1            247        26      2.2s      4.2s
+        //
+        // Not lower than four, even though the numbers say it costs nothing there either. Below
+        // four it would be EASIER to open the gate than to keep it open, which is the hysteresis
+        // backwards: the gate would open on one good mark and shut on the next bad one, flickering
+        // in a way none of these benches is shaped to catch. Four is the lowest honest value.
+        //
+        // What still guards the empty frequency is unchanged and was checked separately: nothing
+        // at all is printed over three minutes of band noise on beacons.wav, at eight, four or one.
+        const int MorseScoreToOpen = 4;
         const int MorseScoreToKeep = 3;
 
         // How much louder the note must be with the key down than with it up before the keying is
