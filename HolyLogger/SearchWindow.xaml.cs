@@ -959,6 +959,9 @@ namespace HolyLogger
             // The same five columns drag as one block and admit no column between them.
             ConfirmationColumnGroup.Attach(ResultsGrid);
 
+            // Before the saved layout is applied, so these columns are placed and remembered like the rest.
+            AddFilterColumns();
+
             // Where the operator put each column, and how wide they made it, kept between sessions - the
             // same as the main window's log table. See GridColumnLayout.
             ApplyWorkshopColumnLayout();
@@ -2309,6 +2312,30 @@ namespace HolyLogger
             // same log - so the highlight survived and Esc emptied every box while the rows stayed lit
             // up. Clearing afterwards clears both, which is now one thing anyway.
             ResultsGrid.DataContext = found;
+
+            // A FIELD SEARCHED BY IS A FIELD SHOWN. Each of these filters has no column of its own, so a
+            // search by one of them listed rows without the value they were found by. Every filter that
+            // is set shows its column - several filters, several columns - and hides it again once the
+            // filter is cleared.
+            ShowFilterColumn("Submode",      submode != null);
+            ShowFilterColumn("DX Locator",   !string.IsNullOrEmpty(locator));
+            ShowFilterColumn("CQ Zone",      cqz != null);
+            ShowFilterColumn("ITU Zone",     ituz != null);
+            ShowFilterColumn("Continent",    continent != null);
+            ShowFilterColumn("State",        state != null);
+            ShowFilterColumn("My Callsign",  myCall != null);
+            ShowFilterColumn("Operator",     !string.IsNullOrEmpty(oper));
+            ShowFilterColumn("My Grid",      !string.IsNullOrEmpty(myGrid));
+            ShowFilterColumn("My Square",    !string.IsNullOrEmpty(mySquare));
+            ShowFilterColumn("Fixed",        review != null);
+            ShowFilterColumn("LoTW Upload",  upLotw != null);
+            ShowFilterColumn("QRZ Upload",   upQrz != null);
+            ShowFilterColumn("eQSL Upload",  upEqsl != null);
+            ShowFilterColumn("Club Log Upload", upClublog != null);
+            ShowFilterColumn("Prop Mode",    !string.IsNullOrEmpty(propMode));
+            ShowFilterColumn("Sat Name",     !string.IsNullOrEmpty(satName));
+            ShowFilterColumn("Soapbox",      !string.IsNullOrEmpty(soapbox));
+
             ClearPicks();                    // these are different rows now - see ClearPicks
             ShowDateSortIndicator();
             UpdatePickState();
@@ -2445,6 +2472,100 @@ namespace HolyLogger
         private const string UploadSent = "Uploaded";
         private const string UploadWaiting = "Waiting";
         private const string UploadNotSent = "Not sent";
+
+        // ---- Columns that appear with their filter -----------------------------------------------
+        //
+        // One per filter that has no column in the table. Hidden until a search uses that filter (see
+        // RunSearch). Appended after Notes, so no column the operator knows the place of moves, and
+        // keyed by header like every other column, so a drag or a width is remembered. The upload
+        // headers say "Upload" because "LoTW", "QRZ"... already name the confirmation columns.
+        private readonly Dictionary<string, DataGridColumn> _filterColumns = new Dictionary<string, DataGridColumn>();
+
+        private void AddFilterColumns()
+        {
+            AddFilterColumn("Submode",     "SUBMode");
+            AddFilterColumn("DX Locator",  "DXLocator");
+            AddFilterColumn("CQ Zone",     "CQZone");
+            AddFilterColumn("ITU Zone",    "ITUZone");
+            AddFilterColumn("Continent",   "Continent");
+            AddFilterColumn("State",       "State");
+            AddFilterColumn("My Callsign", "MyCall");
+            AddFilterColumn("Operator",    "Operator");
+            AddFilterColumn("My Grid",     "MyLocator");
+            AddFilterColumn("My Square",   "STX");
+            AddFilterColumn("Fixed",       "ReviewState", new FuncConverter(v => ReviewText((int)v)));
+            var upload = new FuncConverter(v => UploadText((int)v));
+            AddFilterColumn("LoTW Upload",     "LotwStatus",    upload);
+            AddFilterColumn("QRZ Upload",      "QrzStatus",     upload);
+            AddFilterColumn("eQSL Upload",     "EqslStatus",    upload);
+            AddFilterColumn("Club Log Upload", "ClublogStatus", upload);
+            AddFilterColumn("Prop Mode",   "PROP_MODE");
+            AddFilterColumn("Sat Name",    "SAT_NAME");
+            AddFilterColumn("Soapbox",     "SOAPBOX");
+        }
+
+        private void AddFilterColumn(string header, string path, IValueConverter converter = null)
+        {
+            var cellText = new Style(typeof(TextBlock));
+            cellText.Setters.Add(new Setter(TextBlock.HorizontalAlignmentProperty, HorizontalAlignment.Center));
+            cellText.Setters.Add(new Setter(TextBlock.PaddingProperty, new Thickness(5, 0, 5, 0)));
+            var col = new DataGridTextColumn
+            {
+                Header = header,
+                Binding = new Binding(path) { Mode = BindingMode.OneWay, Converter = converter },
+                SortMemberPath = path,
+                IsReadOnly = true,
+                Width = DataGridLength.Auto,
+                MinWidth = 60,
+                ElementStyle = cellText,
+                Visibility = Visibility.Collapsed
+            };
+            ResultsGrid.Columns.Add(col);
+            _filterColumns[header] = col;
+        }
+
+        private void ShowFilterColumn(string header, bool show)
+        {
+            DataGridColumn col;
+            if (_filterColumns.TryGetValue(header, out col))
+                col.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        // The same words the Fixed filter offers, so a column and its filter never disagree.
+        private static string ReviewText(int state)
+        {
+            switch (state)
+            {
+                case 0:  return FixedNever;
+                case 1:  return "Fixed";
+                case 2:  return ApprovedByMe;
+                case 4:  return ApprovedWithAi;
+                case 3:  return "Checked, nothing to fix";
+                default: return string.Empty;
+            }
+        }
+
+        // The same words the "Uploaded to" filters offer - see UploadStateMatches.
+        private static string UploadText(int status)
+        {
+            if (status == 1) return UploadSent;
+            if (status == 0) return UploadWaiting;
+            if (status == 2) return UploadNotSent;
+            return string.Empty;
+        }
+
+        private sealed class FuncConverter : IValueConverter
+        {
+            private readonly Func<object, string> _convert;
+            public FuncConverter(Func<object, string> convert) { _convert = convert; }
+            public object Convert(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
+            {
+                try { return value == null ? string.Empty : _convert(value); }
+                catch (Exception swallowed) { Log.Swallow(swallowed); return string.Empty; }
+            }
+            public object ConvertBack(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
+                => Binding.DoNothing;
+        }
 
         private static bool UploadStateMatches(int status, string wanted)
         {
