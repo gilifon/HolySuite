@@ -1977,19 +1977,8 @@ namespace HolyLogger
 
         private void AddBtn_Click(object sender, RoutedEventArgs e)
         {
-            // TIMED, and written to the log, like opening a log. "Saving a QSO takes two seconds" is not
-            // settled by reading code: each step below records its own milliseconds, and the line in
-            // holylogger.log names the step that is slow on the operator's own machine and log.
-            // (The "checks" step includes any question the operator was asked before the save.)
-            var swSave = System.Diagnostics.Stopwatch.StartNew();
-            var laps = new StringBuilder();
-            long lapAt = 0;
-            void Lap(string step)
-            {
-                long now = swSave.ElapsedMilliseconds;
-                laps.Append(" | ").Append(step).Append(' ').Append(now - lapAt).Append(" ms");
-                lapAt = now;
-            }
+            // Work that runs only after the callsign box is empty again - see the end of this method.
+            var afterTyping = new List<Action>();
 
             // Before anything else: a QSO must have a log to go into. Without this the INSERT would
             // name a log id that matches no row, and the contact would be stored where nothing reads.
@@ -2017,7 +2006,6 @@ namespace HolyLogger
             // an award program matching on it will never find "EU-5". Answering "log it anyway" keeps
             // what was typed - the operator's data is never silently dropped.
             if (!ConfirmActivityBeforeSave()) return;
-            Lap("checks");
 
             // SET WHEN THE CONTACT DID NOT REACH THE DATABASE, so the form is left exactly as he typed
             // it instead of being emptied at the end of this method. Telling a man his QSO was not saved
@@ -2081,15 +2069,12 @@ namespace HolyLogger
                     }
 
                 }
-                Lap("build");
                 try
                 {
                     lock (_syncLock)
                     {
                         LastQSO = dal.Insert(qso);
-                        Lap("db insert");
                         Qsos.Insert(0, LastQSO);
-                        Lap("table add");
                         Properties.Settings.Default.RecentQSOCounter++;
                     }
 
@@ -2100,51 +2085,50 @@ namespace HolyLogger
 
                     // Copy-to-log: mirror this QSO into the active log's copy-target, if configured.
                     CopyLoggedQsoToTargetLog(LastQSO);
-                    Lap("copy to log");
 
                     // Tell the other programs, on every broadcast line the operator ticked in the UDP
                     // Ports Manager (nothing is sent if there are none). See MainWindow.UdpSend.cs.
                     BroadcastQsoLogged(LastQSO);
-                    Lap("udp");
-
-                    if (QSODataGrid.Items != null && QSODataGrid.Items.Count > 0)
-                        QSODataGrid.ScrollIntoView(QSODataGrid.Items[0]);
-                    Lap("scroll");
-
-                    AddWorkedCountryAndRefreshCluster(qso.DXCall);
-                    Lap("cluster");
-
-                    // He was on the Try Again list and he is in the log now, so he comes off it.
-                    RemoveFromTryAgainAfterLogging(qso.DXCall);
 
                     // In a contest whose sent exchange is a serial number, advance it for the next QSO.
+                    // NOT deferred: the next QSO's exchange must already carry the new number.
                     AdvanceContestSerial();
-                    Lap("try again + serial");
 
-                    // Auto-upload THIS QSO to the eQSL account of the callsign it was logged under.
-                    // If it WILL be auto-uploaded (auto-upload on + callsign in the table + user name
-                    // and password present), don't show the "!" now — let SendOneQsoToEqsl update the
-                    // badge AFTER the attempt, so a successful upload never flashes a "!". Otherwise
-                    // (manual mode, no credentials, or a callsign not set up to send) update the badge
-                    // now so the QSO is shown as queued.
-                    EqslAccount eqslAcct = dal.GetEqslAccount(qso.MyCall);
-                    bool willAutoUpload = Properties.Settings.Default.EqslAutoUpload
-                                          && eqslAcct != null
-                                          && !string.IsNullOrWhiteSpace(eqslAcct.Username)
-                                          && !string.IsNullOrWhiteSpace(eqslAcct.Password);
-                    if (!willAutoUpload)
-                        UpdateEqslQueueIndicator();
-                    _ = SendOneQsoToEqsl(qso);
+                    // EVERYTHING ELSE WAITS UNTIL HE CAN TYPE (see afterTyping below).
+                    afterTyping.Add(() =>
+                    {
+                        if (QSODataGrid.Items != null && QSODataGrid.Items.Count > 0)
+                            QSODataGrid.ScrollIntoView(QSODataGrid.Items[0]);
 
-                    // Real-time push of THIS just-logged QSO to the QRZ.com online logbook (fire and
-                    // forget). Does nothing unless the feature is enabled and an API key is configured;
-                    // a failed/offline push simply leaves the QSO pending for a later silent retry.
-                    _ = SendOneQsoToQrz(qso);
+                        AddWorkedCountryAndRefreshCluster(qso.DXCall);
 
-                    // Real-time push of THIS just-logged QSO to Club Log (fire and forget). Does
-                    // nothing unless the Club Log service is enabled with credentials configured.
-                    _ = SendOneQsoToClublog(qso);
-                    Lap("uploads");
+                        // He was on the Try Again list and he is in the log now, so he comes off it.
+                        RemoveFromTryAgainAfterLogging(qso.DXCall);
+
+                        // Auto-upload THIS QSO to the eQSL account of the callsign it was logged under.
+                        // If it WILL be auto-uploaded (auto-upload on + callsign in the table + user name
+                        // and password present), don't show the "!" now — let SendOneQsoToEqsl update the
+                        // badge AFTER the attempt, so a successful upload never flashes a "!". Otherwise
+                        // (manual mode, no credentials, or a callsign not set up to send) update the badge
+                        // now so the QSO is shown as queued.
+                        EqslAccount eqslAcct = dal.GetEqslAccount(qso.MyCall);
+                        bool willAutoUpload = Properties.Settings.Default.EqslAutoUpload
+                                              && eqslAcct != null
+                                              && !string.IsNullOrWhiteSpace(eqslAcct.Username)
+                                              && !string.IsNullOrWhiteSpace(eqslAcct.Password);
+                        if (!willAutoUpload)
+                            UpdateEqslQueueIndicator();
+                        _ = SendOneQsoToEqsl(qso);
+
+                        // Real-time push of THIS just-logged QSO to the QRZ.com online logbook (fire and
+                        // forget). Does nothing unless the feature is enabled and an API key is configured;
+                        // a failed/offline push simply leaves the QSO pending for a later silent retry.
+                        _ = SendOneQsoToQrz(qso);
+
+                        // Real-time push of THIS just-logged QSO to Club Log (fire and forget). Does
+                        // nothing unless the Club Log service is enabled with credentials configured.
+                        _ = SendOneQsoToClublog(qso);
+                    });
                 }
                 catch (Exception ex)
                 {
@@ -2226,8 +2210,9 @@ namespace HolyLogger
                     QSODataGrid.Items.Refresh();
                 }
 
-                // Rebuild worked countries list after edit (callsign/country may have changed)
-                RebuildWorkedCountriesAndRefreshCluster();
+                // Rebuild worked countries list after edit (callsign/country may have changed).
+                // A walk over the whole log, so it waits until the form is free (afterTyping).
+                afterTyping.Add(RebuildWorkedCountriesAndRefreshCluster);
 
                 ShowEditUndoBar();
 
@@ -2241,27 +2226,43 @@ namespace HolyLogger
             // save worked, and is the whole difference between a message he can act on and one he can
             // only read.
             if (notSaved) return;
-            if (state != State.New) Lap("edit");
 
-            ShowNewDXCC();
-            Lap("new country");
-            ClearBtn_Click(null, null);
-            Lap("clear form");
-            UpdateNumOfQSOs();
-            Lap("counts");
+            // THE CALLSIGN BOX FIRST. What the operator is waiting for after F1 is an empty DX
+            // Callsign box to type the next station into. The QSO is safely in the database by now, so
+            // the form is cleared at once, and everything that is not needed to type the next callsign -
+            // the counters, the new-country picture, the uploads, the map back to the home view - is
+            // queued behind the keyboard at Background priority: every key he presses is handled first.
+            // It stays on this thread (the country lookup and the controls are not safe from another).
+            string countryJustLogged = CB_DXCC.Text;   // read before the clear empties the box
+            _skipHomeMapInClear = true;
+            try { ClearBtn_Click(null, null); }
+            finally { _skipHomeMapInClear = false; }
             ClearMatrix();
             RestoreDataContext();
-            Lap("matrix + table");
+            DateTime clearedAt = DateTime.UtcNow;
 
-            long msBeforePaint = swSave.ElapsedMilliseconds;
-            int qsoCount = Qsos == null ? 0 : Qsos.Count;
-            // After the table and form have laid out and painted - the wait as the operator sees it.
             Dispatcher.BeginInvoke(new Action(() =>
-                Log.Warn("Save QSO: " + qsoCount.ToString("N0") + " QSOs in log" + laps
-                         + " | ready in " + msBeforePaint + " ms | painted after "
-                         + swSave.ElapsedMilliseconds + " ms")),
-                System.Windows.Threading.DispatcherPriority.ContextIdle);
+            {
+                foreach (Action work in afterTyping)
+                {
+                    try { work(); }
+                    catch (Exception swallowed) { Log.Swallow(swallowed); }
+                }
+                ShowNewDXCC(countryJustLogged);
+                UpdateNumOfQSOs();
+
+                // The map back to the home view - unless it is there already (the DX box's own clearing
+                // draws it when the box empties), or the operator has typed far enough that the NEXT
+                // station's map is showing, which the home map must never cover.
+                if (!HomeMapJustShown() && _dxMapDrawnAt < clearedAt
+                    && (MapControl == null || !MapControl.IsClusterMode))
+                    ShowHomeMap();
+            }), DispatcherPriority.Background);
         }
+
+        // Set only while AddBtn_Click clears the form: the home map is then drawn after the operator can
+        // type, not before (see AddBtn_Click). F9 and every other clear still draw it at once.
+        private bool _skipHomeMapInClear;
 
         // THE NEW-COUNTRY GIF ANIMATES ONLY WHILE IT IS ON SCREEN.
         //
@@ -2274,9 +2275,13 @@ namespace HolyLogger
         //
         // Found by asking WPF itself: UIElement.HasAnimatedProperties over every open window's tree
         // named this Image and the blinking text caret, and nothing else.
-        private void ShowNewDXCC()
+        private void ShowNewDXCC() => ShowNewDXCC(CB_DXCC.Text);
+
+        // countryText: the country of the QSO just logged. Passed in by Add, which runs this after the
+        // form - and CB_DXCC with it - has already been cleared.
+        private void ShowNewDXCC(string countryText)
         {
-            var dups = from qso in Qsos where qso.Country == CB_DXCC.Text select qso;
+            var dups = from qso in Qsos where qso.Country == countryText select qso;
             if (dups.Count() == 1) //if there is only one -> it is the one we just added -> it was a new one!
             {
                 try
@@ -2418,7 +2423,7 @@ namespace HolyLogger
             ShowRigParams();
             // Don't reset the map to the home view while it is showing cluster spots — clearing the
             // QSO entry fields (F9) must not wipe the spotted stations from the cluster map.
-            if (MapControl == null || !MapControl.IsClusterMode)
+            if (!_skipHomeMapInClear && (MapControl == null || !MapControl.IsClusterMode))
                 ShowHomeMap();
             RestoreDataContext();
         }
@@ -15196,6 +15201,7 @@ namespace HolyLogger
                 QueueClearQrzPhoto();
 
                 // Defer ALL UI updates to allow immediate textbox response during fast deletion
+                DateTime emptiedAt = DateTime.UtcNow;
                 Dispatcher.BeginInvoke(new Action(() =>
                 {
                     FName = string.Empty;
@@ -15220,7 +15226,14 @@ namespace HolyLogger
                     // twice for every saved QSO, and this second drawing was the slower one: measured
                     // 240 ms on the operator's machine. When the home map has just been drawn and no DX
                     // map since, only the azimuth is reset.
-                    if (HomeMapJustShown())
+                    //
+                    // AND NEVER OVER THE NEXT STATION. After Add the operator may already be typing the
+                    // next callsign by the time this runs; if that station's map is up, it stays.
+                    if (_dxMapDrawnAt > emptiedAt)
+                    {
+                        // the next station's map is showing - leave the map and its azimuth alone
+                    }
+                    else if (HomeMapJustShown())
                         ClearAzimuthForTyping();
                     else
                         ClearAzimuth();

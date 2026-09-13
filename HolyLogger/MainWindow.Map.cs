@@ -164,6 +164,7 @@ namespace HolyLogger
                     if (Properties.Settings.Default.MapAreaDisplayMode != 4)
                     {
                         _homeMapShownAt = DateTime.MinValue;   // the home map is no longer what is showing
+                        _dxMapDrawnAt = DateTime.UtcNow;
                         MapControl.ShowMap(ll.Lat, ll.Long, autoFitRadius, Azimuth, homell.Lat, homell.Long, spotterLat, spotterLon);
                     }
                 }
@@ -198,6 +199,10 @@ namespace HolyLogger
         // When the home map was last drawn, cleared again by any drawing of a DX map. Lets the delayed
         // clearing after Add / F9 skip redrawing a home map that ClearBtn_Click has only just drawn.
         private DateTime _homeMapShownAt = DateTime.MinValue;
+
+        // When a DX station's map was last drawn. After Add the home map is drawn late, behind the
+        // keyboard, and must not cover the map of the next station if that is already showing.
+        private DateTime _dxMapDrawnAt = DateTime.MinValue;
 
         private bool HomeMapJustShown() =>
             (DateTime.UtcNow - _homeMapShownAt).TotalSeconds < 2;
