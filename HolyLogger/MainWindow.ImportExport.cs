@@ -855,9 +855,8 @@ namespace HolyLogger
             // it off, a file holding a contact twice puts one in the log and the second is gone. A
             // setting that throws away data has to be visible at the moment it is about to do it.
             //
-            // It is the SAME setting, not a copy of it: the box opens showing what Options holds, and
-            // whatever it is left at is saved back there, exactly as though it had been changed in the
-            // options window. Two places to look at one switch, never two switches.
+            // This is now its ONLY place - the Options box was removed (2026-09-13), since every
+            // import passes through here. The choice is still the saved setting, kept for next time.
             var dupBox = new CheckBox
             {
                 Content = "Import Duplicates",
@@ -870,8 +869,8 @@ namespace HolyLogger
             {
                 Text = "Off, a contact the file holds more than once is stored only once. Two records are "
                      + "the same contact when the callsign, the date, the band, the mode and the minute "
-                     + "are all the same — the same rule the Log Fixer uses. This is the same setting as "
-                     + "Options → Import Settings, and what you leave it at is kept.",
+                     + "are all the same — the same rule the Log Fixer uses. What you leave it at is kept "
+                     + "for the next import.",
                 TextWrapping = TextWrapping.Wrap, FontSize = 16, MaxWidth = 440,
                 Opacity = 0.75, Margin = new Thickness(24, 0, 0, 30)
             });
@@ -1195,6 +1194,10 @@ namespace HolyLogger
                 _pendingImportOperator = null;
                 _pendingImportFillMissingCall = true;
                 RefreshCopyIndicator();
+                // AND THE STATION BOX FOLLOWS IT. The log was opened before the import, when it had no
+                // callsign yet, so the box was left empty - the Log Manager showed the new callsign while
+                // the main window still said "Must fill" and "Set your callsign".
+                SyncCallsignToActiveLog();
             }
 
             // The log's contents were swapped wholesale, so the "recent QSOs" count means nothing any

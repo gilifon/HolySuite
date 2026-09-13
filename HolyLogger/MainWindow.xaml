@@ -1610,33 +1610,8 @@
         </Border>
         <TextBlock HorizontalAlignment="Left" Margin="12,82,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" ToolTip="The DX Station Callsign" TextAlignment="Left"><Run Text="DX" FontWeight="Bold" /><Run Text=" Callsign" /></TextBlock>
         <TextBox x:Name="TB_DXCallsign" HorizontalAlignment="Left" Height="28" Margin="101,87,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="130" CharacterCasing="Upper" Grid.Row="1" Text="" TextChanged="TB_DXCallsign_TextChanged" LostFocus="TB_DXCallsign_LostFocus" PreviewKeyDown="TB_DXCallsign_KeyDown" PreviewMouseLeftButtonDown="TB_DXCallsign_PreviewMouseLeftButtonDown" FontSize="16" MaxLength="15" TabIndex="8"/>
-        <!-- With no station callsign the program will not log anything, and this is the box the
-             operator is looking at when he starts, so the reminder is put here rather than in a message
-             he would have to dismiss. It goes as soon as either box has something in it. Danger (the
-             theme red) and not the fixed #BB3300, because this box wears the normal input colour and
-             turns dark with the scheme. "Set your callsign" and not the longer sentence: 130px of box
-             will not hold more than that at FontSize 16. -->
-        <Border Grid.Row="1" Margin="101,87,0,0" Width="130" Height="28" HorizontalAlignment="Left"
-                VerticalAlignment="Top" IsHitTestVisible="False">
-            <Border.Style>
-                <Style TargetType="Border">
-                    <Setter Property="Visibility" Value="Collapsed"/>
-                    <Style.Triggers>
-                        <MultiDataTrigger>
-                            <MultiDataTrigger.Conditions>
-                                <Condition Binding="{Binding Text, ElementName=TB_MyCallsign}" Value=""/>
-                                <Condition Binding="{Binding Text, ElementName=TB_DXCallsign}" Value=""/>
-                            </MultiDataTrigger.Conditions>
-                            <Setter Property="Visibility" Value="Visible"/>
-                        </MultiDataTrigger>
-                    </Style.Triggers>
-                </Style>
-            </Border.Style>
-            <!-- Not bold, unlike the one-or-two-word hints: bold "Set your callsign" measures 123.5px
-                 in a box with 125px of room, and a pixel and a half is not enough margin to trust. -->
-            <TextBlock Text="Set your callsign" Style="{StaticResource FieldHintText}"
-                       FontWeight="Normal" Foreground="{DynamicResource Danger}"/>
-        </Border>
+        <!-- No "Set your callsign" hint in this box (removed 2026-09-13): the Station Callsign box
+             already says "Must fill", and saying it twice read as a fault in the DX box. -->
 
         <!-- A second way to turn the same thing on: a plain checkbox, to the left of the button in
              the same span the button used to have alone. Kept in step with the button in
