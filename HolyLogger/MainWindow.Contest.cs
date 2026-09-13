@@ -192,11 +192,15 @@ namespace HolyLogger
                 .Where(f => !IsRstField(f)).ToList();
             _contestRxSig = string.Join(",", fields);
 
-            // RECEIVED frame: RST(R) first, then the contest items. Tab flows DX callsign -> RST-R ->
-            // items. The RST you send lives in the SEND frame instead.
+            // RECEIVED frame: RST(R) first, then the contest items. Tab flows DX callsign -> items:
+            // RST-R is skipped by Tab, because in a contest the report is always 59/599 and the
+            // exchange is what the operator actually types (still editable with a click). The RST
+            // you send lives in the SEND frame instead.
             int tab = 9;
 
-            TextBox rstr = AddContestCell("RST R", 52, tab++, ContestRxPanel);
+            TextBox rstr = AddContestCell("RST R", 52, null, ContestRxPanel);
+            // AddContestCell only gives tab-stop boxes the edit highlight; RST-R is received data too.
+            if (state == State.Edit) rstr.Background = ThemeManager.Brush("EditFieldBg");
             _contestRstRcvdBox = rstr;
             rstr.Text = TB_RSTRcvd != null ? TB_RSTRcvd.Text : "59";
             // The same digit limit the hidden box behind it has - 2 on voice, 3 on CW - since whatever
