@@ -6433,6 +6433,7 @@ namespace HolyLogger
                 var homell = MaidenheadLocator.LocatorToLatLng(TB_MyLocator.Text);
                 var dxLatLng = new HolyParser.LatLng { Lat = dxLat, Long = dxLon };
                 Azimuth = MaidenheadLocator.Azimuth(homell, dxLatLng);
+                _homeMapShownAt = DateTime.MinValue;   // a DX map now, not the home map
                 MapControl.ShowMap(dxLat, dxLon, GetMapRadiusKm(), Azimuth, homell.Lat, homell.Long);
             }
             catch (System.Exception swallowed) { Log.Swallow(swallowed); }

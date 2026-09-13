@@ -1977,6 +1977,20 @@ namespace HolyLogger
 
         private void AddBtn_Click(object sender, RoutedEventArgs e)
         {
+            // TIMED, and written to the log, like opening a log. "Saving a QSO takes two seconds" is not
+            // settled by reading code: each step below records its own milliseconds, and the line in
+            // holylogger.log names the step that is slow on the operator's own machine and log.
+            // (The "checks" step includes any question the operator was asked before the save.)
+            var swSave = System.Diagnostics.Stopwatch.StartNew();
+            var laps = new StringBuilder();
+            long lapAt = 0;
+            void Lap(string step)
+            {
+                long now = swSave.ElapsedMilliseconds;
+                laps.Append(" | ").Append(step).Append(' ').Append(now - lapAt).Append(" ms");
+                lapAt = now;
+            }
+
             // Before anything else: a QSO must have a log to go into. Without this the INSERT would
             // name a log id that matches no row, and the contact would be stored where nothing reads.
             if (!RequireActiveLog("log a QSO into")) return;
@@ -2003,6 +2017,7 @@ namespace HolyLogger
             // an award program matching on it will never find "EU-5". Answering "log it anyway" keeps
             // what was typed - the operator's data is never silently dropped.
             if (!ConfirmActivityBeforeSave()) return;
+            Lap("checks");
 
             // SET WHEN THE CONTACT DID NOT REACH THE DATABASE, so the form is left exactly as he typed
             // it instead of being emptied at the end of this method. Telling a man his QSO was not saved
@@ -2064,14 +2079,17 @@ namespace HolyLogger
                         Log.Swallow(ex);
                         ToggleUploadProgress(Visibility.Hidden);
                     }
-                    
+
                 }
+                Lap("build");
                 try
                 {
                     lock (_syncLock)
                     {
                         LastQSO = dal.Insert(qso);
+                        Lap("db insert");
                         Qsos.Insert(0, LastQSO);
+                        Lap("table add");
                         Properties.Settings.Default.RecentQSOCounter++;
                     }
 
@@ -2082,21 +2100,26 @@ namespace HolyLogger
 
                     // Copy-to-log: mirror this QSO into the active log's copy-target, if configured.
                     CopyLoggedQsoToTargetLog(LastQSO);
+                    Lap("copy to log");
 
                     // Tell the other programs, on every broadcast line the operator ticked in the UDP
                     // Ports Manager (nothing is sent if there are none). See MainWindow.UdpSend.cs.
                     BroadcastQsoLogged(LastQSO);
+                    Lap("udp");
 
                     if (QSODataGrid.Items != null && QSODataGrid.Items.Count > 0)
                         QSODataGrid.ScrollIntoView(QSODataGrid.Items[0]);
+                    Lap("scroll");
 
                     AddWorkedCountryAndRefreshCluster(qso.DXCall);
+                    Lap("cluster");
 
                     // He was on the Try Again list and he is in the log now, so he comes off it.
                     RemoveFromTryAgainAfterLogging(qso.DXCall);
 
                     // In a contest whose sent exchange is a serial number, advance it for the next QSO.
                     AdvanceContestSerial();
+                    Lap("try again + serial");
 
                     // Auto-upload THIS QSO to the eQSL account of the callsign it was logged under.
                     // If it WILL be auto-uploaded (auto-upload on + callsign in the table + user name
@@ -2121,6 +2144,7 @@ namespace HolyLogger
                     // Real-time push of THIS just-logged QSO to Club Log (fire and forget). Does
                     // nothing unless the Club Log service is enabled with credentials configured.
                     _ = SendOneQsoToClublog(qso);
+                    Lap("uploads");
                 }
                 catch (Exception ex)
                 {
@@ -2217,13 +2241,26 @@ namespace HolyLogger
             // save worked, and is the whole difference between a message he can act on and one he can
             // only read.
             if (notSaved) return;
+            if (state != State.New) Lap("edit");
 
             ShowNewDXCC();
+            Lap("new country");
             ClearBtn_Click(null, null);
+            Lap("clear form");
             UpdateNumOfQSOs();
+            Lap("counts");
             ClearMatrix();
             RestoreDataContext();
-            
+            Lap("matrix + table");
+
+            long msBeforePaint = swSave.ElapsedMilliseconds;
+            int qsoCount = Qsos == null ? 0 : Qsos.Count;
+            // After the table and form have laid out and painted - the wait as the operator sees it.
+            Dispatcher.BeginInvoke(new Action(() =>
+                Log.Warn("Save QSO: " + qsoCount.ToString("N0") + " QSOs in log" + laps
+                         + " | ready in " + msBeforePaint + " ms | painted after "
+                         + swSave.ElapsedMilliseconds + " ms")),
+                System.Windows.Threading.DispatcherPriority.ContextIdle);
         }
 
         // THE NEW-COUNTRY GIF ANIMATES ONLY WHILE IT IS ON SCREEN.
@@ -14974,6 +15011,12 @@ namespace HolyLogger
                 }
 
                 var s = Properties.Settings.Default;
+                // NOTHING MOVED, NOTHING WRITTEN. This runs every time the photo window closes - which
+                // is after every saved QSO that had a photo - and writing the settings file costs real
+                // time on the window's thread while the form is being cleared.
+                if (s.QrzPhotoWindowLeft == qrzPhotoLeft.Value && s.QrzPhotoWindowTop == qrzPhotoTop.Value
+                    && s.QrzPhotoWindowWidth == qrzPhotoWidth.Value && s.QrzPhotoWindowHeight == qrzPhotoHeight.Value)
+                    return;
                 s.QrzPhotoWindowLeft = qrzPhotoLeft.Value;
                 s.QrzPhotoWindowTop = qrzPhotoTop.Value;
                 s.QrzPhotoWindowWidth = qrzPhotoWidth.Value;
@@ -15162,7 +15205,16 @@ namespace HolyLogger
                     // Use ClearAzimuth (not ClearAzimuthForTyping) so emptying the DX callsign removes
                     // the azimuth line to the deleted station and immediately restores the cluster-spots
                     // map view, instead of leaving the stale arc until the next spot batch arrives.
-                    ClearAzimuth();
+                    //
+                    // BUT NOT A SECOND TIME. Add and F9 empty this box and then redraw the home map
+                    // themselves (ClearBtn_Click), a moment before this runs - so the map was drawn
+                    // twice for every saved QSO, and this second drawing was the slower one: measured
+                    // 240 ms on the operator's machine. When the home map has just been drawn and no DX
+                    // map since, only the azimuth is reset.
+                    if (HomeMapJustShown())
+                        ClearAzimuthForTyping();
+                    else
+                        ClearAzimuth();
                     ClearMatrix();
                     L_Duplicate.Visibility = Visibility.Hidden;
                     L_Legal.Visibility = Visibility.Hidden;
