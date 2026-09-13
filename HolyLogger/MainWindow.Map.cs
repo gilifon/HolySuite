@@ -163,6 +163,7 @@ namespace HolyLogger
                     // Don't update map if Empty mode is active
                     if (Properties.Settings.Default.MapAreaDisplayMode != 4)
                     {
+                        _homeMapShownAt = DateTime.MinValue;   // the home map is no longer what is showing
                         MapControl.ShowMap(ll.Lat, ll.Long, autoFitRadius, Azimuth, homell.Lat, homell.Long, spotterLat, spotterLon);
                     }
                 }
@@ -194,6 +195,13 @@ namespace HolyLogger
             ShowHomeMap();
         }
 
+        // When the home map was last drawn, cleared again by any drawing of a DX map. Lets the delayed
+        // clearing after Add / F9 skip redrawing a home map that ClearBtn_Click has only just drawn.
+        private DateTime _homeMapShownAt = DateTime.MinValue;
+
+        private bool HomeMapJustShown() =>
+            (DateTime.UtcNow - _homeMapShownAt).TotalSeconds < 2;
+
         private void ShowHomeMap()
         {
             if (MapControl == null) return;
@@ -201,6 +209,8 @@ namespace HolyLogger
             // Don't show map if Empty mode is active
             if (Properties.Settings.Default.MapAreaDisplayMode == 4)
                 return;
+
+            _homeMapShownAt = DateTime.UtcNow;
 
             if (!string.IsNullOrWhiteSpace(TB_MyLocator.Text))
             {

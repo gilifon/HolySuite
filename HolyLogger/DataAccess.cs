@@ -2481,7 +2481,10 @@ Environment.NewLine +
         public int GetGridCountForLog(long logId)
         {
             lock (_dbLock)
-                using (var cmd = new SQLiteCommand("SELECT count(distinct exchange) FROM qso WHERE (dx_callsign like '4X%' or dx_callsign like '4Z%') AND log_id = ?", con))
+                // "+log_id", not "log_id": the plus stops SQLite choosing a log_id index, which made it
+                // read every QSO of the log (137 ms on a 28,580-QSO log, after every saved QSO). Without
+                // it the callsign index finds the few 4X/4Z rows directly: 26 ms, same answer.
+                using (var cmd = new SQLiteCommand("SELECT count(distinct exchange) FROM qso WHERE (dx_callsign like '4X%' or dx_callsign like '4Z%') AND +log_id = ?", con))
                 { cmd.Parameters.Add(new SQLiteParameter(null, logId)); return Convert.ToInt32(cmd.ExecuteScalar()); }
         }
         public int GetDXCCCountForLog(long logId)
@@ -3655,6 +3658,26 @@ Environment.NewLine +
                 using (var cmd = new SQLiteCommand(
                     "CREATE INDEX IF NOT EXISTS idx_qso_dxcc_missing ON qso(Id) WHERE dxcc IS NULL", con))
                     cmd.ExecuteNonQuery();
+
+                // 5. "How many are waiting to upload, and which?" - asked NINE times for every QSO saved
+                //    with F1, to refresh the Tools menu counts and the upload states in memory
+                //    (GetPending*Count, GetQsoIdsByUploadStatus). The old one-column status indexes
+                //    are not used for it: SQLite picks log_id and then reads every row of the log.
+                //    Measured on the operator's 28,580-QSO log: 115 ms per question, about 1 s per
+                //    save; with (log_id, status) 0.1 ms. Built once - about 6 s on his 400 MB file.
+                //    Each in its own try: a database from before one of these columns existed must
+                //    not stop the others being built.
+                foreach (string service in new[] { "lotw", "qrz", "eqsl", "clublog" })
+                {
+                    try
+                    {
+                        using (var cmd = new SQLiteCommand(
+                            "CREATE INDEX IF NOT EXISTS idx_qso_log_" + service + "_status ON qso(log_id, "
+                            + service + "_status)", con))
+                            cmd.ExecuteNonQuery();
+                    }
+                    catch (Exception ex) { Log.Swallow(ex); }
+                }
             }
             catch (Exception ex) { Log.Swallow(ex); }   // an index is an optimization only; never block startup on it
         }
