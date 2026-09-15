@@ -1,0 +1,6 @@
+# Compiled tools and anything regenerated from the tools - never source.
+build/
+training/
+*.exe
+*.pdb
+__pycache__/
