@@ -17473,14 +17473,15 @@ namespace HolyLogger
                                 {
                                     IEnumerable<XElement> image = xDoc.Root.Descendants(ns + "image");
                                     string xmlImageUrl = image.Select(i => i.Value).FirstOrDefault();
-                                    if (!string.IsNullOrWhiteSpace(xmlImageUrl))
-                                    {
-                                        SetQrzPhoto(xmlImageUrl);
-                                    }
-                                    else
-                                    {
-                                        await LoadQrzPhotoFromWebAsync(bare_dxcall);
-                                    }
+                                    // QRZ's <image> is documented as the callsign's primary image - the
+                                    // photo on its main page - and there is no request option to ask for
+                                    // any other one. No <image> means no photo, so SetQrzPhoto clears it.
+                                    // What used to stand here instead was a fallback that scraped the
+                                    // profile page and took the FIRST cdn-bio.qrz.com link in the HTML,
+                                    // which is not necessarily the main photo: for one user it returned a
+                                    // picture embedded in the biography while another user, whose QRZ
+                                    // account did return <image>, saw the right one for the same callsign.
+                                    SetQrzPhoto(xmlImageUrl);
                                 }
                                 catch
                                 {
@@ -17525,75 +17526,6 @@ namespace HolyLogger
                 TB_CQZone.Text = "";
                 ClearQrzPhoto();
             }
-        }
-
-        // Shared client for scraping the QRZ profile page for the operator photo. Browser-like
-        // headers because qrz.com serves different (or no) content to unknown user agents.
-        private static readonly HttpClient _qrzPhotoHttpClient = CreateQrzPhotoHttpClient();
-
-        private static HttpClient CreateQrzPhotoHttpClient()
-        {
-            var handler = new HttpClientHandler { AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate };
-            var client = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(15) };
-            client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36");
-            client.DefaultRequestHeaders.Accept.ParseAdd("text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8");
-            client.DefaultRequestHeaders.AcceptLanguage.ParseAdd("en-US,en;q=0.9");
-            return client;
-        }
-
-        private async Task LoadQrzPhotoFromWebAsync(string bareCallsign)
-        {
-            if (string.IsNullOrWhiteSpace(bareCallsign))
-            {
-                ClearQrzPhoto();
-                return;
-            }
-
-            try
-            {
-                {
-                    // Shared static client (see _qrzPhotoHttpClient): this method runs on every
-                    // callsign lookup, and new HttpClient(+handler) per call leaks sockets into
-                    // TIME_WAIT during an active session.
-                    var client = _qrzPhotoHttpClient;
-                    string html = string.Empty;
-
-                    // Off the UI thread for the same reason as the lookup above: the proxy is resolved
-                    // where the request is started, and this is two requests, on the typing path.
-                    if (!string.IsNullOrWhiteSpace(SessionKey))
-                    {
-                        html = await Task.Run(() => client.GetStringAsync("https://xmldata.qrz.com/xml/current/?s=" + SessionKey + ";html=" + bareCallsign));
-                    }
-
-                    if (string.IsNullOrWhiteSpace(html))
-                    {
-                        html = await Task.Run(() => client.GetStringAsync("https://www.qrz.com/db/" + bareCallsign));
-                    }
-
-                    // The address runs to the first quote, angle bracket or space - the characters that
-                    // can only be the HTML around it. What stood here was [^"'<>\x00-*] with three RAW
-                    // control characters in the source file, invisible in any editor: 0x00-0x1F, then
-                    // 0x7F-0x1F, a range running backwards. .NET rejects that, so BOTH of these matches
-                    // threw ArgumentException every single time and the profile page could never yield a
-                    // photo - proved by ArgumentException "range in reverse order" in holylogger.log.
-                    Match match = Regex.Match(html, @"https://cdn-bio\.qrz\.com/[^""'<>\s]+", RegexOptions.IgnoreCase);
-                    if (match.Success)
-                    {
-                        SetQrzPhoto(match.Value);
-                        return;
-                    }
-
-                    Match altMatch = Regex.Match(html, @"https?://[^""'<>\s]+\.(jpg|jpeg|png|gif)", RegexOptions.IgnoreCase);
-                    if (altMatch.Success)
-                    {
-                        SetQrzPhoto(altMatch.Value);
-                        return;
-                    }
-                }
-            }
-            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
-
-            ClearQrzPhoto();
         }
 
         private async void EntireLogQrzServiseMenuItem_Click(object sender, RoutedEventArgs e)
