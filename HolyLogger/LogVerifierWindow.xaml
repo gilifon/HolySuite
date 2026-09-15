@@ -537,14 +537,22 @@
              laid out against the FULL width of the row: the line of text keeps the left, the button
              stands in the middle of the window whatever the text beside it says. -->
         <Grid Grid.Row="3" Margin="0,12,0,0">
+            <!-- The right margin keeps the line clear of Export ADIF, which stands at the right end. -->
             <TextBlock x:Name="TB_Summary" HorizontalAlignment="Left" VerticalAlignment="Center"
-                       FontSize="16" Margin="0,0,12,0"
+                       FontSize="16" Margin="0,0,200,0"
                        Foreground="{DynamicResource MutedTextBrush}" TextTrimming="CharacterEllipsis"/>
             <!-- NOT IsCancel. Escape belongs to the table here - it clears the highlight - and a
                  window that shuts on the same key would throw away a page of ticks the moment an
                  operator tried to deselect a row. Closing is this button, or the title bar. -->
             <Button x:Name="Btn_Close" Content="Close" HorizontalAlignment="Center" Width="120" Height="38"
                     FontSize="16" Click="Btn_Close_Click"/>
+            <!-- WHAT IS ON SCREEN, TO A FILE. Every QSO in the rows showing now - the whole list, or
+                 only the kind that was clicked - on every screen this window has. Greyed while the
+                 table is empty; UpdateExportButton follows the table. -->
+            <Button x:Name="Btn_ExportAdif" Content="Export ADIF…" HorizontalAlignment="Right"
+                    MinWidth="170" Height="38" FontSize="16" IsEnabled="False"
+                    Click="Btn_ExportAdif_Click"
+                    ToolTip="Save the QSOs in the table to an ADIF file"/>
         </Grid>
 
         <!-- WHILE IT IS WRITING. A line of small text at the foot of the window was not enough: an
