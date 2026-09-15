@@ -2215,8 +2215,8 @@ namespace HolyLogger
         private async void UpdatesMenuItem_Click(object sender, RoutedEventArgs e)
         {
             string tempPath = Path.GetTempPath();
-            string filename = tempPath + @"\HolyLogger_x86.msi";
-            Uri uri = new Uri("http://github.com/4Z1KD/HolyLogger/raw/master/HolyLogger_x86.msi");
+            string filename = tempPath + @"\IARC-Logger_x86.msi";
+            Uri uri = new Uri("http://github.com/4Z1KD/IARC-Logger/raw/master/IARC-Logger_x86.msi");
 
             System.Reflection.Assembly assembly = System.Reflection.Assembly.GetExecutingAssembly();
             FileVersionInfo fvi = FileVersionInfo.GetVersionInfo(assembly.Location);
@@ -2283,7 +2283,7 @@ namespace HolyLogger
         private void wc_DownloadFileCompleted(object sender, AsyncCompletedEventArgs e)
         {
             string tempPath = Path.GetTempPath();
-            string filename = tempPath + @"\HolyLogger_x86.msi";
+            string filename = tempPath + @"\IARC-Logger_x86.msi";
 
             if (e.Error == null)
             {

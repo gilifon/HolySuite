@@ -25,10 +25,10 @@ namespace HolyLogger
         {
             
             bool aIsNewInstance = false;
-            myMutex = new Mutex(true, "HolyLoggerApplication", out aIsNewInstance);
+            myMutex = new Mutex(true, "IARC-LoggerApplication", out aIsNewInstance);
             if (!aIsNewInstance)
             {
-                MessageBox.Show("Holyland logger is already open...");
+                MessageBox.Show("IARC-Logger is already open...");
                 App.Current.Shutdown();
             }
         }
