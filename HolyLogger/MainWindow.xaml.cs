@@ -2216,7 +2216,7 @@ namespace HolyLogger
         {
             string tempPath = Path.GetTempPath();
             string filename = tempPath + @"\IARC-Logger_x86.msi";
-            Uri uri = new Uri("http://github.com/4Z1KD/IARC-Logger/raw/master/IARC-Logger_x86.msi");
+            Uri uri = new Uri("https://github.com/4Z1KD/IARC-Logger/raw/refs/heads/main/IARC-Logger_x86.msi");
 
             System.Reflection.Assembly assembly = System.Reflection.Assembly.GetExecutingAssembly();
             FileVersionInfo fvi = FileVersionInfo.GetVersionInfo(assembly.Location);

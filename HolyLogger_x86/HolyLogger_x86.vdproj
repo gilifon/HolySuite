@@ -513,12 +513,6 @@
         }
         "Entry"
         {
-        "MsmKey" = "8:_C3EB779B9B2F40989C98D0CFC19A5C6A"
-        "OwnerKey" = "8:_UNDEFINED"
-        "MsmSig" = "8:_UNDEFINED"
-        }
-        "Entry"
-        {
         "MsmKey" = "8:_C45A2CC1E5D86A3149705E0554513EB1"
         "OwnerKey" = "8:_B3AC16EEFCCB4135994F46A7F9226169"
         "MsmSig" = "8:_UNDEFINED"
@@ -593,6 +587,12 @@
         {
         "MsmKey" = "8:_F47E27A1C9C001FBF6D6978E36442703"
         "OwnerKey" = "8:_B3AC16EEFCCB4135994F46A7F9226169"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_F6F2BAFAC7BE4BFBB9C78AE5AEF5806E"
+        "OwnerKey" = "8:_UNDEFINED"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
@@ -1535,7 +1535,7 @@
             {
             "AssemblyRegister" = "3:1"
             "AssemblyIsInGAC" = "11:FALSE"
-            "AssemblyAsmDisplayName" = "8:HolyParser, Version=1.0.1.0, Culture=neutral, processorArchitecture=MSIL"
+            "AssemblyAsmDisplayName" = "8:HolyParser, Version=1.0.2.0, Culture=neutral, processorArchitecture=MSIL"
                 "ScatterAssemblies"
                 {
                     "_2450D84030FEC7DAF4EDE26FE4F0ACBD"
@@ -2919,7 +2919,7 @@
             {
             "AssemblyRegister" = "3:1"
             "AssemblyIsInGAC" = "11:FALSE"
-            "AssemblyAsmDisplayName" = "8:DXCCManager, Version=1.0.1.0, Culture=neutral, processorArchitecture=MSIL"
+            "AssemblyAsmDisplayName" = "8:DXCCManager, Version=1.0.2.0, Culture=neutral, processorArchitecture=MSIL"
                 "ScatterAssemblies"
                 {
                     "_B07CB5883DE086A56C1A603F3D9D56DF"
@@ -2975,26 +2975,6 @@
             "Register" = "3:1"
             "Exclude" = "11:FALSE"
             "IsDependency" = "11:TRUE"
-            "IsolateTo" = "8:"
-            }
-            "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_C3EB779B9B2F40989C98D0CFC19A5C6A"
-            {
-            "SourcePath" = "8:..\\..\\..\\..\\Downloads\\HolyLogger icon.ico"
-            "TargetName" = "8:HolyLogger icon.ico"
-            "Tag" = "8:"
-            "Folder" = "8:_447F70E0652E4B60AFA2BC3C93B00245"
-            "Condition" = "8:"
-            "Transitive" = "11:FALSE"
-            "Vital" = "11:TRUE"
-            "ReadOnly" = "11:FALSE"
-            "Hidden" = "11:FALSE"
-            "System" = "11:FALSE"
-            "Permanent" = "11:FALSE"
-            "SharedLegacy" = "11:FALSE"
-            "PackageAs" = "3:1"
-            "Register" = "3:1"
-            "Exclude" = "11:FALSE"
-            "IsDependency" = "11:FALSE"
             "IsolateTo" = "8:"
             }
             "{9F6F8455-1EF1-4B85-886A-4223BCC8E7F7}:_C45A2CC1E5D86A3149705E0554513EB1"
@@ -3358,6 +3338,26 @@
             "IsDependency" = "11:TRUE"
             "IsolateTo" = "8:"
             }
+            "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_F6F2BAFAC7BE4BFBB9C78AE5AEF5806E"
+            {
+            "SourcePath" = "8:..\\..\\..\\..\\Downloads\\HolyLogger icon.ico"
+            "TargetName" = "8:HolyLogger icon.ico"
+            "Tag" = "8:"
+            "Folder" = "8:_447F70E0652E4B60AFA2BC3C93B00245"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:FALSE"
+            "IsolateTo" = "8:"
+            }
             "{9F6F8455-1EF1-4B85-886A-4223BCC8E7F7}:_FC286FCB97D1E39AC5342D20D2E43880"
             {
             "AssemblyRegister" = "3:1"
@@ -3490,15 +3490,15 @@
         {
         "Name" = "8:Microsoft Visual Studio"
         "ProductName" = "8:IARC-Logger"
-        "ProductCode" = "8:{B319B7DE-253B-4CB7-B300-5EEAB19094AF}"
-        "PackageCode" = "8:{B83624FA-772D-47F1-8D29-7D9FE7A8A780}"
+        "ProductCode" = "8:{3B4AB270-EA65-4191-B0C0-DFF274B2A1C4}"
+        "PackageCode" = "8:{AF97D9C9-B531-4BD8-AE1D-85DEB49E9717}"
         "UpgradeCode" = "8:{3EE0E241-F4D5-4EAF-A563-BDBB9C1687D1}"
         "AspNetVersion" = "8:4.0.30319.0"
         "RestartWWWService" = "11:FALSE"
         "RemovePreviousVersions" = "11:FALSE"
         "DetectNewerInstalledVersion" = "11:TRUE"
         "InstallAllUsers" = "11:TRUE"
-        "ProductVersion" = "8:1.0.1"
+        "ProductVersion" = "8:1.0.2"
         "Manufacturer" = "8:4Z1KD"
         "ARPHELPTELEPHONE" = "8:+972547828077"
         "ARPHELPLINK" = "8:https://4z1kd.github.io/HolyLogger/"
@@ -3611,7 +3611,7 @@
         }
         "Shortcut"
         {
-            "{970C0BB2-C7D0-45D7-ABFA-7EC378858BC0}:_443A37E24C154B0A8AC2EAECC1CE1AFF"
+            "{970C0BB2-C7D0-45D7-ABFA-7EC378858BC0}:_6551A18E7BB54E24B471ADBFE8581785"
             {
             "Name" = "8:IARC-Logger"
             "Arguments" = "8:"
@@ -3622,10 +3622,10 @@
             "Target" = "8:_B3AC16EEFCCB4135994F46A7F9226169"
             "Folder" = "8:_287D9384F73E417AB6A790242779BAE5"
             "WorkingFolder" = "8:_447F70E0652E4B60AFA2BC3C93B00245"
-            "Icon" = "8:_C3EB779B9B2F40989C98D0CFC19A5C6A"
+            "Icon" = "8:_F6F2BAFAC7BE4BFBB9C78AE5AEF5806E"
             "Feature" = "8:"
             }
-            "{970C0BB2-C7D0-45D7-ABFA-7EC378858BC0}:_EF5A5376593A4CBF84100A2E8F037215"
+            "{970C0BB2-C7D0-45D7-ABFA-7EC378858BC0}:_B9C515239F634F4583F0BEDB4B39AB69"
             {
             "Name" = "8:IARC-Logger"
             "Arguments" = "8:"
@@ -3636,7 +3636,7 @@
             "Target" = "8:_B3AC16EEFCCB4135994F46A7F9226169"
             "Folder" = "8:_E164CAA6F4E84C46A80A656C418D9FA8"
             "WorkingFolder" = "8:_447F70E0652E4B60AFA2BC3C93B00245"
-            "Icon" = "8:_C3EB779B9B2F40989C98D0CFC19A5C6A"
+            "Icon" = "8:_F6F2BAFAC7BE4BFBB9C78AE5AEF5806E"
             "Feature" = "8:"
             }
         }
