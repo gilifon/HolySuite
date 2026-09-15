@@ -222,7 +222,7 @@ namespace HolyLogger
             string cabrillo = Services.GenerateCabrillo(qsos, c);
             var save = new SaveFileDialog
             {
-                Filter = "Cabrillo File (*.cbr)|*.cbr|Cabrillo Log (*.log)|*.log",
+                Filter = "Cabrillo File (*.cbr)|*.cbr|Cabrillo Log (*.log)|*.log|Text File (*.txt)|*.txt",
                 DefaultExt = "cbr",
                 Title = "Export Cabrillo",
                 InitialDirectory = ExportedLogsFolder.Current
