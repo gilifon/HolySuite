@@ -1310,6 +1310,12 @@ namespace HolyLogger
 
         private async void Window_Loaded(object sender, RoutedEventArgs e)
         {
+            // The table's Items raise a change for every new ItemsSource and every filter refresh, so
+            // this one hook keeps Export ADIF greyed exactly while nothing is on show.
+            ((System.Collections.Specialized.INotifyCollectionChanged)FindingsGrid.Items).CollectionChanged +=
+                (s, a) => UpdateExportButton();
+            UpdateExportButton();
+
             // A window opened with findings already made does not scan anything: there is nothing to
             // look for, the differences were handed to it. Everything after the scan is the same code.
             if (_prepared != null) { ShowPrepared(); return; }
@@ -5766,6 +5772,22 @@ namespace HolyLogger
             menu.Items.Add(GridCopy.CopyCellItem(GridCopy.TextOf(cell)));
             menu.Items.Add(GridCopy.CopyRowsItem(FindingsGrid));
 
+            // THE HIGHLIGHTED ROWS, TO A FILE. Selection, not the Fix ticks: the ticks answer the Fix
+            // button, the mouse highlight is what he picked to look at. Read now, while the menu is
+            // built, so the count on the line is the count that gets written.
+            List<QSO> picked = QsosOf(FindingsGrid.SelectedItems.OfType<FixRow>());
+            var exportItem = new MenuItem
+            {
+                Header = picked.Count == 1 ? "Export this QSO to ADIF…" : $"Export the {picked.Count:N0} selected QSOs to ADIF…",
+                IsEnabled = picked.Count > 0
+            };
+            // Deferred, as in the Log Workshop: a file dialog opened while the menu is still closing
+            // cannot take the click.
+            exportItem.Click += (s, a) => Dispatcher.BeginInvoke(new Action(() => ExportQsosToAdif(picked)),
+                                                                 System.Windows.Threading.DispatcherPriority.Background);
+            menu.Items.Add(new Separator());
+            menu.Items.Add(exportItem);
+
             FindingsGrid.ContextMenu = menu;
         }
 
@@ -5822,6 +5844,64 @@ namespace HolyLogger
         private void Btn_Close_Click(object sender, RoutedEventArgs e)
         {
             Close();
+        }
+
+        // ── EXPORTING WHAT IS ON SCREEN ─────────────────────────────────────────────────────────
+        //
+        // Read-only: the file holds each QSO as the log has it now, never the green suggestion, and
+        // nothing in the log is touched. A QSO with two problems stands on two rows but is written once.
+        private void UpdateExportButton()
+        {
+            if (Btn_ExportAdif != null) Btn_ExportAdif.IsEnabled = FindingsGrid.Items.OfType<FixRow>().Any();
+        }
+
+        private static List<QSO> QsosOf(IEnumerable<FixRow> rows)
+        {
+            var seen = new HashSet<QSO>();
+            var list = new List<QSO>();
+            foreach (FixRow r in rows)
+                if (r != null && r.Qso != null && seen.Add(r.Qso)) list.Add(r.Qso);
+            return list;
+        }
+
+        // FindingsGrid.Items, not _rows: Items is the filtered view, so a clicked kind exports that kind.
+        private void Btn_ExportAdif_Click(object sender, RoutedEventArgs e)
+        {
+            ExportQsosToAdif(QsosOf(FindingsGrid.Items.OfType<FixRow>()));
+        }
+
+        // The same generator and the same carried fields as the File menu and the Log Workshop, so a
+        // QSO leaves this window with exactly the fields it would leave the whole log with.
+        private void ExportQsosToAdif(List<QSO> qsos)
+        {
+            if (qsos == null || qsos.Count == 0) return;
+            try
+            {
+                try { DataAccess.GetInstance()?.FillCarriedAdif(qsos); }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+                string adif = HolyParser.Services.GenerateAdif(qsos, Contests.ContestService.Active?.CabrilloName,
+                                                               includeImportedFields: true);
+                var save = new Microsoft.Win32.SaveFileDialog
+                {
+                    Filter = "ADIF File|*.adi",
+                    DefaultExt = "adi",
+                    Title = qsos.Count == 1 ? "Export the QSO with " + qsos[0].DXCall : $"Export {qsos.Count:N0} QSOs",
+                    FileName = RowMenuParts.AdifFileName(qsos),
+                    InitialDirectory = ExportedLogsFolder.Current
+                };
+                if (save.ShowDialog(this) != true) return;
+
+                File.WriteAllText(save.FileName, adif);
+                ExportedLogsFolder.Remember(save.FileName);
+                HolyMessageBox.ShowSuccess($"{qsos.Count:N0} QSO{(qsos.Count == 1 ? "" : "s")} exported.", "Export ADIF", this);
+            }
+            catch (Exception ex)
+            {
+                HolyMessageBox.ShowError("Export failed.\n\n" + ex.Message + "\n\n"
+                    + "If the file is open in another program, close it and export again.",
+                    "Export ADIF", this);
+            }
         }
 
         // ── REMEMBERING WHAT HE DECIDED ─────────────────────────────────────────────────────────
