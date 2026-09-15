@@ -45,12 +45,6 @@
         }
         "Entry"
         {
-        "MsmKey" = "8:_0CC698D300E1900D4256378351A5C314"
-        "OwnerKey" = "8:_B3AC16EEFCCB4135994F46A7F9226169"
-        "MsmSig" = "8:_UNDEFINED"
-        }
-        "Entry"
-        {
         "MsmKey" = "8:_147A78AFE991FFC806D2E6387050F70F"
         "OwnerKey" = "8:_B3AC16EEFCCB4135994F46A7F9226169"
         "MsmSig" = "8:_UNDEFINED"
@@ -136,6 +130,12 @@
         "Entry"
         {
         "MsmKey" = "8:_237B5D9B1B7B6FCD2CF9A8E24F482612"
+        "OwnerKey" = "8:_B3AC16EEFCCB4135994F46A7F9226169"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_2450D84030FEC7DAF4EDE26FE4F0ACBD"
         "OwnerKey" = "8:_B3AC16EEFCCB4135994F46A7F9226169"
         "MsmSig" = "8:_UNDEFINED"
         }
@@ -303,14 +303,14 @@
         }
         "Entry"
         {
-        "MsmKey" = "8:_6A6A1E1F8232D2DA6AE0EDE76316DC1A"
-        "OwnerKey" = "8:_B3AC16EEFCCB4135994F46A7F9226169"
+        "MsmKey" = "8:_6C9D64A508F3CE555808CA06C80BF502"
+        "OwnerKey" = "8:_2450D84030FEC7DAF4EDE26FE4F0ACBD"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
         {
-        "MsmKey" = "8:_6A6A1E1F8232D2DA6AE0EDE76316DC1A"
-        "OwnerKey" = "8:_0CC698D300E1900D4256378351A5C314"
+        "MsmKey" = "8:_6C9D64A508F3CE555808CA06C80BF502"
+        "OwnerKey" = "8:_B3AC16EEFCCB4135994F46A7F9226169"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
@@ -383,12 +383,6 @@
         {
         "MsmKey" = "8:_8C660C29403E8592715C8F3B4B197995"
         "OwnerKey" = "8:_B3AC16EEFCCB4135994F46A7F9226169"
-        "MsmSig" = "8:_UNDEFINED"
-        }
-        "Entry"
-        {
-        "MsmKey" = "8:_8D1366CFBA87444ABD31721AFA2CFBC5"
-        "OwnerKey" = "8:_UNDEFINED"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
@@ -472,7 +466,7 @@
         "Entry"
         {
         "MsmKey" = "8:_AF5A8110A6BBBE3D3FB69E64505A90B2"
-        "OwnerKey" = "8:_0CC698D300E1900D4256378351A5C314"
+        "OwnerKey" = "8:_2450D84030FEC7DAF4EDE26FE4F0ACBD"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
@@ -495,6 +489,18 @@
         }
         "Entry"
         {
+        "MsmKey" = "8:_B07CB5883DE086A56C1A603F3D9D56DF"
+        "OwnerKey" = "8:_B3AC16EEFCCB4135994F46A7F9226169"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_B07CB5883DE086A56C1A603F3D9D56DF"
+        "OwnerKey" = "8:_2450D84030FEC7DAF4EDE26FE4F0ACBD"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
         "MsmKey" = "8:_B3AC16EEFCCB4135994F46A7F9226169"
         "OwnerKey" = "8:_UNDEFINED"
         "MsmSig" = "8:_UNDEFINED"
@@ -507,8 +513,8 @@
         }
         "Entry"
         {
-        "MsmKey" = "8:_C22BA6162DB9ED8C97241AF8AC3AB218"
-        "OwnerKey" = "8:_B3AC16EEFCCB4135994F46A7F9226169"
+        "MsmKey" = "8:_C3EB779B9B2F40989C98D0CFC19A5C6A"
+        "OwnerKey" = "8:_UNDEFINED"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
@@ -533,6 +539,12 @@
         {
         "MsmKey" = "8:_DFB8BBD0E6D54832F8DB1BBDDDC3E62C"
         "OwnerKey" = "8:_AF5A8110A6BBBE3D3FB69E64505A90B2"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_E156C416842DE90529324043CB70C8F8"
+        "OwnerKey" = "8:_B3AC16EEFCCB4135994F46A7F9226169"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
@@ -573,18 +585,6 @@
         }
         "Entry"
         {
-        "MsmKey" = "8:_F0A5874E5B9F2197FFDA66FD60380805"
-        "OwnerKey" = "8:_0CC698D300E1900D4256378351A5C314"
-        "MsmSig" = "8:_UNDEFINED"
-        }
-        "Entry"
-        {
-        "MsmKey" = "8:_F0A5874E5B9F2197FFDA66FD60380805"
-        "OwnerKey" = "8:_B3AC16EEFCCB4135994F46A7F9226169"
-        "MsmSig" = "8:_UNDEFINED"
-        }
-        "Entry"
-        {
         "MsmKey" = "8:_F0D94981D67A51727F95D96E17595A8E"
         "OwnerKey" = "8:_B3AC16EEFCCB4135994F46A7F9226169"
         "MsmSig" = "8:_UNDEFINED"
@@ -598,7 +598,7 @@
         "Entry"
         {
         "MsmKey" = "8:_FC286FCB97D1E39AC5342D20D2E43880"
-        "OwnerKey" = "8:_0CC698D300E1900D4256378351A5C314"
+        "OwnerKey" = "8:_2450D84030FEC7DAF4EDE26FE4F0ACBD"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
@@ -622,7 +622,25 @@
         "Entry"
         {
         "MsmKey" = "8:_UNDEFINED"
-        "OwnerKey" = "8:_C22BA6162DB9ED8C97241AF8AC3AB218"
+        "OwnerKey" = "8:_E156C416842DE90529324043CB70C8F8"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_UNDEFINED"
+        "OwnerKey" = "8:_2450D84030FEC7DAF4EDE26FE4F0ACBD"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_UNDEFINED"
+        "OwnerKey" = "8:_6C9D64A508F3CE555808CA06C80BF502"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_UNDEFINED"
+        "OwnerKey" = "8:_B07CB5883DE086A56C1A603F3D9D56DF"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
@@ -694,25 +712,7 @@
         "Entry"
         {
         "MsmKey" = "8:_UNDEFINED"
-        "OwnerKey" = "8:_0CC698D300E1900D4256378351A5C314"
-        "MsmSig" = "8:_UNDEFINED"
-        }
-        "Entry"
-        {
-        "MsmKey" = "8:_UNDEFINED"
         "OwnerKey" = "8:_FC286FCB97D1E39AC5342D20D2E43880"
-        "MsmSig" = "8:_UNDEFINED"
-        }
-        "Entry"
-        {
-        "MsmKey" = "8:_UNDEFINED"
-        "OwnerKey" = "8:_F0A5874E5B9F2197FFDA66FD60380805"
-        "MsmSig" = "8:_UNDEFINED"
-        }
-        "Entry"
-        {
-        "MsmKey" = "8:_UNDEFINED"
-        "OwnerKey" = "8:_6A6A1E1F8232D2DA6AE0EDE76316DC1A"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
@@ -1252,37 +1252,6 @@
             "IsDependency" = "11:TRUE"
             "IsolateTo" = "8:"
             }
-            "{9F6F8455-1EF1-4B85-886A-4223BCC8E7F7}:_0CC698D300E1900D4256378351A5C314"
-            {
-            "AssemblyRegister" = "3:1"
-            "AssemblyIsInGAC" = "11:FALSE"
-            "AssemblyAsmDisplayName" = "8:HolyParser, Version=8.0.5.0, Culture=neutral, processorArchitecture=MSIL"
-                "ScatterAssemblies"
-                {
-                    "_0CC698D300E1900D4256378351A5C314"
-                    {
-                    "Name" = "8:HolyParser.dll"
-                    "Attributes" = "3:512"
-                    }
-                }
-            "SourcePath" = "8:HolyParser.dll"
-            "TargetName" = "8:"
-            "Tag" = "8:"
-            "Folder" = "8:_447F70E0652E4B60AFA2BC3C93B00245"
-            "Condition" = "8:"
-            "Transitive" = "11:FALSE"
-            "Vital" = "11:TRUE"
-            "ReadOnly" = "11:FALSE"
-            "Hidden" = "11:FALSE"
-            "System" = "11:FALSE"
-            "Permanent" = "11:FALSE"
-            "SharedLegacy" = "11:FALSE"
-            "PackageAs" = "3:1"
-            "Register" = "3:1"
-            "Exclude" = "11:FALSE"
-            "IsDependency" = "11:TRUE"
-            "IsolateTo" = "8:"
-            }
             "{9F6F8455-1EF1-4B85-886A-4223BCC8E7F7}:_147A78AFE991FFC806D2E6387050F70F"
             {
             "AssemblyRegister" = "3:1"
@@ -1545,6 +1514,37 @@
                     }
                 }
             "SourcePath" = "8:System.ComponentModel.EventBasedAsync.dll"
+            "TargetName" = "8:"
+            "Tag" = "8:"
+            "Folder" = "8:_447F70E0652E4B60AFA2BC3C93B00245"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:TRUE"
+            "IsolateTo" = "8:"
+            }
+            "{9F6F8455-1EF1-4B85-886A-4223BCC8E7F7}:_2450D84030FEC7DAF4EDE26FE4F0ACBD"
+            {
+            "AssemblyRegister" = "3:1"
+            "AssemblyIsInGAC" = "11:FALSE"
+            "AssemblyAsmDisplayName" = "8:HolyParser, Version=1.0.1.0, Culture=neutral, processorArchitecture=MSIL"
+                "ScatterAssemblies"
+                {
+                    "_2450D84030FEC7DAF4EDE26FE4F0ACBD"
+                    {
+                    "Name" = "8:HolyParser.dll"
+                    "Attributes" = "3:512"
+                    }
+                }
+            "SourcePath" = "8:HolyParser.dll"
             "TargetName" = "8:"
             "Tag" = "8:"
             "Folder" = "8:_447F70E0652E4B60AFA2BC3C93B00245"
@@ -2213,20 +2213,20 @@
             "IsDependency" = "11:TRUE"
             "IsolateTo" = "8:"
             }
-            "{9F6F8455-1EF1-4B85-886A-4223BCC8E7F7}:_6A6A1E1F8232D2DA6AE0EDE76316DC1A"
+            "{9F6F8455-1EF1-4B85-886A-4223BCC8E7F7}:_6C9D64A508F3CE555808CA06C80BF502"
             {
             "AssemblyRegister" = "3:1"
             "AssemblyIsInGAC" = "11:FALSE"
-            "AssemblyAsmDisplayName" = "8:DXCCManager, Version=8.0.5.0, Culture=neutral, processorArchitecture=MSIL"
+            "AssemblyAsmDisplayName" = "8:ModeManager, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL"
                 "ScatterAssemblies"
                 {
-                    "_6A6A1E1F8232D2DA6AE0EDE76316DC1A"
+                    "_6C9D64A508F3CE555808CA06C80BF502"
                     {
-                    "Name" = "8:DXCCManager.dll"
+                    "Name" = "8:ModeManager.dll"
                     "Attributes" = "3:512"
                     }
                 }
-            "SourcePath" = "8:DXCCManager.dll"
+            "SourcePath" = "8:ModeManager.dll"
             "TargetName" = "8:"
             "Tag" = "8:"
             "Folder" = "8:_447F70E0652E4B60AFA2BC3C93B00245"
@@ -2552,26 +2552,6 @@
             "Register" = "3:1"
             "Exclude" = "11:FALSE"
             "IsDependency" = "11:TRUE"
-            "IsolateTo" = "8:"
-            }
-            "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_8D1366CFBA87444ABD31721AFA2CFBC5"
-            {
-            "SourcePath" = "8:..\\HolyLogger\\HolyLogger icon.ico"
-            "TargetName" = "8:HolyLogger icon.ico"
-            "Tag" = "8:"
-            "Folder" = "8:_447F70E0652E4B60AFA2BC3C93B00245"
-            "Condition" = "8:"
-            "Transitive" = "11:FALSE"
-            "Vital" = "11:TRUE"
-            "ReadOnly" = "11:FALSE"
-            "Hidden" = "11:FALSE"
-            "System" = "11:FALSE"
-            "Permanent" = "11:FALSE"
-            "SharedLegacy" = "11:FALSE"
-            "PackageAs" = "3:1"
-            "Register" = "3:1"
-            "Exclude" = "11:FALSE"
-            "IsDependency" = "11:FALSE"
             "IsolateTo" = "8:"
             }
             "{9F6F8455-1EF1-4B85-886A-4223BCC8E7F7}:_8E9B0501EAFEFA76C849528B720F9195"
@@ -2935,6 +2915,37 @@
             "IsDependency" = "11:TRUE"
             "IsolateTo" = "8:"
             }
+            "{9F6F8455-1EF1-4B85-886A-4223BCC8E7F7}:_B07CB5883DE086A56C1A603F3D9D56DF"
+            {
+            "AssemblyRegister" = "3:1"
+            "AssemblyIsInGAC" = "11:FALSE"
+            "AssemblyAsmDisplayName" = "8:DXCCManager, Version=1.0.1.0, Culture=neutral, processorArchitecture=MSIL"
+                "ScatterAssemblies"
+                {
+                    "_B07CB5883DE086A56C1A603F3D9D56DF"
+                    {
+                    "Name" = "8:DXCCManager.dll"
+                    "Attributes" = "3:512"
+                    }
+                }
+            "SourcePath" = "8:DXCCManager.dll"
+            "TargetName" = "8:"
+            "Tag" = "8:"
+            "Folder" = "8:_447F70E0652E4B60AFA2BC3C93B00245"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:TRUE"
+            "IsolateTo" = "8:"
+            }
             "{9F6F8455-1EF1-4B85-886A-4223BCC8E7F7}:_BD80A73E94949051ED7B0A28648FBC54"
             {
             "AssemblyRegister" = "3:1"
@@ -2966,21 +2977,10 @@
             "IsDependency" = "11:TRUE"
             "IsolateTo" = "8:"
             }
-            "{9F6F8455-1EF1-4B85-886A-4223BCC8E7F7}:_C22BA6162DB9ED8C97241AF8AC3AB218"
+            "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_C3EB779B9B2F40989C98D0CFC19A5C6A"
             {
-            "AssemblyRegister" = "3:1"
-            "AssemblyIsInGAC" = "11:FALSE"
-            "AssemblyAsmDisplayName" = "8:StickyWindow, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL"
-                "ScatterAssemblies"
-                {
-                    "_C22BA6162DB9ED8C97241AF8AC3AB218"
-                    {
-                    "Name" = "8:StickyWindow.dll"
-                    "Attributes" = "3:512"
-                    }
-                }
-            "SourcePath" = "8:StickyWindow.dll"
-            "TargetName" = "8:"
+            "SourcePath" = "8:..\\..\\..\\..\\Downloads\\HolyLogger icon.ico"
+            "TargetName" = "8:HolyLogger icon.ico"
             "Tag" = "8:"
             "Folder" = "8:_447F70E0652E4B60AFA2BC3C93B00245"
             "Condition" = "8:"
@@ -2994,7 +2994,7 @@
             "PackageAs" = "3:1"
             "Register" = "3:1"
             "Exclude" = "11:FALSE"
-            "IsDependency" = "11:TRUE"
+            "IsDependency" = "11:FALSE"
             "IsolateTo" = "8:"
             }
             "{9F6F8455-1EF1-4B85-886A-4223BCC8E7F7}:_C45A2CC1E5D86A3149705E0554513EB1"
@@ -3062,6 +3062,37 @@
                     }
                 }
             "SourcePath" = "8:System.Linq.dll"
+            "TargetName" = "8:"
+            "Tag" = "8:"
+            "Folder" = "8:_447F70E0652E4B60AFA2BC3C93B00245"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:TRUE"
+            "IsolateTo" = "8:"
+            }
+            "{9F6F8455-1EF1-4B85-886A-4223BCC8E7F7}:_E156C416842DE90529324043CB70C8F8"
+            {
+            "AssemblyRegister" = "3:1"
+            "AssemblyIsInGAC" = "11:FALSE"
+            "AssemblyAsmDisplayName" = "8:StickyWindow, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL"
+                "ScatterAssemblies"
+                {
+                    "_E156C416842DE90529324043CB70C8F8"
+                    {
+                    "Name" = "8:StickyWindow.dll"
+                    "Attributes" = "3:512"
+                    }
+                }
+            "SourcePath" = "8:StickyWindow.dll"
             "TargetName" = "8:"
             "Tag" = "8:"
             "Folder" = "8:_447F70E0652E4B60AFA2BC3C93B00245"
@@ -3265,37 +3296,6 @@
             "IsDependency" = "11:TRUE"
             "IsolateTo" = "8:"
             }
-            "{9F6F8455-1EF1-4B85-886A-4223BCC8E7F7}:_F0A5874E5B9F2197FFDA66FD60380805"
-            {
-            "AssemblyRegister" = "3:1"
-            "AssemblyIsInGAC" = "11:FALSE"
-            "AssemblyAsmDisplayName" = "8:ModeManager, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL"
-                "ScatterAssemblies"
-                {
-                    "_F0A5874E5B9F2197FFDA66FD60380805"
-                    {
-                    "Name" = "8:ModeManager.dll"
-                    "Attributes" = "3:512"
-                    }
-                }
-            "SourcePath" = "8:ModeManager.dll"
-            "TargetName" = "8:"
-            "Tag" = "8:"
-            "Folder" = "8:_447F70E0652E4B60AFA2BC3C93B00245"
-            "Condition" = "8:"
-            "Transitive" = "11:FALSE"
-            "Vital" = "11:TRUE"
-            "ReadOnly" = "11:FALSE"
-            "Hidden" = "11:FALSE"
-            "System" = "11:FALSE"
-            "Permanent" = "11:FALSE"
-            "SharedLegacy" = "11:FALSE"
-            "PackageAs" = "3:1"
-            "Register" = "3:1"
-            "Exclude" = "11:FALSE"
-            "IsDependency" = "11:TRUE"
-            "IsolateTo" = "8:"
-            }
             "{9F6F8455-1EF1-4B85-886A-4223BCC8E7F7}:_F0D94981D67A51727F95D96E17595A8E"
             {
             "AssemblyRegister" = "3:1"
@@ -3406,7 +3406,7 @@
                 {
                     "{9EF0B969-E518-4E46-987F-47570745A589}:_E164CAA6F4E84C46A80A656C418D9FA8"
                     {
-                    "Name" = "8:HolyLogger"
+                    "Name" = "8:IARC-Logger"
                     "AlwaysCreate" = "11:FALSE"
                     "Condition" = "8:"
                     "Transitive" = "11:FALSE"
@@ -3438,7 +3438,7 @@
                         {
                             "{9EF0B969-E518-4E46-987F-47570745A589}:_69DC518C1C884B8E917724CF53907456"
                             {
-                            "Name" = "8:HolyLogger"
+                            "Name" = "8:IARC-Logger"
                             "AlwaysCreate" = "11:TRUE"
                             "Condition" = "8:"
                             "Transitive" = "11:FALSE"
@@ -3490,15 +3490,15 @@
         {
         "Name" = "8:Microsoft Visual Studio"
         "ProductName" = "8:IARC-Logger"
-        "ProductCode" = "8:{EA3A4235-6292-4D33-966F-E1CED4A65474}"
-        "PackageCode" = "8:{FE5DD3B9-C57C-472D-9C00-6EC2FF853299}"
-        "UpgradeCode" = "8:{60EADFD8-DD20-4992-B05E-81FB7BE707D4}"
+        "ProductCode" = "8:{B319B7DE-253B-4CB7-B300-5EEAB19094AF}"
+        "PackageCode" = "8:{B83624FA-772D-47F1-8D29-7D9FE7A8A780}"
+        "UpgradeCode" = "8:{3EE0E241-F4D5-4EAF-A563-BDBB9C1687D1}"
         "AspNetVersion" = "8:4.0.30319.0"
         "RestartWWWService" = "11:FALSE"
         "RemovePreviousVersions" = "11:FALSE"
         "DetectNewerInstalledVersion" = "11:TRUE"
         "InstallAllUsers" = "11:TRUE"
-        "ProductVersion" = "8:8.0.5"
+        "ProductVersion" = "8:1.0.1"
         "Manufacturer" = "8:4Z1KD"
         "ARPHELPTELEPHONE" = "8:+972547828077"
         "ARPHELPLINK" = "8:https://4z1kd.github.io/HolyLogger/"
@@ -3611,9 +3611,9 @@
         }
         "Shortcut"
         {
-            "{970C0BB2-C7D0-45D7-ABFA-7EC378858BC0}:_84342C1885CC4ED9A2F044ACBBC67227"
+            "{970C0BB2-C7D0-45D7-ABFA-7EC378858BC0}:_443A37E24C154B0A8AC2EAECC1CE1AFF"
             {
-            "Name" = "8:HolyLogger"
+            "Name" = "8:IARC-Logger"
             "Arguments" = "8:"
             "Description" = "8:"
             "ShowCmd" = "3:1"
@@ -3622,12 +3622,12 @@
             "Target" = "8:_B3AC16EEFCCB4135994F46A7F9226169"
             "Folder" = "8:_287D9384F73E417AB6A790242779BAE5"
             "WorkingFolder" = "8:_447F70E0652E4B60AFA2BC3C93B00245"
-            "Icon" = "8:_8D1366CFBA87444ABD31721AFA2CFBC5"
+            "Icon" = "8:_C3EB779B9B2F40989C98D0CFC19A5C6A"
             "Feature" = "8:"
             }
-            "{970C0BB2-C7D0-45D7-ABFA-7EC378858BC0}:_F179AFCF0EB549C7B9417D4D5CF31F1B"
+            "{970C0BB2-C7D0-45D7-ABFA-7EC378858BC0}:_EF5A5376593A4CBF84100A2E8F037215"
             {
-            "Name" = "8:HolyLogger"
+            "Name" = "8:IARC-Logger"
             "Arguments" = "8:"
             "Description" = "8:"
             "ShowCmd" = "3:1"
@@ -3636,7 +3636,7 @@
             "Target" = "8:_B3AC16EEFCCB4135994F46A7F9226169"
             "Folder" = "8:_E164CAA6F4E84C46A80A656C418D9FA8"
             "WorkingFolder" = "8:_447F70E0652E4B60AFA2BC3C93B00245"
-            "Icon" = "8:_8D1366CFBA87444ABD31721AFA2CFBC5"
+            "Icon" = "8:_C3EB779B9B2F40989C98D0CFC19A5C6A"
             "Feature" = "8:"
             }
         }
@@ -4040,7 +4040,7 @@
         {
             "{5259A561-127C-4D43-A0A1-72F10C7B3BF8}:_B3AC16EEFCCB4135994F46A7F9226169"
             {
-            "SourcePath" = "8:..\\HolyLogger\\obj\\x86\\Debug\\HolyLogger.exe"
+            "SourcePath" = "8:..\\HolyLogger\\obj\\x86\\Release\\HolyLogger.exe"
             "TargetName" = "8:"
             "Tag" = "8:"
             "Folder" = "8:_447F70E0652E4B60AFA2BC3C93B00245"
