@@ -2,6 +2,7 @@ using DXCCManager;
 using HolyParser;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -366,6 +367,28 @@ namespace HolyParser
                 return t.Length >= 4 ? t.Substring(0, 4) : t;
             }
 
+            // Cabrillo wants the QSO date as yyyy-mm-dd; the log stores it as yyyyMMdd (ADIF's
+            // QSO_DATE form, no separators - see MainWindow.xaml.cs where it's built). Insert the
+            // dashes; a date we don't recognise is passed through untouched rather than guessed at.
+            string _cabrillo_date(string date)
+            {
+                string d = (date ?? string.Empty).Trim();
+                if (d.Length >= 8 && d.Substring(0, 8).All(char.IsDigit))
+                    return d.Substring(0, 4) + "-" + d.Substring(4, 2) + "-" + d.Substring(6, 2);
+                return d;
+            }
+
+            // Cabrillo wants frequency in kHz; the log stores QSO.Freq in MHz (ADIF's own unit -
+            // see HolyLogParser.NormalizeFreqToMhz). A value that isn't a plain number is passed
+            // through untouched rather than guessed at.
+            string _cabrillo_freq(string freqMhz)
+            {
+                double mhz;
+                if (!double.TryParse((freqMhz ?? string.Empty).Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out mhz))
+                    return freqMhz;
+                return Math.Round(mhz * 1000.0).ToString("0", CultureInfo.InvariantCulture);
+            }
+
             string version = Assembly.GetExecutingAssembly().GetName().Version.ToString();
 
             StringBuilder cbr = new StringBuilder(200);
@@ -406,17 +429,21 @@ namespace HolyParser
                     qso.Time = datetime[1];
                 }
 
+                // Every field below is written in its fixed position even when blank - the QSO:
+                // line has ten columns (freq mode date time mycall RST-sent exch-sent hiscall
+                // RST-rcvd exch-rcvd) and skipping a blank one shifts every column after it left,
+                // which is what put the received exchange (e.g. a serial number) one column early.
                 cbr.Append("QSO: ");
-                if (qso.Freq != null) cbr.AppendFormat("{0} ", qso.Freq);
-                if (qso.Mode != null) cbr.AppendFormat("{0} ", _convert_mode(qso.Mode));
-                if (qso.Date != null) cbr.AppendFormat("{0} ", qso.Date);
-                if (qso.Time != null) cbr.AppendFormat("{0} ", _cabrillo_time(qso.Time));
-                if (qso.MyCall != null) cbr.AppendFormat("{0} ", qso.MyCall);
-                if (qso.RST_SENT != null) cbr.AppendFormat("{0} ", qso.RST_SENT);
-                if (qso.STX != null) cbr.AppendFormat("{0} ", qso.STX);
-                if (qso.DXCall != null) cbr.AppendFormat("{0} ", qso.DXCall);
-                if (qso.RST_RCVD != null) cbr.AppendFormat("{0} ", qso.RST_RCVD);
-                if (qso.SRX != null) cbr.AppendFormat("{0} ", qso.SRX);
+                cbr.AppendFormat("{0} ", _cabrillo_freq(qso.Freq));
+                cbr.AppendFormat("{0} ", _convert_mode(qso.Mode ?? string.Empty));
+                cbr.AppendFormat("{0} ", _cabrillo_date(qso.Date));
+                cbr.AppendFormat("{0} ", _cabrillo_time(qso.Time));
+                cbr.AppendFormat("{0} ", qso.MyCall ?? string.Empty);
+                cbr.AppendFormat("{0} ", qso.RST_SENT ?? string.Empty);
+                cbr.AppendFormat("{0} ", qso.STX ?? string.Empty);
+                cbr.AppendFormat("{0} ", qso.DXCall ?? string.Empty);
+                cbr.AppendFormat("{0} ", qso.RST_RCVD ?? string.Empty);
+                cbr.AppendFormat("{0} ", qso.SRX ?? string.Empty);
                 cbr.AppendLine();
             }
             cbr.AppendLine("END-OF-LOG:");
