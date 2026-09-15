@@ -232,7 +232,7 @@ namespace HolyLogger
         DispatcherTimer HeartbeatTimer = new DispatcherTimer();
         System.Windows.Forms.Timer NewDXCCTimer = new System.Windows.Forms.Timer();
 
-        private string title = "HolyLogger   ";
+        private string title = "IARC-Logger   ";
         private const int SEND_CHUNK_SIZE = 50;
 
         BitmapImage qrz_path = new BitmapImage(new Uri("Images/qrz.png", UriKind.Relative));
@@ -2231,7 +2231,7 @@ namespace HolyLogger
             {
                 try
                 {
-                    string baseRequest = "http://raw.githubusercontent.com/4Z1KD/HolyLogger/master/Version?v=" + DateTime.Now.Ticks;
+                    string baseRequest = "https://raw.githubusercontent.com/4Z1KD/IARC-Logger/master/Version?v=" + DateTime.Now.Ticks;
                     var response = await client.GetAsync(baseRequest);
                     var responseFromServer = await response.Content.ReadAsStringAsync();
 
@@ -2771,7 +2771,7 @@ namespace HolyLogger
                 {
                     ServicePointManager.Expect100Continue = true;
                     ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
-                    string baseRequest = "https://raw.githubusercontent.com/4Z1KD/HolyLogger/master/LiveLog?v=" + DateTime.Now.Ticks;
+                    string baseRequest = "https://raw.githubusercontent.com/4Z1KD/IARC-Logger/master/LiveLog?v=" + DateTime.Now.Ticks;
                     var response = await client.GetAsync(baseRequest);
                     var responseFromServer = await response.Content.ReadAsStringAsync();
                     isRemoteServerLiveLog = responseFromServer.ToLower().Trim() == "true";
