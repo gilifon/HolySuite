@@ -6489,6 +6489,16 @@ namespace HolyLogger
             };
             menu.Items.Add(copyItem);
 
+            // ONE QSO TO ADIF. Only a selection of two or more could be exported before, which left the
+            // commonest case - sending one contact to someone who asked for it - with no way to do it.
+            // The same exporter as the selection, so one QSO carries exactly the fields a whole log does.
+            // Deferred like Delete: the save dialog cannot take a click while the menu is still closing.
+            var exportItem = new MenuItem { Header = "Export to ADIF…", Style = itemStyle, Icon = MakeMenuGlyph("", blue) };
+            exportItem.Click += (s, e) =>
+                Dispatcher.BeginInvoke(new Action(() => ExportSelectedToAdif(new List<QSO> { qso })),
+                                       System.Windows.Threading.DispatcherPriority.Background);
+            menu.Items.Add(exportItem);
+
             menu.Items.Add(new Separator { Style = sepStyle });
 
             var editItem = new MenuItem { Header = "Edit", Style = itemStyle, Icon = MakeMenuGlyph("", blue) };
@@ -6668,8 +6678,10 @@ namespace HolyLogger
                 {
                     Filter = "ADIF File|*.adi",
                     DefaultExt = "adi",
-                    Title = string.Format("Export {0:N0} selected QSOs", picked.Count),
-                    FileName = string.Format("selection_{0:yyyyMMdd_HHmm}.adi", DateTime.Now)
+                    Title = picked.Count == 1
+                        ? "Export the QSO with " + picked[0].DXCall
+                        : string.Format("Export {0:N0} selected QSOs", picked.Count),
+                    FileName = RowMenuParts.AdifFileName(picked)
                 };
                 if (save.ShowDialog() != true) return;
 

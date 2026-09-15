@@ -453,6 +453,20 @@ namespace HolyLogger
             };
             menu.Items.Add(ai);
 
+            // ONE QSO TO ADIF - see the same item in the main window's row menu. Deferred for the same
+            // reason as Edit and Delete below.
+            var export = new MenuItem { Header = "Export to ADIF…", Style = itemStyle, Icon = MakeMenuGlyph("\uE74E", blue) };
+            export.Click += (s, e) =>
+            {
+                _hlKeep = true;
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    try { ExportQsosToAdif(new List<QSO> { qso }); }
+                    finally { _hlKeep = false; ClearHighlight(); }
+                }), System.Windows.Threading.DispatcherPriority.Background);
+            };
+            menu.Items.Add(export);
+
             // Edit / Delete are deferred until the menu has fully closed (the editor is modal; running it
             // while the menu is still dismissing and holding mouse capture leaves it unable to take the
             // click). _hlKeep keeps the row highlighted across the close.
@@ -802,14 +816,16 @@ namespace HolyLogger
                 {
                     Filter = "ADIF File|*.adi",
                     DefaultExt = "adi",
-                    Title = $"Export {qsos.Count:N0} selected QSOs",
-                    FileName = $"selection_{DateTime.Now:yyyyMMdd_HHmm}.adi"
+                    Title = qsos.Count == 1 ? "Export the QSO with " + qsos[0].DXCall : $"Export {qsos.Count:N0} selected QSOs",
+                    FileName = RowMenuParts.AdifFileName(qsos)
                 };
                 if (save.ShowDialog() != true) return;
 
                 System.IO.File.WriteAllText(save.FileName, adif);
                 HolyMessageBox.ShowSuccess($"{qsos.Count:N0} QSO{(qsos.Count == 1 ? "" : "s")} exported.", "Export ADIF", this);
-                TB_Status.Text = $"Exported {qsos.Count:N0} selected QSOs to {System.IO.Path.GetFileName(save.FileName)}.";
+                TB_Status.Text = qsos.Count == 1
+                    ? $"Exported the QSO with {qsos[0].DXCall} to {System.IO.Path.GetFileName(save.FileName)}."
+                    : $"Exported {qsos.Count:N0} selected QSOs to {System.IO.Path.GetFileName(save.FileName)}.";
             }
             catch (Exception ex) { HolyMessageBox.ShowError("Export failed: " + ex.Message, "Export ADIF", this); }
         }

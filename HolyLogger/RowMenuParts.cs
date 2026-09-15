@@ -100,6 +100,24 @@ namespace HolyLogger
             return string.Join("  •  ", parts);
         }
 
+        // The name an ADIF export is offered under, for the main log table and the Log Workshop alike.
+        //
+        // ONE QSO IS NAMED AFTER THE STATION: 4X1ABC_20260915.adi, because the reason for exporting a
+        // single contact is nearly always to send it to that station, and "selection_20260915_1432.adi"
+        // says nothing about who it is for. A stroke is not allowed in a Windows file name, so
+        // 4Z5SL/P becomes 4Z5SL-P. More than one keeps the old name.
+        public static string AdifFileName(IList<QSO> qsos)
+        {
+            if (qsos != null && qsos.Count == 1 && qsos[0] != null && !string.IsNullOrWhiteSpace(qsos[0].DXCall))
+            {
+                string call = qsos[0].DXCall.Trim().ToUpperInvariant().Replace('/', '-');
+                foreach (char bad in System.IO.Path.GetInvalidFileNameChars()) call = call.Replace(bad, '-');
+                string date = (qsos[0].Date ?? string.Empty).Trim();
+                return string.IsNullOrEmpty(date) ? call + ".adi" : call + "_" + date + ".adi";
+            }
+            return string.Format(CultureInfo.InvariantCulture, "selection_{0:yyyyMMdd_HHmm}.adi", DateTime.Now);
+        }
+
         // A service checkbox. Disabled with a hint when that service's master switch - Options > LoTW /
         // eQSL / QRZ Services / Club Log, "Use ... for QSOs logging" - is off, so you can't queue to a
         // logger you have turned off. The left indent lives on the grid below, not here.
