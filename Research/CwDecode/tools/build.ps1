@@ -30,7 +30,8 @@ $plan = [ordered]@{
     "CsAnswers"     = @($net, $front)
     "LabelProbe"    = @($net)
     "NetDump"       = @($net)
-    "DumpEnvelope"  = @($decoder, $front)
+    "MakeCtcAudio"  = @()
+    "DumpFeatures"  = @($decoder)
 }
 
 foreach ($name in $plan.Keys) {

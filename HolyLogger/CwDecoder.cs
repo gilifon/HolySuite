@@ -196,6 +196,22 @@ namespace HolyLogger
         /// </summary>
         public event Action<string> Text;
 
+        /// <summary>
+        /// Every 5 ms reading, handed on as it is measured: which frequency is the note, and the
+        /// strength at every frequency the decoder looks at. For a second reader that wants to hear
+        /// what this one hears - the CTC network - and nothing else.
+        ///
+        /// THE ARRAY IS THE DECODER'S OWN and is overwritten by the next reading, so take what is
+        /// needed from it and do not keep it. Raised on the capture thread, like Text.
+        ///
+        /// WHY THE NETWORK READS THIS rather than a front end of its own: the network it replaces had
+        /// a front end that stretched time by the measured speed, so whenever the speed estimate was
+        /// wrong - and it is always wrong for the first seconds of a new station - the network was
+        /// shown CW at the wrong speed and misread it. These readings come at a fixed 5 ms whatever
+        /// anybody is sending, so the network learns speed itself instead of being told it.
+        /// </summary>
+        public event Action<int, double[]> Reading;
+
         public CwDecoder(int sampleRate)
         {
             _sampleRate = sampleRate < 4000 ? 8000 : sampleRate;
@@ -294,6 +310,9 @@ namespace HolyLogger
                 _bestBin = bestIndex;
 
             ToneHz = InterpolatedNote(_bestBin);
+
+            var reading = Reading;
+            if (reading != null) reading(_bestBin, _binPower);
 
             // Step 3: that note's LOUDNESS is the key, up or down.
             //
