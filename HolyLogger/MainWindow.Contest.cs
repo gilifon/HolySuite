@@ -44,6 +44,10 @@ namespace HolyLogger
 
         // Contest Mode follows the active log: a normal (day-by-day) log turns it off; a contest log
         // re-activates that contest without resetting its serial (event_type stores the contest Id).
+        //
+        // ANY TRACE OF A CONTEST IS CLEARED, not only the ContestMode flag. The flag, the saved
+        // contest id and the live ContestService can disagree, and a regular log must never be
+        // logged into as a contest, whichever of the three still remembers one.
         private void ApplyContestModeForActiveLog()
         {
             string eventType = null;
@@ -51,7 +55,7 @@ namespace HolyLogger
 
             if (string.IsNullOrWhiteSpace(eventType))
             {
-                if (Properties.Settings.Default.ContestMode) ExitContest();
+                if (AnyContestRemembered()) ExitContest();
                 return;
             }
 
@@ -66,10 +70,17 @@ namespace HolyLogger
                 ApplyContestExchangeUI();
                 UpdateDup();
             }
-            else if (Properties.Settings.Default.ContestMode)
+            else if (AnyContestRemembered())
             {
                 ExitContest();
             }
+        }
+
+        private static bool AnyContestRemembered()
+        {
+            return Properties.Settings.Default.ContestMode
+                   || !string.IsNullOrWhiteSpace(Properties.Settings.Default.ActiveContestId)
+                   || Contests.ContestService.Active != null;
         }
 
         // Contest Mode follows the active log, and the ONLY place to enter or leave it is

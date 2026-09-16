@@ -1523,10 +1523,12 @@ namespace HolyLogger
             if (CB_SuggestToggle != null)
                 CB_SuggestToggle.IsChecked = Properties.Settings.Default.CallsignSuggestionsEnabled;
 
-            // Restore the active contest (if any) selected in a previous session, then reflect the
-            // Contest Mode state in the Tools-menu header, trophy, and contest-name label.
-            Contests.ContestService.Activate(
-                Contests.ContestService.FindById(Properties.Settings.Default.ActiveContestId));
+            // CONTEST MODE AT STARTUP FOLLOWS THE LOG THAT OPENS, exactly as when a log is opened from
+            // the Log Manager. It used to be restored from the saved contest id alone, never asking
+            // the log: a regular log (Main_4Z5SL) opened with All Asian's exchange boxes on the form,
+            // so its QSOs would have been logged as contest QSOs. A contest log still resumes its
+            // contest, and its serial, through the same call.
+            ApplyContestModeForActiveLog();
             UpdateContestIndicator();
             ApplyContestExchangeUI();
 
