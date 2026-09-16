@@ -74,10 +74,27 @@ namespace HolyLogger
         // just readable by ear, high enough that noise never reaches it.
         const double SignalOverNoise = 6.0;
 
-        // How many dits and dahs must be heard before anything is written on screen at all. Eight is
-        // two or three characters - a moment's delay when a station starts, and far more structure
-        // than noise ever manages to keep up.
-        const int MarksNeededBeforeBelieving = 8;
+        // How many dits and dahs must be heard before anything is written on screen at all. Nothing
+        // is lost while waiting - the text is held and comes out together the moment the gate opens -
+        // but the operator sees a blank window while he can hear the station perfectly well, and he
+        // said so twice.
+        //
+        // EIGHT WAS COSTING SECONDS AND BUYING NOTHING. Swept over all three benches and over the
+        // wait itself, measured from the moment the signal is first heard to the first letter on
+        // screen, across his fourteen recordings:
+        //
+        //     marks   generated   his recordings   W1AW read   invented   average wait   worst
+        //       8      247/256        32/34          1006        328         4.0s        17.3s
+        //       6      247            32             1006        328         3.0s        11.1s
+        //       5      247            32             1006        328         2.6s        11.1s
+        //       4      247            32             1006        328         2.4s        11.1s   <- kept
+        //
+        // Not one of the three quality numbers moves. What guards the empty band was checked
+        // separately and separately, because that is what this constant was for: beacons.wav, three
+        // minutes of band noise and three beacons neither decoder can read, still prints NOTHING at
+        // four; session1.wav, eight minutes of a band that emptied, prints seventeen letters instead
+        // of fifteen. Two letters in eight minutes is what the other second and a half cost.
+        const int MarksNeededBeforeBelieving = 4;
 
         // The most held-back text kept while waiting to be sure. Eight marks is two or three
         // characters; this is generous, and it stops a long carrier quietly filling memory.
@@ -140,6 +157,46 @@ namespace HolyLogger
         // ms scored 217 of 256, twenty 231, twenty-five 241, thirty 235.
         const int ReadingsAveraged = 5;
 
+        // THE DIT AFTER A DAH IS THE ONE THAT GOES MISSING, and it is the only place a lower line is
+        // allowed to help.
+        //
+        // MEASURED, not reasoned. Twenty thousand words of W1AW's bulletin were lined up against the
+        // text ARRL publishes, and every word that came out wrong by exactly one element was traced
+        // to the element that went astray (MissedWhere.py). Fifty elements were lost. Forty-five of
+        // them were DITS. Thirty-two of those forty-five sat immediately after a DAH, although only
+        // a quarter of all dits do - and not one dit was lost after another dit. All thirty-eight
+        // elements judged the wrong length were DAHS heard as something shorter.
+        //
+        // One cause fits all of that: after a long key-down the sound comes back weaker - the
+        // receiver's own gain control ducking, which every Kiwi in the test and his own radio do. So
+        // the dit that follows a dah arrives under the line to START a mark, vanishes, and the
+        // silence left behind (dah, gap, gap) is read as a gap between letters. That is exactly how
+        // WIND came out WINTE and C (-.-.) came out T N.
+        //
+        // WHY THIS IS NOT THE LOWER LINE THAT WAS ALREADY THROWN OUT. That one lowered the line for
+        // every element inside a letter, and lost: an element that starts too easily also fails to
+        // END where it should, so elements bridge into one. This lowers it ONLY in the shadow of a
+        // dah - a couple of dits of silence - and nowhere else, so an element that is already under
+        // way is untouched and the letter gap is untouched.
+        // SWEPT ON ALL THREE BENCHES. The gain is small and it is free, which is the most that can
+        // be had here; anything bolder starts paying for it on the other two benches:
+        //
+        //     shadow line   generated   his recordings   W1AW read   invented
+        //       0.55 (off)   247/256        32/34           1001        335
+        //       0.50         247            32              1006        328   <- kept
+        //       0.45         243            32              1008        324
+        //       0.40         239            30              1010        318
+        //
+        // AND ONLY AFTER A DAH. Letting the lower line follow ANY mark reads six more words of the
+        // bulletin, and costs a case on the generated bench and a word on his own recordings - the
+        // measurement said the dah is where the loss is, and the bench agrees.
+        //
+        // The length of the shadow is not critical: 1.5 dits reads 1003, 2.5 reads 1006, and 4 or 8
+        // add two fewer invented words and nothing else. 2.5 is kept because it cannot reach past
+        // the gap between letters into the next one.
+        const double DahShadowDits = 2.5;        // how long after a dah the lower line applies
+        const double DahShadowOnFraction = 0.50; // the lower line, as a fraction of the loud-quiet span
+
         readonly int _sampleRate;
         readonly int _hopSamples;
         readonly int _windowSamples;
@@ -161,6 +218,7 @@ namespace HolyLogger
         bool _levelsSeeded;
 
         bool _keyDown;
+        bool _lastMarkWasDah;               // the dit right after a dah is the one that goes missing
         double _stateMs;                    // how long the current on/off stretch has lasted
         double _ditMs = 60.0;               // 20 WPM until the sending says otherwise
         readonly double[] _marks = new double[MarkMemory];
@@ -248,7 +306,7 @@ namespace HolyLogger
             Array.Clear(_levelHistory, 0, _levelHistory.Length);
             _windowFill = 0; _levelIndex = 0;
             _noiseFloor = 0; _peak = 0; _levelsSeeded = false;
-            _keyDown = false; _stateMs = 0;
+            _keyDown = false; _lastMarkWasDah = false; _stateMs = 0;
             _ditMs = 60.0;
             _markCount = 0; _markNext = 0;
             Array.Clear(_marks, 0, _marks.Length);
@@ -415,6 +473,7 @@ namespace HolyLogger
             {
                 FinishAnythingPending();
                 _keyDown = false;
+                _lastMarkWasDah = false;
                 _stateMs = 0;
                 return;
             }
@@ -474,7 +533,13 @@ namespace HolyLogger
             // END where it should, so two elements bridge into one, and that costs more characters
             // than the fading dit wins. DO NOT RETRY without a way to catch the weak element that
             // does not also weaken the gap - the gap and the mark are the same threshold here.
-            bool nowDown = _keyDown ? smoothed > offThreshold : smoothed > onThreshold;
+            // IN THE SHADOW OF A DAH the line to start a mark is lowered - see DahShadowDits above
+            // for the measurement that says this is where the lost dits are, and only here.
+            double startLine = onThreshold;
+            if (!_keyDown && _lastMarkWasDah && _stateMs <= _ditMs * DahShadowDits)
+                startLine = _noiseFloor + span * DahShadowOnFraction;
+
+            bool nowDown = _keyDown ? smoothed > offThreshold : smoothed > startLine;
 
             // HOW DEEPLY THE NOTE ACTUALLY SWITCHES OFF. Kept only to judge what we are hearing -
             // never to set the threshold above, which was tried and made fast sending far worse.
@@ -630,6 +695,7 @@ namespace HolyLogger
             _boundaryMs = boundary;
 
             bool isDah = lengthMs > boundary;
+            _lastMarkWasDah = isDah;
 
             // THE LENGTHS ARE KEPT, NOT THE DOTS AND DASHES, and the letter is only spelled out when
             // the gap after it says it is finished. By then a mark or two more has been heard, so the

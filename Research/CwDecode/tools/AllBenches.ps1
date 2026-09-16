@@ -50,7 +50,7 @@ foreach ($v in $Values) {
 
     "" | Out-File "$build\ab.txt" -Encoding utf8
     foreach ($who in $BulletinOnly.Split(",")) { & "$build\AbBul.exe" $bulletin $who | Out-File "$build\ab.txt" -Append -Encoding utf8 }
-    $b = & $py "$tools\ScoreText.py" "$recordings\w1aw_ARLP037.txt" "$build\ab.txt"
+    $b = & $py "$tools\ScoreText.py" "$recordings\w1aw\ARLP037.txt" "$build\ab.txt"
     $read = if ($b -match "READ (\d+) ") { [int]$Matches[1] } else { 0 }
     $invented = if ($b -match "INVENTED (\d+)") { [int]$Matches[1] } else { 0 }
 

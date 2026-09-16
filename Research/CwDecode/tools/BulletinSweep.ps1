@@ -31,6 +31,6 @@ foreach ($v in $Values) {
     [System.IO.File]::WriteAllText("$build\SwVar.cs", $src.Replace($Find, $line))
     & $csc /nologo /o /out:"$build\SwText.exe" "$tools\BulletinText.cs" "$build\SwVar.cs" 2>&1 | Select-Object -First 2
     if ($Only) { & "$build\SwText.exe" $bulletin $Only > "$build\sw.txt" } else { & "$build\SwText.exe" $bulletin > "$build\sw.txt" }
-    $score = & $py "$tools\ScoreText.py" "$recordings\w1aw_ARLP037.txt" "$build\sw.txt"
+    $score = & $py "$tools\ScoreText.py" "$recordings\w1aw\ARLP037.txt" "$build\sw.txt"
     "{0} = {1,-6} {2}" -f $Label, $v, $score
 }
