@@ -355,6 +355,16 @@ namespace HolyLogger.OptionsUserControls
             catch (Exception swallowed) { Log.Swallow(swallowed); }
         }
 
+        // The ADIF Monitor list. Like the UDP Ports table, it is re-read when the Options window closes.
+        private void BTN_AdifMonitor_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                new AdifMonitorWindow(Window.GetWindow(this)).ShowDialog();
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
         private static bool IsValidPort(string text)
         {
             int x;

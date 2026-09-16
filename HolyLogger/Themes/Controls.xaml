@@ -172,6 +172,48 @@
         </Setter>
     </Style>
 
+    <!-- Blue twin of the orange key above: same shape, same light-blue hover. Used where a window's
+         main "add" action should stand out from its Save/Cancel row. -->
+    <Style x:Key="BlueActionButtonStyle" TargetType="Button">
+        <Setter Property="Background" Value="#1565C0"/>
+        <Setter Property="Foreground" Value="#FFFFFF"/>
+        <Setter Property="FontWeight" Value="Bold"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Margin" Value="0,1,0,1"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="KeyOuter" CornerRadius="5" Background="#0B3A75" SnapsToDevicePixels="True" Padding="0,0,0,3">
+                        <Border x:Name="KeyFace" CornerRadius="5" BorderThickness="1" BorderBrush="#4A90E2" SnapsToDevicePixels="True" Background="{TemplateBinding Background}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="4,2,4,2"/>
+                        </Border>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="KeyOuter" Property="Background" Value="#1F5C8E"/>
+                            <Setter TargetName="KeyFace" Property="Background" Value="#A8D8FF"/>
+                            <Setter TargetName="KeyFace" Property="BorderBrush" Value="#3A80C8"/>
+                            <Setter Property="Foreground" Value="#000000"/>
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="KeyFace" Property="Margin" Value="0,2,0,0"/>
+                            <Setter TargetName="KeyOuter" Property="Padding" Value="0,2,0,1"/>
+                            <Setter TargetName="KeyFace" Property="Background" Value="#7DC0F5"/>
+                            <Setter Property="Foreground" Value="#000000"/>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="KeyOuter" Property="Background" Value="#888888"/>
+                            <Setter TargetName="KeyFace" Property="Background" Value="#E4E4E4"/>
+                            <Setter TargetName="KeyFace" Property="BorderBrush" Value="#B5B5B5"/>
+                            <Setter Property="Foreground" Value="#7A7A7A"/>
+                            <Setter Property="Opacity" Value="0.8"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <!-- ── THE HOUSE RIGHT-CLICK MENU ──────────────────────────────────────────────────────────
          Rounded card, red for anything that deletes. The log's menu and the Log Workshop's menu each
          parse their own private copy of a white-and-blue version of this at runtime; these keys are

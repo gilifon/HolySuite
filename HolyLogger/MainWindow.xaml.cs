@@ -1562,6 +1562,10 @@ namespace HolyLogger
             // priority - after the window has been drawn, not before.
             Dispatcher.BeginInvoke(new Action(ApplyUdpListeners),
                                    System.Windows.Threading.DispatcherPriority.Background);
+            // The ADIF files other programs write (Options > General > ADIF Monitor Manager). The first
+            // check adds the contacts made while HolyLogger was closed (MainWindow.AdifMonitor.cs).
+            Dispatcher.BeginInvoke(new Action(ApplyAdifMonitors),
+                                   System.Windows.Threading.DispatcherPriority.Background);
 
             Log.Step("loaded: END of the startup work");
 
@@ -10613,6 +10617,9 @@ namespace HolyLogger
             // Close and dispose the UDP listeners (one per port in the UDP Ports table)
             try { CloseUdpListeners(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
 
+            // Stop checking the monitored ADIF files
+            try { StopAdifMonitors(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+
             // Close cluster WebSocket
             try { CloseClusterWebSocket(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
 
@@ -11760,6 +11767,8 @@ namespace HolyLogger
             // Open, close or move the UDP listeners to match the UDP Ports table, which the
             // operator may have just changed (see MainWindow.Udp.cs).
             ApplyUdpListeners();
+            // Same for the ADIF Monitor list.
+            ApplyAdifMonitors();
 
             NetworkFlagItem.Visibility = Properties.Settings.Default.ShowNetworkFlag ? Visibility.Visible : Visibility.Collapsed;
             // Lock via IsReadOnly (not IsEnabled) so the field keeps full opacity — a disabled TextBox

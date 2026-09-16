@@ -116,9 +116,18 @@
                    Foreground="Gray" TextWrapping="Wrap" Width="380"
                    Text="Receive information from other software, and send yours out to it."/>
 
+        <!-- ADIF MONITOR. For programs that write each contact to an ADIF file of their own (WSJT-X and
+             the like): the files listed there are watched and their new contacts added to the log. -->
+        <Button x:Name="BTN_AdifMonitor" Content="ADIF Monitor Manager" Style="{StaticResource OrangeActionButtonStyle}"
+                HorizontalAlignment="Left" VerticalAlignment="Top" Width="190" Height="32"
+                Margin="0,546,0,0" FontSize="16" Click="BTN_AdifMonitor_Click"/>
+        <TextBlock HorizontalAlignment="Left" VerticalAlignment="Top" Margin="200,551,0,0" FontSize="16"
+                   Foreground="Gray" TextWrapping="Wrap" Width="380"
+                   Text="Add new contacts from ADIF files other software writes."/>
+
         <!-- Audio Alerts: both sound options plus a single shared output-device picker, so alerts can
              go to the speakers instead of a USB radio codec. Left-justified with the checkboxes. -->
-        <GroupBox Header="Audio Alerts" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,541,0,0" Width="580" FontSize="16">
+        <GroupBox Header="Audio Alerts" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,603,0,0" Width="580" FontSize="16">
             <StackPanel Margin="4,4,4,4">
                 <!-- Beep when typing -->
                 <CheckBox x:Name="CBX_NonEnglishKeyBeep" HorizontalAlignment="Left" IsChecked="{Binding Default.NonEnglishKeyBeep, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16" Margin="0,2,0,0" Click="HasChanged_Click">
