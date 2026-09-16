@@ -1,8 +1,10 @@
 ﻿using System;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
 using System.Windows.Media;
+using System.Xml.Linq;
 
 namespace HolyLogger
 {
@@ -76,6 +78,13 @@ namespace HolyLogger
         static readonly Brush CallsignInk = Brushes.White;
         static readonly Brush CallsignPatch = Frozen(Color.FromRgb(0x00, 0x77, 0xCC));
 
+        // GREEN MEANS QRZ.COM KNOWS IT. Blue says only "shaped like a callsign", and the decoder can
+        // make a wrong one look every bit as right - 4Z5SR for 4Z5SL. A callsign with a QRZ record
+        // is far more likely to be what was sent, so it is checked by itself as it is decoded and
+        // turns green when QRZ answers yes. Still an offer and not an answer: a misread can land on
+        // somebody else's real call. Stays blue when QRZ says no, and when it cannot be asked.
+        static readonly Brush RegisteredPatch = Frozen(Color.FromRgb(0x1E, 0x8E, 0x3E));
+
         static Brush Frozen(Color colour)
         {
             var brush = new SolidColorBrush(colour);
@@ -134,11 +143,13 @@ namespace HolyLogger
                 LineHeight = double.NaN
             };
             _box.MouseDoubleClick += OnDoubleClick;
+            _box.ContextMenuOpening += OnContextMenuOpening;
         }
 
         public void Clear()
         {
             _paragraph.Inlines.Clear();
+            QrzLookup.ForgetAll();
             _word = null;
             _atLineStart = true;
             _handedOverAt = DateTime.MinValue;
@@ -380,8 +391,25 @@ namespace HolyLogger
             word.FontWeight = FontWeights.Bold;
             word.Tag = call;
             word.Cursor = System.Windows.Input.Cursors.Hand;
-            word.ToolTip = "Double-click to put " + call + " in the DX Callsign box";
+            word.ToolTip = "Double-click to put " + call + " in the DX Callsign box.\nRight-click to check it on QRZ.com.";
+
+            if (QrzLookup.HasLogin) MarkIfRegistered(word, call);
             return false;
+        }
+
+        // Asks QRZ.com in the background and turns the patch green if it knows the callsign. The text
+        // keeps coming while it asks; a word already trimmed off the top by then is simply not seen.
+        async void MarkIfRegistered(Run word, string call)
+        {
+            try
+            {
+                QrzResult result = await QrzLookup.CheckAsync(call);
+                if (result.Answer != QrzAnswer.Registered) return;
+
+                word.Background = RegisteredPatch;
+                word.ToolTip = call + " is registered on QRZ.com.\nDouble-click to put it in the DX Callsign box.\nRight-click to see it.";
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
         }
 
         // Anything the operator double-clicks that was marked as a callsign goes to the log. A
@@ -406,18 +434,470 @@ namespace HolyLogger
             catch (Exception swallowed) { Log.Swallow(swallowed); }
         }
 
+        // A RIGHT-CLICK ON A CALLSIGN SHOWS WHETHER QRZ.COM KNOWS IT. The blue patch only says
+        // "shaped like a callsign"; a QRZ record is a quick hint that the decoder read it right -
+        // 4Z5SR with no record is probably 4Z5SL misheard. No menu in between: the right-click IS the
+        // question. Anywhere else the box keeps its usual menu.
+        void OnContextMenuOpening(object sender, ContextMenuEventArgs e)
+        {
+            try
+            {
+                var position = _box.GetPositionFromPoint(System.Windows.Input.Mouse.GetPosition(_box), false);
+                var run = position == null ? null : position.Parent as Run;
+                if (run == null || run.Tag == null) return;
+
+                string call = run.Tag.ToString().Trim().ToUpperInvariant();
+                if (call.Length == 0) return;
+
+                e.Handled = true;
+                QrzCallsignWindow.Open(call, Window.GetWindow(_box));
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
         // The document is trimmed from the front, so the newest text is always kept and a window
         // left open all evening never becomes the reason the program is slow.
         void Trim()
         {
             if (_paragraph.Inlines.Count <= MostBlocks) return;
 
+            var gone = new System.Collections.Generic.List<string>();
+
             for (int i = 0; i < BlocksTrimmedAtOnce && _paragraph.Inlines.Count > 0; i++)
             {
                 var first = _paragraph.Inlines.FirstInline;
                 if (first == null || ReferenceEquals(first, _word)) break;
+                if (first.Tag != null) gone.Add(first.Tag.ToString());
                 _paragraph.Inlines.Remove(first);
             }
+
+            // Its QRZ answer goes with it - unless the same callsign is still further down the text,
+            // as it usually is for the station being worked, which sends it over after over.
+            foreach (string call in gone)
+            {
+                bool stillThere = false;
+                foreach (Inline left in _paragraph.Inlines)
+                    if (left.Tag != null && string.Equals(left.Tag.ToString(), call, StringComparison.OrdinalIgnoreCase))
+                    { stillThere = true; break; }
+
+                if (!stillThere) QrzLookup.Forget(call);
+            }
+        }
+    }
+
+    // A SMALL CARD SAYING WHETHER QRZ.COM KNOWS A CALLSIGN - opened by right-clicking a blue callsign
+    // in the decoded text.
+    //
+    // Not the QRZ web page: that is a full browser window over the logging screen, when all the
+    // operator wants to know is "is this a real station?". The photo, name, town and country answer
+    // that at a glance, and the card is gone with Esc.
+    //
+    // It uses the same QRZ login as the DX Callsign lookup (Options), through the XML service, so no
+    // browser is involved. Without a login there is no way to ask, and the web page opens instead.
+    //
+    // It lives in this file rather than its own only because the project file could not be edited
+    // while Visual Studio had it open; it can move to QrzCallsignWindow.cs at any time.
+    public class QrzCallsignWindow : Window
+    {
+        static readonly Brush HeaderPatch = Frozen(Color.FromRgb(0x00, 0x77, 0xCC));
+        static readonly Brush FoundInk = Frozen(Color.FromRgb(0x1E, 0x8E, 0x3E));
+        static readonly Brush NotFoundInk = Frozen(Color.FromRgb(0xC6, 0x28, 0x28));
+        static readonly Brush LabelInk = Frozen(Color.FromRgb(0x6B, 0x75, 0x80));
+        static readonly Brush ValueInk = Frozen(Color.FromRgb(0x1E, 0x2A, 0x34));
+        static readonly Brush PhotoFrame = Frozen(Color.FromRgb(0xD5, 0xDB, 0xE1));
+
+        static Brush Frozen(Color colour)
+        {
+            var brush = new SolidColorBrush(colour);
+            brush.Freeze();
+            return brush;
+        }
+
+        // One card at a time. Right-clicking another callsign while it is open shows that one in the
+        // same card, instead of stacking a pile of them over the decoder.
+        static QrzCallsignWindow _open;
+
+        readonly TextBlock _callText, _status;
+        Button _fullPage;
+        readonly Image _photo;
+        readonly Border _photoFrame;
+        readonly StackPanel _details;
+        string _call;
+        int _revision;
+
+        public static void Open(string call, Window owner)
+        {
+            if (!QrzLookup.HasLogin)
+            {
+                OpenWebPage(call);
+                return;
+            }
+
+            if (_open == null)
+            {
+                _open = new QrzCallsignWindow();
+                if (owner != null && owner.IsVisible)
+                {
+                    _open.Owner = owner;
+                    _open.WindowStartupLocation = WindowStartupLocation.CenterOwner;
+                }
+                else _open.WindowStartupLocation = WindowStartupLocation.CenterScreen;
+                _open.Closed += (s, a) => _open = null;
+                _open.Lookup(call);
+                _open.Show();
+            }
+            else
+            {
+                _open.Lookup(call);
+                _open.Activate();
+            }
+        }
+
+        static void OpenWebPage(string call)
+        {
+            try { System.Diagnostics.Process.Start("https://www.qrz.com/db/" + call); }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        QrzCallsignWindow()
+        {
+            Title = "QRZ.com";
+            Width = 460;
+            SizeToContent = SizeToContent.Height;
+            ResizeMode = ResizeMode.NoResize;
+            ShowInTaskbar = false;
+            Background = Brushes.White;
+            FontSize = 16;
+
+            _callText = new TextBlock
+            {
+                FontSize = 28,
+                FontWeight = FontWeights.Bold,
+                Foreground = Brushes.White,
+                FontFamily = new FontFamily("Consolas")
+            };
+            var header = new Border
+            {
+                Background = HeaderPatch,
+                Padding = new Thickness(16, 10, 16, 10),
+                Child = _callText
+            };
+
+            _status = new TextBlock
+            {
+                FontSize = 18,
+                FontWeight = FontWeights.SemiBold,
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(16, 12, 16, 4)
+            };
+
+            _photo = new Image { Stretch = Stretch.Uniform, MaxWidth = 130, MaxHeight = 160 };
+            _photoFrame = new Border
+            {
+                BorderBrush = PhotoFrame,
+                BorderThickness = new Thickness(1),
+                Padding = new Thickness(3),
+                Margin = new Thickness(0, 0, 14, 0),
+                VerticalAlignment = VerticalAlignment.Top,
+                Child = _photo,
+                Visibility = Visibility.Collapsed
+            };
+
+            _details = new StackPanel();
+
+            var body = new DockPanel { Margin = new Thickness(16, 8, 16, 8) };
+            DockPanel.SetDock(_photoFrame, Dock.Left);
+            body.Children.Add(_photoFrame);
+            body.Children.Add(_details);
+
+            var fullPage = new Button
+            {
+                Content = "Full QRZ.com page",
+                Padding = new Thickness(12, 4, 12, 4),
+                Margin = new Thickness(0, 0, 8, 0)
+            };
+            fullPage.Click += (s, a) => OpenWebPage(_call);
+            _fullPage = fullPage;
+
+            var close = new Button { Content = "Close", Padding = new Thickness(18, 4, 18, 4), IsCancel = true };
+            close.Click += (s, a) => Close();
+
+            var buttons = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                HorizontalAlignment = HorizontalAlignment.Right,
+                Margin = new Thickness(16, 8, 16, 14)
+            };
+            buttons.Children.Add(fullPage);
+            buttons.Children.Add(close);
+
+            var page = new StackPanel();
+            page.Children.Add(header);
+            page.Children.Add(_status);
+            page.Children.Add(body);
+            page.Children.Add(buttons);
+            Content = page;
+        }
+
+        async void Lookup(string call)
+        {
+            int revision = ++_revision;
+            _call = call;
+            Title = "QRZ.com - " + call;
+            _callText.Text = call;
+            _status.Text = "Looking up on QRZ.com...";
+            _status.Foreground = LabelInk;
+            _details.Children.Clear();
+            _photo.Source = null;
+            _photoFrame.Visibility = Visibility.Collapsed;
+            _fullPage.Visibility = Visibility.Visible;
+
+            try
+            {
+                QrzResult result = await QrzLookup.CheckAsync(call);
+                if (revision != _revision) return;
+
+                if (result.Answer == QrzAnswer.CouldNotAsk)
+                {
+                    _status.Text = "QRZ.com could not be reached.";
+                    _status.Foreground = LabelInk;
+                    return;
+                }
+
+                if (result.Answer == QrzAnswer.NotRegistered)
+                {
+                    _status.Text = "Not a QRZ.COM registered callsign";
+                    _status.Foreground = NotFoundInk;
+                    _fullPage.Visibility = Visibility.Collapsed;
+                    return;
+                }
+
+                ShowRecord(result.Record);
+            }
+            catch (Exception swallowed)
+            {
+                Log.Swallow(swallowed);
+                if (revision != _revision) return;
+                _status.Text = "QRZ.com could not be reached.";
+                _status.Foreground = LabelInk;
+            }
+        }
+
+        void ShowRecord(XElement record)
+        {
+            XNamespace ns = record.Name.Namespace;
+            Func<string, string> field = tag => ((string)record.Element(ns + tag) ?? string.Empty).Trim();
+
+            string found = field("call").ToUpperInvariant();
+            if (found.Length > 0 && !string.Equals(found, _call, StringComparison.OrdinalIgnoreCase))
+                _callText.Text = _call + "  (" + found + ")";
+
+            _status.Text = "✔ Registered on QRZ.com";
+            _status.Foreground = FoundInk;
+
+            string name = (field("fname") + " " + field("name")).Trim();
+            string nickname = field("nickname");
+            if (nickname.Length > 0 && name.IndexOf(nickname, StringComparison.OrdinalIgnoreCase) < 0)
+                name += " \"" + nickname + "\"";
+
+            AddRow("Name", name);
+            AddRow("Town", field("addr2"));
+            AddRow("State", field("state"));
+            AddRow("Country", field("country"));
+            AddRow("Grid", field("grid").ToUpperInvariant());
+
+            string image = field("image");
+            if (image.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+            {
+                try
+                {
+                    var bitmap = new System.Windows.Media.Imaging.BitmapImage();
+                    bitmap.BeginInit();
+                    bitmap.UriSource = new Uri(image);
+                    bitmap.DecodePixelWidth = 260;
+                    bitmap.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
+                    bitmap.EndInit();
+                    bitmap.DownloadFailed += (s, a) => _photoFrame.Visibility = Visibility.Collapsed;
+                    _photo.Source = bitmap;
+                    _photoFrame.Visibility = Visibility.Visible;
+                }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
+            }
+        }
+
+        void AddRow(string label, string value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return;
+
+            var row = new StackPanel { Margin = new Thickness(0, 0, 0, 6) };
+            row.Children.Add(new TextBlock { Text = label, Foreground = LabelInk, FontSize = 16 });
+            row.Children.Add(new TextBlock
+            {
+                Text = value,
+                Foreground = ValueInk,
+                FontSize = 18,
+                FontWeight = FontWeights.SemiBold,
+                TextWrapping = TextWrapping.Wrap
+            });
+            _details.Children.Add(row);
+        }
+    }
+
+    public enum QrzAnswer { Registered, NotRegistered, CouldNotAsk }
+
+    public sealed class QrzResult
+    {
+        public QrzAnswer Answer;
+        public XElement Record;         // the QRZ record when Registered, otherwise null
+    }
+
+    // DOES QRZ.COM KNOW THIS CALLSIGN? Asked ONCE per callsign per session, and the one answer is
+    // shared by the green patch in the decoded text and the card behind the right-click.
+    //
+    // ONCE, because the decoder offers the same callsign over and over - he sends it at the start of
+    // every over and the other station reads it back - and each of those must not be a trip to QRZ.
+    // The card then opens instantly, because the answer is already here.
+    //
+    // "COULD NOT ASK" IS NEVER REMEMBERED. No network for a minute must not leave a callsign blue for
+    // the rest of the evening; the next time it is decoded it is asked again. Only QRZ's real
+    // answers - registered, or not - are kept.
+    public static class QrzLookup
+    {
+        static readonly System.Net.Http.HttpClient Http =
+            new System.Net.Http.HttpClient { Timeout = TimeSpan.FromSeconds(15) };
+
+        // AN ANSWER IS KEPT ONLY WHILE ITS CALLSIGN IS STILL IN THE DECODED TEXT. The operator's idea,
+        // and better than any fixed limit: the window already throws its oldest text away once it
+        // grows long, and a callsign gone from the window can no longer be right-clicked, so there is
+        // nothing left to remember it for. See Forget, called as the window trims and clears. The
+        // list can therefore never hold more callsigns than the window can show, however long the
+        // decoder runs. Text that has merely scrolled out of sight is still in the window - he can
+        // scroll back and right-click it - so it is kept.
+        static readonly object Gate = new object();
+        static readonly System.Collections.Generic.Dictionary<string, Task<QrzResult>> Asked =
+            new System.Collections.Generic.Dictionary<string, Task<QrzResult>>(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>The callsign has left the decoded text; its answer is no longer needed.</summary>
+        public static void Forget(string call)
+        {
+            if (string.IsNullOrWhiteSpace(call)) return;
+            lock (Gate) Asked.Remove(call.Trim().ToUpperInvariant());
+        }
+
+        /// <summary>The decoded text was cleared; nothing in it needs an answer any more.</summary>
+        public static void ForgetAll()
+        {
+            lock (Gate) Asked.Clear();
+        }
+
+        // One login for the whole session, shared by every lookup running at once. QRZ keys last
+        // hours; when one expires the lookup is asked again once with a fresh key.
+        static string _sessionKey;
+        static Task<string> _loggingIn;
+
+        /// <summary>Is there a QRZ login in Options to ask with? Without one nothing can be checked.</summary>
+        public static bool HasLogin
+        {
+            get
+            {
+                return !string.IsNullOrWhiteSpace(Properties.Settings.Default.qrz_username)
+                       && !string.IsNullOrWhiteSpace(Properties.Settings.Default.qrz_password);
+            }
+        }
+
+        public static Task<QrzResult> CheckAsync(string call)
+        {
+            call = (call ?? string.Empty).Trim().ToUpperInvariant();
+            lock (Gate)
+            {
+                Task<QrzResult> asked;
+                if (Asked.TryGetValue(call, out asked)) return asked;
+                asked = AskAsync(call);
+                Asked[call] = asked;
+                return asked;
+            }
+        }
+
+        static async Task<QrzResult> AskAsync(string call)
+        {
+            QrzResult result;
+            try
+            {
+                result = await FindAsync(call);
+
+                // A stroke call often has no record of its own - BW/JA1APE is filed under JA1APE.
+                string bare = HolyParser.Services.getBareCallsign(call);
+                if (result.Answer == QrzAnswer.NotRegistered
+                    && !string.IsNullOrEmpty(bare)
+                    && !string.Equals(bare, call, StringComparison.OrdinalIgnoreCase))
+                    result = await FindAsync(bare);
+            }
+            catch (Exception swallowed)
+            {
+                Log.Swallow(swallowed);
+                result = new QrzResult { Answer = QrzAnswer.CouldNotAsk };
+            }
+
+            if (result.Answer == QrzAnswer.CouldNotAsk)
+                lock (Gate) Asked.Remove(call);
+
+            return result;
+        }
+
+        static async Task<string> SessionKeyAsync()
+        {
+            Task<string> login;
+            lock (Gate)
+            {
+                if (!string.IsNullOrEmpty(_sessionKey)) return _sessionKey;
+                if (_loggingIn == null) _loggingIn = Helper.LoginToQRZAsync();
+                login = _loggingIn;
+            }
+
+            string key = await login;
+            lock (Gate)
+            {
+                if (ReferenceEquals(_loggingIn, login)) _loggingIn = null;   // a failed login is tried again next time
+                if (!string.IsNullOrEmpty(key)) _sessionKey = key;
+            }
+            return key;
+        }
+
+        static async Task<QrzResult> FindAsync(string call)
+        {
+            for (int attempt = 0; attempt < 2; attempt++)
+            {
+                string key = await SessionKeyAsync();
+                if (string.IsNullOrEmpty(key)) return new QrzResult { Answer = QrzAnswer.CouldNotAsk };
+
+                string url = "https://xmldata.qrz.com/xml/current/?s=" + key
+                             + ";callsign=" + Uri.EscapeDataString(call);
+                string xml = await Task.Run(() => Http.GetStringAsync(url));
+
+                XDocument doc = XDocument.Parse(xml);
+                XNamespace ns = doc.Root.GetDefaultNamespace();
+
+                XElement record = doc.Root.Element(ns + "Callsign");
+                if (record != null) return new QrzResult { Answer = QrzAnswer.Registered, Record = record };
+
+                XElement session = doc.Root.Element(ns + "Session");
+                string error = session == null ? null : (string)session.Element(ns + "Error");
+                bool keyGone = session == null || session.Element(ns + "Key") == null;
+
+                if (!string.IsNullOrEmpty(error) && error.StartsWith("Not found", StringComparison.OrdinalIgnoreCase))
+                    return new QrzResult { Answer = QrzAnswer.NotRegistered };
+
+                // An expired or refused key: log in again and ask once more.
+                if (keyGone && attempt == 0)
+                {
+                    lock (Gate) { if (_sessionKey == key) _sessionKey = null; }
+                    continue;
+                }
+
+                return new QrzResult { Answer = QrzAnswer.CouldNotAsk };
+            }
+
+            return new QrzResult { Answer = QrzAnswer.CouldNotAsk };
         }
     }
 }
