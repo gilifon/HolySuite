@@ -1,4 +1,10 @@
-# Scores one value of one constant on ALL THREE benches at once.
+# Scores one value of one constant on ALL FOUR benches at once.
+#
+# THE FOURTH, 4Z5SL: the operator's own IC-7610 at 30 W on 7028, keyed from HolyLogger's CW keyer
+# on 16 September 2026, heard in Austria, Czechia and Hungary through public KiwiSDRs. Every letter
+# sent is known (recordings\4z5sl\SENT.txt), and the recordings are cut to his transmission, so the
+# other stations on the frequency - IK5WOB calling CQ before, G0BQV after - are not counted against
+# the decoder. His own radio, keying and path: the closest of the four to what he actually runs.
 #
 # WHY ALL THREE, AND NEVER ONE ALONE. Tuned on W1AW's bulletin by itself, the two keying thresholds
 # looked like a triumph - 2102 words read up to 2398, invented words 1186 down to 690. On the
@@ -23,6 +29,7 @@ $build = Join-Path $tools "..\build"
 $app = Join-Path $tools "..\..\..\HolyLogger"
 $recordings = Join-Path $tools "..\recordings"
 $bulletin = Join-Path $tools "..\training\w1aw\20260915-bulletin0000"
+$own = Join-Path $recordings "4z5sl"
 $py = "C:\Users\user\AppData\Local\Temp\claude\D--Dropbox-LAB-X230-PC-Holysuit-clone-HolySuite\2f8ddf56-5512-4cdb-af92-2976c1b4bafc\scratchpad\pyenv\Scripts\python.exe"
 $csc = "C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
 $src = [System.IO.File]::ReadAllText((Join-Path $app "CwDecoder.cs"))
@@ -54,5 +61,11 @@ foreach ($v in $Values) {
     $read = if ($b -match "READ (\d+) ") { [int]$Matches[1] } else { 0 }
     $invented = if ($b -match "INVENTED (\d+)") { [int]$Matches[1] } else { 0 }
 
-    "{0} = {1,-8} generated {2,3}/{3}   his recordings {4,3}/34   W1AW read {5,5}  invented {6,5}" -f $Label, $v, $pass, $tot, $real, $read, $invented
+    & "$build\AbBul.exe" $own | Out-File "$build\own.txt" -Encoding utf8
+    $o = & $py "$tools\ScoreText.py" "$own\SENT.txt" "$build\own.txt"
+    $ownRead = 0; $ownOf = 0; $ownInvented = 0
+    if ($o -match "READ (\d+) of (\d+)") { $ownRead = [int]$Matches[1]; $ownOf = [int]$Matches[2] }
+    if ($o -match "INVENTED (\d+)") { $ownInvented = [int]$Matches[1] }
+
+    "{0} = {1,-8} generated {2,3}/{3}   his recordings {4,3}/34   W1AW read {5,5}  invented {6,5}   4Z5SL read {7,3}/{8}  invented {9,3}" -f $Label, $v, $pass, $tot, $real, $read, $invented, $ownRead, $ownOf, $ownInvented
 }

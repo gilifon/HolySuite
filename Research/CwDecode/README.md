@@ -46,13 +46,25 @@ receivers by distance from Newington; some cut every listener off after ten seco
 relying on one. `KiwiRecord.py` opens "kiwi/<stamp>/SND" - kiwiclient's own path is answered with
 silence by firmware 1.902.
 
+## recordings/4z5sl/ - his own transmission, text known
+
+4Z5SL's IC-7610 at 30 W on 7028 kHz, keyed from HolyLogger's CW keyer (Ctrl+K) on 16 September 2026
+at about 20:37 UTC, recorded at once on public KiwiSDRs in Austria (OE3AKB), Czechia (OK1DEK) and
+Hungary (HG5ACZ). `SENT.txt` is exactly what went out: part 1 three times (at different speeds), then
+part 3 - part 2 was never sent. Each file is cut to his transmission, so IK5WOB calling CQ before it
+and G0BQV after it are not counted. Standing score: 85 of 337 words read, 246 invented.
+
+To record another session: pick receivers from the public list by distance from Israel, test them
+with a 15-second `KiwiRecord.py` first (about one in three refuse), start them all recording, then
+he sends. Next time send all three parts, on a quieter frequency.
+
 ## NEVER TUNE ON ONE BENCH
 
 Tuned on the bulletin alone, the two keying thresholds looked like a triumph: words read 2102 ->
 2398, invented 1186 -> 690. The same change scored 188 of 256 on the generated bench instead of 247,
 and 12 of 34 on the operator's own recordings instead of 32. The bulletin comes through internet
 receivers with their own AGC and audio path; tuning to it alone fits the decoder to somebody else's
-radio. `AllBenches.ps1` scores all three at once and is the only honest way to judge a change.
+radio. `AllBenches.ps1` scores all four at once and is the only honest way to judge a change.
 
 ## tools/
 
