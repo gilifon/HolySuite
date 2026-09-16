@@ -47,7 +47,8 @@ namespace HolyLogger.OptionsUserControls
             BandGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(160) });
             BandGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(80) });
             BandGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(80) });
-            BandGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(80) });
+            // 110, not 80: the bold "RTTY (kHz)" header is wider than the others and 80 cut off its ")".
+            BandGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(110) });
 
             AddHeaderRow();
 
@@ -156,11 +157,13 @@ namespace HolyLogger.OptionsUserControls
 
         /// <summary>
         /// Reads every box back into the band list and stores it. A box that does not hold a whole
-        /// number of kHz is put back to the value it had, rather than saved as nothing.
+        /// number of kHz is put back to the value it had, rather than saved as nothing - and so is one
+        /// outside its band's edges (the same edges that light the band button on the panel).
         /// </summary>
         public void SaveAll()
         {
             bool changed = false;
+            string rejected = null;
 
             for (int i = 0; i < _bands.Count; i++)
             {
@@ -171,9 +174,21 @@ namespace HolyLogger.OptionsUserControls
                     changed = true;
                 }
 
-                changed |= ReadBox(_ssbBoxes[i], value => _bands[i].SsbKhz = value, _bands[i].SsbKhz);
-                changed |= ReadBox(_cwBoxes[i], value => _bands[i].CwKhz = value, _bands[i].CwKhz);
-                changed |= ReadBox(_rttyBoxes[i], value => _bands[i].RttyKhz = value, _bands[i].RttyKhz);
+                changed |= ReadBox(_ssbBoxes[i], _bands[i], value => _bands[i].SsbKhz = value, _bands[i].SsbKhz, ref rejected);
+                changed |= ReadBox(_cwBoxes[i], _bands[i], value => _bands[i].CwKhz = value, _bands[i].CwKhz, ref rejected);
+                changed |= ReadBox(_rttyBoxes[i], _bands[i], value => _bands[i].RttyKhz = value, _bands[i].RttyKhz, ref rejected);
+            }
+
+            // The message stays until the next save that rejects nothing, so it is still there to
+            // read after focus has moved on to the next box.
+            if (rejected != null)
+            {
+                TB_OutOfBand.Text = rejected;
+                TB_OutOfBand.Visibility = Visibility.Visible;
+            }
+            else
+            {
+                TB_OutOfBand.Visibility = Visibility.Collapsed;
             }
 
             if (!changed) return;
@@ -182,11 +197,19 @@ namespace HolyLogger.OptionsUserControls
             HasChanged = true;
         }
 
-        private static bool ReadBox(TextBox box, Action<int> set, int current)
+        private static bool ReadBox(TextBox box, RadioBandPreset band, Action<int> set, int current, ref string rejected)
         {
             string typed = (box.Text ?? string.Empty).Trim();
             if (int.TryParse(typed, NumberStyles.Integer, CultureInfo.InvariantCulture, out int khz) && khz > 0)
             {
+                if (!band.Contains(khz))
+                {
+                    rejected = khz.ToString(CultureInfo.InvariantCulture) + " is outside the " + band.Name + " band ("
+                        + band.LowKhz.ToString(CultureInfo.InvariantCulture) + " - "
+                        + band.HighKhz.ToString(CultureInfo.InvariantCulture) + " kHz). Not saved.";
+                    box.Text = current.ToString(CultureInfo.InvariantCulture);
+                    return false;
+                }
                 if (khz == current) return false;
                 set(khz);
                 return true;
