@@ -60,6 +60,14 @@ namespace HolyLogger
             // alongside, so it still learns to keep going for minutes on end.
             double shortShare = args.Length > 4 ? double.Parse(args[4], CultureInfo.InvariantCulture) : 0.0;
 
+            // The receiver's AGC - see Agc. How many examples get it, and how high above the band its
+            // ceiling may sit, in tens. Set from measurement against the real recordings.
+            if (args.Length > 5) AgcShare = double.Parse(args[5], CultureInfo.InvariantCulture);
+            if (args.Length > 6) AgcLow = double.Parse(args[6], CultureInfo.InvariantCulture);
+            if (args.Length > 7) AgcHigh = double.Parse(args[7], CultureInfo.InvariantCulture);
+            if (args.Length > 8) StrengthLow = double.Parse(args[8], CultureInfo.InvariantCulture);
+            if (args.Length > 9) StrengthHigh = double.Parse(args[9], CultureInfo.InvariantCulture);
+
             Directory.CreateDirectory(outFolder);
 
             var beds = new List<short[]>();
@@ -93,7 +101,19 @@ namespace HolyLogger
                 };
 
                 double tone = 400 + rnd.NextDouble() * 400;
-                double strength = nothing ? 0.0 : Math.Pow(10, -0.85 * rnd.NextDouble());
+                // AS STRONG AS THE REAL BAND, AND NO STRONGER - measured, not chosen.
+                //
+                // On the features the network hears, the key-down level of every real recording stands
+                // 0.9 to 1.5 above key-up (median 1.21), even for a station at half of full scale; plain
+                // band noise alone spreads about 0.5, and nothing under about 0.9 is readable. The
+                // practice audio's strong signals stood 1.6 to 2.8 above - up to five hundred times - so
+                // nearly all of it lay outside the one window where real readable CW lives, and the
+                // network that learned from it misread clean strong real stations: U4TQR for V4TQ.
+                //
+                // An AGC was tried first and changed nothing (depth 2.49 without it, 2.13 at its
+                // hardest): it turns the signal and the noise between its elements down together, so
+                // the contrast inside a transmission stays where it was.
+                double strength = nothing ? 0.0 : Math.Pow(10, StrengthLow + (StrengthHigh - StrengthLow) * rnd.NextDouble());
                 double fadeDepth = rnd.NextDouble() * 0.7;
                 double fadeSeconds = 2 + rnd.NextDouble() * 8;
                 bool flutter = rnd.NextDouble() < 0.4;
@@ -326,9 +346,58 @@ namespace HolyLogger
             }
 
             int at = rnd.Next(Math.Max(1, bed.Length - key.Count));
+            var mixed = new double[audio.Length];
+            double bedAbs = 0;
             for (int i = 0; i < audio.Length; i++)
-                audio[i] = Clip(audio[i] + (double)bed[(at + i) % bed.Length]);
+            {
+                double b = bed[(at + i) % bed.Length];
+                mixed[i] = audio[i] + b;
+                bedAbs += Math.Abs(b);
+            }
+            bedAbs = Math.Max(1.0, bedAbs / Math.Max(1, audio.Length));
+
+            if (rnd.NextDouble() < AgcShare) Agc(mixed, bedAbs, rnd);
+
+            for (int i = 0; i < audio.Length; i++) audio[i] = Clip(mixed[i]);
             return audio;
+        }
+
+        // THE RADIO'S AGC, which the practice audio did not have and the real band always does.
+        //
+        // Measured on the five numbers the network hears: on every real recording the key-down level
+        // stands 0.9 to 1.5 above the key-up level (in tens: ten to thirty times louder), even on a
+        // station at half of full scale. The strong practice signals stood 1.9 to 2.7 above - up to five
+        // hundred times. The receiver does that: it turns a loud signal down to a set level above the
+        // noise and no further. So on the real band a strong station looks clean but MODERATE, a thing
+        // the network had never practised on - in practice audio, moderate contrast only ever came with
+        // plenty of noise - and it misread the clean strong ones: U4TQR for V4TQ.
+        //
+        // So here the mix goes through the same kind of thing: a level follower that rises in a few
+        // milliseconds and falls back over tens to hundreds, and a gain that holds whatever is louder
+        // than a ceiling down to the ceiling. The band noise itself sits under the ceiling and passes
+        // untouched - it was recorded through the real AGC already. The ceiling is set a random amount
+        // above the band, so how much a strong station is squashed varies from example to example the
+        // way it varies between stations. Weak signals under the ceiling keep their own contrast.
+        // Signal strength, as a power of ten of the 12000 full keying amplitude. The first sets ran
+        // from -0.85 to 0 - see the note where strength is drawn for why that was far too strong.
+        static double StrengthLow = -0.85, StrengthHigh = 0.0;
+
+        static double AgcShare = 0.0;
+        static double AgcLow = 0.8, AgcHigh = 1.6;     // the ceiling above the band, in tens
+
+        static void Agc(double[] x, double bedAbs, Random rnd)
+        {
+            double ceiling = bedAbs * Math.Pow(10, AgcLow + rnd.NextDouble() * (AgcHigh - AgcLow));
+            double attack = Math.Exp(-1.0 / (Rate * (0.002 + rnd.NextDouble() * 0.006)));
+            double release = Math.Exp(-1.0 / (Rate * (0.03 + rnd.NextDouble() * 0.30)));
+
+            double level = bedAbs;
+            for (int i = 0; i < x.Length; i++)
+            {
+                double a = Math.Abs(x[i]) * 1.57;      // a sine's average rectified value is 2/pi of its peak
+                level = a > level ? attack * level + (1 - attack) * a : release * level + (1 - release) * a;
+                if (level > ceiling) x[i] *= ceiling / level;
+            }
         }
 
         static short Clip(double v)

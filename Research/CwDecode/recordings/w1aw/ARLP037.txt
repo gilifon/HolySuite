@@ -1,0 +1,30 @@
+QST de W1AW
+Propagation Forecast Bulletin 37 ARLP037
+From ARRL Headquarters
+Newington, CT September 11, 2026
+To all radio amateurs
+SB PROP ARL ARLP037
+ARLP037 The ARRL Solar Report
+
+Solar flare activity was at low levels in the past week with isolated C-class flare activity, according to NOAA's Space Weather Prediction Center. The largest flare of the period was a C3.4 on September 8 from otherwise stable Region 4528. Region 4530 developed asymmetric penumbra on both its leading and trailing poles while undergoing consolidation in its intermediate area. New flux emergence in the intermediate area was observed late in the period.
+
+Region 4521 began to show signs of possible flux emergence and pore development as it produced three C2-class flares on September 8. Solar activity is likely to be at low levels due to isolated to occasional C-class flare activity, with a slight chance for M-class flares (R1-R2/Minor-Moderate) through September 11.
+
+Solar wind parameters have been at or close to nominal levels, but enhanced solar wind conditions due to positive polarity CH HSS (coronal hole high speed stream) influences are expected to continue through September 10. On September 11, a separate additional positive polarity coronal hole high speed stream is likely to arrive, bringing a mildly disturbed solar wind environment. Quiet to unsettled levels in the geomagnetic field are expected to prevail on September 10 and continue into September 11 as another positive polarity CHHSS becomes geoeffective.
+
+The Australian Space Weather Forecasting Centre predicts that degraded HF propagation conditions on September 9 would begin to clear up on September 10 and 11, leading to normal or normal-fair HF propagation through all latitudes as we approach equinoctial propagation conditions.
+
+Weekly Commentary on the Sun, the Magnetosphere, and the Earth's Ionosphere, September 10, 2026, by F. K. Janda, OK1HH:
+
+The observed number of sunspot groups ranged from six to seven starting on September 4, while there were occasional Class C and M solar flares. Sun emitted two coronal mass ejections (CMEs) toward Earth, but they missed the planet. Nevertheless, the intensified solar wind following a geomagnetically quiet period from September 1 to 6 contributed to a noticeable increase in geomagnetic activity, particularly on September 7-8. The positive phase of the disturbance during the afternoon and especially the evening hours UT on the first day was interesting and impressive. This was, however, inexorably followed by a negative phase, which significantly affected shortwave ionospheric propagation as late as September 10.
+
+No increase in solar activity is expected in the coming days either. However, after the erratic and disrupted conditions expected in the second third of September, a calmer period with significantly more favorable shortwave propagation conditions should follow for the remainder of the month, particularly around the equinox.
+
+The latest report from Dr. Tamitha Skov, WX6SWW, can be found at https://www.youtube.com/watch?v=rQgzXKOV2ow.
+
+The Predicted Planetary A Index for September 11 to September 17 is 5, 5, 5, 15, 12, 10, and 5 with a mean of 8.1. The Predicted Planetary K Index is 2, 2, 2, 4, 4, 4, and 2 with a mean of 2.9. 10.7 centimeter flux is 108, 105, 102, 105, 105, 105, and 105 with a mean of 105.0.
+
+For more information concerning shortwave radio propagation, see www.arrl.org/propagation and the ARRL Technical Information Service web page at www.arrl.org/propagation-of-rf-signals. For an explanation of numbers used in this bulletin, see www.arrl.org/the-sun-the-earth-the-ionosphere. Information and tutorials on propagation can be found at http://k9la.us.
+
+Also, check this: "Understanding Solar Indices" from September 2002 QST. https://bit.ly/3Rc8Njt
+NNNN

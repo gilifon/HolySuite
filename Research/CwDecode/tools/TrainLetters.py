@@ -135,41 +135,68 @@ def save(model, path):
             f.write(t.detach().cpu().numpy().astype("<f4").tobytes())
 
 
-def main(training_file, real_file, out, minutes):
+def main(training_file, real_file, out, minutes, resume=None):
     torch.manual_seed(4)
     rng = np.random.RandomState(4)
 
-    examples, bins = read(training_file)
+    # SEVERAL SETS, comma-separated. The held-back examples come only from the LAST set named - so when
+    # a run carries on from an earlier network, it is judged on examples that network never saw either.
+    files = [f for f in training_file.split(",") if f.strip()]
+    sets = []
+    bins = 0
+    for f in files:
+        part, bins = read(f)
+        sets.append(part)
     real, _ = read(real_file)
+
     # A recording of nothing but the band has no letters, so it has no marks and DumpFeatures writes
     # no labels for it. It is NOT to be thrown away: every frame of it is "nothing", and it is the
     # only thing that teaches the network what an empty frequency sounds like. The first run filtered
     # these out by accident - 1,547 of 8,000 examples, every silence lesson in the set.
-    kept = []
-    for name, text, d, lab in examples:
-        if len(d) <= 60:
-            continue
-        if len(lab) == 0 and not text.strip():
-            lab = np.zeros(len(d), dtype=np.int64)
-        if len(lab) == len(d):
-            kept.append((name, text, d, lab))
-    examples = kept
-    print("%d examples, %d of them nothing but the band" % (len(examples), sum(1 for e in examples if not e[1].strip())))
-    look(examples)
+    def usable(part):
+        kept = []
+        for name, text, d, lab in part:
+            if len(d) <= 60:
+                continue
+            if len(lab) == 0 and not text.strip():
+                lab = np.zeros(len(d), dtype=np.int64)
+            if len(lab) == len(d):
+                kept.append((name, text, d, lab))
+        return kept
 
-    rng.shuffle(examples)
-    held = max(100, len(examples) // 10)
-    heldout, training = examples[:held], examples[held:]
-    print("\n%d training, %d held back, %d real recordings" % (len(training), len(heldout), len(real)))
+    sets = [usable(part) for part in sets]
+    for part in sets:
+        rng.shuffle(part)
+    newest = sets[-1]
+    held = max(100, len(newest) // 10)
+    heldout = newest[:held]
+    training = [e for part in sets[:-1] for e in part] + newest[held:]
+    print("%d examples from %d set(s), %d of them nothing but the band"
+          % (sum(len(p) for p in sets), len(sets), sum(1 for p in sets for e in p if not e[1].strip())))
+    print("%d training, %d held back, %d real recordings" % (len(training), len(heldout), len(real)))
 
     model = LetterNet(bins)
+    if resume:
+        load_weights(model, resume)
+        print("carrying on from " + resume)
     weights = torch.ones(CLASSES)
     weights[BLANK] = 0.1
     loss_of = nn.CrossEntropyLoss(weight=weights, ignore_index=-100)
-    opt = torch.optim.Adam(model.parameters(), lr=2e-3)
+
+    # CARRYING ON, THE STEPS GET SMALLER. A network that has already found its way needs its details
+    # settled, not to be shaken again at the rate that got it started - so a resumed run begins at half
+    # the fresh rate and eases down to a twentieth of it by the end.
+    first_rate = 1e-3 if resume else 2e-3
+    last_rate = 1e-4 if resume else 2e-3
+    opt = torch.optim.Adam(model.parameters(), lr=first_rate)
 
     started, step, best = time.time(), 0, 9.9
     while time.time() - started < minutes * 60:
+        through = (time.time() - started) / (minutes * 60)
+        rate = last_rate + (first_rate - last_rate) * 0.5 * (1 + np.cos(np.pi * min(1.0, through)))
+        for group in opt.param_groups:
+            group["lr"] = rate
+
         x = np.zeros((32, CROP, bins), dtype=np.float32)
         y = np.full((32, CROP), -100, dtype=np.int64)
         for k in range(32):
@@ -207,8 +234,8 @@ def main(training_file, real_file, out, minutes):
                 best = cer
                 save(model, out)
                 mark = "  <- saved"
-            print("step %5d  %4.0f min  loss %.3f  held-back char error %5.1f%%  REAL %2d of %d words, -%d noise => %d%s"
-                  % (step, (time.time() - started) / 60, loss.item(), cer * 100, found, wanted, noise, score, mark))
+            print("step %5d  %4.0f min  rate %.5f  loss %.3f  held-back char error %5.1f%%  REAL %2d of %d words, -%d noise => %d%s"
+                  % (step, (time.time() - started) / 60, rate, loss.item(), cer * 100, found, wanted, noise, score, mark))
             sys.stdout.flush()
 
     save(model, out + ".last")
@@ -218,8 +245,32 @@ def main(training_file, real_file, out, minutes):
     print("REAL %d of %d words, -%d noise => %d   (plain decoder: 32)" % (found, wanted, noise, score))
 
 
+def load_weights(model, path):
+    with open(path, "rb") as f:
+        raw = f.read()
+    assert raw[:8] == b"CWLETTR1", "not a letter-network weights file"
+    at = 8
+    (count,) = struct.unpack_from("<i", raw, at); at += 4
+    state = {}
+    for _ in range(count):
+        (n,) = struct.unpack_from("<i", raw, at); at += 4
+        name = raw[at:at + n].decode(); at += n
+        (dims,) = struct.unpack_from("<i", raw, at); at += 4
+        shape = []
+        for _ in range(dims):
+            (d,) = struct.unpack_from("<i", raw, at); at += 4
+            shape.append(d)
+        total = int(np.prod(shape)) if shape else 1
+        state[name] = torch.from_numpy(np.frombuffer(raw, dtype="<f4", count=total, offset=at).reshape(shape).copy())
+        at += total * 4
+    model.load_state_dict(state)
+
+
 if __name__ == "__main__":
     if len(sys.argv) > 2 and sys.argv[1] == "--look":
         look(read(sys.argv[2])[0], many=4)
     else:
-        main(sys.argv[1], sys.argv[2], sys.argv[3], float(sys.argv[4]) if len(sys.argv) > 4 else 45)
+        # TrainLetters.py set1.bin[,set2.bin...] real.bin out.net [minutes] [carry-on-from.net]
+        main(sys.argv[1], sys.argv[2], sys.argv[3],
+             float(sys.argv[4]) if len(sys.argv) > 4 else 45,
+             sys.argv[5] if len(sys.argv) > 5 else None)
