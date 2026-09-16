@@ -1032,6 +1032,18 @@ namespace HolyLogger.Properties {
                 this["UdpBroadcastJson"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string AdifMonitorJson {
+            get {
+                return ((string)(this["AdifMonitorJson"]));
+            }
+            set {
+                this["AdifMonitorJson"] = value;
+            }
+        }
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]

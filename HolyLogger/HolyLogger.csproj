@@ -569,6 +569,13 @@
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="UdpPorts.cs" />
+    <Compile Include="AdifMonitor.cs" />
+    <Compile Include="AdifMonitorWindow.xaml.cs">
+      <DependentUpon>AdifMonitorWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="MainWindow.AdifMonitor.cs">
+      <DependentUpon>MainWindow.xaml</DependentUpon>
+    </Compile>
     <Compile Include="MainWindow.Map.cs">
       <DependentUpon>MainWindow.xaml</DependentUpon>
       <SubType>Code</SubType>
@@ -630,6 +637,10 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="ChannelsWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="AdifMonitorWindow.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
