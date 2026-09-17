@@ -905,16 +905,24 @@ namespace HolyLogger
                     if (radioRX > 0) lastRealRigKhz = radioRX * 1000.0;
 
                     // THE SATELLITE SHIFT IS NOT ADDED HERE. It used to be, and it put a frequency on
-                    // the screen that the radio was not on: with Satellite Mode ticked and the shipped
-                    // QO-100 shift of 1968 MHz, a radio sitting on 7.036 MHz lit the LED as
-                    // 1975036.000 kHz while the Radio Control Panel, which reads the rig directly,
+                    // the screen that the radio was not on: with Satellite Mode ticked, Settings
+                    // .SatelliteShift was added to radioRX, so a radio sitting on 7.036 MHz lit the LED
+                    // as 1975036.000 kHz while the Radio Control Panel, which reads the rig directly,
                     // still showed 7036.000 - and the Band box, derived from the displayed number,
-                    // said 160M, so the QSO was logged on the wrong band.
+                    // said 160M, so the QSO was logged on the wrong band. Reported from a demonstration
+                    // on someone else's PC, 2026-09-17.
                     //
                     // The shift describes the UPLINK. Its proper home in ADIF is FREQ/BAND for the
                     // uplink with FREQ_RX/BAND_RX for the downlink, not the one box that says where
                     // the radio is. Until that pair is stored, Satellite Mode still marks the QSO the
-                    // way it always did - PROP_MODE=SAT and the satellite name.
+                    // way it always did - PROP_MODE=SAT and the satellite name, and SatelliteShift is
+                    // read by nothing at all.
+                    //
+                    // ABOUT THAT SETTING'S SHIPPED VALUE, 1968: it is NOT QO-100's shift, whatever the
+                    // satellite name beside it says. QO-100 goes up on 2400.05-2400.30 MHz and comes
+                    // down on 10489.55-10489.80, a gap of about 8089.5 MHz. Where 1968 came from is
+                    // unknown. A single box also cannot be right for more than one satellite: every
+                    // one of them has its own gap, so whatever finally uses this must be per-satellite.
 
                     // OmniRig can fire StatusChange before it has polled the rig's frequency
                     // register; GetRxFrequency returns 0 in that window. Skip the update so
