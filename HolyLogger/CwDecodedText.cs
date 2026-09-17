@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -155,6 +157,7 @@ namespace HolyLogger
             _handedOverAt = DateTime.MinValue;
             _noteAtHandover = 0; _speedAtHandover = 0;
             _lastLetterAt = DateTime.MinValue; _lastNote = 0; _lastSpeed = 0;
+            _recentCalls.Clear(); _recentCallOrder.Clear();
         }
 
         /// <summary>Adds newly decoded text, colouring any callsign as its last letter arrives.</summary>
@@ -376,16 +379,32 @@ namespace HolyLogger
             foreach (string over in LetterHandOver)
                 if (string.Equals(call, over, StringComparison.Ordinal)) return true;
 
+            if (IsOfferableCall(call))
+            {
+                ColourAsCallsign(word, call);
+                RememberCall(call, new[] { word });
+            }
+            else JoinPiecesEndingWith(word);
+
+            return false;
+        }
+
+        // Shaped like a callsign, and not his own - never a stroke variant of it either, a man does
+        // not log himself.
+        static bool IsOfferableCall(string call)
+        {
             if (!CallsignIdentity.LooksLikeCallsign(call)) return false;
             if (!CouldStartACallsign(call)) return false;
 
-            // Never his own, and never a stroke variant of it either - a man does not log himself.
             string mine = null;
             try { mine = Properties.Settings.Default.my_callsign; }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
 
-            if (!string.IsNullOrWhiteSpace(mine) && CallsignIdentity.Same(call, mine)) return false;
+            return string.IsNullOrWhiteSpace(mine) || !CallsignIdentity.Same(call, mine);
+        }
 
+        void ColourAsCallsign(Run word, string call)
+        {
             word.Foreground = CallsignInk;
             word.Background = CallsignPatch;
             word.FontWeight = FontWeights.Bold;
@@ -394,7 +413,97 @@ namespace HolyLogger
             word.ToolTip = "Double-click to put " + call + " in the DX Callsign box.\nRight-click to check it on QRZ.com.";
 
             if (QrzLookup.HasLogin) MarkIfRegistered(word, call);
-            return false;
+        }
+
+        // A CALLSIGN SENT WITH PAUSES IN IT - "HB9 D NP", then "HB 9 D NP", then "H B9 DNP".
+        //
+        // Every letter was heard right; what the decoder got wrong were the spaces. Many operators
+        // pause inside their own call, and a pause a little longer than the gap between letters is
+        // read as the gap between words. So the call never arrives as one word and is never offered,
+        // while a man listening picks it up at once - because the same letters keep coming back.
+        //
+        // That is exactly the test used here, and nothing is guessed: the short pieces just printed
+        // are joined, and if they make a callsign shape AND the same callsign has already been seen
+        // nearby - whole, or joined from other pieces - every piece is coloured as that callsign, and
+        // a double-click on any of them logs the whole call. The text on screen stays exactly as it
+        // was heard; not one letter is added or changed. Seen only once, it is not offered: one
+        // chance joining of words is too easy to make.
+        const int MostPiecesJoined = 4;
+        const int LongestJoinedCall = 10;
+        const int RecentCallsKept = 30;
+
+        // Words that are part of every exchange and never part of a callsign sent in pieces.
+        // Without them "UR 5NN", sent in every QSO, joins into UR5NN - a perfectly good callsign shape.
+        static readonly HashSet<string> NeverAPiece = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "DE", "UR", "RST", "5NN", "599", "TU", "ES", "CQ", "BK", "73", "TNX", "FB", "HR", "OP",
+            "NAME", "QTH", "GM", "GA", "GE", "PSE", "AGN", "QSL", "QRZ", "TEST"
+        };
+
+        readonly Dictionary<string, List<Run[]>> _recentCalls =
+            new Dictionary<string, List<Run[]>>(StringComparer.OrdinalIgnoreCase);
+        readonly Queue<string> _recentCallOrder = new Queue<string>();
+
+        void JoinPiecesEndingWith(Run last)
+        {
+            var pieces = new List<Run>();
+            int length = 0;
+
+            for (Inline at = last; at != null && pieces.Count < MostPiecesJoined; at = at.PreviousInline)
+            {
+                var run = at as Run;
+                if (run == null) break;                      // a line break: the turn changed
+                string text = run.Text.Trim();
+                if (text.Length == 0) continue;              // the space between two words
+                if (text.IndexOf('<') >= 0 || NeverAPiece.Contains(text)) break;
+                // A word that is a callsign by itself stays one. A piece already coloured as part of
+                // a JOINED call may yet belong to a longer one - see WhyTheLongerCallWins.
+                if (run.Tag != null && string.Equals(run.Tag.ToString(), text, StringComparison.OrdinalIgnoreCase)) break;
+
+                pieces.Insert(0, run);
+                length += text.Length;
+                if (length > LongestJoinedCall) break;
+                if (pieces.Count < 2) continue;
+
+                string joined = string.Concat(pieces.Select(p => p.Text.Trim()));
+                if (IsOfferableCall(joined)) RememberCall(joined, pieces.ToArray());
+            }
+        }
+
+        void RememberCall(string call, Run[] pieces)
+        {
+            List<Run[]> seen;
+            if (!_recentCalls.TryGetValue(call, out seen))
+            {
+                seen = new List<Run[]>();
+                _recentCalls[call] = seen;
+                _recentCallOrder.Enqueue(call);
+                while (_recentCallOrder.Count > RecentCallsKept)
+                    _recentCalls.Remove(_recentCallOrder.Dequeue());
+            }
+            seen.Add(pieces);
+
+            // Seen twice: now every copy sent in pieces is shown as the callsign it is, the earlier
+            // ones included.
+            if (seen.Count < 2) return;
+            foreach (Run[] group in seen)
+            {
+                if (group.Length < 2) continue;
+                foreach (Run piece in group)
+                    if (piece.Tag == null || WhyTheLongerCallWins(piece.Tag.ToString(), call))
+                        ColourAsCallsign(piece, call);
+            }
+        }
+
+        // THE LONGER CALL WINS. Pieces arrive one at a time, so the front of a callsign can be proved
+        // before its end has even been sent: "HB9 D NP" twice over holds "HB9 D" twice, and HB9D is a
+        // perfectly good callsign shape. It was offered - measured on exactly that text - and the NP
+        // left hanging. So a piece coloured as a joined call gives way to a longer joined call that
+        // contains it. A call already the same is simply coloured again.
+        static bool WhyTheLongerCallWins(string was, string now)
+        {
+            if (string.Equals(was, now, StringComparison.OrdinalIgnoreCase)) return true;
+            return now.Length > was.Length && now.IndexOf(was, StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
         // Asks QRZ.com in the background and turns the patch green if it knows the callsign. The text
