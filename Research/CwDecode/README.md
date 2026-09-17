@@ -52,7 +52,7 @@ silence by firmware 1.902.
 at about 20:37 UTC, recorded at once on public KiwiSDRs in Austria (OE3AKB), Czechia (OK1DEK) and
 Hungary (HG5ACZ). `SENT.txt` is exactly what went out: part 1 three times (at different speeds), then
 part 3 - part 2 was never sent. Each file is cut to his transmission, so IK5WOB calling CQ before it
-and G0BQV after it are not counted. Standing score: 85 of 337 words read, 246 invented.
+and G0BQV after it are not counted. Standing score (17 September): 88 of 337 words read, 233 invented.
 
 To record another session: pick receivers from the public list by distance from Israel, test them
 with a 15-second `KiwiRecord.py` first (about one in three refuse), start them all recording, then
@@ -109,7 +109,9 @@ KEPT, 16-17 September 2026, each on all four benches: a lower start line in the 
 four marks before printing instead of eight, joining a dip when one piece is a fragment, and two
 seconds' grace through a fade with nothing read. On his transmission the frequency was called empty
 18-26% of the time and is now 13-14%, about the real pauses between his parts. What is left there is
-elements never heard on a weak, fading signal. The element-counting neural network (seven outputs, retrained on
+elements never heard on a weak, fading signal.
+
+The element-counting neural network (seven outputs, retrained on
 this band) scored 0 of 34 despite 93.6% on clean CW: one miscounted element ruins a letter.
 
 The LETTER network (TrainLetters.py) - taught by naming each letter in the gap after it, after CTC
