@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 
@@ -31,6 +32,9 @@ namespace HolyLogger.OptionsUserControls
         private void BuildRows(List<RadioBandPreset> bands)
         {
             _bands = bands;
+            // The standard frequencies, by band, so a box holding anything else can be marked.
+            var standards = new Dictionary<string, RadioBandPreset>();
+            foreach (var d in RadioPanelPresets.Defaults()) standards[d.Label] = d;
             _enabledBoxes.Clear();
             _ssbBoxes.Clear();
             _cwBoxes.Clear();
@@ -83,9 +87,11 @@ namespace HolyLogger.OptionsUserControls
                 Grid.SetColumn(label, 1);
                 BandGrid.Children.Add(label);
 
-                var ssb = MakeBox(band.SsbKhz, row, 2);
-                var cw = MakeBox(band.CwKhz, row, 3);
-                var rtty = MakeBox(band.RttyKhz, row, 4);
+                RadioBandPreset standard;
+                standards.TryGetValue(band.Label, out standard);
+                var ssb = MakeBox(band.SsbKhz, standard?.SsbKhz, row, 2);
+                var cw = MakeBox(band.CwKhz, standard?.CwKhz, row, 3);
+                var rtty = MakeBox(band.RttyKhz, standard?.RttyKhz, row, 4);
                 _ssbBoxes.Add(ssb);
                 _cwBoxes.Add(cw);
                 _rttyBoxes.Add(rtty);
@@ -122,7 +128,23 @@ namespace HolyLogger.OptionsUserControls
             BandGrid.Children.Add(rtty);
         }
 
-        private TextBox MakeBox(int khz, int row, int column)
+        // A frequency that is not the standard one gets a light red box, so it is seen at a glance
+        // which ones were changed. Checked on every keystroke, and again when a bad entry is put back.
+        private static readonly System.Windows.Media.Brush ChangedBrush =
+            new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0xFF, 0xD6, 0xD6));
+
+        private static void MarkIfNotStandard(TextBox box)
+        {
+            int? standard = box.Tag as int?;
+            bool isStandard = standard.HasValue
+                && int.TryParse((box.Text ?? string.Empty).Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out int khz)
+                && khz == standard.Value;
+
+            if (isStandard || !standard.HasValue) box.ClearValue(Control.BackgroundProperty);
+            else box.Background = ChangedBrush;
+        }
+
+        private TextBox MakeBox(int khz, int? standardKhz, int row, int column)
         {
             var box = new TextBox
             {
@@ -134,8 +156,11 @@ namespace HolyLogger.OptionsUserControls
                 Width = 70,
                 HorizontalAlignment = HorizontalAlignment.Left,
                 VerticalContentAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(0, 4, 8, 4)
+                Margin = new Thickness(0, 4, 8, 4),
+                Tag = standardKhz
             };
+            MarkIfNotStandard(box);
+            box.TextChanged += (s, e) => MarkIfNotStandard(box);
             box.LostFocus += Box_LostFocus;
             Grid.SetRow(box, row);
             Grid.SetColumn(box, column);
@@ -217,6 +242,21 @@ namespace HolyLogger.OptionsUserControls
 
             box.Text = current.ToString(CultureInfo.InvariantCulture);
             return false;
+        }
+
+        private void Btn_SpectrumWidths_Click(object sender, RoutedEventArgs e)
+        {
+            // The radio's name comes from the main window, the only place that knows what OmniRig is
+            // running, so the table can show which row is his.
+            string rig = string.Empty;
+            try
+            {
+                var main = Application.Current?.Windows.OfType<MainWindow>().FirstOrDefault();
+                if (main != null) rig = main.ConnectedRigName();
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+            SpectrumWidthManagerWindow.Show(Window.GetWindow(this), rig);
         }
 
         private void Btn_RestoreDefaults_Click(object sender, RoutedEventArgs e)

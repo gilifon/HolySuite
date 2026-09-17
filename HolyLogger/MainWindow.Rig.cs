@@ -1555,7 +1555,9 @@ namespace HolyLogger
 
             // Same mapping the cluster and the log use, so SSB below 10 MHz is LSB and above it USB.
             int? rigMode = MapClusterModeToRigMode(wanted, frequencyHz / 1000000.0);
-            await TryTuneRigFrequencyAsync(frequencyHz, (OmniRig.RigParamX)(rigMode ?? PM_SSB_U));
+            // No mode asked for ("leave the mode alone") is not HolyLogger changing the mode, so no width.
+            await TryTuneRigFrequencyAsync(frequencyHz, (OmniRig.RigParamX)(rigMode ?? PM_SSB_U),
+                                           sendSpectrumWidth: !string.IsNullOrWhiteSpace(mode));
 
             UpdateRadioPanel();
         }

@@ -863,6 +863,9 @@
     <Setting Name="RadioPanelBands" Type="System.String" Scope="User">
       <Value Profile="(Default)" />
     </Setting>
+    <Setting Name="SpectrumWidths" Type="System.String" Scope="User">
+      <Value Profile="(Default)" />
+    </Setting>
     <Setting Name="RadioPanelWindowLeft" Type="System.Double" Scope="User">
       <Value Profile="(Default)">-1</Value>
     </Setting>

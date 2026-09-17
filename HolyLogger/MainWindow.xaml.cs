@@ -13152,13 +13152,14 @@ namespace HolyLogger
             }
         }
 
-        private async Task TryTuneRigFrequencyAsync(int frequencyHz, OmniRig.RigParamX mode)
+        private async Task TryTuneRigFrequencyAsync(int frequencyHz, OmniRig.RigParamX mode, bool sendSpectrumWidth = true)
         {
             if (Rig == null || Rig.Status != OmniRig.RigStatusX.ST_ONLINE)
             {
                 return;
             }
 
+            bool modeSent = false;
             try
             {
                 int writable = (int)Rig.WriteableParams;
@@ -13168,6 +13169,7 @@ namespace HolyLogger
                 try
                 {
                     Rig.Mode = mode;
+                    modeSent = true;
                 }
                 catch (System.Exception swallowed) { Log.Swallow(swallowed); }
 
@@ -13175,16 +13177,65 @@ namespace HolyLogger
                 {
                     Rig.Freq = frequencyHz;
                     await TryGetRigReadbackAsync(frequencyHz);
-                    return;
                 }
-
-                if (freqAWritable)
+                else if (freqAWritable)
                 {
                     Rig.FreqA = frequencyHz;
                     await TryGetRigReadbackAsync(frequencyHz);
                 }
             }
             catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+
+            // AFTER the frequency, not between the mode and it: the radio is where it is going by now,
+            // so nothing that follows the band change can put the old width back.
+            if (modeSent && sendSpectrumWidth)
+                SendSpectrumWidthForMode(mode);
+        }
+
+        // ── SPECTRUM WIDTH, SENT WITH THE MODE ──────────────────────────────────────────────────
+        //
+        // Only here, right after HolyLogger itself has sent the radio a mode - the operator's rule.
+        // Turning the radio's own mode knob sends nothing. The width is his choice in
+        // Options > Radio Control Panel > Spectrum width manager, per radio model and per mode; an
+        // empty cell, or a radio not on that list, sends nothing. What each radio accepts is in
+        // SpectrumWidths (RadioPanelPresets.cs), all of it from the makers' own documents.
+        private void SendSpectrumWidthForMode(OmniRig.RigParamX mode)
+        {
+            try
+            {
+                string column;
+                switch ((int)mode)
+                {
+                    case PM_SSB_U: case PM_SSB_L: column = "SSB"; break;
+                    case PM_CW_U: case PM_CW_L: column = "CW"; break;
+                    case PM_AM: column = "AM"; break;
+                    case PM_FM: column = "FM"; break;
+                    case PM_DIG_L: column = "RTTY"; break;   // the RTTY slot; DIG_U is FT8/data, no column
+                    default: return;
+                }
+
+                string rigName = ConnectedRigName();
+                SpectrumRadio radio = SpectrumWidths.RadioFor(rigName);
+                SpectrumWidthChoice width = SpectrumWidths.ChosenFor(radio, column);
+                if (width == null) return;
+
+                string command;
+                if (radio.Kind == SpectrumCommandKind.IcomCiv)
+                {
+                    // The address is read from OmniRig's own rig file, as for CW and voice messages.
+                    string address = GetIcomCivAddress(rigName);
+                    if (address == null) return;
+                    command = "FE FE " + address + " E0 " + radio.Command(width.Code) + " FD";
+                }
+                else
+                {
+                    command = radio.Command(width.Code);
+                }
+
+                if (!TrySendOmniRigCustomCommand(command))
+                    Log.Warn("Spectrum width not sent to " + rigName + ": " + command);
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
         }
 
         private async Task<bool> TryGetRigReadbackAsync(int targetHz)
