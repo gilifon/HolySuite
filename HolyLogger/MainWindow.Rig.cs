@@ -902,9 +902,19 @@ namespace HolyLogger
                 {
                     double radioRX = (double)Rig.GetRxFrequency() / 1000000;
                     double radioTX = (double)Rig.GetTxFrequency() / 1000000;
-                    if (radioRX > 0) lastRealRigKhz = radioRX * 1000.0;   // before the satellite shift
-                    if (Properties.Settings.Default.IsSatelliteMode)
-                        radioRX += Properties.Settings.Default.SatelliteShift;
+                    if (radioRX > 0) lastRealRigKhz = radioRX * 1000.0;
+
+                    // THE SATELLITE SHIFT IS NOT ADDED HERE. It used to be, and it put a frequency on
+                    // the screen that the radio was not on: with Satellite Mode ticked and the shipped
+                    // QO-100 shift of 1968 MHz, a radio sitting on 7.036 MHz lit the LED as
+                    // 1975036.000 kHz while the Radio Control Panel, which reads the rig directly,
+                    // still showed 7036.000 - and the Band box, derived from the displayed number,
+                    // said 160M, so the QSO was logged on the wrong band.
+                    //
+                    // The shift describes the UPLINK. Its proper home in ADIF is FREQ/BAND for the
+                    // uplink with FREQ_RX/BAND_RX for the downlink, not the one box that says where
+                    // the radio is. Until that pair is stored, Satellite Mode still marks the QSO the
+                    // way it always did - PROP_MODE=SAT and the satellite name.
 
                     // OmniRig can fire StatusChange before it has polled the rig's frequency
                     // register; GetRxFrequency returns 0 in that window. Skip the update so
