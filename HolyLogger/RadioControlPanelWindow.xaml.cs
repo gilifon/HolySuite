@@ -228,10 +228,13 @@ namespace HolyLogger
             // take the radio away from the satellite. So satellite mode shows 2m and up, and nothing
             // else; switch the mode off and the whole list comes back. Rebuilt whenever Options
             // closes, which is where the mode is changed.
+            // and the HF panel keeps the bands it always had - 160m to 4m - with nothing from 2m up
+            // cluttering it. The two lists never overlap: the mode decides which one is on screen.
+            // The Options page still lists every band, so their frequencies can be set either way.
             var all = RadioPanelPresets.Load();
-            _bands = Properties.Settings.Default.IsSatelliteMode
-                ? all.Where(b => b.LowKhz >= 144000).ToList()
-                : all;
+            _bands = all.Where(b => Properties.Settings.Default.IsSatelliteMode
+                                        ? b.LowKhz >= 144000
+                                        : b.LowKhz < 144000).ToList();
             _bandButtons.Clear();
             ButtonGrid.Children.Clear();
             ModeRow.Children.Clear();
