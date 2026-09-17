@@ -54,9 +54,21 @@ Hungary (HG5ACZ). `SENT.txt` is exactly what went out: part 1 three times (at di
 part 3 - part 2 was never sent. Each file is cut to his transmission, so IK5WOB calling CQ before it
 and G0BQV after it are not counted. Standing score (17 September): 88 of 337 words read, 233 invented.
 
+## recordings/4z5sl2/ - the same text again, 17 September, on a clear frequency
+
+The second session, and the better one: all three parts sent (part 2 included), 30 W on 7036 kHz at
+about 20:31 UTC, heard in Greece (Nikea), Italy (Ischia, Trecastelli) and Hungary (HA2NA, HG5ACZ).
+The frequency was chosen by listening: ten seconds recorded on each of eighteen candidates through a
+Hungarian receiver and the quietest taken - 7036 and 7038 were busy 2% of the time, 7030 66% and
+7022 85%. `SENT.txt` holds the three parts in the order sent.
+
+Standing score: 282 of 584 words read, 275 invented - against 88 of 337 on the first session, on a
+frequency where somebody else was working. Greece alone reads 87 of 121; the Hungarian copies, weak
+and fading, read about a third. `AllBenches.ps1` counts both sessions together.
+
 To record another session: pick receivers from the public list by distance from Israel, test them
-with a 15-second `KiwiRecord.py` first (about one in three refuse), start them all recording, then
-he sends. Next time send all three parts, on a quieter frequency.
+with a 15-second `KiwiRecord.py` first (about one in three refuse), find a quiet frequency the same
+way, start them all recording, then he sends.
 
 ## NEVER TUNE ON ONE BENCH
 
