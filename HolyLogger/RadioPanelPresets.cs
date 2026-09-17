@@ -179,4 +179,343 @@ namespace HolyLogger
             Properties.Settings.Default.Save();
         }
     }
+
+    // ── SPECTRUM WIDTH ──────────────────────────────────────────────────────────────────────────
+    //
+    // The operator picks, per radio model and per mode, the width the radio's scope should show.
+    // HolyLogger sends it right after it sends the radio a mode - and never otherwise: turning the
+    // radio's own mode knob changes nothing here. A mode left empty sends nothing at all.
+    //
+    // EVERY COMMAND AND EVERY WIDTH BELOW IS FROM THE MAKER'S OWN DOCUMENT, read 2026-09-16:
+    //   Icom   - CI-V Reference Guides (IC-705, 7300MK2, 7610, 7760, 9700) and the IC-7300
+    //            Information sheet: command 27 15, "Scope span settings (in the Center mode ...)".
+    //            Data: one byte 00 (MAIN), then the HALF span as 5 BCD bytes in frequency order.
+    //            Only ±2.5, 5, 10, 25, 50, 100, 250, 500 kHz exist. It works in Center mode only.
+    //   Yaesu  - CAT Operation Reference Manuals. FTDX10, FTDX101, FT-710: "SS" P1=0 P2=5 (SPAN)
+    //            P3=0-9 (1 kHz - 1 MHz), P4-P7 = 0. The older sets have no span command, only a
+    //            menu item set through "EX": FT-991 menu 120, FT-991A menu 116 (both 03-07 =
+    //            50-1000 kHz), FT-891 menu 1302 (0-4 = 37.5-750 kHz), FTDX3000 menu 128 (0-5 =
+    //            20-1000 kHz). The FT-991 and FT-991A put the item at DIFFERENT menu numbers, so
+    //            they are two rows: the wrong number would change a microphone EQ setting instead.
+    //   Kenwood - PC Control Command Reference Guides: "BS4". TS-890S 0-6 = 5-500 kHz. TS-990S
+    //            0-7 = ±2.5-±250 kHz from firmware 1.20; firmware 1.13 and older number them
+    //            differently, which the row's name says.
+    //   Elecraft - K4 Programmer's Reference: "#SPNn;" n = 6000-368000 Hz. The K3/K3S and KX3 have
+    //            no scope of their own: the P3 and PX3 do, "#SPNxxxxxx;" in 100 Hz units, 2-200 kHz.
+    //   TS-480, TS-590S/SG and KX2 have no scope and no such command, so they are not listed.
+
+    public sealed class SpectrumWidthChoice
+    {
+        public SpectrumWidthChoice(string code, string label) { Code = code; Label = label; }
+        public string Code { get; }    // what is saved, and what the command is built from
+        public string Label { get; }   // what the operator sees
+        public override string ToString() => Label;
+    }
+
+    public enum SpectrumCommandKind { IcomCiv, Ascii }
+
+    public sealed class SpectrumRadio
+    {
+        public SpectrumRadio(string name, string modelKey, SpectrumCommandKind kind,
+                             Func<string, string> command, params SpectrumWidthChoice[] choices)
+        {
+            Name = name; ModelKey = modelKey; Kind = kind; Command = command; Choices = choices;
+        }
+
+        public string Name { get; }            // shown in the table
+        public string ModelKey { get; }        // OmniRig's rig name, punctuation out, must START with this
+        public SpectrumCommandKind Kind { get; }
+        // Icom: the CI-V bytes after "FE FE <address> E0". Everyone else: the whole command.
+        public Func<string, string> Command { get; }
+        public SpectrumWidthChoice[] Choices { get; }
+    }
+
+    public static class SpectrumWidths
+    {
+        // SSB and CW first: those are the two he uses most.
+        public static readonly string[] Modes = { "SSB", "CW", "AM", "RTTY", "FM" };
+
+        private static SpectrumWidthChoice C(string code, string label) => new SpectrumWidthChoice(code, label);
+
+        // Icom: the code is the half span in Hz. 2500 -> "00 25 00 00 00".
+        private static string IcomSpan(string hz)
+        {
+            string d = hz.PadLeft(10, '0');
+            return "27 15 00 " + d.Substring(8, 2) + " " + d.Substring(6, 2) + " " + d.Substring(4, 2)
+                 + " " + d.Substring(2, 2) + " " + d.Substring(0, 2);
+        }
+
+        private static readonly SpectrumWidthChoice[] IcomChoices =
+        {
+            C("2500", "±2.5 kHz"), C("5000", "±5 kHz"), C("10000", "±10 kHz"), C("25000", "±25 kHz"),
+            C("50000", "±50 kHz"), C("100000", "±100 kHz"), C("250000", "±250 kHz"), C("500000", "±500 kHz")
+        };
+
+        private static readonly SpectrumWidthChoice[] YaesuSsChoices =
+        {
+            C("0", "1 kHz"), C("1", "2 kHz"), C("2", "5 kHz"), C("3", "10 kHz"), C("4", "20 kHz"),
+            C("5", "50 kHz"), C("6", "100 kHz"), C("7", "200 kHz"), C("8", "500 kHz"), C("9", "1 MHz")
+        };
+
+        private static readonly SpectrumWidthChoice[] Ft991Choices =
+        {
+            C("03", "50 kHz"), C("04", "100 kHz"), C("05", "200 kHz"), C("06", "500 kHz"), C("07", "1000 kHz")
+        };
+
+        // P3 and PX3: 100 Hz units, six digits.
+        private static readonly SpectrumWidthChoice[] ElecraftP3Choices =
+        {
+            C("000020", "2 kHz"), C("000050", "5 kHz"), C("000100", "10 kHz"), C("000200", "20 kHz"),
+            C("000500", "50 kHz"), C("001000", "100 kHz"), C("002000", "200 kHz")
+        };
+
+        public static readonly SpectrumRadio[] Radios =
+        {
+            new SpectrumRadio("IC-705", "IC705", SpectrumCommandKind.IcomCiv, IcomSpan, IcomChoices),
+            new SpectrumRadio("IC-7300", "IC7300", SpectrumCommandKind.IcomCiv, IcomSpan, IcomChoices),
+            new SpectrumRadio("IC-7300MK2", "IC7300MK2", SpectrumCommandKind.IcomCiv, IcomSpan, IcomChoices),
+            new SpectrumRadio("IC-7610", "IC7610", SpectrumCommandKind.IcomCiv, IcomSpan, IcomChoices),
+            new SpectrumRadio("IC-7760", "IC7760", SpectrumCommandKind.IcomCiv, IcomSpan, IcomChoices),
+            new SpectrumRadio("IC-9700", "IC9700", SpectrumCommandKind.IcomCiv, IcomSpan, IcomChoices),
+
+            new SpectrumRadio("FTDX10", "FTDX10", SpectrumCommandKind.Ascii, c => "SS05" + c + "0000;", YaesuSsChoices),
+            new SpectrumRadio("FTDX101D / MP", "FTDX101", SpectrumCommandKind.Ascii, c => "SS05" + c + "0000;", YaesuSsChoices),
+            new SpectrumRadio("FT-710", "FT710", SpectrumCommandKind.Ascii, c => "SS05" + c + "0000;", YaesuSsChoices),
+            new SpectrumRadio("FT-991", "FT991", SpectrumCommandKind.Ascii, c => "EX120" + c + ";", Ft991Choices),
+            new SpectrumRadio("FT-991A", "FT991A", SpectrumCommandKind.Ascii, c => "EX116" + c + ";", Ft991Choices),
+            new SpectrumRadio("FT-891", "FT891", SpectrumCommandKind.Ascii, c => "EX1302" + c + ";",
+                C("0", "37.5 kHz"), C("1", "75 kHz"), C("2", "150 kHz"), C("3", "375 kHz"), C("4", "750 kHz")),
+            new SpectrumRadio("FTDX3000", "FTDX3000", SpectrumCommandKind.Ascii, c => "EX128" + c + ";",
+                C("0", "20 kHz"), C("1", "50 kHz"), C("2", "100 kHz"), C("3", "200 kHz"), C("4", "500 kHz"), C("5", "1000 kHz")),
+
+            new SpectrumRadio("TS-890S", "TS890", SpectrumCommandKind.Ascii, c => "BS4" + c + ";",
+                C("0", "5 kHz"), C("1", "10 kHz"), C("2", "25 kHz"), C("3", "50 kHz"), C("4", "100 kHz"),
+                C("5", "200 kHz"), C("6", "500 kHz")),
+            new SpectrumRadio("TS-990S (firmware 1.20 or later)", "TS990", SpectrumCommandKind.Ascii, c => "BS4" + c + ";",
+                C("0", "±2.5 kHz"), C("1", "±5 kHz"), C("2", "±10 kHz"), C("3", "±15 kHz"), C("4", "±25 kHz"),
+                C("5", "±50 kHz"), C("6", "±100 kHz"), C("7", "±250 kHz")),
+
+            new SpectrumRadio("K4", "K4", SpectrumCommandKind.Ascii, c => "#SPN" + c + ";",
+                C("6000", "6 kHz"), C("10000", "10 kHz"), C("25000", "25 kHz"), C("50000", "50 kHz"),
+                C("100000", "100 kHz"), C("200000", "200 kHz"), C("368000", "368 kHz")),
+            new SpectrumRadio("K3 / K3S (with a P3)", "K3", SpectrumCommandKind.Ascii, c => "#SPN" + c + ";", ElecraftP3Choices),
+            new SpectrumRadio("KX3 (with a PX3)", "KX3", SpectrumCommandKind.Ascii, c => "#SPN" + c + ";", ElecraftP3Choices),
+        };
+
+        // OmniRig's name with the punctuation and the word Elecraft taken out, as the voice
+        // message table does it: "IC-7610-DATA-FIL1" -> "IC7610DATAFIL1".
+        private static string ModelKey(string rigType)
+        {
+            string name = (rigType ?? string.Empty).Trim().ToUpperInvariant();
+            if (name.StartsWith("ELECRAFT", StringComparison.Ordinal))
+                name = name.Substring("ELECRAFT".Length);
+            var model = new StringBuilder(name.Length);
+            foreach (char c in name)
+                if (char.IsLetterOrDigit(c)) model.Append(c);
+            return model.ToString();
+        }
+
+        /// <summary>
+        /// The row for the radio OmniRig is running, or null. The LONGEST match wins: "FTDX101D"
+        /// also starts with "FTDX10", and "FT991A" with "FT991" - and those are different radios.
+        /// </summary>
+        public static SpectrumRadio RadioFor(string rigType)
+        {
+            string key = ModelKey(rigType);
+            if (key.Length == 0) return null;
+            return Radios.Where(r => key.StartsWith(r.ModelKey, StringComparison.Ordinal))
+                         .OrderByDescending(r => r.ModelKey.Length)
+                         .FirstOrDefault();
+        }
+
+        // Saved as "IC7610|SSB=25000;IC7610|CW=2500". Only filled cells are kept.
+        public static Dictionary<string, string> Load()
+        {
+            var cells = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            try
+            {
+                string text = Properties.Settings.Default.SpectrumWidths ?? string.Empty;
+                foreach (string item in text.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries))
+                {
+                    int eq = item.IndexOf('=');
+                    if (eq <= 0) continue;
+                    cells[item.Substring(0, eq).Trim()] = item.Substring(eq + 1).Trim();
+                }
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+            return cells;
+        }
+
+        public static void Save(Dictionary<string, string> cells)
+        {
+            Properties.Settings.Default.SpectrumWidths = string.Join(";",
+                cells.Where(c => !string.IsNullOrEmpty(c.Value)).Select(c => c.Key + "=" + c.Value));
+            Properties.Settings.Default.Save();
+        }
+
+        public static string CellKey(SpectrumRadio radio, string mode) => radio.ModelKey + "|" + mode;
+
+        /// <summary>
+        /// The width chosen for this radio in this mode, or null when the cell is empty - or holds a
+        /// code the radio's list no longer has, which is never sent.
+        /// </summary>
+        public static SpectrumWidthChoice ChosenFor(SpectrumRadio radio, string mode)
+        {
+            if (radio == null || string.IsNullOrEmpty(mode)) return null;
+            string code;
+            if (!Load().TryGetValue(CellKey(radio, mode), out code)) return null;
+            return radio.Choices.FirstOrDefault(c => c.Code == code);
+        }
+    }
+
+    /// <summary>
+    /// Options > Radio Control Panel > Spectrum width manager. One row per radio, one column per
+    /// mode, and in each cell only the widths that radio's manual lists.
+    /// </summary>
+    internal sealed class SpectrumWidthManagerWindow : System.Windows.Window
+    {
+        private const string Empty = "—";
+
+        internal static void Show(System.Windows.Window owner, string connectedRig)
+        {
+            new SpectrumWidthManagerWindow(connectedRig) { Owner = owner }.ShowDialog();
+        }
+
+        private readonly Dictionary<string, string> _cells = SpectrumWidths.Load();
+
+        private SpectrumWidthManagerWindow(string connectedRig)
+        {
+            Title = "Spectrum width manager";
+            SizeToContent = System.Windows.SizeToContent.WidthAndHeight;
+            ResizeMode = System.Windows.ResizeMode.NoResize;
+            ShowInTaskbar = false;
+            WindowStartupLocation = System.Windows.WindowStartupLocation.CenterOwner;
+            SetResourceReference(BackgroundProperty, "WindowBg");
+
+            var stack = new System.Windows.Controls.StackPanel { Margin = new System.Windows.Thickness(18, 16, 18, 16) };
+
+            stack.Children.Add(new System.Windows.Controls.TextBlock
+            {
+                Text = "Choose a width for each mode. HolyLogger sends it when it changes the radio's mode. "
+                     + "Leave “" + Empty + "” and nothing is sent.",
+                FontSize = 16,
+                TextWrapping = System.Windows.TextWrapping.Wrap,
+                MaxWidth = 900,
+                HorizontalAlignment = System.Windows.HorizontalAlignment.Left,
+                Margin = new System.Windows.Thickness(0, 0, 0, 4)
+            });
+            stack.Children.Add(new System.Windows.Controls.TextBlock
+            {
+                Text = "Icom: the scope must be in Center mode.",
+                FontSize = 16,
+                Margin = new System.Windows.Thickness(0, 0, 0, 10)
+            });
+
+            SpectrumRadio mine = SpectrumWidths.RadioFor(connectedRig);
+            if (!string.IsNullOrWhiteSpace(connectedRig))
+            {
+                var yours = new System.Windows.Controls.TextBlock
+                {
+                    Text = mine != null
+                        ? "Your radio: " + connectedRig + " (shown in bold)"
+                        : "Your radio: " + connectedRig + " - not on this list, so no width is sent.",
+                    FontSize = 16,
+                    FontWeight = System.Windows.FontWeights.Bold,
+                    Margin = new System.Windows.Thickness(0, 0, 0, 10)
+                };
+                yours.SetResourceReference(System.Windows.Controls.TextBlock.ForegroundProperty, "AccentBrush");
+                stack.Children.Add(yours);
+            }
+
+            var grid = new System.Windows.Controls.Grid();
+            grid.ColumnDefinitions.Add(new System.Windows.Controls.ColumnDefinition { Width = System.Windows.GridLength.Auto });
+            foreach (string _ in SpectrumWidths.Modes)
+                grid.ColumnDefinitions.Add(new System.Windows.Controls.ColumnDefinition { Width = new System.Windows.GridLength(125) });
+
+            grid.RowDefinitions.Add(new System.Windows.Controls.RowDefinition { Height = System.Windows.GridLength.Auto });
+            AddText(grid, "Radio", 0, 0, true);
+            for (int m = 0; m < SpectrumWidths.Modes.Length; m++)
+                AddText(grid, SpectrumWidths.Modes[m], 0, m + 1, true);
+
+            for (int r = 0; r < SpectrumWidths.Radios.Length; r++)
+            {
+                SpectrumRadio radio = SpectrumWidths.Radios[r];
+                int row = r + 1;
+                grid.RowDefinitions.Add(new System.Windows.Controls.RowDefinition { Height = System.Windows.GridLength.Auto });
+                AddText(grid, radio.Name, row, 0, ReferenceEquals(radio, mine));
+
+                for (int m = 0; m < SpectrumWidths.Modes.Length; m++)
+                {
+                    string key = SpectrumWidths.CellKey(radio, SpectrumWidths.Modes[m]);
+                    var box = new System.Windows.Controls.ComboBox
+                    {
+                        FontSize = 16,
+                        Width = 115,
+                        Margin = new System.Windows.Thickness(0, 3, 10, 3),
+                        HorizontalAlignment = System.Windows.HorizontalAlignment.Left
+                    };
+                    box.Items.Add(Empty);
+                    foreach (var choice in radio.Choices) box.Items.Add(choice);
+
+                    string saved;
+                    object selected = Empty;
+                    if (_cells.TryGetValue(key, out saved))
+                        selected = radio.Choices.FirstOrDefault(c => c.Code == saved) ?? (object)Empty;
+                    box.SelectedItem = selected;
+
+                    box.SelectionChanged += (s, e) =>
+                    {
+                        var picked = box.SelectedItem as SpectrumWidthChoice;
+                        if (picked == null) _cells.Remove(key);
+                        else _cells[key] = picked.Code;
+                        SpectrumWidths.Save(_cells);
+                    };
+
+                    System.Windows.Controls.Grid.SetRow(box, row);
+                    System.Windows.Controls.Grid.SetColumn(box, m + 1);
+                    grid.Children.Add(box);
+                }
+            }
+
+            stack.Children.Add(grid);
+
+            var close = new System.Windows.Controls.Button
+            {
+                Content = "Close",
+                FontSize = 16,
+                Height = 34,
+                MinWidth = 110,
+                Margin = new System.Windows.Thickness(0, 16, 0, 0),
+                HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
+                IsDefault = true,
+                IsCancel = true
+            };
+            close.Click += (s, e) => Close();
+            stack.Children.Add(close);
+
+            // Grows to its content, but never past the screen, so Close stays reachable.
+            Content = new System.Windows.Controls.ScrollViewer
+            {
+                Content = stack,
+                VerticalScrollBarVisibility = System.Windows.Controls.ScrollBarVisibility.Auto,
+                HorizontalScrollBarVisibility = System.Windows.Controls.ScrollBarVisibility.Disabled,
+                MaxHeight = Math.Max(300, System.Windows.SystemParameters.WorkArea.Height - 80)
+            };
+        }
+
+        private static void AddText(System.Windows.Controls.Grid grid, string text, int row, int column, bool bold)
+        {
+            var block = new System.Windows.Controls.TextBlock
+            {
+                Text = text,
+                FontSize = 16,
+                FontWeight = bold ? System.Windows.FontWeights.Bold : System.Windows.FontWeights.Normal,
+                VerticalAlignment = System.Windows.VerticalAlignment.Center,
+                Margin = new System.Windows.Thickness(0, 3, 14, 3)
+            };
+            System.Windows.Controls.Grid.SetRow(block, row);
+            System.Windows.Controls.Grid.SetColumn(block, column);
+            grid.Children.Add(block);
+        }
+    }
 }
