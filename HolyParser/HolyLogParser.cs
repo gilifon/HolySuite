@@ -1364,6 +1364,49 @@ namespace HolyParser
             return s.ToString();
         }
 
+        // THE FREQUENCY IS MEGAHERTZ AND NOTHING ELSE. convertFreqToBand below has to guess whether a
+        // number is MHz, kHz or Hz, because it reads ADIF written by a dozen other programs - and that
+        // guess is wrong for the main window, whose frequency box is always MHz. A radio on 7.036 MHz
+        // with the satellite shift added showed 1975.036, which that function read as 1975 kHz and
+        // called 160M. There is no amateur band at 1975 MHz (the allocations jump from 23cm to 13cm),
+        // so the honest answer is no band at all, and an empty Band box says exactly that.
+        //
+        // One behaviour goes with the strict reading: "2.4" in the box is 2.4 MHz, which is no band,
+        // where the guessing version read it as 2.4 GHz and answered 13CM. A box in MHz cannot have it
+        // both ways, and 2400.2 - what a 13cm operator's box actually holds - is answered below.
+        public static string convertMhzToBand(string freqMhz)
+        {
+            double mhz;
+            if (!double.TryParse((freqMhz ?? string.Empty).Trim(), NumberStyles.Float,
+                                 CultureInfo.InvariantCulture, out mhz) || mhz <= 0) return string.Empty;
+
+            if (mhz >= 1.8 && mhz <= 2) return "160M";
+            if (mhz >= 3.5 && mhz <= 4) return "80M";
+            if (mhz >= 5 && mhz <= 5.4) return "60M";
+            if (mhz >= 7 && mhz <= 7.3) return "40M";
+            if (mhz >= 10 && mhz <= 10.15) return "30M";
+            if (mhz >= 14 && mhz <= 14.35) return "20M";
+            if (mhz >= 18 && mhz <= 18.168) return "17M";
+            if (mhz >= 21 && mhz <= 21.45) return "15M";
+            if (mhz >= 24.89 && mhz <= 24.99) return "12M";
+            if (mhz >= 28 && mhz <= 29.7) return "10M";
+            if (mhz >= 50 && mhz <= 54) return "6M";
+            if (mhz >= 70 && mhz <= 71) return "4M";
+            if (mhz >= 144 && mhz <= 148) return "2M";
+            if (mhz >= 222 && mhz <= 225) return "1.25M";
+            if (mhz >= 420 && mhz <= 450) return "70CM";
+            if (mhz >= 902 && mhz <= 928) return "33CM";
+            if (mhz >= 1240 && mhz <= 1300) return "23CM";
+            // The satellite bands, in the units a transverter operator's box holds them: 2400.2 up and
+            // 10489.7 down are QO-100's own frequencies, not a mis-scaled HF number.
+            if (mhz >= 2300 && mhz <= 2450) return "13CM";
+            if (mhz >= 3300 && mhz <= 3500) return "9CM";
+            if (mhz >= 5650 && mhz <= 5925) return "6CM";
+            if (mhz >= 10000 && mhz <= 10500) return "3CM";
+            if (mhz >= 24000 && mhz <= 24250) return "1.2CM";
+            return string.Empty;   // between the bands: say so rather than name the nearest one
+        }
+
         public static string convertFreqToBand(string freq)
         {
             double parsedFreq;
