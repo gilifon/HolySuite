@@ -11892,6 +11892,8 @@ namespace HolyLogger
             if (optionWindow.SatelliteControlInstance.HasChanged)
             {
                 ShowRigParams();
+                UpdateSatelliteModeIcon();      // the dish by the clock comes or goes with the mode
+                ReloadRadioPanelPresets();      // and the panel drops the HF buttons, or gets them back
             }
             if (optionWindow.RadioControlPanelControlInstance.HasChanged)
             {

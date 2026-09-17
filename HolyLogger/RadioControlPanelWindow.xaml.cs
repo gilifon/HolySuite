@@ -223,7 +223,15 @@ namespace HolyLogger
 
         private void BuildButtons()
         {
-            _bands = RadioPanelPresets.Load();
+            // THE PANEL FOLLOWS THE MODE. In satellite mode the HF buttons are not just unused, they
+            // are wrong: the station is on a 432 IF feeding a transverter, and a press on 20m would
+            // take the radio away from the satellite. So satellite mode shows 2m and up, and nothing
+            // else; switch the mode off and the whole list comes back. Rebuilt whenever Options
+            // closes, which is where the mode is changed.
+            var all = RadioPanelPresets.Load();
+            _bands = Properties.Settings.Default.IsSatelliteMode
+                ? all.Where(b => b.LowKhz >= 144000).ToList()
+                : all;
             _bandButtons.Clear();
             ButtonGrid.Children.Clear();
             ModeRow.Children.Clear();
