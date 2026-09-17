@@ -10828,6 +10828,18 @@ namespace HolyLogger
             bool wrongBand = !FrequencyIsEmpty
                              && string.IsNullOrWhiteSpace(HolyLogParser.convertMhzToBand(TB_Frequency.Text));
             BandWarningOverlay.Visibility = wrongBand ? Visibility.Visible : Visibility.Collapsed;
+            if (!wrongBand) return;
+
+            // THE MARK HAS TO BE ABLE TO ANSWER "why?". It used to carry a tooltip and IsHitTestVisible
+            // = False, which means the mouse went straight through it and the tooltip never appeared.
+            // The text is written here rather than in the XAML because satellite mode deserves its own
+            // sentence: that is the case where a perfectly good radio frequency has been moved off every
+            // band by the shift, and the cure is a switch in Options, not a different radio.
+            string why = Properties.Settings.Default.IsSatelliteMode
+                ? "Satellite mode is on, so the shift has moved this frequency off every ham band."
+                  + Environment.NewLine + "Switch satellite mode off if you are not on the satellite."
+                : "This frequency is not in any ham band.";
+            BandWarningOverlay.ToolTip = new TextBlock { Text = why, FontSize = 16 };
         }
 
         private void TB_Frequency_GotFocus(object sender, RoutedEventArgs e)
