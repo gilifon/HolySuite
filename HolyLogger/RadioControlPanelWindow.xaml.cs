@@ -228,13 +228,15 @@ namespace HolyLogger
             // take the radio away from the satellite. So satellite mode shows 2m and up, and nothing
             // else; switch the mode off and the whole list comes back. Rebuilt whenever Options
             // closes, which is where the mode is changed.
-            // and the HF panel keeps the bands it always had - 160m to 4m - with nothing from 2m up
-            // cluttering it. The two lists never overlap: the mode decides which one is on screen.
-            // The Options page still lists every band, so their frequencies can be set either way.
+            // and the ordinary panel carries everything a radio tunes directly: 160m up to 70cm, with
+            // the microwave bands left out - nobody works 3cm without a transverter. The two lists
+            // overlap on 2m and 70cm, which belong to both worlds: terrestrial contacts on one side,
+            // the satellite's IF on the other. The Options page still lists every band, so the
+            // frequencies behind both lists can be set up there.
             var all = RadioPanelPresets.Load();
             _bands = all.Where(b => Properties.Settings.Default.IsSatelliteMode
                                         ? b.LowKhz >= 144000
-                                        : b.LowKhz < 144000).ToList();
+                                        : b.LowKhz < 1000000).ToList();
             _bandButtons.Clear();
             ButtonGrid.Children.Clear();
             ModeRow.Children.Clear();
