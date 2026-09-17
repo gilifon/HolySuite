@@ -902,6 +902,7 @@ namespace HolyLogger
                 {
                     double radioRX = (double)Rig.GetRxFrequency() / 1000000;
                     double radioTX = (double)Rig.GetTxFrequency() / 1000000;
+                    if (radioRX > 0) lastRealRigKhz = radioRX * 1000.0;   // before the satellite shift
                     if (Properties.Settings.Default.IsSatelliteMode)
                         radioRX += Properties.Settings.Default.SatelliteShift;
 
@@ -1358,6 +1359,12 @@ namespace HolyLogger
             catch (Exception swallowed) { Log.Swallow(swallowed); }
         }
 
+        // The radio's last real (non-zero) RX frequency in kHz, with no satellite shift. OmniRig can
+        // answer 0 before it has polled the frequency register; the LED already skips those, and the
+        // panel must too - taking the 0 left no band lit and made the mode buttons do nothing (they
+        // had no frequency to go to) until the radio itself moved and OmniRig reported again.
+        private double lastRealRigKhz;
+
         /// <summary>
         /// Tells the panel what the radio is doing. Called from ShowRigParams, which runs on every
         /// OmniRig params/status event, so the panel follows the radio without a timer of its own.
@@ -1387,6 +1394,8 @@ namespace HolyLogger
                     // The radio's real frequency, with no satellite shift applied: the shift belongs to
                     // what is logged, not to which band the radio is actually sitting on.
                     khz = (double)Rig.GetRxFrequency() / 1000.0;
+                    if (khz > 0) lastRealRigKhz = khz;
+                    else khz = lastRealRigKhz;   // not polled yet: keep the last real reading
                     mode = GetNormalizedRigMode();
 
                     // GetNormalizedRigMode collapses both of OmniRig's digital slots into "DIGI" -
