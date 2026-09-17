@@ -246,24 +246,37 @@ namespace HolyLogger
             var style = (Style)Resources["PanelToggleStyle"];
 
             // THE GRID'S ROW COUNT IS WORKED OUT, NOT WRITTEN DOWN. It was fixed at 5 in the XAML,
-            // which fitted the 13 bands that existed then exactly; adding 2m, 70cm and the microwave
-            // bands would have squeezed 22 cells into 15 and cut the bottom rows off. Cells are every
-            // band but the last, then a blank, the last band, and another blank - count + 2 - three to
-            // a row. The window is SizeToContent="Height", so it grows to whatever this asks for.
-            ButtonGrid.Rows = (int)Math.Ceiling((_bands.Count + 2) / 3.0);
+            // which fitted the 13 bands that existed then exactly, and any other number either cut
+            // the bottom row off or left an empty one. The window is SizeToContent="Height", so it
+            // grows to whatever this asks for.
+            //
+            // A FULL LAST ROW IS LEFT FULL. The lone last band centred between two blanks is what to
+            // do with a row that cannot be filled - with 15 bands it wasted a whole row, putting 70cm
+            // by itself under a complete row of three. When the count divides by three, every button
+            // simply follows the one before it.
+            bool lastRowIsFull = _bands.Count > 0 && _bands.Count % 3 == 0;
+            ButtonGrid.Rows = lastRowIsFull
+                ? _bands.Count / 3
+                : (int)Math.Ceiling((_bands.Count + 2) / 3.0);
 
-            // Every band gets a button, in order, except the last one - that band sits alone in the
-            // middle of its row, its left and right cells (Columns 0 and 2) left blank on purpose.
             // SSB, AM and CW are not in this grid at all - they fill ModeRow, just below the divider.
-            for (int i = 0; i < _bands.Count - 1; i++)
-                ButtonGrid.Children.Add(MakeBandButton(_bands[i], style));
+            if (lastRowIsFull)
+            {
+                foreach (var band in _bands)
+                    ButtonGrid.Children.Add(MakeBandButton(band, style));
+            }
+            else
+            {
+                for (int i = 0; i < _bands.Count - 1; i++)
+                    ButtonGrid.Children.Add(MakeBandButton(_bands[i], style));
 
-            ButtonGrid.Children.Add(new Border());   // blank - left of the last band
+                ButtonGrid.Children.Add(new Border());   // blank - left of the last band
 
-            if (_bands.Count > 0)
-                ButtonGrid.Children.Add(MakeBandButton(_bands[_bands.Count - 1], style));
+                if (_bands.Count > 0)
+                    ButtonGrid.Children.Add(MakeBandButton(_bands[_bands.Count - 1], style));
 
-            ButtonGrid.Children.Add(new Border());   // blank - right of the last band
+                ButtonGrid.Children.Add(new Border());   // blank - right of the last band
+            }
 
             _ssbButton = MakeModeButton("SSB", style);
             ModeRow.Children.Add(_ssbButton);
