@@ -1101,9 +1101,10 @@
                      centred text in this same stretched cell, so its right edge moves with the time
                      string, and the dish would have wandered with it. Pinned 38px in from the right it
                      sits between the clock and the heartbeat button (24 wide, 8 in) and never moves,
-                     and it still appears when the clock itself is switched off. -->
-                <Image x:Name="SatModeIcon" Source="Images/satV.png" Width="22" Height="22"
-                       HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,38,0"
+                     and it still appears when the clock itself is switched off. 56 in, not 38: at 38
+                     the two icons read as one pair of buttons. -->
+                <Image x:Name="SatModeIcon" Source="Images/satV.png" Width="26" Height="26"
+                       HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,56,0"
                        Cursor="Hand" Visibility="Collapsed" MouseUp="SatModeIcon_MouseUp"/>
 
                 <!-- Heartbeat button, at the top right corner of the window, past the clock. The clock
