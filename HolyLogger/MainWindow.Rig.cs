@@ -904,25 +904,21 @@ namespace HolyLogger
                     double radioTX = (double)Rig.GetTxFrequency() / 1000000;
                     if (radioRX > 0) lastRealRigKhz = radioRX * 1000.0;
 
-                    // THE SATELLITE SHIFT IS NOT ADDED HERE. It used to be, and it put a frequency on
-                    // the screen that the radio was not on: with Satellite Mode ticked, Settings
-                    // .SatelliteShift was added to radioRX, so a radio sitting on 7.036 MHz lit the LED
-                    // as 1975036.000 kHz while the Radio Control Panel, which reads the rig directly,
-                    // still showed 7036.000 - and the Band box, derived from the displayed number,
-                    // said 160M, so the QSO was logged on the wrong band. Reported from a demonstration
-                    // on someone else's PC, 2026-09-17.
+                    // THE SATELLITE SHIFT, ADDED WHILE SATELLITE MODE IS ON. It is the transverter's
+                    // offset, not a decoration: the radio sits on a 70cm IF and the transverter puts the
+                    // signal out on 2400 MHz, so 432.200 on the dial IS 2400.200 on the air - which is
+                    // what belongs in the log. Hence the shipped 1968 (2400 - 432), and hence 308 QSOs
+                    // in this operator's log sitting correctly at 2400.x on 13CM.
                     //
-                    // The shift describes the UPLINK. Its proper home in ADIF is FREQ/BAND for the
-                    // uplink with FREQ_RX/BAND_RX for the downlink, not the one box that says where
-                    // the radio is. Until that pair is stored, Satellite Mode still marks the QSO the
-                    // way it always did - PROP_MODE=SAT and the satellite name, and SatelliteShift is
-                    // read by nothing at all.
-                    //
-                    // ABOUT THAT SETTING'S SHIPPED VALUE, 1968: it is NOT QO-100's shift, whatever the
-                    // satellite name beside it says. QO-100 goes up on 2400.05-2400.30 MHz and comes
-                    // down on 10489.55-10489.80, a gap of about 8089.5 MHz. Where 1968 came from is
-                    // unknown. A single box also cannot be right for more than one satellite: every
-                    // one of them has its own gap, so whatever finally uses this must be per-satellite.
+                    // Removed on 2026-09-17 after a demonstration showed a radio on 7.036 MHz lighting
+                    // the LED as 1975036.000 kHz with the Band box on 160M, and put back on 2026-09-18
+                    // when the log showed what the shift is for. The demo fault was not the shift: it
+                    // was satellite mode left on while working HF, with nothing on screen saying so.
+                    // Three QSOs in 105,855 were logged that way (2019-12-30 and 2020-04-05). The dish
+                    // beside the UTC clock - UpdateSatelliteModeIcon - is the answer to that, not
+                    // taking the shift away from the operators who use it.
+                    if (Properties.Settings.Default.IsSatelliteMode)
+                        radioRX += Properties.Settings.Default.SatelliteShift;
 
                     // OmniRig can fire StatusChange before it has polled the rig's frequency
                     // register; GetRxFrequency returns 0 in that window. Skip the update so
