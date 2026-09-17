@@ -761,6 +761,7 @@ namespace HolyLogger
 
             ApplyLogColumnLayout();
             ToggleMatrixControl();
+            UpdateSatelliteModeIcon();
             ToggleAzimuthControl();
             NetworkFlag.Fill = isNetworkAvailable ? new SolidColorBrush(Color.FromRgb(0x00, 0xFF, 0x00)) : new SolidColorBrush(Color.FromRgb(0xFF, 0x00, 0x00));
             NetworkChange.NetworkAvailabilityChanged += NetworkChange_NetworkAvailabilityChanged;
@@ -1760,6 +1761,38 @@ namespace HolyLogger
             else
             {
                 L_TitleClock.Visibility = Visibility.Collapsed;
+            }
+        }
+
+        // The dish beside the clock: shown only while Satellite Mode is ticked. It is the only place on
+        // the main window that says so - the mode changes what every saved QSO carries (PROP_MODE=SAT
+        // and the satellite name), and it was possible to work a whole session without knowing it was
+        // on. Independent of the clock's own setting: the clock can be off and this must still show.
+        private void UpdateSatelliteModeIcon()
+        {
+            if (SatModeIcon == null) return;
+            if (!Properties.Settings.Default.IsSatelliteMode)
+            {
+                SatModeIcon.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            string name = (Properties.Settings.Default.SatelliteName ?? string.Empty).Trim();
+            SatModeIcon.ToolTip = (name.Length > 0 ? "Satellite mode is on: " + name + "." : "Satellite mode is on.")
+                                  + Environment.NewLine + "Every QSO you save is marked as a satellite contact."
+                                  + Environment.NewLine + "Click to open the satellite settings.";
+            SatModeIcon.Visibility = Visibility.Visible;
+        }
+
+        // The whole point of the dish is to be noticed and turned off, so it opens the page that holds
+        // the switch rather than only explaining itself in a tooltip.
+        private void SatModeIcon_MouseUp(object sender, MouseButtonEventArgs e)
+        {
+            OptionsMenuItemMenuItem_Click(null, null);
+            if (options != null && options.SatelliteItem != null)
+            {
+                options.SatelliteItem.IsSelected = true;
+                options.SatelliteItem.BringIntoView();
             }
         }
 
@@ -11822,6 +11855,7 @@ namespace HolyLogger
                 SetQrzConnected(isNetworkAvailable && !string.IsNullOrWhiteSpace(_SessionKey));
             }
             ToggleMatrixControl();
+            UpdateSatelliteModeIcon();
             ToggleAzimuthControl();
             if (optionWindow.GeneralSettingsControlControlInstance.HasChanged)
             {
