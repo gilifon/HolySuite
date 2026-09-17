@@ -1179,6 +1179,24 @@ namespace HolyLogger
             // arrive exactly when the text is already hard to follow and make it harder still. The
             // operator asked for silence instead, and silence is also the honest answer - we did not
             // hear a letter.
+            //
+            // MEASURED AND THROWN OUT: SPLITTING IT INTO TWO LETTERS AT ITS LONGEST GAP.
+            //
+            // Counted first: 7.3% of the letters on his transmission over the fading path spell
+            // nothing, 6.2% on his own recordings, 0.6% on W1AW - and many look like two letters with
+            // the gap between them read short (".....-", "-.-..-"). The gap between two letters is the
+            // longest in the pattern and it was measured, so the pattern was split there, when that gap
+            // stood out from every other by a factor and both halves spelled a letter:
+            //
+            //     split when longest gap is   generated   his recordings   W1AW read  invented   4Z5SL read  invented
+            //       off                        248/256       32/34           1009       327          88        233
+            //       any amount longer          248           32              1007       334          88        239
+            //       1.2 times                  248           32              1009       328          88        234
+            //       1.3, 1.5 or 2 times        248           32              1009       327          88        233
+            //
+            // Clear splits changed no word on any bench; looser ones only invented. A word with one
+            // letter recovered is usually still wrong somewhere else, and a pattern with no clear
+            // pause in it was never two letters that could be told apart.
             string letter;
             if (FromMorseTable.TryGetValue(pattern, out letter)) Output(letter);
         }
