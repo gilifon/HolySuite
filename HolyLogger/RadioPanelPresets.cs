@@ -72,6 +72,23 @@ namespace HolyLogger
         // AA5AU and others agree on all nine) - close to the segment's low edge, where RTTY has
         // always concentrated. 60m, 8m and 4m have no such segment and no established RTTY
         // convention at all, so their RTTY column repeats the CW slot rather than inventing one.
+        // ABOVE 4m: 2m and 70cm first, because satellite mode needs 70cm - a 432 IF with the 1968 MHz
+        // transverter shift is what puts the station on QO-100's 2400 uplink, and the panel could not
+        // reach 432 at all. Then the microwave bands, so a station that HAS a radio up there is not
+        // told the panel stops at 4m. A radio that cannot reach a band is what the per-band Select
+        // checkbox in Options is for: uncheck it and the button greys out.
+        //
+        // The EDGES are IARU Region 1 allocations: 2m 144-146, 70cm 430-440, 23cm 1240-1300,
+        // 13cm 2300-2450, 9cm 3400-3410 (the narrowband slice most R1 countries actually have),
+        // 6cm 5650-5850, 3cm 10000-10500 MHz.
+        //
+        // The FREQUENCIES inside them are the conventional narrowband calling spots - 2m 144.300 SSB
+        // / 144.050 CW, 70cm 432.200 / 432.050, 23cm 1296.200 / 1296.050, 6cm 5760.200, 3cm 10368.200
+        // - and, on 13cm, QO-100's own transponder rather than the terrestrial 2320.200, because that
+        // is what a 13cm station is nearly always doing. Microwave calling frequencies vary more by
+        // country than HF ones do, and like every row here they are a starting point the operator
+        // edits. The bands with no digimode convention repeat their CW slot, the way 60m, 8m and 4m
+        // already do.
         private static readonly object[][] Factory =
         {
             //   label   name    low     high    ssb     cw      rtty
@@ -88,6 +105,13 @@ namespace HolyLogger
             new object[] { "40",  "8m",   40660,  40700,  40680,  40680,  40680 },
             new object[] { "50",  "6m",   50000,  54000,  50150,  50090,  50090 },
             new object[] { "70",  "4m",   70000,  70500,  70200,  70200,  70200 },
+            new object[] { "144", "2m",  144000, 146000, 144300, 144050, 144600 },
+            new object[] { "432", "70cm",430000, 440000, 432200, 432050, 432600 },
+            new object[] { "1296","23cm",1240000,1300000,1296200,1296050,1296050 },
+            new object[] { "2400","13cm",2300000,2450000,2400200,2400075,2400075 },
+            new object[] { "3400","9cm", 3400000,3410000,3400200,3400200,3400200 },
+            new object[] { "5760","6cm", 5650000,5850000,5760200,5760200,5760200 },
+            new object[] { "10368","3cm",10000000,10500000,10368200,10368200,10368200 },
         };
 
         // The band EDGES never change and are not the operator's to edit - only the two frequencies

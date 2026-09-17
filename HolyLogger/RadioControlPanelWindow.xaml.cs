@@ -232,6 +232,13 @@ namespace HolyLogger
 
             var style = (Style)Resources["PanelToggleStyle"];
 
+            // THE GRID'S ROW COUNT IS WORKED OUT, NOT WRITTEN DOWN. It was fixed at 5 in the XAML,
+            // which fitted the 13 bands that existed then exactly; adding 2m, 70cm and the microwave
+            // bands would have squeezed 22 cells into 15 and cut the bottom rows off. Cells are every
+            // band but the last, then a blank, the last band, and another blank - count + 2 - three to
+            // a row. The window is SizeToContent="Height", so it grows to whatever this asks for.
+            ButtonGrid.Rows = (int)Math.Ceiling((_bands.Count + 2) / 3.0);
+
             // Every band gets a button, in order, except the last one - that band sits alone in the
             // middle of its row, its left and right cells (Columns 0 and 2) left blank on purpose.
             // SSB, AM and CW are not in this grid at all - they fill ModeRow, just below the divider.
