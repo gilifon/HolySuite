@@ -194,6 +194,44 @@ namespace HolyLogger
         // The length of the shadow is not critical: 1.5 dits reads 1003, 2.5 reads 1006, and 4 or 8
         // add two fewer invented words and nothing else. 2.5 is kept because it cannot reach past
         // the gap between letters into the next one.
+        // A SILENCE THIS SHORT, in dits, INSIDE A MARK IS A DIP, NOT THE END OF IT.
+        //
+        // Measured on his own transmission heard in Europe (recordingsz5sl): one mark in eleven was
+        // a fragment under three quarters of a dit, against one in fifty on W1AW, and silences under
+        // half a dit were ten times as common. A signal that has come over a fading path drops for a
+        // few milliseconds in the middle of a dah, the key threshold sees two marks, and a dah comes
+        // out as two dits - HB9CVQ was printed EEEEBONCVQ. So a mark is held for this long after the
+        // tone goes: if it comes straight back, the mark carries on as one.
+        //
+        // JOINING EVERY SHORT DIP WAS A TRAP, and a tempting one. It read far more of his own
+        // transmission, and it wrecked everything else, because a dit, its gap and the next dit
+        // measured in noise can look exactly like a dah with a dip in it:
+        //
+        //     joined whenever the dip is short     generated   his recordings   4Z5SL read  invented
+        //       off                                  247/256       32/34           85        246
+        //       0.25 dit                             240           32              86        239
+        //       0.5 dit                              200           29              98        218
+        //
+        // So two pieces are joined only if one of them is a FRAGMENT - see FragmentDits - which a
+        // torn element leaves and two real dits do not. Swept with that rule, and this is the first
+        // change here that loses on none of the four benches:
+        //
+        //     dip    fragment   generated   his recordings   W1AW read  invented   4Z5SL read  invented
+        //     off       -        247/256       32/34           1006       328          85        246
+        //     0.25     0.75      247           32              1007       327          86        241
+        //     0.3      0.5       248           32              1008       328          85        239
+        //     0.3      0.75      248           32              1009       327          86        237   <- kept
+        //     0.3      1.0       240           31              1009       326          86        233
+        //     0.35     0.75      239           32              1010       325          87        229
+        //     0.5      0.75      227           29              1012       322          88        230
+        //
+        // The bigger gain on his signal is still there to be had, at 0.5 dit and joining everything -
+        // but only by a test that can tell a torn dah from two dits by something other than length.
+        const double DipDits = 0.3;
+
+        // A piece of a mark shorter than this, in dits, is a fragment - no operator sends one.
+        const double FragmentDits = 0.75;
+
         const double DahShadowDits = 2.5;        // how long after a dah the lower line applies
         const double DahShadowOnFraction = 0.50; // the lower line, as a fraction of the loud-quiet span
 
@@ -219,6 +257,8 @@ namespace HolyLogger
 
         bool _keyDown;
         bool _lastMarkWasDah;               // the dit right after a dah is the one that goes missing
+        double _heldMarkMs;                 // a mark whose end may yet turn out to be a dip - see DipDits
+        double _heldDipMs;                  // the short silence after it, while the next mark decides
         double _stateMs;                    // how long the current on/off stretch has lasted
         double _ditMs = 60.0;               // 20 WPM until the sending says otherwise
         readonly double[] _marks = new double[MarkMemory];
@@ -306,7 +346,7 @@ namespace HolyLogger
             Array.Clear(_levelHistory, 0, _levelHistory.Length);
             _windowFill = 0; _levelIndex = 0;
             _noiseFloor = 0; _peak = 0; _levelsSeeded = false;
-            _keyDown = false; _lastMarkWasDah = false; _stateMs = 0;
+            _keyDown = false; _lastMarkWasDah = false; _heldMarkMs = 0; _heldDipMs = 0; _stateMs = 0;
             _ditMs = 60.0;
             _markCount = 0; _markNext = 0;
             Array.Clear(_marks, 0, _marks.Length);
@@ -474,6 +514,8 @@ namespace HolyLogger
                 FinishAnythingPending();
                 _keyDown = false;
                 _lastMarkWasDah = false;
+                _heldMarkMs = 0;
+                _heldDipMs = 0;
                 _stateMs = 0;
                 return;
             }
@@ -555,7 +597,12 @@ namespace HolyLogger
             if (nowDown == _keyDown)
             {
                 _stateMs += FrameMilliseconds;
-                if (!_keyDown) CheckGaps();
+                if (!_keyDown)
+                {
+                    // The silence has now lasted too long to be a dip: the held mark really ended.
+                    if (_heldMarkMs > 0 && _stateMs > _ditMs * DipDits) ReleaseHeldMark();
+                    CheckGaps();
+                }
                 return;
             }
 
@@ -564,8 +611,45 @@ namespace HolyLogger
             _keyDown = nowDown;
             _stateMs = FrameMilliseconds;
 
-            if (!nowDown) EndOfMark(lasted);
-            else RememberGap(lasted);
+            if (!nowDown)
+            {
+                if (_heldDipMs > 0)
+                {
+                    // A MARK, A SHORT DIP, AND NOW A SECOND MARK - one element broken by fading, or
+                    // two real ones close together? Only a FRAGMENT gives it away: a dah torn in the
+                    // middle leaves at least one piece far shorter than any dit, while a dit, its
+                    // gap and the next dit leave two pieces of full size. Joining without asking this
+                    // welded real dit pairs together and cost the generated bench 47 cases.
+                    double first = _heldMarkMs, dip = _heldDipMs, second = lasted;
+                    _heldDipMs = 0;
+                    double fragment = _ditMs * FragmentDits;
+
+                    if (first < fragment || second < fragment)
+                        _heldMarkMs = first + dip + second;
+                    else
+                    {
+                        _heldMarkMs = 0;
+                        EndOfMark(first);
+                        RememberGap(dip);
+                        _heldMarkMs = second;
+                    }
+                }
+                else _heldMarkMs = lasted;
+
+                // NOT ENDED YET - it may be a dip. See DipDits.
+                if (DipDits <= 0) ReleaseHeldMark();
+            }
+            else if (_heldMarkMs > 0 && lasted <= _ditMs * DipDits)
+            {
+                // The tone came straight back. Whether that silence was a dip or a real gap is
+                // decided when this next mark ends and its length is known - see above.
+                _heldDipMs = lasted;
+            }
+            else
+            {
+                ReleaseHeldMark();
+                RememberGap(lasted);
+            }
         }
 
         // THE NOTE TO A FEW Hz, not to the nearest 25.
@@ -659,6 +743,14 @@ namespace HolyLogger
             }
             double power = s1 * s1 + s2 * s2 - coefficient * s1 * s2;
             return power < 0 ? 0 : power / _windowSamples;
+        }
+
+        void ReleaseHeldMark()
+        {
+            if (_heldMarkMs <= 0) return;
+            double mark = _heldMarkMs;
+            _heldMarkMs = 0;
+            EndOfMark(mark);
         }
 
         void EndOfMark(double lengthMs)
