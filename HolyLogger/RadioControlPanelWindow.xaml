@@ -197,6 +197,14 @@
              thing that made the window taller than it used to be. -->
         <Border Grid.Row="2" Height="3" Background="#8B5A2B" Margin="2,0,2,0"/>
 
+        <!-- The mode half of the panel, on the same light blue as the main window's entry form -
+             FormBg, so it follows the colour scheme instead of being one hardcoded blue that would go
+             wrong the moment the operator picks a dark one. Declared BEFORE the things it sits behind:
+             children later in the file paint on top of it. It spans both remaining rows, which is what
+             makes the divider read as a line between two areas rather than a line under the buttons. -->
+        <Border Grid.Row="3" Grid.RowSpan="2" Background="{DynamicResource FormBg}"
+                CornerRadius="4" Margin="2,4,2,0"/>
+
         <!-- SSB, AM and CW - one row, filled in by BuildButtons the same way ButtonGrid's cells are.
              RTTY and FM are not here at all - they sit in the row below, flanking TX/RX (see the next
              Grid). -->
