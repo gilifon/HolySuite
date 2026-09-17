@@ -195,7 +195,7 @@
              it. No top/bottom margin of its own: the row above and below already carry their
              buttons' usual 4px margins, and giving the divider more air on top of that was the one
              thing that made the window taller than it used to be. -->
-        <Border Grid.Row="2" Height="2" Background="#8B5A2B" Margin="2,0,2,0"/>
+        <Border Grid.Row="2" Height="3" Background="#8B5A2B" Margin="2,0,2,0"/>
 
         <!-- SSB, AM and CW - one row, filled in by BuildButtons the same way ButtonGrid's cells are.
              RTTY and FM are not here at all - they sit in the row below, flanking TX/RX (see the next
