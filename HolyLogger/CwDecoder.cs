@@ -258,6 +258,33 @@ namespace HolyLogger
         // A piece of a mark shorter than this, in dits, is a fragment - no operator sends one.
         const double FragmentDits = 0.75;
 
+        // MEASURED AND THROWN OUT: TELLING A FADE FROM A GAP BY HOW DEEP IT FALLS.
+        //
+        // The idea was sound on paper. When the key goes up the tone is gone and the loudness drops
+        // to the band noise; when a path fades for an instant the tone is only weaker. So a short
+        // silence whose quietest reading stayed well above the noise floor should be a fade, and its
+        // two pieces could be joined even when neither is a fragment - reaching for the bigger gain
+        // on his transmission that joining every dip showed (86 -> 98 words).
+        //
+        // The depths were measured first, on every short silence: his transmission over the fading
+        // path, W1AW, and his own IC-7610 recordings all show the SAME spread, deep and shallow alike,
+        // with no separate hump for fades. Swept anyway, with the fragment rule kept for the shortest
+        // silences and depth deciding the longer ones:
+        //
+        //     held   shallow at   generated   his recordings   W1AW read  invented   4Z5SL read  invented
+        //     0.3        -         248/256        32/34           1009       327          88        233
+        //     0.4       0.15       247            31              1014       318          93        226
+        //     0.5       0.15       246            31              1017       315          94        228
+        //     0.5       0.2        247            31              1016       316          93        231
+        //
+        // Every form of it cost a word on his own recordings, and the word says why: SP9ADG came out
+        // NP9ADG - two real dits of the S joined into a dah. On a fast, weak signal through a narrow
+        // filter the gap between two dits never falls to the floor either; the 20 ms filter and the
+        // 25 ms average smear it shut. The generated cases it broke were the same kind, 28 WPM and
+        // weak through a 300 Hz filter. Depth cannot separate a fade from a real gap that is too short
+        // to be heard all the way down, and those are exactly the gaps in question. A callsign lost
+        // is worse than a few words gained.
+
         const double DahShadowDits = 2.5;        // how long after a dah the lower line applies
         const double DahShadowOnFraction = 0.50; // the lower line, as a fraction of the loud-quiet span
 
