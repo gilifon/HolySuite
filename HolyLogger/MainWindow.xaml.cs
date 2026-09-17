@@ -10845,10 +10845,19 @@ namespace HolyLogger
             // sentence: that is the case where a perfectly good radio frequency has been moved off every
             // band by the shift, and the cure is a switch in Options, not a different radio.
             string why = Properties.Settings.Default.IsSatelliteMode
-                ? "Satellite mode is on, so the shift has moved this frequency off every ham band."
-                  + Environment.NewLine + "Switch satellite mode off if you are not on the satellite."
+                ? "Satellite mode is on." + Environment.NewLine
+                  + "The shift moved this frequency off every ham band." + Environment.NewLine
+                  + "Switch it off if you are not on the satellite."
                 : "This frequency is not in any ham band.";
-            BandWarningOverlay.ToolTip = new TextBlock { Text = why, FontSize = 16 };
+            // Wrapped and capped: one long line ran off the right of the tooltip and lost its last
+            // words. Short lines plus a width the text can fold inside means nothing is cut again.
+            BandWarningOverlay.ToolTip = new TextBlock
+            {
+                Text = why,
+                FontSize = 16,
+                TextWrapping = TextWrapping.Wrap,
+                MaxWidth = 380
+            };
         }
 
         private void TB_Frequency_GotFocus(object sender, RoutedEventArgs e)
