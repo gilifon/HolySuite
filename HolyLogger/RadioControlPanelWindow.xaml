@@ -201,9 +201,12 @@
              FormBg, so it follows the colour scheme instead of being one hardcoded blue that would go
              wrong the moment the operator picks a dark one. Declared BEFORE the things it sits behind:
              children later in the file paint on top of it. It spans both remaining rows, which is what
-             makes the divider read as a line between two areas rather than a line under the buttons. -->
+             makes the divider read as a line between two areas rather than a line under the buttons.
+             NEGATIVE MARGINS ON PURPOSE: the outer Grid holds everything 8px in from the window,
+             and the blue is meant to reach the window's own edge on both sides and along the bottom,
+             so it is pulled back out by exactly that 8. Its top is flush with the divider. -->
         <Border Grid.Row="3" Grid.RowSpan="2" Background="{DynamicResource FormBg}"
-                CornerRadius="4" Margin="2,4,2,0"/>
+                Margin="-8,0,-8,-8"/>
 
         <!-- SSB, AM and CW - one row, filled in by BuildButtons the same way ButtonGrid's cells are.
              RTTY and FM are not here at all - they sit in the row below, flanking TX/RX (see the next
