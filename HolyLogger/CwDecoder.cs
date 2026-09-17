@@ -194,6 +194,32 @@ namespace HolyLogger
         // The length of the shadow is not critical: 1.5 dits reads 1003, 2.5 reads 1006, and 4 or 8
         // add two fewer invented words and nothing else. 2.5 is kept because it cannot reach past
         // the gap between letters into the next one.
+        // HOW LONG A STATION ALREADY PROVED TO BE MORSE MAY FADE BELOW THE SIGNAL LINE BEFORE IT IS
+        // GIVEN UP, in milliseconds.
+        //
+        // Giving up costs far more than the moment it lasts. It throws away the text held back, the
+        // letter half spelled out and the proof that this is Morse at all, so after every dip the
+        // decoder has to earn its trust again from nothing - four more dits and dahs before a letter
+        // is printed. On his own transmission heard in Austria the signal test called the frequency
+        // empty for about a tenth of the time he was sending, and whole stretches of text were
+        // never printed. A fade on HF lasts a fraction of a second to a second or two; a station that
+        // has really stopped does not come back, and the grace runs out.
+        //
+        // READING ON THROUGH THE FADE LOST; WAITING THROUGH IT WON. Both swept on all four benches:
+        //
+        //     through a fade        grace    generated  his recordings  W1AW read  invented  4Z5SL read  invented
+        //     (no grace)              -       248/256       32/34         1009       327         86        237
+        //     read on                0.5s     248           32            1009       327         89        244
+        //     read on                1s       248           31            1009       327         90        255
+        //     wait, read nothing     1s       248           32            1009       327         88        234
+        //     wait, read nothing     2s       248           32            1009       327         88        233   <- kept
+        //
+        // Reading on recovers the most words and invents more than it recovers, because what sits
+        // under the line in a fade is mostly noise. Waiting loses on no bench. Beyond two seconds it
+        // changes nothing more, and a longer grace would hand a new station the old one's trust.
+        const double FadeGraceMs = 2000.0;
+        const bool PauseDuringFade = true;
+
         // A SILENCE THIS SHORT, in dits, INSIDE A MARK IS A DIP, NOT THE END OF IT.
         //
         // Measured on his own transmission heard in Europe (recordingsz5sl): one mark in eleven was
@@ -259,6 +285,7 @@ namespace HolyLogger
         bool _lastMarkWasDah;               // the dit right after a dah is the one that goes missing
         double _heldMarkMs;                 // a mark whose end may yet turn out to be a dip - see DipDits
         double _heldDipMs;                  // the short silence after it, while the next mark decides
+        double _fadedMs;                    // how long a proved station has been under the signal line - see FadeGraceMs
         double _stateMs;                    // how long the current on/off stretch has lasted
         double _ditMs = 60.0;               // 20 WPM until the sending says otherwise
         readonly double[] _marks = new double[MarkMemory];
@@ -346,7 +373,7 @@ namespace HolyLogger
             Array.Clear(_levelHistory, 0, _levelHistory.Length);
             _windowFill = 0; _levelIndex = 0;
             _noiseFloor = 0; _peak = 0; _levelsSeeded = false;
-            _keyDown = false; _lastMarkWasDah = false; _heldMarkMs = 0; _heldDipMs = 0; _stateMs = 0;
+            _keyDown = false; _lastMarkWasDah = false; _heldMarkMs = 0; _heldDipMs = 0; _fadedMs = 0; _stateMs = 0;
             _ditMs = 60.0;
             _markCount = 0; _markNext = 0;
             Array.Clear(_marks, 0, _marks.Length);
@@ -505,10 +532,29 @@ namespace HolyLogger
             // and over, and every time it went absent the letter being spelled out was thrown away -
             // so a station next to another one lost letters it had actually decoded correctly.
             double standsOutBy = _binAverage[_bestBin] / NoiseBesideTheNote();
-            SignalPresent = (SignalPresent
+            bool standsOut = (SignalPresent
                                 ? standsOutBy > SignalOverNoise * 0.5
                                 : standsOutBy > SignalOverNoise)
                             && span > 1e-5;
+
+            // A STATION ALREADY PROVED TO BE MORSE IS NOT GIVEN UP AT THE FIRST FADE - see FadeGraceMs.
+            bool fading = false;
+            if (standsOut) _fadedMs = 0;
+            else if (SignalPresent && _looksLikeMorse && _fadedMs < FadeGraceMs)
+            {
+                _fadedMs += FrameMilliseconds;
+                standsOut = true;
+                fading = true;
+            }
+
+            SignalPresent = standsOut;
+
+            // WHILE IT IS FADED, NOTHING IS READ - the decoder only waits. Reading on through the fade
+            // was tried first: it did recover words, and it printed more wrong ones than it recovered,
+            // because what is under the line in a fade is mostly noise. Waiting keeps everything the
+            // fade used to destroy - the trust, the held text, the letter in hand - and reads nothing
+            // that is not there.
+            if (fading && PauseDuringFade) return;
             if (!SignalPresent)
             {
                 FinishAnythingPending();
