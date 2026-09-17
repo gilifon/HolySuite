@@ -619,6 +619,24 @@ namespace HolyLogger
             // measurably worse - 86 of 104 against 94 - and it destroyed fast sending completely,
             // because at 40 WPM a mark is 30 ms and there is not enough of it to learn from. Deep
             // fading is left as a known weakness rather than paid for with everything else.
+            // SWEPT AGAIN ON 18 SEPTEMBER 2026, both lines together, now that a second transmission of
+            // his (recordingsz5sl2, a clear frequency, all three parts) had joined the benches.
+            // Every move helps somewhere and costs somewhere, so both lines stay where they are:
+            //
+            //     start  keep    generated   his recordings   W1AW read  invented   4Z5SL read  invented
+            //     0.45   0.35     238/256       33/34           1026       303         356        470
+            //     0.48   0.35     246           32              1020       310         367        475
+            //     0.50   0.35     246           32              1017       319         366        487
+            //     0.55   0.35     248           32              1009       327         370        508   <- kept
+            //     0.60   0.35     248           30               998       338         371        543
+            //     0.55   0.25     244           28              1031       303         382        481
+            //     0.55   0.30     246           31              1020       311         372        497
+            //     0.55   0.40     248           31               991       348         352        538
+            //     0.48   0.30     243           31              1032       296         368        471
+            //
+            // A lower start line reads more of W1AW and one more word of his own recordings, and
+            // invents fewer words everywhere - but it costs ten generated cases and fourteen words of
+            // his transmission. Nothing here wins on all five, which is the standing rule.
             double onThreshold = _noiseFloor + span * 0.55;
             double offThreshold = _noiseFloor + span * 0.35;
 
