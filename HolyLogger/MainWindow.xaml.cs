@@ -4550,6 +4550,8 @@ namespace HolyLogger
             cwKeyboard = new CwKeyboardWindow(
                 chunk =>
                 {
+                    AskIcomBreakInBeforeCw(rigType);
+
                     // A Yaesu takes two: the text into a memory, then the memory played.
                     string[] pair = BuildYaesuCwCommands(rigType, chunk);
                     if (pair != null)
@@ -5095,6 +5097,71 @@ namespace HolyLogger
             TrySendOmniRigCustomCommand(command, replyLength, replyEnd);
         }
 
+        // -- IS BREAK-IN ON? (ICOM) ---------------------------------------------------------------
+        //
+        // WITH BK-IN OFF AN ICOM KEYS NOTHING. CW sent by CAT only goes on the air "when the
+        // transceiver is transmitting or the Break-in function is ON in the CW mode" (IC-7300MK2 CI-V
+        // Reference Guide, command 17). Otherwise the operator hears the sidetone and believes it went
+        // out - found on an IC-7300MK2, where the Msg buttons "sent" and the radio never transmitted.
+        //
+        // 16 47 reads it: 00 = OFF, 01 = semi, 02 = full (same guide). Asked once at the start of each
+        // burst of sending, not per keyer chunk, so the question never sits between two chunks of a
+        // message. An Icom that does not know 16 47 answers NG (FA) or nothing, and gets no warning.
+        //
+        // ONLY ICOM SO FAR. Kenwood, Yaesu and Elecraft are still to be checked against their manuals.
+        private DateTime lastCwSendUtc = DateTime.MinValue;
+        private DateTime breakInWarnedUtc = DateTime.MinValue;
+
+        private void AskIcomBreakInBeforeCw(string rigType)
+        {
+            DateTime now = DateTime.UtcNow;
+            bool newBurst = now - lastCwSendUtc > TimeSpan.FromSeconds(5);
+            lastCwSendUtc = now;
+            if (!newBurst) return;
+
+            string icom = GetIcomCivAddress(rigType);
+            if (icom == null) return;
+
+            // Seven bytes echoed, then the eight-byte answer FE FE E0 <rig> 16 47 dd FD.
+            string ask = "FE FE " + icom + " E0 16 47 FD";
+            bool sent = TrySendOmniRigCustomCommand(ask, 15, string.Empty);
+            breakInAskedUtc = now;
+            Log.Warn("BKIN asked " + rigType + ": " + ask + (sent ? "" : " (SEND FAILED)"));
+        }
+
+        // Replies arriving this soon after the question are written to the log, raw, so a radio that
+        // answers in a shape not expected here can be seen rather than guessed at.
+        private DateTime breakInAskedUtc = DateTime.MinValue;
+
+        // True when the reply is Icom's answer to 16 47 saying break-in is OFF.
+        private static bool ReplySaysBreakInOff(object reply)
+        {
+            byte[] b = ReplyBytes(reply);
+            if (b == null) return false;
+
+            // Addressed to us (E0 in the TO position), which tells the answer from the echo.
+            for (int i = 0; i + 7 < b.Length; i++)
+            {
+                if (b[i] != 0xFE || b[i + 1] != 0xFE || b[i + 2] != 0xE0) continue;
+                if (b[i + 4] != 0x16 || b[i + 5] != 0x47 || b[i + 7] != 0xFD) continue;
+                return b[i + 6] == 0x00;
+            }
+            return false;
+        }
+
+        private void ShowBreakInOffWarning()
+        {
+            // Once per half minute: every keyer chunk of a message that is not going out must not
+            // bring up a box of its own.
+            if (DateTime.UtcNow - breakInWarnedUtc < TimeSpan.FromSeconds(30)) return;
+            breakInWarnedUtc = DateTime.UtcNow;
+
+            HolyMessageBox.ShowWarning(
+                "BK-IN is off on the radio, so the CW did not go out on the air.\n\n"
+                + "Turn BK-IN on at the radio.",
+                "CW Text", this);
+        }
+
         // -- THE LITE KEYER ON THE MENU ROW ------------------------------------------------------
         //
         // The window is the full keyer; this is the one line. It is on the bar only while that window
@@ -5131,6 +5198,7 @@ namespace HolyLogger
         private bool SendCwChunkToRadio(string chunk)
         {
             string rigType = NormalizeRigType(Rig != null ? Rig.RigType : null);
+            AskIcomBreakInBeforeCw(rigType);
 
             // A Yaesu takes two: the text into a memory, then the memory played.
             string[] pair = BuildYaesuCwCommands(rigType, chunk);
@@ -5258,6 +5326,19 @@ namespace HolyLogger
 
         private void OmniRigEngine_CustomReply(int RigNumber, object Command, object Reply)
         {
+            if (DateTime.UtcNow - breakInAskedUtc < TimeSpan.FromSeconds(3))
+            {
+                byte[] raw = ReplyBytes(Reply);
+                Log.Warn("BKIN reply: " + (raw == null ? "(null, " + (Reply == null ? "null" : Reply.GetType().Name) + ")"
+                                                       : BitConverter.ToString(raw).Replace("-", " ")));
+            }
+
+            if (ReplySaysBreakInOff(Reply))
+            {
+                Dispatcher.BeginInvoke(new Action(ShowBreakInOffWarning));
+                return;
+            }
+
             int wpm = CwSpeedFromReply(Reply);
             if (wpm <= 0) return;
 
@@ -5523,6 +5604,8 @@ namespace HolyLogger
                     "CW Text", this);
                 return;
             }
+
+            AskIcomBreakInBeforeCw(rigType);
 
             // A Yaesu takes two commands - the text into memory 5, then that memory played - so it is
             // handled before the single-command path rather than inside it.
