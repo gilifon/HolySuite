@@ -10787,7 +10787,9 @@ namespace HolyLogger
         {
             if (TB_Band != null)
             {
-                string band = HolyLogParser.convertFreqToBand(TB_Frequency.Text);
+                // convertMhzToBand, not convertFreqToBand: this box is always MHz, and the guessing
+                // version read the satellite-shifted 1975.036 as 1975 kHz and answered 160M.
+                string band = HolyLogParser.convertMhzToBand(TB_Frequency.Text);
                 if (!string.IsNullOrWhiteSpace(band))
                 {
                     RestartHeartbeatTimer();
@@ -10819,9 +10821,12 @@ namespace HolyLogger
         private void UpdateBandWarningIcon()
         {
             if (BandWarningOverlay == null) return;
-            bool wrongBand = Properties.Settings.Default.ValidateHamFrequency
-                             && !FrequencyIsEmpty
-                             && string.IsNullOrWhiteSpace(HolyLogParser.convertFreqToBand(TB_Frequency.Text));
+            // NOT TIED TO "Validate ham frequency" ANY MORE. That setting decides whether the program
+            // stops you on Add; it was never a reason to hide the fact that the frequency on screen
+            // belongs to no band. The mark states what is true and costs nothing - the operator can
+            // still save whatever he likes.
+            bool wrongBand = !FrequencyIsEmpty
+                             && string.IsNullOrWhiteSpace(HolyLogParser.convertMhzToBand(TB_Frequency.Text));
             BandWarningOverlay.Visibility = wrongBand ? Visibility.Visible : Visibility.Collapsed;
         }
 
@@ -11427,7 +11432,7 @@ namespace HolyLogger
 
             string band = FrequencyIsEmpty
                 ? string.Empty
-                : HolyLogParser.convertFreqToBand(TB_Frequency.Text);
+                : HolyLogParser.convertMhzToBand(TB_Frequency.Text);
             if (!string.IsNullOrWhiteSpace(band)) return true;   // a real amateur band -> nothing to warn
 
             var dlg = new HamFreqWarningWindow(FrequencyInKhzText()) { Owner = this };
