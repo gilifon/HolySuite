@@ -1640,8 +1640,7 @@
              is a purely visual cue that the frequency needs fixing, and it never blocks the click. -->
         <Border x:Name="BandWarningOverlay" Margin="419,49,0,0" Grid.Row="1" Width="58" Height="28"
                 HorizontalAlignment="Left" VerticalAlignment="Top" Background="Transparent"
-                IsHitTestVisible="False" Visibility="Collapsed"
-                ToolTip="This frequency is not an amateur band">
+                Visibility="Collapsed">
             <TextBlock Text="&#x26A0;" Foreground="#C0392B" FontSize="18" FontWeight="Bold"
                        HorizontalAlignment="Center" VerticalAlignment="Center"/>
         </Border>
