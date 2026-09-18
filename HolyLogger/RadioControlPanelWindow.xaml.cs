@@ -404,12 +404,23 @@ namespace HolyLogger
             foreach (var button in _bandButtons)
                 button.IsChecked = rigOnline && ReferenceEquals(button.Tag, _currentBand);
 
+            // 30m has no phone allocation by international band plan - CW and digital only, nothing
+            // WARC calls "All modes" the way 17m gets one. SSB, AM and FM all go dark while the radio
+            // is showing 30m, however it got there (the band button, the wheel, the radio's own VFO)
+            // - this only ever turns a button off, never touches the radio itself. CW and RTTY, the
+            // modes the band actually allows, stay lit.
+            bool on30m = _currentBand != null && string.Equals(_currentBand.Name, "30m", StringComparison.OrdinalIgnoreCase);
+
             if (_modeButtons != null)
             {
                 foreach (var entry in _modeButtons)
                 {
                     entry.Button.IsChecked = rigOnline && string.Equals(mode, entry.Mode, StringComparison.OrdinalIgnoreCase);
-                    entry.Button.IsEnabled = rigOnline;
+                    bool isPhoneMode = string.Equals(entry.Mode, "SSB", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(entry.Mode, "AM", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(entry.Mode, "FM", StringComparison.OrdinalIgnoreCase);
+                    bool blockedOn30m = on30m && isPhoneMode;
+                    entry.Button.IsEnabled = rigOnline && !blockedOn30m;
                 }
             }
 
@@ -525,7 +536,12 @@ namespace HolyLogger
             button.IsChecked = ReferenceEquals(band, _currentBand);
 
             if (band == null) return;
-            _main.TuneRadioToKhz(band.FrequencyFor(_mode), _mode);
+
+            // 30m has no SSB by international band plan - pressing its button always asks for CW,
+            // whatever mode the panel was on, rather than repeating whatever the operator was last
+            // doing on a band that allows it. Every other band keeps the panel's current mode.
+            string mode = string.Equals(band.Name, "30m", StringComparison.OrdinalIgnoreCase) ? "CW" : _mode;
+            _main.TuneRadioToKhz(band.FrequencyFor(mode), mode);
         }
 
         private void ModeButton_Click(object sender, RoutedEventArgs e)

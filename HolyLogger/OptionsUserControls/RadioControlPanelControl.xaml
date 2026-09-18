@@ -5,9 +5,11 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:local="clr-namespace:HolyLogger.OptionsUserControls"
              mc:Ignorable="d"
-             d:DesignHeight="620" d:DesignWidth="700">
+             d:DesignHeight="420" d:DesignWidth="960">
 
-    <StackPanel HorizontalAlignment="Left" Width="680">
+    <!-- 940, not the old 680: the band table now runs in two column-groups side by side rather than
+         one column of twenty rows, and needs the width to lay both out without crowding. -->
+    <StackPanel HorizontalAlignment="Left" Width="940">
         <TextBlock Text="Radio Control Panel" FontSize="18" FontWeight="Bold" Margin="0,0,0,6"/>
         <TextBlock FontSize="16" TextWrapping="Wrap" Margin="0,0,0,10"
                    Text="Each band button on the panel holds three frequencies. Pressing the button moves the radio to the SSB one when the panel is on SSB, the CW one when it is on CW, and the RTTY one when it is on RTTY. Frequencies are in kHz. Uncheck Select for a band your radio does not cover - its button on the panel goes grey and stops responding."/>
