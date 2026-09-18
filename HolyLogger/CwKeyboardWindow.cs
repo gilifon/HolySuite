@@ -596,9 +596,10 @@ namespace HolyLogger
             };
 
             var overlayShift = new TranslateTransform();
+            _overlayShift = overlayShift;
             _sendOverlay.RenderTransform = overlayShift;
             _box.AddHandler(ScrollViewer.ScrollChangedEvent,
-                new ScrollChangedEventHandler((s2, e2) => overlayShift.X = -_box.HorizontalOffset));
+                new ScrollChangedEventHandler((s2, e2) => { if (!_following) overlayShift.X = -_box.HorizontalOffset; }));
 
             _box.Background = Brushes.Transparent;
             _box.Foreground = Brushes.Transparent;
@@ -609,8 +610,20 @@ namespace HolyLogger
             _box.SelectionOpacity = 0.35;
             _box.SetResourceReference(System.Windows.Controls.Primitives.TextBoxBase.CaretBrushProperty, "TextBrush");
 
+            // THE DRAWN TEXT SITS ON A CANVAS, which never cuts a child down to its own size. In the
+            // grid it was measured to the width of the row and clipped THERE, before it was slid left
+            // - so when the row glided along a long text, everything past the right edge had never
+            // been drawn and the row emptied from the right until the next piece dropped off the
+            // front. Now the whole text is drawn and only the frame (ClipToBounds on the grid) cuts it.
+            var overlayHost = new Canvas { IsHitTestVisible = false };
+            overlayHost.Children.Add(_sendOverlay);
+            SizeChangedEventHandler centre = (s2, e2) =>
+                Canvas.SetTop(_sendOverlay, Math.Max(0, (overlayHost.ActualHeight - _sendOverlay.ActualHeight) / 2));
+            overlayHost.SizeChanged += centre;
+            _sendOverlay.SizeChanged += centre;
+
             var sendLayers = new Grid { ClipToBounds = true };
-            sendLayers.Children.Add(_sendOverlay);
+            sendLayers.Children.Add(overlayHost);
             sendLayers.Children.Add(_box);
 
             var sendFrame = new Border
@@ -692,7 +705,7 @@ namespace HolyLogger
             // the radio keying whatever it had already been handed, with nothing left on the screen
             // saying so and no Escape to press. This catches every way out - the X, Ctrl+K, and the
             // program closing it itself when the radio leaves CW.
-            Closing += (s2, e2) => StopEverything();
+            Closing += (s2, e2) => { StopEverything(); StopGliding(); };
         }
 
         // ── A KEYER IN FRONT OF A RADIO IT CANNOT KEY ───────────────────────────────────────────
@@ -1170,6 +1183,7 @@ namespace HolyLogger
 
                 int caret = _box.CaretIndex;
                 _box.Text = text.Substring(drop);
+                _droppedFromFront += drop;
                 _box.CaretIndex = Math.Max(0, caret - drop);
                 _handedUpTo = Math.Max(0, _handedUpTo - drop);
                 _releasedUpTo = Math.Max(0, _releasedUpTo - drop);
@@ -1214,10 +1228,21 @@ namespace HolyLogger
                 if (drop <= 0) break;
                 if (KeyedSoFar(text) < drop) break;   // still being sent: it stays where he can see it
 
+                // WHILE THE ROW IS GLIDING, a piece leaves only once it has slid out of sight on the left.
+                // Handing it down the moment it was keyed took two dozen letters off the front at once -
+                // the whole line jumped, which was the very thing the glide is there to stop, and the
+                // keying never got far enough along to reach the middle and start the glide at all.
+                // Counting what has already gone this tick too: the glide takes those letters off its
+                // offset only on the next frame, and without them a second piece still on the screen
+                // was judged off it - two dozen letters vanished mid-row, found in the test window.
+                if (_following && _charWidth > 0
+                    && (_droppedFromFront + drop) * _charWidth > _followOffset + 0.5) break;
+
                 _inFlight.Dequeue();
 
                 int caret = _box.CaretIndex;
                 _box.Text = text.Substring(drop);
+                _droppedFromFront += drop;
                 _box.CaretIndex = Math.Max(0, caret - drop);
                 _handedUpTo = Math.Max(0, _handedUpTo - drop);
                 _releasedUpTo = Math.Max(0, _releasedUpTo - drop);
@@ -1231,10 +1256,25 @@ namespace HolyLogger
                 _box.UpdateLayout();
             }
 
-            if (moved) RenderHistory();
+            if (!moved) return;
+
+            // THE PICTURE AND THE SHIFT CHANGE TOGETHER, IN THIS SAME TICK. The drawn row used to be
+            // repainted only on the next tick, 50 ms later, while the glide moved it at the very next
+            // frame - so for a moment the old picture, still holding the piece just handed down, stood
+            // shifted by that piece's width, and the whole row flicked left and back each time a piece
+            // went into the record below. He saw it as a jump.
+            RepaintSendLine();
+            if (_following && _droppedFromFront > 0 && _charWidth > 0)
+            {
+                _followOffset = Math.Max(0, _followOffset - _droppedFromFront * _charWidth);
+                _droppedFromFront = 0;
+                _overlayShift.X = -_followOffset;
+            }
+
+            RenderHistory();
         }
 
-        // -- AND WHAT IS GOING OUT STAYS IN SIGHT -------------------------------------------------
+        // -- AND WHAT IS GOING OUT STAYS IN SIGHT, GLIDING ----------------------------------------
         //
         // TrimRowToWidth cannot help a row that is too long with text NOT YET KEYED - it only hands
         // down what has gone. A long text pasted in is exactly that, and the box, being one line, then
@@ -1243,40 +1283,168 @@ namespace HolyLogger
         // went out and nothing on it moved until the rest was short enough to fit. Found on the air,
         // sending the practice text for the decoder.
         //
-        // So while text is going out and he is not typing, the row is scrolled to keep the character
-        // being keyed near its left edge, a few already sent in front of it so he can see where it is.
-        // It moves in steps of about half a row rather than one character at a time, so it can be read.
+        // So while text is going out and he is not typing, the row follows the keying. The colouring
+        // walks along from the left as it always did; once it reaches the MIDDLE of the row, the row
+        // starts to slide left under it, so the letter going out stays in the middle with what has
+        // just gone on its left and what is coming on its right.
+        //
+        // SLIDING, NOT JUMPING. The first version moved half a row at a time, and he saw the line
+        // vanish for a moment and come back somewhere else - "not very elegant". So the position is
+        // worked out to a fraction of a letter from the keying clock, and on every frame the screen
+        // draws, the row eases a little towards it. The drawn text is moved directly, in the same
+        // frame, rather than waiting for the box to report that it has scrolled.
+        //
         // The moment he types, the box goes back to following his caret; a few seconds after he stops,
         // it follows the keying again.
-        private const int SentCharactersInFront = 3;
         private static readonly TimeSpan FollowKeyingAfterTyping = TimeSpan.FromSeconds(3);
+        private const double GlideSeconds = 0.15;       // how quickly the row catches up: smooth, not lagging
         private DateTime _lastTypedUtc = DateTime.MinValue;
+        private TranslateTransform _overlayShift;
+        private bool _following;
+        private bool _glideHooked;
+        private double _followOffset;
+        private double _charWidth;
+        private int _droppedFromFront;                  // letters taken off the front since the last frame
+        private TimeSpan _lastFrame = TimeSpan.Zero;
 
-        private void KeepKeyingInSight()
+        private bool ShouldFollowKeying()
         {
-            if (_box == null) return;
-
-            // Let the box finish its own scrolling first: a piece handed down to the record this very
-            // tick changes the text, and the box then scrolls to the caret. Scrolling after it, not
-            // before, is what keeps the keying in view instead of flicking between the two.
-            _box.UpdateLayout();
-
-            if (_box.ViewportWidth <= 0) return;
-            if (_box.ExtentWidth <= _box.ViewportWidth + 1) return;          // it all fits
-            if (_inFlight.Count == 0) return;                                // nothing is going out
-            if (DateTime.UtcNow - _lastTypedUtc < FollowKeyingAfterTyping) return;
+            if (_box == null || _box.ViewportWidth <= 0) return false;
+            if (_inFlight.Count == 0) return false;                                 // nothing going out
+            if (DateTime.UtcNow - _lastTypedUtc < FollowKeyingAfterTyping) return false;
 
             string text = _box.Text ?? string.Empty;
-            int from = Math.Max(0, Math.Min(KeyedSoFar(text) - SentCharactersInFront, text.Length - 1));
-            if (from < 0) return;
+            bool overflowing = text.Length * CharWidth(text) > _box.ViewportWidth + 1;
 
-            Rect at = _box.GetRectFromCharacterIndex(from);
-            if (at.IsEmpty) return;
+            // ONCE GLIDING, IT GLIDES TO THE END. When the last pieces go down to the record, what is
+            // left can suddenly fit the row - and stopping then let the box snap back to its own start,
+            // a jump of half a row just as the transmission finished. Found by him on a window wider
+            // than the one it was tested in. So a row that has slid along stays slid, and keeps the
+            // letter going out in the middle until the row is emptied into the record.
+            return overflowing || _following;
+        }
 
-            // Already in the left half of the row: leave it, so the text is not crawling under his eyes.
-            if (at.X >= 0 && at.X <= _box.ViewportWidth / 2) return;
+        // Called on every tick of the pump. The glide is hooked to the screen's frames only while
+        // there is something to follow, so an idle keyer costs nothing.
+        private void KeepKeyingInSight()
+        {
+            bool follow = ShouldFollowKeying();
+            if (follow && !_glideHooked)
+            {
+                _lastFrame = TimeSpan.Zero;
+                CompositionTarget.Rendering += GlideWithTheKeying;
+                _glideHooked = true;
+            }
+            else if (!follow && _glideHooked)
+            {
+                StopGliding();
+            }
+        }
 
-            _box.ScrollToHorizontalOffset(Math.Max(0, _box.HorizontalOffset + at.X));
+        private void StopGliding()
+        {
+            if (_glideHooked) CompositionTarget.Rendering -= GlideWithTheKeying;
+            _glideHooked = false;
+            _following = false;
+            _droppedFromFront = 0;
+            if (_overlayShift != null && _box != null) _overlayShift.X = -_box.HorizontalOffset;
+            if (_box != null)
+                _box.SetResourceReference(System.Windows.Controls.Primitives.TextBoxBase.CaretBrushProperty, "TextBrush");
+        }
+
+        private void GlideWithTheKeying(object sender, EventArgs e)
+        {
+            try
+            {
+                // Rendering can be raised more than once for one frame; only a new frame moves the row.
+                var frame = e as RenderingEventArgs;
+                double seconds = 1.0 / 60;
+                if (frame != null)
+                {
+                    if (frame.RenderingTime == _lastFrame) return;
+                    if (_lastFrame != TimeSpan.Zero) seconds = (frame.RenderingTime - _lastFrame).TotalSeconds;
+                    _lastFrame = frame.RenderingTime;
+                }
+
+                if (!ShouldFollowKeying()) { StopGliding(); return; }
+
+                string text = _box.Text ?? string.Empty;
+                double width = CharWidth(text);
+                if (width <= 0) return;
+
+                bool starting = !_following;
+                if (starting)
+                {
+                    _following = true;
+                    _followOffset = _box.HorizontalOffset;
+                    _droppedFromFront = 0;
+
+                    // The box cannot scroll as far as the drawn text now goes, so its caret would stand
+                    // a little off from the letters; it is hidden while the row glides.
+                    _box.CaretBrush = Brushes.Transparent;
+                }
+
+                // Letters handed down to the record have come off the front of the row: move by the
+                // same amount, so everything still on it stays exactly where it was on the screen.
+                if (_droppedFromFront > 0)
+                {
+                    _followOffset -= _droppedFromFront * width;
+                    _droppedFromFront = 0;
+                }
+
+                // As far as the LAST letter reaching the middle, not the last letter reaching the right
+                // edge: near the end the row empties from the right like a prompter, instead of the
+                // letter going out drifting from the middle to the far end.
+                double furthest = Math.Max(0, text.Length * width - _box.ViewportWidth / 2);
+                double wanted = KeyedPosition(text) * width - _box.ViewportWidth / 2;
+                wanted = Math.Max(0, Math.Min(furthest, wanted));
+
+                // Far away - just after a paste the box sits at the end - go straight there. Close by,
+                // ease towards it.
+                // Starting - just after a paste, with the box sitting at the far end - it goes straight
+                // to where it belongs rather than sliding across the whole text to get there.
+                if (starting || Math.Abs(wanted - _followOffset) > _box.ViewportWidth) _followOffset = wanted;
+                else _followOffset += (wanted - _followOffset) * (1 - Math.Exp(-Math.Max(0, seconds) / GlideSeconds));
+                if (_followOffset < 0) _followOffset = 0;
+
+                _overlayShift.X = -_followOffset;
+                if (Math.Abs(_box.HorizontalOffset - _followOffset) > 0.5) _box.ScrollToHorizontalOffset(_followOffset);
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); StopGliding(); }
+        }
+
+        // Consolas: every letter is the same width, so it is measured once.
+        private double CharWidth(string text)
+        {
+            if (_charWidth > 0 || _box == null || text.Length == 0) return _charWidth;
+
+            Rect first = _box.GetRectFromCharacterIndex(0);
+            Rect last = _box.GetRectFromCharacterIndex(text.Length);
+            if (first.IsEmpty || last.IsEmpty) return 0;
+
+            double w = (last.X - first.X) / text.Length;
+            if (w > 0) _charWidth = w;
+            return _charWidth;
+        }
+
+        // Where the keying has got to, in letters, WITH the fraction of the letter going out now - the
+        // same running total KeyedSoFar counts whole letters from. The fraction is what lets it glide.
+        private double KeyedPosition(string text)
+        {
+            if (text.Length == 0 || _handedUpTo <= 0) return 0;
+
+            int limit = Math.Min(_handedUpTo, text.Length);
+            var cumulative = CwSendMonitorWindow.CumulativeUnits(text.Substring(0, limit));
+
+            for (int i = 0; i < limit; i++)
+            {
+                double startsAt = i == 0 ? 0 : cumulative[i - 1];
+                double endsAt = cumulative[i];
+                if (_unitsKeyed < endsAt)
+                    return i + (endsAt > startsAt ? Math.Max(0, (_unitsKeyed - startsAt) / (endsAt - startsAt)) : 0);
+            }
+
+            return limit;
         }
 
         // The radio has stopped and stayed stopped for as long as the operator asked for. The line
@@ -1380,6 +1548,7 @@ namespace HolyLogger
                 int drop = Math.Min(chunk.Length + (sent.Value ? 1 : 0), text.Length);
 
                 _box.Text = text.Substring(drop);
+                _droppedFromFront += drop;
                 _handedUpTo = Math.Max(0, _handedUpTo - drop);
                 _releasedUpTo = Math.Max(0, _releasedUpTo - drop);
 
