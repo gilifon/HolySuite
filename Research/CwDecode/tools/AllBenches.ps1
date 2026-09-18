@@ -35,6 +35,7 @@ $recordings = Join-Path $tools "..\recordings"
 $bulletin = Join-Path $tools "..\training\w1aw\20260915-bulletin0000"
 $own = Join-Path $recordings "4z5sl"
 $own2 = Join-Path $recordings "4z5sl2"
+$own3 = Join-Path $recordings "4z5sl3"
 $py = "C:\Users\user\AppData\Local\Temp\claude\D--Dropbox-LAB-X230-PC-Holysuit-clone-HolySuite\2f8ddf56-5512-4cdb-af92-2976c1b4bafc\scratchpad\pyenv\Scripts\python.exe"
 $csc = "C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
 $src = [System.IO.File]::ReadAllText((Join-Path $app "CwDecoder.cs"))
@@ -74,10 +75,11 @@ foreach ($v in $Values) {
     $read = if ($b -match "READ (\d+) ") { [int]$Matches[1] } else { 0 }
     $invented = if ($b -match "INVENTED (\d+)") { [int]$Matches[1] } else { 0 }
 
-    # BOTH of his transmissions, counted together - 16 September on 7028 (three receivers, a busy
-    # frequency) and 17 September on 7036 (five receivers, clear, all three parts sent).
+    # ALL his transmissions, counted together - 16 September on 7028 (three receivers, a busy
+    # frequency), 17 September on 7036 (five receivers, clear) and 18 September on 10106 (morning,
+    # four receivers, part 3 ending at 10 W).
     $ownRead = 0; $ownOf = 0; $ownInvented = 0
-    foreach ($folder in @($own, $own2)) {
+    foreach ($folder in @($own, $own2, $own3)) {
         & "$build\AbBul.exe" $folder | Out-File "$build\own.txt" -Encoding utf8
         $o = & $py "$tools\ScoreText.py" "$folder\SENT.txt" "$build\own.txt"
         if ($o -match "READ (\d+) of (\d+)") { $ownRead += [int]$Matches[1]; $ownOf += [int]$Matches[2] }

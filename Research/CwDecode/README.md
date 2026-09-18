@@ -66,6 +66,14 @@ Standing score: 282 of 584 words read, 275 invented - against 88 of 337 on the f
 frequency where somebody else was working. Greece alone reads 87 of 121; the Hungarian copies, weak
 and fading, read about a third. `AllBenches.ps1` counts both sessions together.
 
+## recordings/4z5sl3/ - the third, on 30 metres in the morning
+
+18 September at about 05:40 UTC, 30 W on 10106 kHz (found quiet by the same listening), heard in
+Italy (Ischia, Trecastelli) and Hungary (HA2NA, HG5ACZ); the two German receivers tried heard
+nothing of him. Part 3 dropped to 10 W for its last few words. Standing score: 139 of 335 words read,
+192 invented. G4RCG began calling CQ on the frequency the moment he finished, so the files end with
+his K.
+
 To record another session: pick receivers from the public list by distance from Israel, test them
 with a 15-second `KiwiRecord.py` first (about one in three refuse), find a quiet frequency the same
 way, start them all recording, then he sends.
