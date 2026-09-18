@@ -1789,6 +1789,7 @@ namespace HolyLogger
                     // in QSOs that are on their way out and drop records that belong in the new log.
                     // They are only still there because the deleting now happens at the end.
                     int completedThisFile = 0, ambiguousThisFile = 0;
+                    var matchedInLog = new List<KeyValuePair<QSO, QSO>>();
                     if (_importChoice != ImportChoice.Replace)
                     {
                         _importPhase = $"checking which of the file's {count:N0} QSOs this log already has";
@@ -1797,9 +1798,13 @@ namespace HolyLogger
                         {
                             rawQSOList = dal.CompleteExistingQsos(rawQSOList, dal.ActiveLogId,
                                                                   out completedThisFile, out ambiguousThisFile,
-                                                                  null, mergeFilled, mergeAmbiguous, undo);
+                                                                  null, mergeFilled, mergeAmbiguous, undo,
+                                                                  matchedInLog);
                         }
                     }
+
+                    _importPhase = "settling the comments of contacts the file holds twice";
+                    ResolveImportComments(parser.GetDroppedCommentCopies(), matchedInLog, undo);
                     completedQso += completedThisFile;
                     ambiguousQso += ambiguousThisFile;
                     count = rawQSOList.Count;   // what is left is what actually gets inserted
@@ -2218,6 +2223,107 @@ namespace HolyLogger
                      + (string.IsNullOrWhiteSpace(op) ? string.Empty : "  /  " + op.Trim());
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); return null; }
+        }
+
+        // NO COMMENT IS LOST TO A DUPLICATE. Two ways an import meets the same contact twice: the log
+        // already has it (matched), or the file holds it twice and the second was dropped (copies). Either
+        // way the copy that is not stored may carry a comment of its own.
+        //
+        //   one comment between them  - it simply goes on the contact that stays, no question asked.
+        //   different comments        - the operator is asked once for the whole file, in the same
+        //                               window Remove Duplicates uses: tick one, several, or Merge all.
+        //                               Cancel leaves every comment as it was.
+        //
+        // Runs on the import's worker thread; only the window goes to the dispatcher.
+        private void ResolveImportComments(Dictionary<string, List<QSO>> copies,
+                                           List<KeyValuePair<QSO, QSO>> matched,
+                                           DataAccess.ImportUndo undo)
+        {
+            bool anyCopies = copies != null && copies.Count > 0;
+            bool anyMatched = matched != null && matched.Count > 0;
+            if (!anyCopies && !anyMatched) return;
+
+            var groups = new List<DupGroup>();
+            var inLogFor = new Dictionary<DupGroup, QSO>();   // the QSO already in the log, when there is one
+            var usedKeys = new HashSet<string>(StringComparer.Ordinal);
+
+            if (anyMatched)
+                foreach (var pair in matched)
+                {
+                    QSO target = pair.Key, incoming = pair.Value;
+                    string key = QSO.MatchKey(incoming);
+
+                    // The log's QSO first, so its comment is the one ticked for the operator.
+                    var members = new List<QSO> { target };
+                    List<QSO> fromFile;
+                    if (anyCopies && key != null && copies.TryGetValue(key, out fromFile))
+                    {
+                        members.AddRange(fromFile);
+                        usedKeys.Add(key);
+                    }
+                    else members.Add(incoming);
+
+                    DupGroup g = DupGroup.Of(members);
+                    if (g.Comments.Count == 0) continue;
+                    // The log already holds the only thing written: nothing to do.
+                    if (g.Comments.Count == 1 && string.Equals(g.Comments[0], (target.Comment ?? string.Empty).Trim(),
+                                                               StringComparison.OrdinalIgnoreCase)) continue;
+                    inLogFor[g] = target;
+                    groups.Add(g);
+                }
+
+            if (anyCopies)
+                foreach (var kv in copies)
+                {
+                    if (usedKeys.Contains(kv.Key)) continue;
+                    DupGroup g = DupGroup.Of(kv.Value);
+                    if (g.Comments.Count > 0) groups.Add(g);
+                }
+
+            if (groups.Count == 0) return;
+
+            var conflicts = groups.Where(g => g.NeedsChoice).ToList();
+            bool chosen = false;
+            if (conflicts.Count > 0 && !Dispatcher.HasShutdownStarted)
+                chosen = Dispatcher.Invoke(() =>
+                {
+                    var w = new DuplicatesWindow(conflicts, fromImport: true) { Owner = this };
+                    return w.ShowDialog() == true;
+                });
+
+            int filled = 0, merged = 0;
+            foreach (DupGroup g in groups)
+            {
+                // A group that needed a choice and got none (Cancel) keeps its comments as they were.
+                string comment = g.NeedsChoice ? (chosen && !g.Skipped ? g.ChosenComment : null) : g.ChosenComment;
+                comment = (comment ?? string.Empty).Trim();
+                if (comment.Length == 0) continue;
+
+                try
+                {
+                    QSO target;
+                    if (inLogFor.TryGetValue(g, out target))
+                    {
+                        if (string.Equals(comment, (target.Comment ?? string.Empty).Trim(), StringComparison.Ordinal))
+                            continue;
+                        if (undo != null) undo.NoteComment(target.id, target.Comment);
+                        target.Comment = comment;
+                        lock (_syncLock) { dal.Update(target); }
+                    }
+                    else
+                    {
+                        // Not in the log yet: the record that stays is about to be added, so its
+                        // comment is set before it is written.
+                        g.Members[0].Comment = comment;
+                    }
+                    if (g.NeedsChoice) merged++; else filled++;
+                }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
+            }
+
+            Log.Warn(string.Format(CultureInfo.InvariantCulture,
+                "IMPORT: comments of repeated contacts - {0:N0} moved across, {1:N0} of {2:N0} with different comments settled{3}",
+                filled, merged, conflicts.Count, conflicts.Count > 0 && !chosen ? " (window cancelled)" : ""));
         }
 
         private void WriteImportReport(List<ImportReject> rejects, List<HolyLogParser.FilledField> filled,

@@ -119,6 +119,10 @@ namespace HolyLogger
             long position = file.Position;
             HashSet<string> keysInLog = null;       // built once, only when there is something to check
             var newRecords = new List<string>();
+            // Contacts we already have that arrive carrying a comment - joined onto the stored one at
+            // the end, after the new contacts are in (a repeat inside this same batch needs its first
+            // copy stored before there is anything to join onto).
+            var commentRepeats = new List<QSO>();
 
             // Read everything after the saved position first, so the question can say how many.
             while (!_isShutdownCleanupDone)
@@ -144,7 +148,11 @@ namespace HolyLogger
                             qso.Band = HolyLogParser.convertFreqToBand(qso.Freq);
 
                         string key = DataAccess.MatchKey(qso);
-                        if (!string.IsNullOrEmpty(key) && keysInLog.Contains(key)) continue;   // already have it (e.g. came over UDP)
+                        if (!string.IsNullOrEmpty(key) && keysInLog.Contains(key))   // already have it (e.g. came over UDP)
+                        {
+                            if (!string.IsNullOrWhiteSpace(qso.Comment)) commentRepeats.Add(qso);
+                            continue;
+                        }
                         if (!string.IsNullOrEmpty(key)) keysInLog.Add(key);   // a contact written twice in the file counts once
 
                         newRecords.Add(record);
@@ -191,6 +199,17 @@ namespace HolyLogger
                     catch (Exception swallowed) { Log.Swallow(swallowed); }
                 }
             }
+
+            // The repeats' comments, joined on without asking - the same as a repeat over UDP.
+            if (commentRepeats.Count > 0 && !_isShutdownCleanupDone && !Dispatcher.HasShutdownStarted)
+                Dispatcher.Invoke(() =>
+                {
+                    foreach (QSO repeat in commentRepeats)
+                    {
+                        QSO stored = FindInLog(repeat);
+                        if (stored != null) MergeCommentIntoLog(stored, repeat.Comment);
+                    }
+                });
 
             file.Position = position;
             if (file.Position != startPosition && !_isShutdownCleanupDone && !Dispatcher.HasShutdownStarted)

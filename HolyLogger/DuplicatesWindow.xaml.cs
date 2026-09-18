@@ -36,6 +36,66 @@ namespace HolyLogger
         // The operator ticked nothing for this group, so it is left exactly as it is - both contacts
         // stay in the log rather than one being removed on a guess.
         public bool Skipped;
+
+        // A group built from members already in the order they should be shown - the import puts the
+        // contact already in the log first. Fills Comments and ChosenComment the same way the scan does.
+        public static DupGroup Of(IEnumerable<QSO> members)
+        {
+            var g = new DupGroup();
+            g.Members.AddRange(members.Where(q => q != null));
+            g.CollectComments();
+            return g;
+        }
+
+        internal void CollectComments()
+        {
+            Comments.Clear();
+            foreach (QSO q in Members)
+            {
+                string c = (q.Comment ?? string.Empty).Trim();
+                if (c.Length == 0) continue;
+                if (!Comments.Any(x => string.Equals(x, c, StringComparison.OrdinalIgnoreCase)))
+                    Comments.Add(c);
+            }
+
+            // One comment in the whole group: nothing to choose between. If the contact that stays
+            // is the one without it, it takes it over - otherwise removing a copy would throw away
+            // the only note anybody wrote about that contact.
+            if (Comments.Count == 1) ChosenComment = Comments[0];
+        }
+    }
+
+    // JOINING COMMENTS, the one way the whole program does it: "first / second". Used when the operator
+    // ticks several comments, presses Merge all, or when a contact arrives over UDP or from a monitored
+    // file that the log already has but with something new written on it.
+    public static class CommentMerge
+    {
+        public const string Separator = " / ";
+
+        // The existing comment with the incoming one added on the end - unless it says nothing, or the
+        // existing comment already holds exactly that text (on its own, or as one of its joined parts),
+        // so the same contact arriving twice does not write the same note twice.
+        public static string Add(string existing, string incoming)
+        {
+            string have = (existing ?? string.Empty).Trim();
+            string add = (incoming ?? string.Empty).Trim();
+            if (add.Length == 0) return have;
+            if (have.Length == 0) return add;
+
+            if (string.Equals(have, add, StringComparison.OrdinalIgnoreCase)) return have;
+            foreach (string part in have.Split(new[] { Separator }, StringSplitOptions.None))
+                if (string.Equals(part.Trim(), add, StringComparison.OrdinalIgnoreCase)) return have;
+
+            return have + Separator + add;
+        }
+
+        public static string Join(IEnumerable<string> comments)
+        {
+            string all = string.Empty;
+            if (comments != null)
+                foreach (string c in comments) all = Add(all, c);
+            return all;
+        }
     }
 
     // FINDING THE GROUPS, in the one place both Tools > Remove Duplicates and the Log Fixer ask.
@@ -78,19 +138,7 @@ namespace HolyLogger
                     .ThenBy(q => q.id)
                     .ToList();
 
-                foreach (QSO q in g.Members)
-                {
-                    string c = (q.Comment ?? string.Empty).Trim();
-                    if (c.Length == 0) continue;
-                    if (!g.Comments.Any(x => string.Equals(x, c, StringComparison.OrdinalIgnoreCase)))
-                        g.Comments.Add(c);
-                }
-
-                // One comment in the whole group: nothing to choose between. If the contact that stays
-                // is the one without it, it takes it over - otherwise removing a copy would throw away
-                // the only note anybody wrote about that contact.
-                if (g.Comments.Count == 1) g.ChosenComment = g.Comments[0];
-
+                g.CollectComments();
                 groups.Add(g);
             }
 
@@ -245,12 +293,18 @@ namespace HolyLogger
         // set on any group he ticked nothing in. The caller does the removing, exactly as in step one.
         public List<DupGroup> Resolved { get { return _commentGroups; } }
 
-        public DuplicatesWindow(List<DupGroup> conflicts)
+        // fromImport: the same question asked by an import, where nothing is removed - the file's copy
+        // is simply not added again - so the words on screen say that instead.
+        public DuplicatesWindow(List<DupGroup> conflicts, bool fromImport = false)
         {
             InitializeComponent();
             WindowBounds.Attach(this, "DuplicateComments");
             MaxWidth = SystemParameters.WorkArea.Width;
-            Title = "Remove Duplicates — which comment to keep";
+            Title = fromImport ? "Import — which comment to keep" : "Remove Duplicates — which comment to keep";
+            if (fromImport)
+                TB_Explain2.Text = "The file holds contacts you already have, or holds one contact twice, "
+                                 + "with a different comment. Tick the comment to keep, or tick several to "
+                                 + "join them. Merge all joins every comment. Cancel leaves the comments as they are.";
 
             G_Stage1.Visibility = Visibility.Collapsed;
             G_Stage2.Visibility = Visibility.Visible;
@@ -331,7 +385,7 @@ namespace HolyLogger
                 }
 
                 g.Skipped = false;
-                g.ChosenComment = string.Join(" / ", ticked);
+                g.ChosenComment = CommentMerge.Join(ticked);
                 willRemove += g.Members.Count - 1;
             }
 
@@ -368,8 +422,8 @@ namespace HolyLogger
             {
                 TB_Summary2.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
                 double footer = TB_Summary2.DesiredSize.Width
-                                + Btn_Delete2.Width + Btn_Cancel2.Width
-                                + 10          // gap between the two buttons
+                                + Btn_MergeAll.Width + Btn_Delete2.Width + Btn_Cancel2.Width
+                                + 20          // gaps between the three buttons
                                 + 28          // the grid's left and right margins
                                 + 24;         // window frame, and air after the text
 
@@ -431,6 +485,21 @@ namespace HolyLogger
             catch (Exception swallowed) { Log.Swallow(swallowed); }
 
             if (_commentGroups != null && !HarvestComments()) return;
+            DialogResult = true;
+        }
+
+        // MERGE ALL: every comment in every group is kept, joined into one. The same as ticking every
+        // box and pressing OK.
+        private void Btn_MergeAll_Click(object sender, RoutedEventArgs e)
+        {
+            if (_commentRows == null) return;
+            try { CommentsGrid.CommitEdit(DataGridEditingUnit.Row, true); }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+            foreach (CommentRow r in _commentRows)
+                if (r.Comment.Length > 0) r.Keep = true;
+
+            if (!HarvestComments()) return;
             DialogResult = true;
         }
 
