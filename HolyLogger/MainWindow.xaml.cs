@@ -585,6 +585,11 @@ namespace HolyLogger
             Log.Step("ctor: credentials restored");
             CredentialStore.Backup();
 
+            // The owner's saved callsign / grid locator / Holyland square (Options > Personal Info) fill the main
+            // window's boxes only where they are empty; see ContestHeaderStore.
+            Contests.ContestHeaderStore.SeedPersonalFromMainWindowOnce();
+            Contests.ContestHeaderStore.FillEmptyMainWindowFromPersonal();
+
             NormalizeEnterKeyBehaviorSettings();
 
             if (Properties.Settings.Default.isAutoCheckUpdates && isNetworkAvailable)

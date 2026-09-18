@@ -44,7 +44,55 @@ namespace HolyLogger
             Resources[SystemColors.WindowBrushKey] = Brushes.White;
             Resources[SystemColors.WindowFrameBrushKey] = SystemColors.ActiveBorderBrush;
 
+            PersonalInfoControlInstance.FilledChanged += (s, e) => MarkPersonalInfo();
+            MarkPersonalInfo();
+
             GeneralItem.IsSelected = true;
+        }
+
+        // "Personal Info" is white on red in the list while the name or e-mail is empty. The colour is
+        // on the header's own TextBlock, not on the list row: the row's background is taken over by the
+        // selected / mouse-over highlight, and white text on that light blue could not be read.
+        private void MarkPersonalInfo()
+        {
+            var header = PersonalInfoItem.Header as TextBlock;
+            if (header == null)
+            {
+                header = new TextBlock { Text = "Personal Info" };
+                PersonalInfoItem.Header = header;
+                // The red runs the full width of the list: the row template left-aligns its header, so
+                // the TextBlock is given the row's width, and a -6 margin reaches over the row's 6px
+                // side padding (the 6px text padding keeps the words in line with the other items).
+                PersonalInfoItem.SizeChanged += (s, e) => SizePersonalInfoHeader();
+            }
+
+            if (PersonalInfoControlInstance.NameOrEmailMissing)
+            {
+                header.Background = new SolidColorBrush(Color.FromRgb(0xD3, 0x2F, 0x2F));
+                header.Foreground = Brushes.White;
+                header.Padding = new Thickness(6, 0, 6, 0);
+                header.Margin = new Thickness(-6, 0, -6, 0);
+                PersonalInfoItem.ToolTip = "Fill in your name and e-mail";
+            }
+            else
+            {
+                header.ClearValue(TextBlock.BackgroundProperty);
+                header.ClearValue(TextBlock.ForegroundProperty);
+                header.ClearValue(TextBlock.PaddingProperty);
+                header.ClearValue(MarginProperty);
+                PersonalInfoItem.ClearValue(ToolTipProperty);
+            }
+            SizePersonalInfoHeader();
+        }
+
+        private void SizePersonalInfoHeader()
+        {
+            var header = PersonalInfoItem.Header as TextBlock;
+            if (header == null) return;
+            if (PersonalInfoControlInstance.NameOrEmailMissing && PersonalInfoItem.ActualWidth > 0)
+                header.Width = PersonalInfoItem.ActualWidth;
+            else
+                header.ClearValue(WidthProperty);
         }
 
         protected override void OnSourceInitialized(EventArgs e)
