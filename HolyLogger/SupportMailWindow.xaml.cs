@@ -259,7 +259,18 @@ namespace HolyLogger
                 ? "1 picture will be sent with your message"
                 : _pictures.Count + " pictures will be sent with your message";
             UpdateSendEnabled();   // not just "clear the status" - the reminder must survive a paste
+
+            // The window may be dragged short, and the pictures panel takes its room from the message
+            // box - which stops at its own MinHeight. Past that the Send button would be pushed out of
+            // sight, so the window's floor rises by the panel's height (and drops back when it goes).
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                MinHeight = BaseMinHeight + (PicturesPanel.IsVisible ? PicturesPanel.ActualHeight + PicturesPanel.Margin.Top : 0);
+            }), System.Windows.Threading.DispatcherPriority.Loaded);
         }
+
+        // Matches MinHeight in the XAML: the shortest the window can be dragged with no pictures pasted.
+        private const double BaseMinHeight = 580;
 
         private void RemovePicture_Click(object sender, RoutedEventArgs e)
         {
