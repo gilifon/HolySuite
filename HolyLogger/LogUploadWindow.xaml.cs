@@ -67,6 +67,20 @@ namespace HolyLogger
 
         public LogUploadWindow()
         {
+            // The Operator Callsign box starts from the main window's Operator box (then the owner's
+            // callsign in Options > Personal Info, then the station callsign) every time. It used to show
+            // whatever was last typed here, and that value rides along in the settings mirror
+            // (CredentialStore) into new installs - an operator installing on a PC someone else had used
+            // was offered that person's callsign. He can still type another callsign before sending.
+            // Name and Email are the station owner's, as typed in Options > Personal Info; a log that is
+            // loaded does not change them.
+            var st = Properties.Settings.Default;
+            string op = (st.Operator ?? string.Empty).Trim();
+            if (op.Length == 0) op = Contests.ContestHeaderStore.OwnerCallsign();   // Options > Personal Info
+            if (op.Length == 0) op = (st.my_callsign ?? string.Empty).Trim();
+            if (op.Length > 0)
+                st.PersonalInfoCallsign = op.ToUpperInvariant();
+
             InitializeComponent();
             try
             {

@@ -3,12 +3,22 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-             mc:Ignorable="d" Height="720" Width="660">
+             mc:Ignorable="d" Width="700">
+    <!-- NO FIXED HEIGHT: the fields are added in code, and the page grew past the 720 it was pinned
+         at (your callsign, Holyland square and their hints) - Country was cut off and could not be
+         typed in. Sized to its content, the Options window's scroll bar reaches every field. -->
     <StackPanel>
         <TextBlock Text="Personal / Station Info" FontSize="17" FontWeight="Bold" Margin="0,2,0,2"/>
         <TextBlock TextWrapping="Wrap" FontSize="16" Foreground="#555555" Margin="0,0,10,8"
-                   Text="This information fills the Cabrillo log header for every contest — enter it once and it's reused automatically. Nothing here is mandatory; a contest may still require some of it before you can export that contest's log."/>
+                   Text="Your own details, typed once and kept. Your callsign, locator and Holyland square fill the main window's boxes when those are empty. Name, e-mail and address go into contest logs (Cabrillo)."/>
         <!-- Fields are added in code-behind from the Cabrillo header catalog (personal fields). -->
-        <StackPanel x:Name="SP_Fields" Margin="0,0,12,0"/>
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <StackPanel x:Name="SP_Fields" Grid.Column="0" Margin="0,0,30,0"/>
+            <StackPanel x:Name="SP_FieldsRight" Grid.Column="1"/>
+        </Grid>
     </StackPanel>
 </UserControl>
