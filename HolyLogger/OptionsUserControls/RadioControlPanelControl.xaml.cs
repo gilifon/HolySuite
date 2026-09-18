@@ -29,6 +29,11 @@ namespace HolyLogger.OptionsUserControls
             BuildRows(RadioPanelPresets.Load());
         }
 
+        // Two column-groups side by side (Select/Band/SSB/CW/RTTY, a gap, then the same five again),
+        // rather than one twenty-row list running off the bottom of the screen. COLS is how many grid
+        // columns one group takes, including the gap after it.
+        private const int Cols = 6;
+
         private void BuildRows(List<RadioBandPreset> bands)
         {
             _bands = bands;
@@ -44,23 +49,35 @@ namespace HolyLogger.OptionsUserControls
             BandGrid.RowDefinitions.Clear();
             BandGrid.ColumnDefinitions.Clear();
 
-            // Select goes on the LEFT, not the right: it is about the band's identity (does this
-            // radio even have it), so it belongs beside the Band column rather than after the
-            // frequencies. Everything else keeps its usual place, just shifted one column right.
-            BandGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(60) });
-            BandGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(160) });
-            BandGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(80) });
-            BandGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(80) });
-            // 110, not 80: the bold "RTTY (kHz)" header is wider than the others and 80 cut off its ")".
-            BandGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(110) });
+            // Select goes on the LEFT of each group, not the right: it is about the band's identity
+            // (does this radio even have it), so it belongs beside the Band column rather than after
+            // the frequencies. Two groups, so two of each column, with a gap between them.
+            for (int g = 0; g < 2; g++)
+            {
+                BandGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(55) });
+                BandGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(140) });
+                BandGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(80) });
+                BandGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(80) });
+                // 92, not 80: the bold "RTTY (kHz)" header is wider than the others and 80 cut off
+                // its ")".
+                BandGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(92) });
+                if (g == 0) BandGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(30) });
+            }
 
-            AddHeaderRow();
+            // Rows per group: half the bands (rounded up), plus their own header row.
+            int perGroup = (_bands.Count + 1) / 2;
+            for (int r = 0; r <= perGroup; r++)
+                BandGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+
+            AddHeaderRow(0);
+            AddHeaderRow(1);
 
             for (int i = 0; i < _bands.Count; i++)
             {
                 var band = _bands[i];
-                int row = i + 1;
-                BandGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                int group = i < perGroup ? 0 : 1;
+                int row = (i % perGroup) + 1;
+                int colBase = group * Cols;
 
                 var enabled = new CheckBox
                 {
@@ -72,7 +89,7 @@ namespace HolyLogger.OptionsUserControls
                 enabled.Checked += EnabledBox_Changed;
                 enabled.Unchecked += EnabledBox_Changed;
                 Grid.SetRow(enabled, row);
-                Grid.SetColumn(enabled, 0);
+                Grid.SetColumn(enabled, colBase + 0);
                 BandGrid.Children.Add(enabled);
                 _enabledBoxes.Add(enabled);
 
@@ -84,47 +101,71 @@ namespace HolyLogger.OptionsUserControls
                     Margin = new Thickness(0, 4, 8, 4)
                 };
                 Grid.SetRow(label, row);
-                Grid.SetColumn(label, 1);
+                Grid.SetColumn(label, colBase + 1);
                 BandGrid.Children.Add(label);
 
                 RadioBandPreset standard;
                 standards.TryGetValue(band.Label, out standard);
-                var ssb = MakeBox(band.SsbKhz, standard?.SsbKhz, row, 2);
-                var cw = MakeBox(band.CwKhz, standard?.CwKhz, row, 3);
-                var rtty = MakeBox(band.RttyKhz, standard?.RttyKhz, row, 4);
+
+                // 30m has no SSB by international band plan - CW and digital only - so there is no
+                // frequency here to edit. A dash says so plainly rather than leaving the cell looking
+                // like something failed to draw.
+                bool noSsb = string.Equals(band.Name, "30m", StringComparison.OrdinalIgnoreCase);
+                TextBox ssb = null;
+                if (noSsb)
+                {
+                    var dash = new TextBlock
+                    {
+                        Text = "—",
+                        FontSize = 16,
+                        HorizontalAlignment = HorizontalAlignment.Left,
+                        VerticalAlignment = VerticalAlignment.Center,
+                        Margin = new Thickness(0, 4, 8, 4)
+                    };
+                    dash.SetResourceReference(TextBlock.ForegroundProperty, "MutedTextBrush");
+                    Grid.SetRow(dash, row);
+                    Grid.SetColumn(dash, colBase + 2);
+                    BandGrid.Children.Add(dash);
+                }
+                else
+                {
+                    ssb = MakeBox(band.SsbKhz, standard?.SsbKhz, row, colBase + 2);
+                }
+                var cw = MakeBox(band.CwKhz, standard?.CwKhz, row, colBase + 3);
+                var rtty = MakeBox(band.RttyKhz, standard?.RttyKhz, row, colBase + 4);
                 _ssbBoxes.Add(ssb);
                 _cwBoxes.Add(cw);
                 _rttyBoxes.Add(rtty);
             }
         }
 
-        private void AddHeaderRow()
+        private void AddHeaderRow(int group)
         {
-            BandGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            int colBase = group * Cols;
 
             var select = new TextBlock { Text = "Select", FontSize = 16, FontWeight = FontWeights.Bold, Margin = new Thickness(0, 0, 8, 4) };
             Grid.SetRow(select, 0);
-            Grid.SetColumn(select, 0);
+            Grid.SetColumn(select, colBase + 0);
             BandGrid.Children.Add(select);
 
             var band = new TextBlock { Text = "Band", FontSize = 16, FontWeight = FontWeights.Bold, Margin = new Thickness(0, 0, 8, 4) };
             Grid.SetRow(band, 0);
-            Grid.SetColumn(band, 1);
+            Grid.SetColumn(band, colBase + 1);
             BandGrid.Children.Add(band);
 
             var ssb = new TextBlock { Text = "SSB (kHz)", FontSize = 16, FontWeight = FontWeights.Bold, Margin = new Thickness(0, 0, 8, 4) };
             Grid.SetRow(ssb, 0);
-            Grid.SetColumn(ssb, 2);
+            Grid.SetColumn(ssb, colBase + 2);
             BandGrid.Children.Add(ssb);
 
             var cw = new TextBlock { Text = "CW (kHz)", FontSize = 16, FontWeight = FontWeights.Bold, Margin = new Thickness(0, 0, 8, 4) };
             Grid.SetRow(cw, 0);
-            Grid.SetColumn(cw, 3);
+            Grid.SetColumn(cw, colBase + 3);
             BandGrid.Children.Add(cw);
 
             var rtty = new TextBlock { Text = "RTTY (kHz)", FontSize = 16, FontWeight = FontWeights.Bold, Margin = new Thickness(0, 0, 8, 4) };
             Grid.SetRow(rtty, 0);
-            Grid.SetColumn(rtty, 4);
+            Grid.SetColumn(rtty, colBase + 4);
             BandGrid.Children.Add(rtty);
         }
 
@@ -199,7 +240,9 @@ namespace HolyLogger.OptionsUserControls
                     changed = true;
                 }
 
-                changed |= ReadBox(_ssbBoxes[i], _bands[i], value => _bands[i].SsbKhz = value, _bands[i].SsbKhz, ref rejected);
+                // No box at all for 30m (see BuildRows) - nothing to read back for it.
+                if (_ssbBoxes[i] != null)
+                    changed |= ReadBox(_ssbBoxes[i], _bands[i], value => _bands[i].SsbKhz = value, _bands[i].SsbKhz, ref rejected);
                 changed |= ReadBox(_cwBoxes[i], _bands[i], value => _bands[i].CwKhz = value, _bands[i].CwKhz, ref rejected);
                 changed |= ReadBox(_rttyBoxes[i], _bands[i], value => _bands[i].RttyKhz = value, _bands[i].RttyKhz, ref rejected);
             }

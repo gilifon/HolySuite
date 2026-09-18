@@ -83,19 +83,25 @@ namespace HolyLogger
         // 6cm 5650-5850, 3cm 10000-10500 MHz.
         //
         // The FREQUENCIES inside them are the conventional narrowband calling spots - 2m 144.300 SSB
-        // / 144.050 CW, 70cm 432.200 / 432.050, 23cm 1296.200 / 1296.050, 6cm 5760.200, 3cm 10368.200
-        // - and, on 13cm, QO-100's own transponder rather than the terrestrial 2320.200, because that
-        // is what a 13cm station is nearly always doing. Microwave calling frequencies vary more by
-        // country than HF ones do, and like every row here they are a starting point the operator
-        // edits. The bands with no digimode convention repeat their CW slot, the way 60m, 8m and 4m
-        // already do.
+        // / 144.050 CW, 70cm 432.200 / 432.050, 23cm one shared narrowband centre of activity for
+        // CW/SSB/MGM at 1296.200 (IARU Region 1 UHF band plan - CW gets no separate point there the
+        // way 70cm's does), 6cm 5760.200, 3cm 10368.200 (IARU Region 1's own narrowband calling point,
+        // confirmed against Region 2's different 10368.1) - and, on 13cm, QO-100's own transponder
+        // rather than the terrestrial 2320.200, because that is what a 13cm station is nearly always
+        // doing. Microwave calling frequencies vary more by country than HF ones do, and like every
+        // row here they are a starting point the operator edits. The bands with no digimode convention
+        // repeat their CW slot, the way 60m, 8m and 4m already do.
+        //
+        // 9cm and 6cm: the only sourced calling points found were Region 2/3 ones (3400.10, 5760.1),
+        // not Region 1 - left unchanged rather than importing another region's number as if it were
+        // this one's.
         private static readonly object[][] Factory =
         {
             //   label   name    low     high    ssb     cw      rtty
             new object[] { "1.8", "160m",  1800,   2000,   1843,   1825,   1838 },
             new object[] { "3.5", "80m",   3500,   4000,   3750,   3530,   3580 },
             new object[] { "5",   "60m",   5351,   5367,   5357,   5352,   5352 },
-            new object[] { "7",   "40m",   7000,   7200,   7090,   7030,   7040 },
+            new object[] { "7",   "40m",   7000,   7200,   7150,   7030,   7040 },
             new object[] { "10",  "30m",  10100,  10150,  10120,  10120,  10140 },
             new object[] { "14",  "20m",  14000,  14350,  14250,  14030,  14080 },
             new object[] { "18",  "17m",  18068,  18168,  18140,  18080,  18100 },
@@ -103,11 +109,11 @@ namespace HolyLogger
             new object[] { "24",  "12m",  24890,  24990,  24950,  24900,  24920 },
             new object[] { "28",  "10m",  28000,  29700,  28450,  28030,  28080 },
             new object[] { "40",  "8m",   40660,  40700,  40680,  40680,  40680 },
-            new object[] { "50",  "6m",   50000,  54000,  50150,  50090,  50090 },
+            new object[] { "50",  "6m",   50000,  54000,  50125,  50090,  50090 },
             new object[] { "70",  "4m",   70000,  70500,  70200,  70200,  70200 },
             new object[] { "144", "2m",  144000, 146000, 144300, 144050, 144600 },
             new object[] { "432", "70cm",430000, 440000, 432200, 432050, 432600 },
-            new object[] { "1296","23cm",1240000,1300000,1296200,1296050,1296050 },
+            new object[] { "1296","23cm",1240000,1300000,1296200,1296200,1296200 },
             new object[] { "2400","13cm",2300000,2450000,2400200,2400075,2400075 },
             new object[] { "3400","9cm", 3400000,3410000,3400200,3400200,3400200 },
             new object[] { "5760","6cm", 5650000,5850000,5760200,5760200,5760200 },
