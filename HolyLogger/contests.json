@@ -2284,6 +2284,52 @@
       "dupe_rule": "Once per band per mode",
       "cabrillo_name": "WFD",
       "rules_url": "https://www.winterfieldday.com/"
+    },
+    {
+      "id": "SUKKOT",
+      "name": "Sukkot Contest",
+      "bands": [
+        "2m",
+        "70cm"
+      ],
+      "modes": [
+        "FM"
+      ],
+      "categories": [
+        "VHF+UHF",
+        "VHF",
+        "UHF"
+      ],
+      "asymmetric": false,
+      "no_satellite": true,
+      "exchange": {
+        "sent": [
+          "GRID"
+        ],
+        "received": [
+          "GRID"
+        ]
+      },
+      "notes": "Israeli internal FM contest on fixed channels. Most radios on these bands have no CAT, so the operator picks the channel and the frequency is filled in from this list.",
+      "channels": [
+        { "name": "S1", "mhz": 144.675 },
+        { "name": "S9", "mhz": 145.225 },
+        { "name": "S10", "mhz": 145.250 },
+        { "name": "S11", "mhz": 145.275 },
+        { "name": "S15", "mhz": 145.375 },
+        { "name": "S16", "mhz": 145.400 },
+        { "name": "S19", "mhz": 145.475 },
+        { "name": "S20", "mhz": 145.500 },
+        { "name": "S21", "mhz": 145.525 },
+        { "name": "S22", "mhz": 145.550 },
+        { "name": "U-S1", "mhz": 430.925 },
+        { "name": "U-S2", "mhz": 438.550 },
+        { "name": "U-S410", "mhz": 438.900 },
+        { "name": "U-S411", "mhz": 438.925 },
+        { "name": "U-S412", "mhz": 438.950 },
+        { "name": "U-S413", "mhz": 438.975 },
+        { "name": "U-S414", "mhz": 439.000 }
+      ]
     }
   ]
 }
