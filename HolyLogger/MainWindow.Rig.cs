@@ -1393,9 +1393,13 @@ namespace HolyLogger
                 return;
             }
 
+            // Manual counts as no radio here: in Manual the program is not working with the CAT radio
+            // (a Sukkot channel on a radio with no CAT, say), so the panel greys out exactly as it does
+            // with the radio off, rather than offer buttons for a radio that is not the one in use.
             bool online = Properties.Settings.Default.EnableOmniRigCAT
                           && OmniRigEngine != null && Rig != null
-                          && Rig.Status == OmniRig.RigStatusX.ST_ONLINE;
+                          && Rig.Status == OmniRig.RigStatusX.ST_ONLINE
+                          && !Properties.Settings.Default.isManualMode;
 
             double khz = 0;
             string mode = null;

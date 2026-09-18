@@ -68,6 +68,7 @@ namespace HolyLogger
                 Properties.Settings.Default.Save();
                 UpdateContestIndicator();
                 ApplyContestExchangeUI();
+                PrepareStationForContest(contest);
                 UpdateDup();
             }
             else if (AnyContestRemembered())
@@ -75,6 +76,170 @@ namespace HolyLogger
                 ExitContest();
             }
         }
+
+        // =====================================================================================
+        // STATION SET-UP FOR A CONTEST
+        //
+        // Everything a contest asks of the station, kept together here. Each step is switched on by
+        // the contest's own entry in contests.json, so a contest that does not ask for it is left
+        // alone. Today only Sukkot asks for any of them:
+        //
+        //   on opening the log (PrepareStationForContest), in this order:
+        //     1. "no_satellite": true   -> Satellite Mode off         (EndSatelliteModeForContest)
+        //     2. "channels": [...]      -> back to CAT if CAT is on   (ResumeCatForChannelContest)
+        //     3. "modes": ["FM"]        -> logger and radio to FM     (ApplyContestFmOnly)
+        //     Satellite goes first, so nothing after it is read or tuned with the transverter shift.
+        //
+        //   while logging:
+        //     4. "channels": [...]      -> Channel drop-down in the send bar (AddContestChannelCell,
+        //                                  built with the exchange cells); picking a channel fills
+        //                                  the frequency, tries CAT, and falls back to Manual
+        //                                  (TuneToContestChannelAsync)
+        // =====================================================================================
+
+        private void PrepareStationForContest(Contests.Contest c)
+        {
+            EndSatelliteModeForContest(c);
+            ResumeCatForChannelContest(c);
+            ApplyContestFmOnly(c);
+        }
+
+        // 1. A contest not worked through satellites turns Satellite Mode off. Left on, every QSO would
+        // be saved as a satellite contact, and with CAT the transverter shift would be added to the
+        // frequency. The same refreshes as turning it off in Options.
+        private void EndSatelliteModeForContest(Contests.Contest c)
+        {
+            if (c == null || !c.NoSatellite || !Properties.Settings.Default.IsSatelliteMode) return;
+            Properties.Settings.Default.IsSatelliteMode = false;
+            try { Properties.Settings.Default.Save(); }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+            ShowRigParams();
+            UpdateSatelliteModeIcon();      // the dish by the clock goes
+            ReloadRadioPanelPresets();      // and the panel gets its HF buttons back
+        }
+
+        // 2. A channel contest starts on CAT whenever CAT is switched on, so the frequency box shows the
+        // radio's real frequency. Manual is saved with the settings, so without this a Manual left from
+        // the last session (e.g. a channel the CAT radio could not reach) would reopen the log showing
+        // a stale frequency. Manual comes back only when a picked channel is out of the radio's reach.
+        private void ResumeCatForChannelContest(Contests.Contest c)
+        {
+            if (c?.Channels == null || c.Channels.Count == 0) return;
+            if (!Properties.Settings.Default.EnableOmniRigCAT || !Properties.Settings.Default.isManualMode) return;
+            ToggleManualMode();     // -> CAT; it re-reads the radio when the radio is online
+        }
+
+        // 3. An FM-only contest puts the logger, and the radio when CAT is live, in FM.
+        private void ApplyContestFmOnly(Contests.Contest c)
+        {
+            if (c?.Modes == null || c.Modes.Count != 1
+                || !string.Equals(c.Modes[0], "FM", StringComparison.OrdinalIgnoreCase)) return;
+            SelectLoggerMode("FM");
+            if (Properties.Settings.Default.isManualMode || !IsCatLive()) return;
+            try { Rig.Mode = (OmniRig.RigParamX)PM_FM; }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        // 4. Contest channels. Most radios on the Sukkot channels (2m / 70cm FM) have no CAT, so the
+        // frequency cannot come from the radio. The Channel drop-down fills it in instead: pick S16
+        // and the frequency becomes 145.400 (and the band follows). It also follows the frequency
+        // back, so it always names the channel you are on, or nothing when you are off every channel.
+
+        private ComboBox _contestChannelBox;
+        private bool _syncingContestChannel;
+
+        private void AddContestChannelCell(List<Contests.ContestChannel> channels)
+        {
+            const double comboWidth = 175;   // "U-S414  439.000 MHz" measures 153 at 16px, + 15 for chevron and border
+
+            // Set apart from the exchange cells (the channel is not part of what you send), and its right
+            // edge lined up with the Date box's right edge below it. The gap is whatever is left between
+            // the cells already in the bar and that edge - measured, since a label can be wider than
+            // its box.
+            double used = 0;
+            foreach (UIElement cell in ContestTxPanel.Children)
+            {
+                cell.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+                used += cell.DesiredSize.Width;     // includes the cell's own right margin
+            }
+            double dateRight = TP_Date.Margin.Left + TP_Date.Width;
+            double gap = Math.Max(10, dateRight - ContestTxPanel.Margin.Left - used - comboWidth);
+
+            var col = new StackPanel { Orientation = Orientation.Vertical, Margin = new Thickness(gap, 0, 10, 0) };
+            col.Children.Add(ContestCellLabel("Channel"));
+            var combo = new ComboBox
+            {
+                Width = comboWidth,
+                Height = 26,
+                Margin = new Thickness(0, 1, 0, 0),
+                FontSize = 16,
+                IsTabStop = false,
+                VerticalContentAlignment = VerticalAlignment.Center,
+                BorderBrush = new SolidColorBrush(Color.FromRgb(0xAB, 0xAD, 0xB3)),
+                ToolTip = "Pick the channel - the frequency is filled in for you"
+            };
+            combo.SetResourceReference(Control.BackgroundProperty, "ControlBg");
+            combo.SetResourceReference(Control.ForegroundProperty, "TextBrush");
+            if (TryFindResource("FlatComboTemplate") is ControlTemplate flat) combo.Template = flat;
+            foreach (var ch in channels)
+                combo.Items.Add(new ComboBoxItem
+                {
+                    Content = ch.Name + "  " + ch.Mhz.ToString("0.000", CultureInfo.InvariantCulture) + " MHz",
+                    Tag = ch
+                });
+            _contestChannelBox = combo;
+            SyncContestChannelPick();
+            combo.SelectionChanged += ContestChannel_SelectionChanged;
+            col.Children.Add(combo);
+            ContestTxPanel.Children.Add(col);
+        }
+
+        private async void ContestChannel_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_syncingContestChannel) return;
+            var ch = (_contestChannelBox?.SelectedItem as ComboBoxItem)?.Tag as Contests.ContestChannel;
+            if (ch == null) return;
+            await TuneToContestChannelAsync(ch.Mhz);
+        }
+
+        // Shows the channel the frequency box is on (or none). Called whenever the frequency changes.
+        private void SyncContestChannelPick()
+        {
+            if (_contestChannelBox == null) return;
+            double.TryParse((TB_Frequency.Text ?? string.Empty).Trim(), NumberStyles.Float,
+                CultureInfo.InvariantCulture, out double mhz);
+            object match = _contestChannelBox.Items.OfType<ComboBoxItem>()
+                .FirstOrDefault(i => i.Tag is Contests.ContestChannel ch && Math.Abs(ch.Mhz - mhz) < 0.0005);
+            if (_contestChannelBox.SelectedItem == match) return;
+            _syncingContestChannel = true;
+            try { _contestChannelBox.SelectedItem = match; }
+            finally { _syncingContestChannel = false; }
+        }
+
+        // The frequency box gets the channel first, so the QSO is logged on the channel whatever the
+        // radio does. With CAT live the radio is then asked to go there too. If it does not get there -
+        // the CAT radio has no 2m/70cm, or it is simply not the radio the contest is being worked on
+        // (IC-7610 on CAT, contest on an IC-5100 with no CAT) - the program switches to Manual, so the
+        // CAT radio's own frequency can no longer overwrite the channel.
+        private async Task TuneToContestChannelAsync(double freqMhz)
+        {
+            string freqText = freqMhz.ToString("0.0###", CultureInfo.InvariantCulture);
+            TB_Frequency.Text = freqText;
+            SelectLoggerMode("FM");
+
+            if (Properties.Settings.Default.isManualMode || !IsCatLive()) return;
+
+            int freqHz = (int)Math.Round(freqMhz * 1000000.0, MidpointRounding.AwayFromZero);
+            await TryTuneRigFrequencyAsync(freqHz, (OmniRig.RigParamX)PM_FM);
+            if (await TryGetRigReadbackAsync(freqHz)) return;
+
+            if (!Properties.Settings.Default.isManualMode) ToggleManualMode();
+            // While we waited, the CAT poll may have put the radio's own frequency back in the box.
+            TB_Frequency.Text = freqText;
+            SelectLoggerMode("FM");
+        }
+
+        // =====================================================================================
 
         private static bool AnyContestRemembered()
         {
@@ -164,6 +329,7 @@ namespace HolyLogger
             _contestRxBoxes.Clear();
             ContestRxPanel.Children.Clear();
             if (ContestTxPanel != null) ContestTxPanel.Children.Clear();
+            _contestChannelBox = null;
 
             Contests.Contest contest = Contests.ContestService.Active;
             bool inContest = contest != null;
@@ -255,6 +421,8 @@ namespace HolyLogger
                     if (fieldKey == "SERIAL") _contestSendSerialBox = sbox;
                     _contestSendBoxes.Add(sbox);
                 }
+                if (contest.Channels != null && contest.Channels.Count > 0)
+                    AddContestChannelCell(contest.Channels);
                 ContestTxPanel.Visibility = Visibility.Visible;
             }
             SetExchangeLabel(L_SendLabel, "Exchange", "send", true);
@@ -318,26 +486,8 @@ namespace HolyLogger
         // tabIndex makes the box skip the Tab order.
         private TextBox AddContestCell(string label, double width, int? tabIndex, StackPanel target)
         {
-            var blue = new SolidColorBrush(Color.FromRgb(0x15, 0x65, 0xC0));
             var col = new StackPanel { Orientation = Orientation.Vertical, Margin = new Thickness(0, 0, 10, 0) };
-            // The cell has to fit inside the 48px coloured band (1px border, so 46px of room) with a
-            // pixel clear at the top and bottom, and the band cannot grow - the divider line is right
-            // under it. A natural 16px line is 21.3px, which with a 28px box made the cell 49.3 and
-            // left the boxes hanging out of the band's lower edge.
-            // So: LineHeight 17 (same tight-line idiom as L_RstSLabel/L_RstRLabel) + 1px of air + a
-            // 26px box = 44. The 1px of air is not decoration: measured, a 'g'/'y'/'q' tail still
-            // inks down to y=17 in a 17px line, so without it the box's top edge shaves the tail off
-            // labels like "Age" and "Holyland Square".
-            col.Children.Add(new TextBlock
-            {
-                Text = label,
-                FontSize = 16,
-                FontWeight = FontWeights.Bold,
-                Foreground = blue,
-                LineHeight = 17,
-                LineStackingStrategy = LineStackingStrategy.BlockLineHeight,
-                HorizontalAlignment = HorizontalAlignment.Center
-            });
+            col.Children.Add(ContestCellLabel(label));
             var box = new TextBox
             {
                 Width = width,
@@ -359,6 +509,29 @@ namespace HolyLogger
             col.Children.Add(box);
             target.Children.Add(col);
             return box;
+        }
+
+        // The blue label above a contest cell.
+        private static TextBlock ContestCellLabel(string label)
+        {
+            // The cell has to fit inside the 48px coloured band (1px border, so 46px of room) with a
+            // pixel clear at the top and bottom, and the band cannot grow - the divider line is right
+            // under it. A natural 16px line is 21.3px, which with a 28px box made the cell 49.3 and
+            // left the boxes hanging out of the band's lower edge.
+            // So: LineHeight 17 (same tight-line idiom as L_RstSLabel/L_RstRLabel) + 1px of air + a
+            // 26px box = 44. The 1px of air is not decoration: measured, a 'g'/'y'/'q' tail still
+            // inks down to y=17 in a 17px line, so without it the box's top edge shaves the tail off
+            // labels like "Age" and "Holyland Square".
+            return new TextBlock
+            {
+                Text = label,
+                FontSize = 16,
+                FontWeight = FontWeights.Bold,
+                Foreground = new SolidColorBrush(Color.FromRgb(0x15, 0x65, 0xC0)),
+                LineHeight = 17,
+                LineStackingStrategy = LineStackingStrategy.BlockLineHeight,
+                HorizontalAlignment = HorizontalAlignment.Center
+            };
         }
 
         // Switches the lower block (everything below the divider) between its normal positions and the
@@ -478,7 +651,7 @@ namespace HolyLogger
                 case "MEMBER_NR": label = "Member#"; width = 64; break;
                 case "CALLSIGN": label = "Call"; width = 90; break;
                 case "FIELD_DAY_CLASS": label = "Class"; width = 56; break;
-                case "GRID": label = "Grid"; width = 64; break;
+                case "GRID": label = "Grid"; width = 72; break;   // same as My Locator
                 case "DXCC": label = "DXCC"; width = 56; break;
                 case "STATE_PROVINCE_DXCC": label = "St/Pr/DX"; width = 72; break;
                 case "STATE_OR_SERIAL": label = "St/Ser"; width = 64; break;

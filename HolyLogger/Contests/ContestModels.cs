@@ -38,5 +38,20 @@ namespace HolyLogger.Contests
         // default-required tags a given contest does not need.
         [JsonProperty("cabrillo_required")] public List<string> CabrilloRequired { get; set; }
         [JsonProperty("cabrillo_optional")] public List<string> CabrilloOptional { get; set; }
+
+        // Optional fixed operating channels (Sukkot: the 2m / 70cm FM channels). When present, the
+        // contest bar shows a Channel drop-down that fills the frequency, since most radios used on
+        // such channels have no CAT to read it from.
+        [JsonProperty("channels")] public List<ContestChannel> Channels { get; set; }
+
+        // True for a contest not worked through satellites (Sukkot): opening its log turns Satellite
+        // Mode off.
+        [JsonProperty("no_satellite")] public bool NoSatellite { get; set; }
+    }
+
+    public class ContestChannel
+    {
+        [JsonProperty("name")] public string Name { get; set; }
+        [JsonProperty("mhz")] public double Mhz { get; set; }
     }
 }

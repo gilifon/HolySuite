@@ -10826,6 +10826,9 @@ namespace HolyLogger
             // first, it still saw the empty box a moment earlier and left the picker up over a frequency
             // that had just been filled in.
             UpdateBandPickAvailability();
+
+            // In a contest with fixed channels (Sukkot) the Channel drop-down names the channel we are on.
+            SyncContestChannelPick();
         }
 
         // Show a red attention glyph over the band box when the operator has entered a frequency that maps
