@@ -541,6 +541,17 @@ namespace HolyLogger
             // queue the CQ twenty times over.
             PreviewKeyDown += (s2, e2) =>
             {
+                // ESC STOPS THE SENDING FROM ANYWHERE IN THE WINDOW. It used to be heard only by the
+                // typing row, so with the focus on a button, the gear or the record below - one click
+                // away, and invisible - the most urgent key in the window did nothing while the radio
+                // went on transmitting. Stopping cannot wait for him to find where the focus is.
+                if (e2.Key == Key.Escape)
+                {
+                    StopEverything();
+                    e2.Handled = true;
+                    return;
+                }
+
                 if (e2.IsRepeat) return;
                 if (e2.Key < Key.F1 || e2.Key > Key.F12) return;
 
@@ -818,6 +829,8 @@ namespace HolyLogger
         // The same beep the callsign box makes for a keyboard left in the wrong language.
         private void Box_PreviewTextInput(object sender, TextCompositionEventArgs e)
         {
+            _lastTypedUtc = DateTime.UtcNow;       // his caret leads the row for a while - see KeepKeyingInSight
+
             foreach (char c in e.Text)
             {
                 if (IsSendable(c)) continue;
@@ -871,6 +884,13 @@ namespace HolyLogger
 
         private void Box_PreviewKeyDown(object sender, KeyEventArgs e)
         {
+            // Editing or moving the caret means he is looking at the caret, not at the keying. A Ctrl
+            // key (Ctrl+V above all) does not: a pasted text should be followed as it goes out.
+            if ((Keyboard.Modifiers & ModifierKeys.Control) == 0
+                && (e.Key == Key.Back || e.Key == Key.Delete || e.Key == Key.Left || e.Key == Key.Right
+                    || e.Key == Key.Home || e.Key == Key.End))
+                _lastTypedUtc = DateTime.UtcNow;
+
             // Ctrl+K again puts the window away - the key that opened it. The X in the corner does the
             // same thing; this is only so the operator's hands need not leave the keyboard.
             if (e.Key == Key.K && (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control)
@@ -952,6 +972,7 @@ namespace HolyLogger
             RepaintSendLine();
             DropWhatTheRadioHasKeyed();
             TrimRowToWidth();
+            KeepKeyingInSight();
 
             string text = _box.Text ?? string.Empty;
 
@@ -1211,6 +1232,51 @@ namespace HolyLogger
             }
 
             if (moved) RenderHistory();
+        }
+
+        // -- AND WHAT IS GOING OUT STAYS IN SIGHT -------------------------------------------------
+        //
+        // TrimRowToWidth cannot help a row that is too long with text NOT YET KEYED - it only hands
+        // down what has gone. A long text pasted in is exactly that, and the box, being one line, then
+        // scrolls to wherever the caret is: the END of the paste, a minute or more ahead of the radio.
+        // What was being keyed sat off to the left, out of sight, and the row looked frozen - words
+        // went out and nothing on it moved until the rest was short enough to fit. Found on the air,
+        // sending the practice text for the decoder.
+        //
+        // So while text is going out and he is not typing, the row is scrolled to keep the character
+        // being keyed near its left edge, a few already sent in front of it so he can see where it is.
+        // It moves in steps of about half a row rather than one character at a time, so it can be read.
+        // The moment he types, the box goes back to following his caret; a few seconds after he stops,
+        // it follows the keying again.
+        private const int SentCharactersInFront = 3;
+        private static readonly TimeSpan FollowKeyingAfterTyping = TimeSpan.FromSeconds(3);
+        private DateTime _lastTypedUtc = DateTime.MinValue;
+
+        private void KeepKeyingInSight()
+        {
+            if (_box == null) return;
+
+            // Let the box finish its own scrolling first: a piece handed down to the record this very
+            // tick changes the text, and the box then scrolls to the caret. Scrolling after it, not
+            // before, is what keeps the keying in view instead of flicking between the two.
+            _box.UpdateLayout();
+
+            if (_box.ViewportWidth <= 0) return;
+            if (_box.ExtentWidth <= _box.ViewportWidth + 1) return;          // it all fits
+            if (_inFlight.Count == 0) return;                                // nothing is going out
+            if (DateTime.UtcNow - _lastTypedUtc < FollowKeyingAfterTyping) return;
+
+            string text = _box.Text ?? string.Empty;
+            int from = Math.Max(0, Math.Min(KeyedSoFar(text) - SentCharactersInFront, text.Length - 1));
+            if (from < 0) return;
+
+            Rect at = _box.GetRectFromCharacterIndex(from);
+            if (at.IsEmpty) return;
+
+            // Already in the left half of the row: leave it, so the text is not crawling under his eyes.
+            if (at.X >= 0 && at.X <= _box.ViewportWidth / 2) return;
+
+            _box.ScrollToHorizontalOffset(Math.Max(0, _box.HorizontalOffset + at.X));
         }
 
         // The radio has stopped and stayed stopped for as long as the operator asked for. The line
