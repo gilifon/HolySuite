@@ -675,7 +675,44 @@ namespace HolyLogger
                 // text wanted 4,333 pixels, the viewport was given all 4,333, and the window was
                 // chopped at 960. Capping the SCROLLER makes it scroll, and the window - which sizes
                 // itself to its content - then comes out exactly as tall as the screen allows.
-                double room = SystemParameters.WorkArea.Height - TallFurniture;
+                // THE SCREEN THIS BOX IS ON, AND THE ROOM UNDER ITS OWN TOP EDGE.
+                //
+                // SystemParameters.WorkArea answers for the PRIMARY monitor only, so on the second
+                // screen the figure was simply wrong. And the height of the screen is not the room
+                // this window has: the box opens where it was last left, or centred on its owner, and
+                // a box as tall as the desktop that starts 200 pixels down ends 200 pixels below the
+                // bottom - starting with its OK button. The cap is measured from where the window
+                // actually is, downwards.
+                double usableTop = SystemParameters.WorkArea.Top;
+                double usableBottom = usableTop + SystemParameters.WorkArea.Height;
+                try
+                {
+                    IntPtr hwnd = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+                    if (hwnd != IntPtr.Zero)
+                    {
+                        var src = PresentationSource.FromVisual(this);
+                        double sy = src != null && src.CompositionTarget != null
+                                  ? src.CompositionTarget.TransformToDevice.M22 : 1.0;
+                        if (sy <= 0) sy = 1.0;
+
+                        var wa = System.Windows.Forms.Screen.FromHandle(hwnd).WorkingArea;
+                        usableTop = wa.Top / sy;
+                        usableBottom = wa.Bottom / sy;
+                    }
+                }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+                double room = usableBottom - usableTop - TallFurniture;
+
+                // Where the window starts. Only a window placed by hand has a Top worth trusting;
+                // a centred one has not been positioned yet when this runs.
+                if (WindowStartupLocation == WindowStartupLocation.Manual
+                    && !double.IsNaN(Top) && Top > usableTop)
+                {
+                    // 12 of air, so the bottom edge is not flush with the taskbar.
+                    room = Math.Min(room, usableBottom - Top - TallFurniture - 12);
+                }
+
                 if (room > 200) MessageScroller.MaxHeight = room;
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
