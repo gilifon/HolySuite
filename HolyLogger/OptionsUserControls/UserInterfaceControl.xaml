@@ -82,7 +82,7 @@
                 <RadioButton x:Name="RB_MapDisplay_QRZPhoto" Content="Photo from QRZ.com" GroupName="MapDisplay" FontSize="16" Margin="0,2" Checked="MapDisplayMode_Changed"/>
                 <RadioButton x:Name="RB_MapDisplay_CustomImage" Content="Custom image" GroupName="MapDisplay" FontSize="16" Margin="0,2" Checked="MapDisplayMode_Changed"/>
                 <TextBox x:Name="TB_CustomImagePath" Height="28" FontSize="16" Margin="0,5,0,0" IsReadOnly="True" VerticalContentAlignment="Center" BorderBrush="#AAAAAA" BorderThickness="1" HorizontalAlignment="Stretch"/>
-                <Button x:Name="Btn_BrowseImage" Content="Browse..." Width="90" Height="30" FontSize="16" Margin="0,5,0,0" HorizontalAlignment="Left" Click="Btn_BrowseImage_Click"/>
+                <Button x:Name="Btn_BrowseImage" Content="Browse..." Width="90" Height="34" FontSize="16" Margin="0,5,0,0" HorizontalAlignment="Left" Click="Btn_BrowseImage_Click"/>
             </StackPanel>
         </GroupBox>
         <!-- NO FIXED HEIGHT: it hugs what it holds. The 178 was sized when this box also carried
