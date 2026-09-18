@@ -325,6 +325,9 @@ namespace HolyLogger
                         qso.Operator = TB_Operator.Text;
                     }
 
+                    // What the other program itself wrote - kept apart from the comment box filled in
+                    // below, so a repeat of a contact we already have adds only ITS words to it.
+                    string sentComment = qso.Comment;
                     qso.Comment = string.IsNullOrWhiteSpace(qso.Comment) ? TB_Comment.Text : qso.Comment;
                     qso.STX = string.IsNullOrWhiteSpace(qso.STX) ? TB_MyHolyland.Text : qso.STX;
 
@@ -341,7 +344,15 @@ namespace HolyLogger
                             // from the radio program, one through a helper), so the same QSO can land
                             // on two ports. The program's one duplicate rule decides: same callsign,
                             // day, band, mode and minute is the contact we already have.
-                            if (IsAlreadyInLog(qso)) return;
+                            //
+                            // Not stored twice - but not deaf to it either: a comment it carries that the
+                            // stored contact does not have is joined onto it, so nothing written is lost.
+                            QSO already = FindInLog(qso);
+                            if (already != null)
+                            {
+                                MergeCommentIntoLog(already, sentComment);
+                                return;
+                            }
 
                             QSO q = dal.Insert(qso);
                             Qsos.Insert(0, q);
@@ -393,20 +404,41 @@ namespace HolyLogger
 
         // Is this contact already in the open log? Answered against the loaded list, by the same key the
         // import merge and Remove Duplicates use, so all three agree on what "the same contact" means.
-        private bool IsAlreadyInLog(QSO qso)
+        // The stored contact, or null. Call on the window's thread (Qsos belongs to it).
+        private QSO FindInLog(QSO qso)
         {
             try
             {
                 string key = DataAccess.MatchKey(qso);
-                if (string.IsNullOrEmpty(key)) return false;
+                if (string.IsNullOrEmpty(key)) return null;
                 foreach (QSO existing in Qsos)
                 {
                     if (string.Equals(DataAccess.MatchKey(existing), key, StringComparison.Ordinal))
-                        return true;
+                        return existing;
                 }
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
-            return false;
+            return null;
+        }
+
+        // A REPEAT OF A CONTACT WE HAVE, WITH SOMETHING NEW WRITTEN ON IT. Joined on without asking -
+        // this arrives in the middle of operating, where a question would get in the way - and only when
+        // it says something the stored comment does not already say. Call on the window's thread.
+        private void MergeCommentIntoLog(QSO stored, string incoming)
+        {
+            try
+            {
+                string joined = CommentMerge.Add(stored.Comment, incoming);
+                if (string.Equals(joined, (stored.Comment ?? string.Empty).Trim(), StringComparison.Ordinal)) return;
+
+                stored.Comment = joined;
+                lock (_syncLock) { dal.Update(stored); }
+
+                // QSO does not announce its own changes, so the row is put back into the list to redraw.
+                for (int i = 0; i < Qsos.Count; i++)
+                    if (ReferenceEquals(Qsos[i], stored)) { Qsos[i] = stored; break; }
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
         }
 
         // N1MM+'s radio broadcast: put its frequency and mode in the entry boxes. This is the reader the

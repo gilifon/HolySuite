@@ -83,9 +83,9 @@
         <StackPanel Grid.Row="0" Margin="0,0,0,8">
             <TextBlock x:Name="TB_Header2" FontSize="16" FontWeight="Bold"
                        Foreground="{DynamicResource AccentBrush}"/>
-            <TextBlock FontSize="16" TextWrapping="Wrap" Margin="0,4,0,0"
+            <TextBlock x:Name="TB_Explain2" FontSize="16" TextWrapping="Wrap" Margin="0,4,0,0"
                        Foreground="{DynamicResource MutedTextBrush}"
-                       Text="These contacts are in the log twice, and the copies carry different comments. Everything else about them is identical, so the only thing to decide is which comment the log keeps. The first one is ticked for you — tick a different one, or tick several and they are joined together. One comment in each group must stay ticked; the copies are removed either way."/>
+                       Text="These contacts are in the log twice, and the copies carry different comments. Everything else about them is identical, so the only thing to decide is which comment the log keeps. The first one is ticked for you — tick a different one, or tick several and they are joined together. Merge all joins every comment. One comment in each group must stay ticked; the copies are removed either way."/>
         </StackPanel>
 
         <DataGrid x:Name="CommentsGrid" Grid.Row="1" AutoGenerateColumns="False" IsReadOnly="False"
@@ -137,8 +137,7 @@
 
         <DockPanel Grid.Row="2" Margin="0,12,0,0">
             <Button x:Name="Btn_Cancel2" Content="Cancel" DockPanel.Dock="Right" Width="110" Height="34"
-                    FontSize="16" IsCancel="True" Click="Btn_Cancel_Click"/>
-            <!-- Plain OK, and green. The deleting was agreed to in step one; all that is settled here
+                    FontSize="16" IsCancel="True" Click="Btn_Cancel_Click"/>            <!-- Plain OK, and green. The deleting was agreed to in step one; all that is settled here
                  is which comment the log keeps, so a red "Remove" button was both alarming and
                  pulling against the Keep boxes above it. -->
             <Button x:Name="Btn_Delete2" DockPanel.Dock="Right" Width="110" Height="34" Margin="0,0,10,0"
@@ -167,6 +166,9 @@
                     </ControlTemplate>
                 </Button.Template>
             </Button>
+            <!-- Keeps every comment in every group, joined into one: the same as ticking every box. -->
+            <Button x:Name="Btn_MergeAll" Content="Merge all" DockPanel.Dock="Right" Width="120" Height="34"
+                    Margin="0,0,10,0" FontSize="16" Click="Btn_MergeAll_Click"/>
             <TextBlock x:Name="TB_Summary2" VerticalAlignment="Center" FontSize="16"
                        Foreground="{DynamicResource MutedTextBrush}" TextTrimming="CharacterEllipsis"/>
         </DockPanel>

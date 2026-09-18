@@ -240,6 +240,11 @@ namespace HolyParser
         // How many records the option threw away, all told, kept or not.
         public int DroppedDuplicateCount { get { return m_droppedDuplicateCount; } }
 
+        // THE DROPPED COPIES THAT CARRIED A DIFFERENT COMMENT, one list per contact: the record that
+        // stays first, then the copies. Keyed by QSO.MatchKey. Empty when nothing was dropped.
+        private readonly Dictionary<string, List<QSO>> m_commentCopies = new Dictionary<string, List<QSO>>();
+        public Dictionary<string, List<QSO>> GetDroppedCommentCopies() { return m_commentCopies; }
+
         // The station callsign to fall back on when a record names neither STATION_CALLSIGN nor
         // OPERATOR. Set by the importer to the log's own identity; left empty, such a record is
         // rejected rather than guessed at.
@@ -382,15 +387,34 @@ namespace HolyParser
                 // it cannot be shown to be a repeat of anything, and losing a contact is the failure
                 // that matters.
                 var kept = new List<QSO>(m_qsoList.Count);
-                var seen = new HashSet<string>();
+                var firstByKey = new Dictionary<string, QSO>();
                 foreach (var q in m_qsoList)
                 {
                     string key = QSO.MatchKey(q);
-                    if (key == null || seen.Add(key)) kept.Add(q);
+                    QSO first;
+                    if (key == null || !firstByKey.TryGetValue(key, out first))
+                    {
+                        if (key != null) firstByKey[key] = q;
+                        kept.Add(q);
+                    }
                     else
                     {
                         m_droppedDuplicateCount++;
                         if (m_droppedDuplicates.Count < MaxDroppedKept) m_droppedDuplicates.Add(q);
+
+                        // A COPY WITH A COMMENT OF ITS OWN is not thrown away with its comment. It is
+                        // kept beside the record that stays, so the importer can ask which comment the
+                        // contact keeps. Only the ones that say something different - a copy repeating
+                        // the same words has nothing to add.
+                        string c = (q.Comment ?? string.Empty).Trim();
+                        if (c.Length > 0 && !string.Equals(c, (first.Comment ?? string.Empty).Trim(),
+                                                           StringComparison.OrdinalIgnoreCase))
+                        {
+                            List<QSO> group;
+                            if (!m_commentCopies.TryGetValue(key, out group))
+                                m_commentCopies[key] = group = new List<QSO> { first };
+                            group.Add(q);
+                        }
                     }
                 }
                 m_qsoList = kept;

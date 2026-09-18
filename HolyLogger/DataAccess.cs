@@ -3961,6 +3961,17 @@ Environment.NewLine +
                 FilledIds.Add(id);
                 FilledColumns.Add(columnBits);
             }
+
+            // COMMENTS THE IMPORT CHANGED on QSOs the log already held - the one field it may write over
+            // rather than only fill, because the operator chose it. So the OLD text is kept, to put back.
+            internal readonly List<long> CommentIds = new List<long>();
+            internal readonly List<string> OldComments = new List<string>();
+
+            public void NoteComment(long id, string oldComment)
+            {
+                CommentIds.Add(id);
+                OldComments.Add(oldComment ?? string.Empty);
+            }
         }
 
         // The columns the merge can fill, in the bit order ImportUndo records them in. The UPDATE in
@@ -4049,6 +4060,26 @@ Environment.NewLine +
                         foreach (var c in byMask.Values) c.Dispose();
                     }
 
+                    // The comments put back to what they said before, on the QSO and on any linked copy
+                    // of it in another log - Update wrote both, so both are undone.
+                    if (undo.CommentIds.Count > 0)
+                    {
+                        using (var cc = new SQLiteCommand(
+                            "UPDATE qso SET comment = @c WHERE Id = @id OR source_qso_id = @id " +
+                            "OR Id = (SELECT source_qso_id FROM qso WHERE Id = @id)", con, tx))
+                        {
+                            cc.Parameters.Add(new SQLiteParameter("@c"));
+                            cc.Parameters.Add(new SQLiteParameter("@id"));
+                            // Backwards, so a QSO changed twice ends on its first old text.
+                            for (int i = undo.CommentIds.Count - 1; i >= 0; i--)
+                            {
+                                cc.Parameters["@c"].Value = undo.OldComments[i];
+                                cc.Parameters["@id"].Value = undo.CommentIds[i];
+                                if (cc.ExecuteNonQuery() > 0) fieldsPutBack++;
+                            }
+                        }
+                    }
+
                     tx.Commit();
                 }
                 return deleted;
@@ -4108,8 +4139,12 @@ Environment.NewLine +
                                               Action<int> progress = null,
                                               List<MergeNote> filledNotes = null,
                                               List<MergeNote> ambiguousNotes = null,
-                                              ImportUndo undo = null)
+                                              ImportUndo undo = null,
+                                              List<KeyValuePair<QSO, QSO>> matched = null)
         {
+            // matched: every record that turned out to be a QSO this log already holds, as (the QSO in
+            // the log, the record from the file). The comment is not filled here - the importer compares
+            // the two and asks the operator when they say different things.
             completed = 0; ambiguous = 0;
             var unmatched = new List<QSO>();
             if (parsed == null || parsed.Count == 0) return unmatched;
@@ -4250,6 +4285,7 @@ Environment.NewLine +
                             }
                         }
                         bucket.Remove(target);
+                        if (matched != null) matched.Add(new KeyValuePair<QSO, QSO>(target, p));
 
                         // A record that has nothing to give still counts as "already in this log" - it
                         // simply needs no write. Skipping those keeps a re-import of a plain file (a
