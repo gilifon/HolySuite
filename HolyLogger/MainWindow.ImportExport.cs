@@ -1166,11 +1166,11 @@ namespace HolyLogger
                     if (!string.IsNullOrEmpty(result.ReportPath))
                     {
                         HolyMessageBox.ShowWithLinks(msg, "Import Complete", HolyMsgType.Warning, this,
-                            FileLinks(result), OpenPath, 620, ReportsFooter);
+                            FileLinks(result), OpenPath, ImportBoxWidth, ReportsFooter);
                     }
                     else
                     {
-                        HolyMessageBox.ShowWarning(msg, "Import Complete", this, 620);
+                        HolyMessageBox.ShowWarning(msg, "Import Complete", this, ImportBoxWidth);
                     }
                 }
                 else if (!string.IsNullOrEmpty(result.ReportPath))
@@ -1178,11 +1178,11 @@ namespace HolyLogger
                     // Nothing rejected, but there IS a report - fields were filled in. Still success,
                     // and still reachable in one click.
                     HolyMessageBox.ShowWithLinks(msg, "Import Complete", HolyMsgType.Success, this,
-                        FileLinks(result), OpenPath, 620, ReportsFooter);
+                        FileLinks(result), OpenPath, ImportBoxWidth, ReportsFooter);
                 }
                 else
                 {
-                    HolyMessageBox.ShowSuccess(msg, "Import Complete", this, 620);
+                    HolyMessageBox.ShowSuccess(msg, "Import Complete", this, ImportBoxWidth);
                 }
             }
             // Give the imported log the identity the user confirmed before the import (if it had none).
@@ -1291,9 +1291,9 @@ namespace HolyLogger
             var links = FileLinks(result);
             if (links.Count > 0)
                 HolyMessageBox.ShowWithLinks(msg, "Import stopped", HolyMsgType.Warning, this,
-                                             links, OpenPath, 620, ReportsFooter);
+                                             links, OpenPath, ImportBoxWidth, ReportsFooter);
             else
-                HolyMessageBox.ShowWarning(msg, "Import stopped", this, 620);
+                HolyMessageBox.ShowWarning(msg, "Import stopped", this, ImportBoxWidth);
         }
 
         // THE CHECK RUNS ITSELF WHEN AN IMPORT BRINGS QSOs IN.
@@ -2123,6 +2123,17 @@ namespace HolyLogger
             int left = (width - s.Length) / 2;
             return new string(' ', left) + s + new string(' ', width - s.Length - left);
         }
+
+        // HOW WIDE THE END-OF-IMPORT BOX IS.
+        //
+        // These two messages are the longest in the program - counts, a paragraph about what happens
+        // next, two full file paths - and at the old 620 the box came out 1,022 pixels tall on a
+        // 1,040-pixel desktop. Anything at all below the top of the screen, a remembered position or
+        // an owner window that is not centred, and the OK button was under the bottom edge with no way
+        // to reach it. The same words at 880 measure 860 tall: the SAME text, a shorter box, and 180
+        // pixels of room under it. Measured, not guessed - wider than this buys almost nothing,
+        // because what is left is mostly line breaks the width cannot take out.
+        private const double ImportBoxWidth = 880;
 
         // The last line of any message that hands the operator a report: where to find it again. The
         // path above it is one click today and gone tomorrow - this says how to come back to it in a
