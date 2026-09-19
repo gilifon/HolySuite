@@ -229,6 +229,7 @@
     <Compile Include="Contests\CabrilloHeader.cs" />
     <Compile Include="Contests\ContestHeaderStore.cs" />
     <Compile Include="Contests\ContestModels.cs" />
+    <Compile Include="Contests\ContestRadioCommands.cs" />
     <Compile Include="Contests\ContestService.cs" />
     <EmbeddedResource Include="contests.json" />
     <!-- Club Log's application API key, compiled in from a file next to the solution that .gitignore
@@ -320,6 +321,9 @@
     </Compile>
     <Compile Include="ChannelsWindow.xaml.cs">
       <DependentUpon>ChannelsWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="ContestRadioSetupWindow.xaml.cs">
+      <DependentUpon>ContestRadioSetupWindow.xaml</DependentUpon>
     </Compile>
     <Compile Include="UdpPortsWindow.xaml.cs">
       <DependentUpon>UdpPortsWindow.xaml</DependentUpon>
@@ -641,6 +645,10 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="AdifMonitorWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="ContestRadioSetupWindow.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

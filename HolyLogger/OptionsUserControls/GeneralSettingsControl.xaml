@@ -17,33 +17,59 @@
 
         <CheckBox x:Name="CBX_EnableOmniRigCAT" Content="Enable Omni-Rig CAT" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.EnableOmniRigCAT, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16" Margin="0,126,0,0" Click="CBX_EnableOmniRigCAT_Changed"/>
 
-        <!-- WHAT OMNIRIG IS SET TO, read out of its own file when this page opens. Everything the
-             program knows about the radio arrives on that poll, so a slow one is felt everywhere -
-             the frequency box lagging the dial most of all. Red and italic because it is a fault to
-             put right, and it says nothing at all when the setting is already 500 or better. -->
-        <TextBlock x:Name="OmniRigPollNote" HorizontalAlignment="Left" VerticalAlignment="Top"
-                   Margin="212,155,0,0" FontSize="16" FontStyle="Italic" Foreground="#C62828"
-                   TextWrapping="Wrap" Width="368" Visibility="Collapsed"/>
-
-        <!-- One press to the place the number is changed, beside the sentence that names it. -->
-        <Button x:Name="OmniRigOpenBtn" Content="Set OmniRig" Style="{StaticResource GoActionButtonStyle}"
-                HorizontalAlignment="Left" VerticalAlignment="Top" Margin="452,215,0,0" FontSize="16"
-                Height="32" Width="128" Visibility="Collapsed" Click="OmniRigOpenBtn_Click"/>
-
+        <!-- FROM HERE DOWN THE ROWS ARE STACKED, not placed at fixed heights: the OmniRig sentence can
+             be longer (the red one) and its frame taller, and everything below then moves down instead
+             of being covered. -->
+        <StackPanel HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,151,0,0" Width="580">
+        <Grid>
         <!-- Left edge lines up with the word "Enable" (checkbox text starts after the ~20px glyph).
              Narrow: a rig name is short (~15 chars), so ~half the old width is plenty. -->
-        <GroupBox x:Name="groupBox" Header="Select Rig" Height="90" Margin="20,151,0,0" HorizontalAlignment="Left" VerticalAlignment="Top" Width="180" FontSize="16">
+        <GroupBox x:Name="groupBox" Header="Select Rig" Height="90" Margin="20,0,0,0" HorizontalAlignment="Left" VerticalAlignment="Top" Width="180" FontSize="16">
             <StackPanel>
                 <RadioButton x:Name="Rig1_RB" HorizontalAlignment="Left" Margin="0,8,0,0" VerticalAlignment="Top" Content="1: Rig Number 1"  Click="HasChanged_Click" IsChecked="{Binding Default.SelectedOmniRig1, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16"/>
                 <RadioButton x:Name="Rig2_RB" HorizontalAlignment="Left" Margin="0,8,0,0" VerticalAlignment="Top" Content="2: Rig Number 2" Click="HasChanged_Click" IsChecked="{Binding Default.SelectedOmniRig2, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16"/>
             </StackPanel>
         </GroupBox>
 
+        <!-- WHAT OMNIRIG IS SET TO, read out of its own file when this page opens. Everything the
+             program knows about the radio arrives on that poll, so a slow one is felt everywhere -
+             the frequency box lagging the dial most of all. Red and italic because it is a fault to
+             put right, and green and upright when the setting is already 500 or better. -->
+        <!-- The sentence and its button sit in one frame, the height of the Select Rig box beside it,
+             with the button in the frame's bottom-right corner. The frame grows when the red sentence
+             is longer; the code then gives the button a line of its own (ShowOmniRigPollInterval). -->
+        <Border x:Name="OmniRigPollFrame" HorizontalAlignment="Left" VerticalAlignment="Top"
+                Margin="208,0,0,0" Width="372" MinHeight="90" Padding="8,4,8,6"
+                BorderBrush="#D5DFE5" BorderThickness="1" CornerRadius="4" Visibility="Collapsed">
+            <Grid>
+                <TextBlock x:Name="OmniRigPollNote" FontSize="16" FontStyle="Italic" Foreground="#C62828"
+                           TextWrapping="Wrap" VerticalAlignment="Top"/>
+
+                <!-- One press to the place the number is changed, beside the sentence that names it. -->
+                <Button x:Name="OmniRigOpenBtn" Content="Set OmniRig" Style="{StaticResource GoActionButtonStyle}"
+                        HorizontalAlignment="Right" VerticalAlignment="Bottom" FontSize="16"
+                        Height="32" Width="128" Click="OmniRigOpenBtn_Click"/>
+            </Grid>
+        </Border>
+        </Grid>
+
+        <!-- CONTEST RADIO SETUP. The commands that put a radio in VFO, simplex, no tone and no TSQL,
+             sent when a log of the contest picked there is opened (ContestRadioSetupWindow). Here,
+             under the rig it is sent to. -->
+        <Grid Margin="0,12,0,0">
+            <Button x:Name="BTN_ContestRadioSetup" Content="Contest Radio Setup" Style="{StaticResource OrangeActionButtonStyle}"
+                    HorizontalAlignment="Left" VerticalAlignment="Top" Width="190" Height="32"
+                    FontSize="16" Click="BTN_ContestRadioSetup_Click"/>
+            <TextBlock HorizontalAlignment="Left" VerticalAlignment="Top" Margin="200,5,0,0" FontSize="16"
+                       Foreground="Gray" TextWrapping="Wrap" Width="380"
+                       Text="Radio commands sent when a contest log opens."/>
+        </Grid>
+
         <!-- OmniRig has two CW modes, CW_U and CW_L, and which of them is CW normal depends on the
              radio - see CwRigModeForConnectedRig in MainWindow.Rig.cs, which reads the answer out of
              the radio's own OmniRig .ini file. This box is the one case that file cannot know about:
              an Icom whose own menu has CW Normal Side changed from LSB to USB. -->
-        <GroupBox Header="CW Mode" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,246,0,0" Width="580" FontSize="16">
+        <GroupBox Header="CW Mode" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,12,0,0" Width="580" FontSize="16">
             <StackPanel Margin="4,4,4,4">
                 <CheckBox x:Name="CBX_SwapCwSideband" Content="Swap CW and CW-R" HorizontalAlignment="Left" IsChecked="{Binding Default.SwapCwSideband, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16"/>
                 <TextBlock TextWrapping="Wrap" Margin="0,6,0,0" FontSize="16" Foreground="Gray"
@@ -59,27 +85,31 @@
              boxes, and the one button on it that opens a table of its own was reading as part of the
              wall. Width and Height are set here because the keycap template lays its content out
              itself and ignores Padding; 120 keeps the key clear of the sentence beside it at 130. -->
-        <Button x:Name="BTN_UdpPorts" Content="UDP Ports Manager" Style="{StaticResource OrangeActionButtonStyle}"
-                HorizontalAlignment="Left" VerticalAlignment="Top" Width="190" Height="32"
-                Margin="0,368,0,0" FontSize="16" Click="BTN_UdpPorts_Click"/>
-        <!-- The button grew with its longer label, so the sentence beside it starts further right; the
-             width stops it at 580, where every group box on this page ends. -->
-        <TextBlock HorizontalAlignment="Left" VerticalAlignment="Top" Margin="200,373,0,0" FontSize="16"
-                   Foreground="Gray" TextWrapping="Wrap" Width="380"
-                   Text="Receive information from other software, and send yours out to it."/>
+        <Grid Margin="0,22,0,0">
+            <Button x:Name="BTN_UdpPorts" Content="UDP Ports Manager" Style="{StaticResource OrangeActionButtonStyle}"
+                    HorizontalAlignment="Left" VerticalAlignment="Top" Width="190" Height="32"
+                    FontSize="16" Click="BTN_UdpPorts_Click"/>
+            <!-- The button grew with its longer label, so the sentence beside it starts further right; the
+                 width stops it at 580, where every group box on this page ends. -->
+            <TextBlock HorizontalAlignment="Left" VerticalAlignment="Top" Margin="200,5,0,0" FontSize="16"
+                       Foreground="Gray" TextWrapping="Wrap" Width="380"
+                       Text="Receive information from other software, and send yours out to it."/>
+        </Grid>
 
         <!-- ADIF MONITOR. For programs that write each contact to an ADIF file of their own (WSJT-X and
              the like): the files listed there are watched and their new contacts added to the log. -->
-        <Button x:Name="BTN_AdifMonitor" Content="ADIF Monitor Manager" Style="{StaticResource OrangeActionButtonStyle}"
-                HorizontalAlignment="Left" VerticalAlignment="Top" Width="190" Height="32"
-                Margin="0,430,0,0" FontSize="16" Click="BTN_AdifMonitor_Click"/>
-        <TextBlock HorizontalAlignment="Left" VerticalAlignment="Top" Margin="200,435,0,0" FontSize="16"
-                   Foreground="Gray" TextWrapping="Wrap" Width="380"
-                   Text="Add new contacts from ADIF files other software writes."/>
+        <Grid Margin="0,12,0,0">
+            <Button x:Name="BTN_AdifMonitor" Content="ADIF Monitor Manager" Style="{StaticResource OrangeActionButtonStyle}"
+                    HorizontalAlignment="Left" VerticalAlignment="Top" Width="190" Height="32"
+                    FontSize="16" Click="BTN_AdifMonitor_Click"/>
+            <TextBlock HorizontalAlignment="Left" VerticalAlignment="Top" Margin="200,5,0,0" FontSize="16"
+                       Foreground="Gray" TextWrapping="Wrap" Width="380"
+                       Text="Add new contacts from ADIF files other software writes."/>
+        </Grid>
 
         <!-- Audio Alerts: both sound options plus a single shared output-device picker, so alerts can
              go to the speakers instead of a USB radio codec. Left-justified with the checkboxes. -->
-        <GroupBox Header="Audio Alerts" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,487,0,0" Width="580" FontSize="16">
+        <GroupBox Header="Audio Alerts" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,25,0,0" Width="580" FontSize="16">
             <StackPanel Margin="4,4,4,4">
                 <!-- Beep when typing -->
                 <CheckBox x:Name="CBX_NonEnglishKeyBeep" HorizontalAlignment="Left" IsChecked="{Binding Default.NonEnglishKeyBeep, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16" Margin="0,2,0,0" Click="HasChanged_Click">
@@ -145,6 +175,7 @@
                 </StackPanel>
             </StackPanel>
         </GroupBox>
+        </StackPanel>
 
     </Grid>
 </UserControl>
