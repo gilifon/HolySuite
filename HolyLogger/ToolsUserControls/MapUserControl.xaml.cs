@@ -64,6 +64,12 @@ namespace HolyLogger.ToolsUserControls
         {
             _owner.RaiseSpotHoverEnded();
         }
+
+        // The pin in the map's corner: pin the map window onto the main window, or let it float.
+        public void TogglePin()
+        {
+            _owner.RaisePinToggleRequested();
+        }
     }
 
     public partial class MapUserControl : UserControl
@@ -99,6 +105,80 @@ namespace HolyLogger.ToolsUserControls
         internal void RaiseSpotTuneRequested(string freq, string mode) => SpotTuneRequested?.Invoke(freq, mode);
         internal void RaiseSpotHovered(string callsign) => SpotHovered?.Invoke(callsign);
         internal void RaiseSpotHoverEnded() => SpotHoverEnded?.Invoke();
+
+        // THE PIN. The map lives in its own window; the pin is drawn by this control - in the page's
+        // corner, and on the "set My Locator" notice - because a pinned window has no title bar to
+        // carry it. The window answers the click and tells this control the new state.
+        public event Action PinToggleRequested;
+        internal void RaisePinToggleRequested() => PinToggleRequested?.Invoke();
+
+        private bool _isPinned;
+        public bool IsPinned
+        {
+            get { return _isPinned; }
+            set { _isPinned = value; UpdatePinButton(); }
+        }
+
+        private void PlaceholderPinBtn_Click(object sender, System.Windows.RoutedEventArgs e) => RaisePinToggleRequested();
+
+        // Floating, the window draws the frame (thick enough to grab and resize by); pinned, the map
+        // wears its own thin frame again, as it did when it was part of the main window.
+        public void ShowOwnFrame(bool show)
+        {
+            MapFrame.BorderThickness = show ? new System.Windows.Thickness(3, 3, 3, 0) : new System.Windows.Thickness(0);
+        }
+
+        // Segoe MDL2 glyphs, the same two My Favorite Channels uses: the upright pin (E840) when held
+        // in place, the angled one (E718) when it can be pinned.
+        private const string PinnedGlyph = "";
+        private const string UnpinnedGlyph = "";
+        private const string PinnedTip = "Pinned onto the main window. Click to let the map float.";
+        private const string UnpinnedTip = "Click to pin the map onto the main window.";
+
+        private void UpdatePinButton()
+        {
+            PlaceholderPinBtn.Content = _isPinned ? PinnedGlyph : UnpinnedGlyph;
+            PlaceholderPinBtn.ToolTip = _isPinned ? PinnedTip : UnpinnedTip;
+            InjectPinButton();
+        }
+
+        // Adds the pin to whichever of the four map pages is loaded, in the top right corner, and moves
+        // the Polar/Flat button along to make room. Added from here rather than written into each page
+        // so the four cannot drift apart. Runs again after every page load.
+        private void InjectPinButton()
+        {
+            try
+            {
+                if (MapBrowser.Document == null) return;
+                string glyph = _isPinned ? "&#xE840;" : "&#xE718;";
+                string tip = _isPinned ? PinnedTip : UnpinnedTip;
+                string bg = _isPinned ? "#1565C0" : "#9FCBF5";
+                string fg = _isPinned ? "#FFFFFF" : "#333333";
+                MapBrowser.InvokeScript("eval", new object[] { @"
+(function() {
+    if (!document.body) return;
+    var b = document.getElementById('hl-pin-btn');
+    if (!b) {
+        b = document.createElement('button');
+        b.id = 'hl-pin-btn';
+        b.onclick = function() { try { window.external.TogglePin(); } catch(e) {} };
+        document.body.appendChild(b);
+    }
+    var st = b.style;
+    st.position = 'absolute'; st.top = '0px'; st.right = '0px'; st.zIndex = '1001';
+    st.width = '28px'; st.height = '24px'; st.padding = '0'; st.cursor = 'pointer';
+    st.border = '1px solid #4B76A0'; st.borderRadius = '10px';
+    st.fontFamily = 'Segoe MDL2 Assets'; st.fontSize = '16px';
+    st.background = '" + bg + @"'; st.color = '" + fg + @"';
+    b.innerHTML = '" + glyph + @"';
+    b.title = '" + tip.Replace("'", "'") + @"';
+    var p = document.getElementById('proj-btn');
+    if (p) p.style.right = '30px';
+})();
+" });
+            }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+        }
 
         public bool IsPolarProjection => _isPolar;
 
@@ -137,6 +217,7 @@ namespace HolyLogger.ToolsUserControls
             MapBrowser.LoadCompleted += (s, e) =>
             {
                 SuppressScriptErrors();
+                InjectPinButton();
                 if (_isClusterMode)
                     _clusterMapLoaded = true;
                 else if (_isPolar)
@@ -165,6 +246,21 @@ namespace HolyLogger.ToolsUserControls
             _resizeRedrawTimer.Start();
         }
 
+        // REDRAWN FOR ITS NEW SIZE, NOW. The map window hides itself while it is pinned or unpinned,
+        // calls this, and shows itself again - so the map comes back already fitted, rather than
+        // being seen at its old scale in the new frame and then jumping. The day/night shading is
+        // NOT waited for: on the flat map it takes about 0.2 s, and a map that stays invisible that
+        // much longer feels like a program that did not hear the click. It follows a moment later.
+        public void RedrawForNewSize()
+        {
+            if (_resizeRedrawTimer != null) _resizeRedrawTimer.Stop();
+            try
+            {
+                MapBrowser.InvokeScript("eval", new object[] { ResizeScript });
+            }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
         private void ResizeRedrawTimer_Tick(object sender, EventArgs args)
         {
             {
@@ -173,8 +269,13 @@ namespace HolyLogger.ToolsUserControls
                 {
                     // Force the browser to recalculate and trigger resize by dispatching event
                     // and then explicitly forcing a layout recalculation
-                    MapBrowser.InvokeScript("eval", new object[] {
-                        @"
+                    MapBrowser.InvokeScript("eval", new object[] { ResizeScript });
+                }
+                catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+            }
+        }
+
+        private const string ResizeScript = @"
                         (function() {
                             // The legacy WebBrowser engine may not support the Event() constructor,
                             // which throws 'object doesn't support this property or method'. Build the
@@ -197,12 +298,7 @@ namespace HolyLogger.ToolsUserControls
                                 setTimeout(fireResize, 50);
                             }
                         })();
-                        "
-                    });
-                }
-                catch (System.Exception swallowed) { Log.Swallow(swallowed); }
-            }
-        }
+                        ";
 
         // Releases the underlying IE WebBrowser ActiveX control (a known memory/resource hog that is
         // not collected by GC alone). Call once at application shutdown.
@@ -562,7 +658,25 @@ function ensureDayNightCanvas() {
     return dayNightLayer;
 }
 
+// ONE DRAWING FOR A BURST OF CHANGES. A resize moves, zooms and resizes the map in one go, and each of
+// those asked for the shading again - measured, six drawings of 2.3 s each behind one unpin, with the
+// map frozen at its old size the whole time. Asked for many times, it is now drawn once, just after
+// the last request.
+// A QUARTER OF A SECOND, so the map is seen at its new size first. The drawing still takes a moment,
+// and while it runs nothing is painted: with a short wait it ran before the map had been shown at the
+// new size, twice (the window's own resize and the program's repeat of it 100 ms later), and the map
+// sat at its old size for about 0.4 s. Now the map fills the window at once and the shading follows.
+var dayNightTimer = null;
 function drawDayNight() {
+    if (dayNightTimer) clearTimeout(dayNightTimer);
+    dayNightTimer = setTimeout(function() { dayNightTimer = null; drawDayNightNow(); }, 250);
+}
+
+// EVERY 4TH SCREEN DOT, STRETCHED. The shading is worked out point by point, and on a big window that
+// is a million points. The edge between day and night is soft anyway, so a canvas a quarter of the
+// size, stretched to fit, looks the same - and is about 16 times less work.
+var DAYNIGHT_STEP = 4;
+function drawDayNightNow() {
     if (sunMarker) {
         map.removeLayer(sunMarker);
         sunMarker = null;
@@ -578,8 +692,9 @@ function drawDayNight() {
 
     var canvas = ensureDayNightCanvas();
     var size = map.getSize();
-    canvas.width = size.x;
-    canvas.height = size.y;
+    var step = DAYNIGHT_STEP;
+    canvas.width = Math.ceil(size.x / step);
+    canvas.height = Math.ceil(size.y / step);
     canvas.style.width = size.x + 'px';
     canvas.style.height = size.y + 'px';
     var topLeft = map.containerPointToLayerPoint([0, 0]);
@@ -595,8 +710,8 @@ function drawDayNight() {
         var sinSunLat = Math.sin(sunLatRad);
         var cosSunLat = Math.cos(sunLatRad);
 
-        var width = size.x;
-        var height = size.y;
+        var width = canvas.width;
+        var height = canvas.height;
         var twilightBand = 0.02;
         var maxAlpha = 0.25;
         var image = ctx.createImageData(width, height);
@@ -604,7 +719,7 @@ function drawDayNight() {
 
         for (var y = 0; y < height; y++) {
             for (var x = 0; x < width; x++) {
-                var ll = map.containerPointToLatLng([x + 0.5, y + 0.5]);
+                var ll = map.containerPointToLatLng([(x + 0.5) * step, (y + 0.5) * step]);
                 var latRad = ll.lat * Math.PI / 180;
                 var lonRad = ll.lng * Math.PI / 180;
                 var cosZenith = Math.sin(latRad) * sinSunLat + Math.cos(latRad) * cosSunLat * Math.cos(lonRad - sunLonRad);
@@ -661,6 +776,42 @@ function gcArcPoints(lat1, lon1, lat2, lon2, n) {
     }
     return pts;
 }
+// THE DX DOT'S SHAPE TELLS THE MODE: square SSB, triangle CW, hexagon digital, round AM / FM and
+// any spot whose mode is not known. The colour still tells the band.
+function modeShape(m) {
+    m = (m || '').toUpperCase();
+    if (m === '' || m === 'AM' || m === 'FM') return 'circle';
+    if (m === 'SSB' || m === 'USB' || m === 'LSB') return 'square';
+    if (m === 'CW') return 'triangle';
+    return 'hexagon';
+}
+// SVG path of that shape around x,y. r is the size a round dot would have; the corners reach a
+// little further so a square, triangle or hexagon looks about as big as the dot beside it.
+function shapePath(x, y, r, shape) {
+    if (shape === 'square') {
+        var s = r * 0.9;
+        return 'M' + (x - s) + ',' + (y - s) + 'L' + (x + s) + ',' + (y - s) + 'L' + (x + s) + ',' + (y + s) + 'L' + (x - s) + ',' + (y + s) + 'Z';
+    }
+    if (shape === 'triangle' || shape === 'hexagon') {
+        var n = shape === 'triangle' ? 3 : 6, rr = r * (n === 3 ? 1.35 : 1.1), d = '';
+        for (var i = 0; i < n; i++) {
+            var a = -Math.PI / 2 + i * 2 * Math.PI / n;
+            d += (i ? 'L' : 'M') + (x + rr * Math.cos(a)) + ',' + (y + rr * Math.sin(a));
+        }
+        return d + 'Z';
+    }
+    return 'M' + (x - r) + ',' + y + 'a' + r + ',' + r + ' 0 1,0 ' + (2 * r) + ',0a' + r + ',' + r + ' 0 1,0 ' + (-2 * r) + ',0';
+}
+// A circleMarker that draws the mode's shape instead of a circle. Everything else - colour,
+// setRadius for the hover / on-frequency enlargement, clicks, tooltip - is the circleMarker's own.
+var ShapeMarker = L.CircleMarker.extend({
+    _updatePath: function() {
+        var shape = this.options.shape, rd = this._renderer;
+        if (!shape || shape === 'circle' || !rd._setPath || !this._path) { L.CircleMarker.prototype._updatePath.call(this); return; }
+        if (this._empty()) { rd._setPath(this, 'M0 0'); return; }
+        rd._setPath(this, shapePath(this._point.x, this._point.y, this._radius, shape));
+    }
+});
 var hlCs = null, hlF = null;  // cluster-list hover highlight (callsign + freq)
 var flatSpotRefs = [];        // per-spot Leaflet layers, for in-place hover highlighting
 function renderSpots() {
@@ -672,7 +823,7 @@ function renderSpots() {
         if (sp.sp) {
             // Great circle line spotter -> DX
             var arcPts = gcArcPoints(sp.sp[0], sp.sp[1], sp.c[0], sp.c[1], 50);
-            var arcColor = (sp.b === '40' || sp.b === '40m' || (parseFloat(sp.f) >= 7.0 && parseFloat(sp.f) <= 7.3)) ? '#FFFFFF' : (sp.k || '#FF6600');
+            var arcColor = (!mapBW && (sp.b === '40' || sp.b === '40m' || (parseFloat(sp.f) >= 7.0 && parseFloat(sp.f) <= 7.3))) ? '#FFFFFF' : (sp.k || '#FF6600');  // white 40 m only on the colored map; on the white map it would vanish
             ref.arc = L.polyline(arcPts, { color: arcColor, weight: 0.8, opacity: 0.7, interactive: false }).addTo(spotsLayer);
             // Spotter dot (black)
             ref.spDot = L.circleMarker(sp.sp, { radius: 2, color: '#000000', fillColor: '#000000', fillOpacity: 1, weight: 0, interactive: false }).addTo(spotsLayer);
@@ -680,7 +831,7 @@ function renderSpots() {
         // Band-colored DX dot with tooltip and click. On-frequency spots (sp.of) get a light-green
         // ring + bigger dot, matching the list's green 'On My Radio Freq' highlight.
         var dotColor = sp.k || '#FF6600';
-        var m = L.circleMarker(sp.c, { radius: 5, color: dotColor, fillColor: dotColor, fillOpacity: 1, weight: 0, interactive: true });
+        var m = new ShapeMarker(sp.c, { shape: modeShape(sp.m), radius: 5, color: dotColor, fillColor: dotColor, fillOpacity: 1, weight: 0, interactive: true });
         m._dotColor = dotColor;
         m._of = (sp.of === 1);   // on-frequency ring applied by applyFlatHighlight, identical to hover
         m.bindTooltip('<b>' + sp.cs + '</b><br/>' + sp.f + '<span style=""font-size:9px;font-weight:normal""> MHz</span>&nbsp;' + sp.m, {
@@ -796,7 +947,21 @@ function updateCenterButtons() {
 updateCenterButtons();
 function toggleProjection() { try { window.external.ToggleProjection(); } catch(e) {} }
 map.on('move zoom resize', drawDayNight);
-window.addEventListener('resize', function() { if (map) { map.invalidateSize(); drawDayNight(); } });
+// THE SCALE FOLLOWS THE WINDOW. The zoom for the chosen radius depends on how many pixels the map
+// has, and it was worked out once, at the size the page was loaded with. Unpinning the map loaded it
+// small and then made it big, and the old zoom showed the whole world under '5000 km'. The zoom the
+// radius needs is worked out again for the new size; any wheel-zoom on top of it is kept, and so is
+// the place in the middle. (getSize still holds the OLD size until invalidateSize, which is why the
+// difference is read first.)
+function radiusZoom() { return map.getBoundsZoom(L.latLng(homeLat, homeLon).toBounds(radiusMeters * 2)); }
+window.addEventListener('resize', function() {
+    if (!map) return;
+    var extra = map.getZoom() - radiusZoom();
+    var center = map.getCenter();
+    map.invalidateSize(false);
+    map.setView(center, radiusZoom() + extra, { animate:false });
+    drawDayNight();
+});
 </script>
 </body>
 </html>";
@@ -809,9 +974,6 @@ window.addEventListener('resize', function() { if (map) { map.invalidateSize(); 
 
         private void RenderClusterPolarMap(System.Collections.Generic.List<ClusterSpotInfo> spots, double homeLat, double homeLon, int radiusKm)
         {
-            // Check if we should show compass instead of map
-            bool showCompass = Properties.Settings.Default.MapAreaDisplayMode == 1;
-
             var ic = System.Globalization.CultureInfo.InvariantCulture;
             double marginMultiplier = 1.15;
             try
@@ -1231,7 +1393,7 @@ function drawOverlays() {
             if (sp.sp) {
                 try {
                     var gcLine = { type: 'LineString', coordinates: [sp.sp, sp.c] };
-                    var arcColor = (sp.b === '40' || sp.b === '40m' || (parseFloat(sp.f) >= 7.0 && parseFloat(sp.f) <= 7.3)) ? '#FFFFFF' : (sp.k || '#FF6600');
+                    var arcColor = (!mapBW && (sp.b === '40' || sp.b === '40m' || (parseFloat(sp.f) >= 7.0 && parseFloat(sp.f) <= 7.3))) ? '#FFFFFF' : (sp.k || '#FF6600');  // white 40 m only on the colored map; on the white map it would vanish
                     arcsG.append('path')
                         .datum(gcLine)
                         .attr('class', 'spot-arc').attr('data-cs', sp.cs)
@@ -1254,9 +1416,11 @@ function drawOverlays() {
             if (pt && isFinite(pt[0]) && isFinite(pt[1])) {
                 (function(spot, px, py) {
                     var dotColor = spot.k || '#FF6600';
-                    dxG.append('circle')
+                    var shape = modeShape(spot.m);
+                    dxG.append('path')
                         .attr('class', 'spot-dx').attr('data-cs', spot.cs).attr('data-of', spot.of === 1 ? '1' : '0')
-                        .attr('cx', px).attr('cy', py).attr('r', 4)
+                        .attr('data-x', px).attr('data-y', py).attr('data-shape', shape)
+                        .attr('d', shapePath(px, py, 4, shape))
                         .attr('fill', dotColor).attr('stroke', 'none').attr('stroke-width', 0)
                         .attr('clip-path', 'url(#globe-clip)')
                         .style('cursor', 'pointer')
@@ -1285,6 +1449,32 @@ function drawOverlays() {
         .attr('fill', 'none').attr('stroke', '#2a607a').attr('stroke-width', 2);
     applyHighlight(hlCs);   // re-apply any active hover highlight after this redraw
 }
+// THE DX DOT'S SHAPE TELLS THE MODE: square SSB, triangle CW, hexagon digital, round AM / FM and
+// any spot whose mode is not known. The colour still tells the band.
+function modeShape(m) {
+    m = (m || '').toUpperCase();
+    if (m === '' || m === 'AM' || m === 'FM') return 'circle';
+    if (m === 'SSB' || m === 'USB' || m === 'LSB') return 'square';
+    if (m === 'CW') return 'triangle';
+    return 'hexagon';
+}
+// SVG path of that shape around x,y. r is the size a round dot would have; the corners reach a
+// little further so a square, triangle or hexagon looks about as big as the dot beside it.
+function shapePath(x, y, r, shape) {
+    if (shape === 'square') {
+        var s = r * 0.9;
+        return 'M' + (x - s) + ',' + (y - s) + 'L' + (x + s) + ',' + (y - s) + 'L' + (x + s) + ',' + (y + s) + 'L' + (x - s) + ',' + (y + s) + 'Z';
+    }
+    if (shape === 'triangle' || shape === 'hexagon') {
+        var n = shape === 'triangle' ? 3 : 6, rr = r * (n === 3 ? 1.35 : 1.1), d = '';
+        for (var i = 0; i < n; i++) {
+            var a = -Math.PI / 2 + i * 2 * Math.PI / n;
+            d += (i ? 'L' : 'M') + (x + rr * Math.cos(a)) + ',' + (y + rr * Math.sin(a));
+        }
+        return d + 'Z';
+    }
+    return 'M' + (x - r) + ',' + y + 'a' + r + ',' + r + ' 0 1,0 ' + (2 * r) + ',0a' + r + ',' + r + ' 0 1,0 ' + (-2 * r) + ',0';
+}
 // Restyle the hovered spot's arc + spotter dot + DX dot in place (matched by DX callsign) so the
 // change never removes/re-adds nodes -- which would otherwise retrigger the map's own hover
 // events and flicker. Only the non-interactive arc/spotter are raised (never the DX dot).
@@ -1305,7 +1495,7 @@ function applyHighlight(cs) {
         var el = d3.select(this); var on = (cs !== null && el.attr('data-cs') === cs);
         // On-frequency looks EXACTLY like a hover: white ring AND enlarged dot.
         var hl = on || (el.attr('data-of') === '1');
-        el.attr('r', hl ? 9 : 4)
+        el.attr('d', shapePath(+el.attr('data-x'), +el.attr('data-y'), hl ? 9 : 4, el.attr('data-shape')))
           .attr('stroke', hl ? '#FFFFFF' : 'none')
           .attr('stroke-width', hl ? 2 : 0);
     });
@@ -1635,7 +1825,12 @@ if (document.addEventListener) document.addEventListener(wheelName, onWheelEvent
 else if (document.attachEvent) document.attachEvent('on' + wheelName, onWheelEvent);
 
 window.addEventListener('resize', function() {
+    // THE SAME SIZE IS NOT REDRAWN. The program repeats every resize 100 ms later, to be sure the page
+    // heard of it, and redrawing every country outline for a size already drawn cost about 0.1 s
+    // each time (measured). The polar DX map has always had this check; this one had not.
+    var oldW = W, oldH = H;
     W = window.innerWidth; H = window.innerHeight;
+    if (W === oldW && H === oldH) return;
     mapR = Math.floor((Math.min(W, H) / 2) - 4);
     cx = W / 2; cy = H / 2;
     svg.attr('width', W).attr('height', H);
@@ -1789,8 +1984,10 @@ window.addEventListener('resize', function() {
 
         private string BuildFlatMapHtml(double lat, double lon, int radiusKm, double? azimuthDeg, double? homeLat = null, double? homeLon = null, double marginMultiplier = 1.15, double? spotterLat = null, double? spotterLon = null)
         {
-            // Check if we should show compass instead of map
-            bool showCompass = Properties.Settings.Default.MapAreaDisplayMode == 1;
+            // Never the compass. "Compass" is a choice for the picture area of the main window, and the
+            // map used to BE that area, so it read the same setting. The map has its own window now;
+            // the compass is drawn by the main window, and this window always shows a map.
+            bool showCompass = false;
             // Always show compass overlay if azimuth is provided
             bool hasAzimuth = azimuthDeg.HasValue;
 
@@ -2551,7 +2748,9 @@ try {
 } catch(e4) {}
 drawOverlays();
 drawRadiusRing(radiusKm);
-if (autoZoomActive) applyAutoZoom();
+// (No Auto Zoom here. A line calling it came along when this block was copied from the cluster map,
+// where Auto Zoom lives; on this page autoZoomActive does not exist, so it threw - and everything
+// below it never ran: dragging, wheel zoom, and refitting the map when its window changes size.)
 
 function onRadiusChange(km) {
     radiusKm = parseInt(km, 10);

@@ -917,8 +917,8 @@ namespace HolyLogger
             // Always hide MapDisabledPanel first (it has highest ZIndex)
             MapDisabledPanel.Visibility = Visibility.Collapsed;
 
-            // Hide all content options
-            MapControl.Visibility = Visibility.Hidden;
+            // Hide all content options. (The map is not one of them any more: it has its own window,
+            // and "Map" here now leaves the area empty - which is where that window sits when pinned.)
             CustomGraphicsBorder.Visibility = Visibility.Collapsed;
             QRZGraphicsBorder.Visibility = Visibility.Collapsed;
             CompassBorder.Visibility = Visibility.Collapsed;
@@ -931,12 +931,8 @@ namespace HolyLogger
                 case -1: // None - show blank panel with background color
                     MapDisabledPanel.Visibility = Visibility.Visible;
                     break;
-                case 0: // Map
-                    MapControl.Visibility = Visibility.Visible;
-                    // Force map to render immediately with current data
-                    MapControl.InvalidateVisual();
-                    MapControl.UpdateLayout();
-                    UpdateClusterSpotsOnMap();
+                case 0: // Map - its own window now; the area is left empty for it
+                    MapDisabledPanel.Visibility = Visibility.Visible;
                     break;
                 case 1: // Compass
                     CompassBorder.Visibility = Visibility.Visible;
@@ -954,10 +950,7 @@ namespace HolyLogger
                     CustomGraphicsBorder.UpdateLayout();
                     break;
                 default:
-                    MapControl.Visibility = Visibility.Visible;
-                    MapControl.InvalidateVisual();
-                    MapControl.UpdateLayout();
-                    UpdateClusterSpotsOnMap();
+                    MapDisabledPanel.Visibility = Visibility.Visible;
                     break;
             }
         }
@@ -1515,10 +1508,9 @@ namespace HolyLogger
             // the QSO Date/Time pickers current (see UTCTimer_Elapsed).
             StartUTCTimer();
 
-            MapControl.RadiusChanged += OnMapRadiusChanged;
-            MapControl.SpotTuneRequested += OnMapSpotTuneRequested;
-            MapControl.SpotHovered += OnMapSpotHovered;
-            MapControl.SpotHoverEnded += OnMapSpotHoverEnded;
+            // The map's own window: built here, shown once this window has been drawn (see
+            // CreateMapWindow). ShowHomeMap below draws nothing until then; showing the window does.
+            CreateMapWindow();
             ShowHomeMap();
             Log.Step("loaded: home map drawn");
 
@@ -10735,11 +10727,17 @@ namespace HolyLogger
             // Close cluster WebSocket
             try { CloseClusterWebSocket(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
 
-            // Unsubscribe from MapControl events
-            try { MapControl.RadiusChanged -= OnMapRadiusChanged; } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
-            try { MapControl.SpotTuneRequested -= OnMapSpotTuneRequested; } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
-            try { MapControl.SpotHovered -= OnMapSpotHovered; } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
-            try { MapControl.SpotHoverEnded -= OnMapSpotHoverEnded; } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+            // Unsubscribe from the map's events, and let its window really close with this one - until
+            // now its X only hid it.
+            if (_mapWindow != null)
+            {
+                var map = _mapWindow.Map;
+                try { map.RadiusChanged -= OnMapRadiusChanged; } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+                try { map.SpotTuneRequested -= OnMapSpotTuneRequested; } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+                try { map.SpotHovered -= OnMapSpotHovered; } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+                try { map.SpotHoverEnded -= OnMapSpotHoverEnded; } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+                try { _mapWindow.AllowClose(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+            }
         }
 
         private void Window_Closed(object sender, EventArgs e)
@@ -10784,7 +10782,7 @@ namespace HolyLogger
             // a column divider raises no event we listen for. See SaveLogColumnLayout.
             SaveLogColumnLayout();
             try { Properties.Settings.Default.Save(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
-            try { MapControl?.DisposeBrowser(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+            try { _mapWindow?.Map.DisposeBrowser(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
             if (dal != null) dal.Close();
         }
 
@@ -11839,6 +11837,8 @@ namespace HolyLogger
             options.UserInterfaceControlInstance.GraphicsBoxModeChanged += UserInterfaceControl_GraphicsBoxModeChanged;
             // "Show Control Panel" acts at once, not when Options is closed.
             options.UserInterfaceControlInstance.ShowRadioControlPanelChanged += (s2, e2) => ApplyRadioControlPanelVisibility();
+            // "Show the map window" acts at once too.
+            options.UserInterfaceControlInstance.ShowMapWindowChanged += (s2, e2) => ApplyMapWindowSetting();
             // Refresh the QRZ icon as soon as the user tests the connection in QRZ Service options.
             options.QRZServicesControlInstance.ConnectionTested += QRZServiceControl_ConnectionTested;
             // Give the LoTW control access to the database so it can reset the upload queue.

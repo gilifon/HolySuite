@@ -90,6 +90,12 @@
              under the last radio button behind it. -->
         <GroupBox Header="Map" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="370,250,0,0" Width="300" FontSize="16">
             <StackPanel Margin="10">
+                <!-- THE ONLY WAY TO BE WITHOUT THE MAP FOR GOOD. Its window's X (and View > Map) hide
+                     it until the next start; this is the one place that keeps it away. Acts at once. -->
+                <CheckBox x:Name="CBX_ShowMapWindow" Content="Show the MAP" FontSize="16" Margin="0,2"
+                          ToolTip="Closing the map only hides it until the next start."
+                          IsChecked="{Binding Default.ShowMapWindow, Source={StaticResource Settings}, Mode=TwoWay}"
+                          Checked="ShowMapWindow_Changed" Unchecked="ShowMapWindow_Changed"/>
                 <!-- "Plot spots on map" moved to the Cluster window's gear (Cluster Settings), which is
                      now the single home for the cluster's display/behaviour settings. -->
                 <CheckBox x:Name="CBX_MapShowDayNight" Content="Show day/night overlay" FontSize="16" Margin="0,2" Checked="MapShowDayNight_Changed" Unchecked="MapShowDayNight_Changed"/>
@@ -100,7 +106,7 @@
         </GroupBox>
         <!-- Only whether the cluster RUNS and whether its window SHOWS live here. Everything about how
              the cluster looks/behaves is in the Cluster window's gear (Cluster Settings). -->
-        <GroupBox Header="Cluster" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="370,436,0,0" Width="330" Height="146" FontSize="16">
+        <GroupBox Header="Cluster" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="370,486,0,0" Width="330" Height="146" FontSize="16">
             <StackPanel Margin="10">
                 <CheckBox x:Name="CBX_ClusterActive" Content="Active" FontSize="16" Margin="0,2" Checked="ClusterActive_Changed" Unchecked="ClusterActive_Changed"/>
                 <CheckBox x:Name="CBX_ClusterVisible" Content="Visible" FontSize="16" Margin="0,2" Checked="ClusterVisible_Changed" Unchecked="ClusterVisible_Changed"/>
@@ -108,13 +114,14 @@
                            TextWrapping="Wrap" Margin="0,8,0,0" Foreground="{DynamicResource MutedTextBrush}"/>
             </StackPanel>
         </GroupBox>
-        <!-- Below the Cluster box (which ends at y=582), in the right-hand column. -->
-        <GroupBox Header="Radio Control Panel" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="370,590,0,0" Width="330" FontSize="16">
+        <!-- Below the Cluster box (which ends at y=632), in the right-hand column. Both moved down 50 when
+             the Map box above gained "Show the map window" and its note. -->
+        <GroupBox Header="Radio Control Panel" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="370,640,0,0" Width="330" FontSize="16">
             <StackPanel Margin="10,6,10,8">
                 <CheckBox x:Name="CBX_ShowRadioControlPanel" Content="Show Control Panel" FontSize="16" Margin="0,2"
                           IsChecked="{Binding Default.ShowRadioControlPanel, Source={StaticResource Settings}, Mode=TwoWay}"
                           Checked="ShowRadioControlPanel_Changed" Unchecked="ShowRadioControlPanel_Changed"/>
-                <TextBlock Text="A small window with a frequency box and buttons for the bands, SSB and CW. Its frequencies are set on the Radio Control Panel page."
+                <TextBlock Text="A small window with buttons to set the Radio Bands and Modes."
                            FontSize="16" TextWrapping="Wrap" Margin="0,6,0,0"
                            Foreground="{DynamicResource MutedTextBrush}"/>
             </StackPanel>

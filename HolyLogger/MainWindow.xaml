@@ -738,6 +738,27 @@
                             <Image Source="Images/onair.png" Stretch="UniformToFill" Width="16" Height="16"/>
                         </MenuItem.Icon>
                     </MenuItem>
+                    <!-- Ticked while the map window is open. Also the only way to close a PINNED map,
+                         which has no title bar and so no X. The tick is set in code (IsCheckable would
+                         flip it before the click handler has decided anything). -->
+                    <MenuItem x:Name="MapMenuItem" Header="Map" ToolTip="Open or close the map window" Click="MapMenuItem_Click">
+                        <MenuItem.Icon>
+                            <!-- A folded paper map with a red place pin. Drawn here like the CW key and
+                                 the radio panel above: the fold lines take the theme's text colour, the
+                                 panels a light sea blue and the pin the same red as the map's markers. -->
+                            <Viewbox Width="16" Height="16">
+                                <Canvas Width="24" Height="24">
+                                    <Polygon Points="2,5 8,3 16,5 22,3 22,19 16,21 8,19 2,21" Fill="#B8E8EE"
+                                             Stroke="{DynamicResource TextBrush}" StrokeThickness="1.6" StrokeLineJoin="Round"/>
+                                    <Line X1="8" Y1="3" X2="8" Y2="19" Stroke="{DynamicResource TextBrush}" StrokeThickness="1.4"/>
+                                    <Line X1="16" Y1="5" X2="16" Y2="21" Stroke="{DynamicResource TextBrush}" StrokeThickness="1.4"/>
+                                    <Path Data="M12,6.5 C9.6,6.5 8.6,8.4 8.6,9.8 C8.6,12.4 12,16 12,16 C12,16 15.4,12.4 15.4,9.8 C15.4,8.4 14.4,6.5 12,6.5 Z"
+                                          Fill="#D7263D" Stroke="#8F1422" StrokeThickness="0.8"/>
+                                    <Ellipse Canvas.Left="10.9" Canvas.Top="8.7" Width="2.2" Height="2.2" Fill="White"/>
+                                </Canvas>
+                            </Viewbox>
+                        </MenuItem.Icon>
+                    </MenuItem>
                 </MenuItem>
                 <MenuItem Header="Tools" FontSize="16" SubmenuOpened="ToolsMenu_SubmenuOpened">
                     <!-- FIRST IN THE MENU. Picking the radio and its COM port is what an operator does
@@ -2482,8 +2503,11 @@
              thing as the Undo button on the activity row, at the same moment, in two places at once. -->
         </Grid>
 
-        <ToolsUserControls:MapUserControl x:Name="MapControl" HorizontalAlignment="Stretch" Height="344" Margin="677,0,6,0" Grid.Row="1" VerticalAlignment="Top"/>
-        <Border x:Name="MapDisabledPanel" HorizontalAlignment="Stretch" Height="{Binding Height, ElementName=MapControl}" Margin="677,0,6,0" Grid.Row="1" VerticalAlignment="Top" Background="{Binding Fill, ElementName=MainFormBackgroundRect}" Panel.ZIndex="21" Visibility="Collapsed"/>
+        <!-- THE MAP'S PLACE. The map itself has its own window now (MapWindow, in MainWindow.Map.cs);
+             pinned, that window is laid exactly over this empty, invisible box and follows it when
+             this window moves or changes size. Same size and place the map always had. -->
+        <Border x:Name="MapPinArea" HorizontalAlignment="Stretch" Height="344" Margin="677,0,6,0" Grid.Row="1" VerticalAlignment="Top" IsHitTestVisible="False"/>
+        <Border x:Name="MapDisabledPanel" HorizontalAlignment="Stretch" Height="344" Margin="677,0,6,0" Grid.Row="1" VerticalAlignment="Top" Background="{Binding Fill, ElementName=MainFormBackgroundRect}" Panel.ZIndex="21" Visibility="Collapsed"/>
         <Border HorizontalAlignment="Stretch" Height="344" Margin="677,0,6,0" Grid.Row="1" VerticalAlignment="Top" Background="{Binding Fill, ElementName=MainFormBackgroundRect}" Panel.ZIndex="20" Visibility="Collapsed" x:Name="CustomGraphicsBorder">
             <Image x:Name="Img_CustomGraphics" HorizontalAlignment="Center" VerticalAlignment="Center" Stretch="Uniform"/>
         </Border>

@@ -32,6 +32,18 @@ namespace HolyLogger.OptionsUserControls
         /// goes away at once rather than when the Options window is closed.</summary>
         public event EventHandler ShowRadioControlPanelChanged;
 
+        /// <summary>Raised when "Show the map window" is ticked or unticked; the map comes or goes at once.</summary>
+        public event EventHandler ShowMapWindowChanged;
+
+        private void ShowMapWindow_Changed(object sender, RoutedEventArgs e)
+        {
+            if (!IsLoaded) return;
+            HasChanged = true;
+            UpdateMapDisplayModeUI();   // greys (or frees) "Map" in the Graphics Box
+            // The two-way binding has already written the setting; the main window reads it from there.
+            ShowMapWindowChanged?.Invoke(this, EventArgs.Empty);
+        }
+
         public UserInterfaceControl()
         {
             InitializeComponent();
@@ -329,6 +341,19 @@ namespace HolyLogger.OptionsUserControls
                 RB_MapDisplay_Map.IsChecked = true;
                 Properties.Settings.Default.MapAreaDisplayMode = 0; // Map
                 Properties.Settings.Default.Save();
+            }
+
+            // "Map" in the Graphics Box means "keep this area free for the map". With the map window
+            // switched off there is nothing to keep it free for, so the choice is greyed, and if it
+            // was the one picked the area goes to Empty.
+            bool showMap = CBX_ShowMapWindow.IsChecked == true;
+            RB_MapDisplay_Map.IsEnabled = showMap;
+            if (!showMap && RB_MapDisplay_Map.IsChecked == true)
+            {
+                RB_MapDisplay_None.IsChecked = true;
+                Properties.Settings.Default.MapAreaDisplayMode = -1; // Empty
+                Properties.Settings.Default.Save();
+                GraphicsBoxModeChanged?.Invoke(this, EventArgs.Empty);
             }
 
             // Enable/disable custom image path controls based on selection
