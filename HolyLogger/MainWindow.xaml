@@ -401,7 +401,7 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="RadioButton">
                         <Border x:Name="Seg" CornerRadius="3,0,0,3" Background="Transparent"
-                                Padding="9,3" SnapsToDevicePixels="True">
+                                Padding="6,3" SnapsToDevicePixels="True">
                             <!-- The hidden bold twin is what gives this segment its width. Sized to the
                                  visible text alone, the segment grew when UpdateFreqModeRadios bolded the
                                  chosen Manual, and the whole status bar to its right jumped sideways on
@@ -438,7 +438,7 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="RadioButton">
                         <Border x:Name="Seg" CornerRadius="0,3,3,0" Background="Transparent"
-                                Padding="9,3" SnapsToDevicePixels="True">
+                                Padding="6,3" SnapsToDevicePixels="True">
                             <!-- See FreqSegLeft: the hidden bold twin reserves the width so bolding the
                                  label cannot resize the segment. -->
                             <Grid>
@@ -1232,7 +1232,7 @@
                     <!-- Blue frame: the accent colour, so the group is picked out from the plain text and
                          counts around it and follows the theme (it lightens on the dark schemes). -->
                     <Border CornerRadius="5" BorderThickness="1" BorderBrush="{DynamicResource AccentBrush}"
-                            Margin="12,0,0,0" Padding="7,3" VerticalAlignment="Center" SnapsToDevicePixels="True">
+                            Margin="6,0,0,0" Padding="4,3" VerticalAlignment="Center" SnapsToDevicePixels="True">
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                             <TextBlock Text="Freq &amp; Mode" FontSize="16" VerticalAlignment="Center" Margin="0,0,8,0"/>
                             <!-- The toggle keeps its own hairline frame: it is the control, the outer box
@@ -1256,28 +1256,28 @@
                 </StatusBarItem>
                 <!-- The QSO's date and time: do they follow the UTC clock, or stand where you set them?
                      Built like the frequency group beside it - same framed label + two-segment toggle - so
-                     the two read as the same kind of choice. The frame is RED because Manual here means
-                     the date and time on screen are NOT the time now, which is worth noticing at a glance
-                     when you look up mid-contact.
+                     the two read as the same kind of choice, down to the same blue accent frame.
 
                      This is the switch that used to be part of Manual Mode. It is its own now: where the
                      frequency comes from and whether the clock runs are two unrelated questions, and
                      answering one by answering the other surprised people. -->
                 <StatusBarItem>
-                    <Border CornerRadius="5" BorderThickness="1" BorderBrush="{DynamicResource Danger}"
-                            Margin="10,0,0,0" Padding="7,3" VerticalAlignment="Center" SnapsToDevicePixels="True">
+                    <Border CornerRadius="5" BorderThickness="1" BorderBrush="{DynamicResource AccentBrush}"
+                            Margin="4,0,0,0" Padding="4,3" VerticalAlignment="Center" SnapsToDevicePixels="True">
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                             <TextBlock Text="Time" FontSize="16" VerticalAlignment="Center" Margin="0,0,8,0"/>
                             <Border CornerRadius="4" BorderThickness="1" BorderBrush="{DynamicResource ThemeBorderBrush}"
                                     VerticalAlignment="Center" SnapsToDevicePixels="True">
                                 <StackPanel Orientation="Horizontal">
-                                    <RadioButton x:Name="RB_TimeManual" GroupName="TimeMode" Content="Manual"
-                                                 Style="{StaticResource FreqSegLeft}" Click="TimeMode_Click"
-                                                 ToolTip="The QSO's date and time stay exactly as you set them, so you can log a contact that happened earlier."/>
-                                    <Rectangle Width="1" Fill="{DynamicResource ThemeBorderBrush}"/>
+                                    <!-- Auto on the left, Manual on the right - the same order as
+                                         CAT / Manual in the frequency group beside it. -->
                                     <RadioButton x:Name="RB_TimeAuto" GroupName="TimeMode" Content="Auto"
-                                                 Style="{StaticResource FreqSegRight}" Click="TimeMode_Click"
+                                                 Style="{StaticResource FreqSegLeft}" Click="TimeMode_Click"
                                                  ToolTip="The QSO's date and time follow the UTC clock."/>
+                                    <Rectangle Width="1" Fill="{DynamicResource ThemeBorderBrush}"/>
+                                    <RadioButton x:Name="RB_TimeManual" GroupName="TimeMode" Content="Manual"
+                                                 Style="{StaticResource FreqSegRight}" Click="TimeMode_Click"
+                                                 ToolTip="The QSO's date and time stay exactly as you set them, so you can log a contact that happened earlier."/>
                                 </StackPanel>
                             </Border>
                         </StackPanel>
