@@ -87,11 +87,15 @@ namespace HolyLogger
         //   on opening the log (PrepareStationForContest), in this order:
         //     1. "no_satellite": true   -> Satellite Mode off         (EndSatelliteModeForContest)
         //     2. "channels": [...]      -> back to CAT if CAT is on   (ResumeCatForChannelContest)
-        //     3. "modes": ["FM"]        -> logger and radio to FM     (ApplyContestFmOnly)
+        //     3. picked in Options > General > Contest Radio Setup (not in contests.json)
+        //                               -> radio to VFO, simplex, no tone, no TSQL
+        //                                  (ApplyContestRadioSetup; also when the radio comes on CAT later)
+        //     4. "modes": ["FM"]        -> logger and radio to FM     (ApplyContestFmOnly)
         //     Satellite goes first, so nothing after it is read or tuned with the transverter shift.
+        //     The radio leaves memory mode before FM is set, so FM lands on the VFO.
         //
         //   while logging:
-        //     4. "channels": [...]      -> Channel drop-down in the send bar (AddContestChannelCell,
+        //     5. "channels": [...]      -> Channel drop-down in the send bar (AddContestChannelCell,
         //                                  built with the exchange cells); picking a channel fills
         //                                  the frequency, tries CAT, and falls back to Manual
         //                                  (TuneToContestChannelAsync)
@@ -101,6 +105,8 @@ namespace HolyLogger
         {
             EndSatelliteModeForContest(c);
             ResumeCatForChannelContest(c);
+            _contestRadioSetupDoneFor = null;   // a log just opened: the radio gets set again
+            ApplyContestRadioSetup();
             ApplyContestFmOnly(c);
         }
 
@@ -129,7 +135,7 @@ namespace HolyLogger
             ToggleManualMode();     // -> CAT; it re-reads the radio when the radio is online
         }
 
-        // 3. An FM-only contest puts the logger, and the radio when CAT is live, in FM.
+        // 4. An FM-only contest puts the logger, and the radio when CAT is live, in FM.
         private void ApplyContestFmOnly(Contests.Contest c)
         {
             if (c?.Modes == null || c.Modes.Count != 1
@@ -140,7 +146,84 @@ namespace HolyLogger
             catch (Exception swallowed) { Log.Swallow(swallowed); }
         }
 
-        // 4. Contest channels. Most radios on the Sukkot channels (2m / 70cm FM) have no CAT, so the
+        // 3. The contest picked in Options > General > Contest Radio Setup (Sukkot unless another is
+        // picked) puts the radio on CAT in VFO mode, simplex, no tone and no TSQL. OmniRig has no way to
+        // say any of that for every radio, so these are the radio's own commands, one set per radio
+        // model, from that same window. Any other contest leaves the radio alone.
+        //
+        // SENT ONCE, when both are true: the log is open AND a radio is on CAT. Whichever comes second
+        // sends it - opening the log with the radio already on, or switching the radio on (or picking
+        // RIG1/RIG2) after the log is open. After that it is not sent again for the same radio, so the
+        // operator can still change the radio by hand during the contest. Opening the log again, or a
+        // different radio coming on CAT, sends it again.
+        private string _contestRadioSetupDoneFor;
+
+        private void ApplyContestRadioSetup()
+        {
+            var c = Contests.ContestService.Active;
+            if (c == null || !IsCatLive()) return;
+            var setup = Contests.ContestRadioCommands.Load();
+            if (!string.Equals(c.Id, setup.ContestId, StringComparison.OrdinalIgnoreCase)) return;
+
+            string rigType = NormalizeRigType(Rig.RigType);
+            string key = (Properties.Settings.Default.SelectedOmniRig2 ? "RIG2|" : "RIG1|") + rigType;
+            if (key == _contestRadioSetupDoneFor) return;
+            _contestRadioSetupDoneFor = key;
+
+            List<string> commands = Contests.ContestRadioCommands.FindFor(setup, rigType)?.CommandsToSend();
+            string radio = string.IsNullOrEmpty(rigType) ? "radio on CAT" : rigType;
+            string problem = null;
+            if (commands == null || commands.Count == 0)
+                problem = "HolyLogger has no commands to set the " + radio + " to VFO, simplex and no tone for the "
+                        + c.Name + ".\n\nYou can add them in Options > General > Contest Radio Setup.";
+            else if (!SendRadioSetupCommands(rigType, commands))
+                problem = "HolyLogger could not send the " + c.Name + " setup to the " + radio + ".";
+
+            // Shown after the log has finished opening, not in the middle of it.
+            if (problem != null)
+                Dispatcher.BeginInvoke(new Action(() =>
+                    HolyMessageBox.Show(problem, "Contest Radio Setup", HolyMsgType.Info, this)),
+                    DispatcherPriority.Background);
+        }
+
+        // Rig events arrive while other work is going on; the check runs once that has settled.
+        private void QueueContestRadioSetup()
+            => Dispatcher.BeginInvoke(new Action(ApplyContestRadioSetup), DispatcherPriority.Background);
+
+        private bool SendRadioSetupCommands(string rigType, List<string> commands)
+        {
+            bool allSent = true;
+            foreach (string command in commands)
+            {
+                bool sent = TrySendOmniRigCustomCommand(command);
+                allSent &= sent;
+                Log.Warn("Contest radio setup -> " + rigType + ": " + command + (sent ? "" : "  (NOT SENT)"));
+            }
+            return allSent;
+        }
+
+        // The "Send now" button in Options > General > Contest Radio Setup: sends one radio's row, to try it out.
+        // Only to that radio - the row's commands mean nothing to another model.
+        private string SendContestRadioSetupNow(Contests.RadioCommandSet set)
+        {
+            if (!IsCatLive()) return "No radio is on CAT now.";
+            string rigType = NormalizeRigType(Rig.RigType);
+            if (!string.Equals(rigType, (set.Radio ?? "").Trim(), StringComparison.OrdinalIgnoreCase))
+                return "The radio on CAT now is the " + rigType + ", not the " + (set.Radio ?? "").Trim() + ".";
+            List<string> commands = set.CommandsToSend();
+            if (commands.Count == 0) return "This radio has no commands yet.";
+            return SendRadioSetupCommands(rigType, commands)
+                ? "Sent to the " + rigType + "."
+                : "Could not send the commands to the " + rigType + ".";
+        }
+
+        // Opened from Options > General, under Select Rig.
+        internal void OpenContestRadioSetup(Window owner)
+        {
+            new ContestRadioSetupWindow(owner ?? this, new[] { Rig1, Rig2 }, SendContestRadioSetupNow).ShowDialog();
+        }
+
+        // 5. Contest channels. Most radios on the Sukkot channels (2m / 70cm FM) have no CAT, so the
         // frequency cannot come from the radio. The Channel drop-down fills it in instead: pick S16
         // and the frequency becomes 145.400 (and the band follows). It also follows the frequency
         // back, so it always names the channel you are on, or nothing when you are off every channel.

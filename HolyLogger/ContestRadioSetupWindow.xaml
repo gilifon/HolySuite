@@ -1,0 +1,112 @@
+<Window x:Class="HolyLogger.ContestRadioSetupWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:HolyLogger"
+        Title="Contest Radio Setup" Height="445" MinHeight="375" Width="1300" MinWidth="1300"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False" ResizeMode="CanResize"
+        Icon="Images/crown.png"
+        Background="{DynamicResource WindowBg}"
+        Foreground="{DynamicResource TextBrush}">
+    <Window.Resources>
+        <local:NotInOmniRigBrushConverter x:Key="NotInOmniRig"/>
+    </Window.Resources>
+    <Grid Margin="14">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Only contests with 2m or 70cm are offered (ContestRadioCommands.VhfUhfContests): every
+             radio in the table below is a VHF/UHF one. -->
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,10">
+            <TextBlock Text="Contest:" FontSize="16" FontWeight="Bold" VerticalAlignment="Center" Margin="0,0,8,0"/>
+            <ComboBox x:Name="ContestBox" Width="300" FontSize="16" VerticalContentAlignment="Center"
+                      DisplayMemberPath="Name"/>
+        </StackPanel>
+
+        <TextBlock Grid.Row="1" FontSize="16" TextWrapping="Wrap" Margin="0,0,0,10"
+                   Foreground="{DynamicResource MutedTextBrush}"><Run Text="When a log of this contest is opened, these commands go to the radio on CAT: VFO, simplex, no tone, no TSQL."/><LineBreak/><Run Text="Each radio has its own commands. The radio name must be the one OmniRig uses."/></TextBlock>
+
+        <DataGrid x:Name="RadiosGrid" Grid.Row="2" AutoGenerateColumns="False"
+                  CanUserAddRows="False" CanUserDeleteRows="False" CanUserReorderColumns="False"
+                  CanUserSortColumns="False"
+                  HeadersVisibility="Column" SelectionMode="Single" SelectionUnit="FullRow"
+                  GridLinesVisibility="All" FontSize="16" RowHeight="32"
+                  Background="{DynamicResource GridRowBg}" Foreground="{DynamicResource TextBrush}"
+                  RowBackground="{DynamicResource GridRowBg}" AlternatingRowBackground="{DynamicResource GridAltRowBg}">
+            <DataGrid.Resources>
+                <!-- The boxes are live in every row, so there is no edit mode to enter first. -->
+                <Style x:Key="CommandBox" TargetType="TextBox">
+                    <Setter Property="FontFamily" Value="Consolas"/>
+                    <Setter Property="FontSize" Value="16"/>
+                    <Setter Property="Background" Value="Transparent"/>
+                    <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
+                    <Setter Property="CaretBrush" Value="{DynamicResource TextBrush}"/>
+                    <Setter Property="BorderThickness" Value="0"/>
+                    <Setter Property="Padding" Value="4,0"/>
+                    <Setter Property="VerticalContentAlignment" Value="Center"/>
+                    <Setter Property="CharacterCasing" Value="Upper"/>
+                </Style>
+            </DataGrid.Resources>
+            <DataGrid.Columns>
+                <DataGridTemplateColumn Header="Radio (OmniRig name)" Width="210">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <!-- Red when OmniRig has no file by this name (NotInOmniRigBrushConverter). -->
+                            <ComboBox IsEditable="True" FontSize="16" VerticalContentAlignment="Center"
+                                      ItemsSource="{Binding RigNames, RelativeSource={RelativeSource AncestorType=Window}}"
+                                      Text="{Binding Radio, UpdateSourceTrigger=PropertyChanged}"
+                                      Foreground="{Binding Text, RelativeSource={RelativeSource Self}, Converter={StaticResource NotInOmniRig}}"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTemplateColumn Header="VFO" Width="*" MinWidth="220">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBox Style="{StaticResource CommandBox}" Text="{Binding Vfo, UpdateSourceTrigger=PropertyChanged}"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTemplateColumn Header="Simplex" Width="*" MinWidth="220">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBox Style="{StaticResource CommandBox}" Text="{Binding Simplex, UpdateSourceTrigger=PropertyChanged}"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTemplateColumn Header="No Tone" Width="*" MinWidth="220">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBox Style="{StaticResource CommandBox}" Text="{Binding NoTone, UpdateSourceTrigger=PropertyChanged}"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTemplateColumn Header="No TSQL" Width="*" MinWidth="220">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBox Style="{StaticResource CommandBox}" Text="{Binding NoTsql, UpdateSourceTrigger=PropertyChanged}"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTemplateColumn Header="" Width="Auto">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <Button Content="Send now" FontSize="16" Padding="10,0" Margin="2"
+                                    ToolTip="Send this radio's commands to the radio on CAT now"
+                                    Click="BtnSendNow_Click"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+            </DataGrid.Columns>
+        </DataGrid>
+
+        <StackPanel Grid.Row="3" Margin="0,10,0,0" Orientation="Horizontal" HorizontalAlignment="Center">
+            <Button x:Name="BtnAdd" Content="Add Radio" Padding="12,4" Margin="0,0,8,0" FontSize="16" Click="BtnAdd_Click"/>
+            <Button x:Name="BtnDelete" Content="Delete" Padding="12,4" Margin="0,0,8,0" FontSize="16"
+                    ToolTip="Delete the selected radio" Click="BtnDelete_Click"/>
+            <Button x:Name="BtnClose" Content="Close" Padding="14,4" FontSize="16" Click="BtnClose_Click"/>
+        </StackPanel>
+    </Grid>
+</Window>

@@ -117,8 +117,11 @@ namespace HolyLogger.OptionsUserControls
                     good ? System.Windows.Media.Color.FromRgb(0x1B, 0x5E, 0x20)
                          : System.Windows.Media.Color.FromRgb(0xC6, 0x28, 0x28));
 
-                OmniRigPollNote.Visibility = System.Windows.Visibility.Visible;
-                if (OmniRigOpenBtn != null) OmniRigOpenBtn.Visibility = System.Windows.Visibility.Visible;
+                // The short green sentence ends early on its last line, so the button sits beside it in
+                // the frame's corner. The red one runs to the edge, so the button gets a line below it.
+                OmniRigPollNote.Margin = new System.Windows.Thickness(0, 0, 0, good ? 0 : 38);
+
+                if (OmniRigPollFrame != null) OmniRigPollFrame.Visibility = System.Windows.Visibility.Visible;
             }
             catch (System.Exception swallowed) { Log.Swallow(swallowed); }
         }
@@ -351,6 +354,18 @@ namespace HolyLogger.OptionsUserControls
             try
             {
                 new UdpPortsWindow(Window.GetWindow(this)).ShowDialog();
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        // The radio commands a Sukkot log sends (VFO, simplex, no tone, no TSQL). The window needs the
+        // main window, which knows the rig on CAT, for its Send now button.
+        private void BTN_ContestRadioSetup_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var main = Application.Current != null ? Application.Current.MainWindow as MainWindow : null;
+                if (main != null) main.OpenContestRadioSetup(Window.GetWindow(this));
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
         }

@@ -718,6 +718,7 @@ namespace HolyLogger
             else if (Properties.Settings.Default.SelectedOmniRig2)
                 Rig = OmniRigEngine.Rig2;
             UpdateFreqLed();   // reflect the newly-selected rig (or blank if it isn't online)
+            QueueContestRadioSetup();   // RIG1/RIG2 switched with the contest-radio-setup log open
         }
 
         //OmniRig ParamsChange events
@@ -774,6 +775,9 @@ namespace HolyLogger
             // The first time a radio actually answers is the moment to look at how often OmniRig is
             // asking it - see CheckOmniRigPollInterval. Once a session, and nothing is said at 500.
             if (IsCatLive()) CheckOmniRigPollInterval();
+
+            // A radio that comes on CAT after the contest-radio-setup log was opened is set up now.
+            QueueContestRadioSetup();
         }
 
         private void QueueShowRigParams()
