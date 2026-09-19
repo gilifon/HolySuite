@@ -3589,5 +3589,29 @@ namespace HolyLogger.Properties {
                 this["EsmSearchAndPounce"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool ShowMapWindow {
+            get {
+                return ((bool)(this["ShowMapWindow"]));
+            }
+            set {
+                this["ShowMapWindow"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool MapWindowPinned {
+            get {
+                return ((bool)(this["MapWindowPinned"]));
+            }
+            set {
+                this["MapWindowPinned"] = value;
+            }
+        }
     }
 }

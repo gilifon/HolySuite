@@ -9,13 +9,17 @@
          map is a WebBrowser (an airspace HWND) so a border cannot be drawn OVER it; instead the browser
          sits inside this Border, inset by its thickness, so the frame shows around it. Fixed blue so it
          appears in both light and dark mode. -->
-    <Border BorderBrush="#1565C0" BorderThickness="3,3,3,0">
+    <!-- Named so the map window can take the frame away while the map floats: the window then draws
+         its own, thicker one, which is also what the operator grabs to resize it. -->
+    <Border x:Name="MapFrame" BorderBrush="#1565C0" BorderThickness="3,3,3,0">
     <Grid>
         <WebBrowser x:Name="MapBrowser" />
         <Border x:Name="PlaceholderPanel" Background="#DCEBF8">
             <Grid Margin="10">
-                <!-- Arrow tip at Y=20 in this grid = Y=30 from MapControl top = My Locator textbox center -->
-                <Canvas HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
+                <!-- The red arrow once reached out of the map to the My Locator box beside it. The map
+                     has its own window now and nothing can be drawn outside a window, so the arrow is
+                     kept but never shown, and the text below names the box instead. -->
+                <Canvas HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Visibility="Collapsed"
                         IsHitTestVisible="False" ClipToBounds="False" Panel.ZIndex="2" Margin="-10">
                     <Polygon Points="-325,30  -307,19  -307,28  85,28  85,32  -307,32  -307,41"
                              Fill="#D7263D" Stroke="#8F1422" StrokeThickness="1.5"/>
@@ -47,7 +51,7 @@
                                    FontWeight="SemiBold"
                                    Foreground="#1E2A36"/>
                         <TextBlock Margin="0,10,0,0"
-                                   Text="Enter your locator in the box on the left to enable the map."
+                                   Text="Enter your locator in the My Locator box to enable the map."
                                    TextWrapping="Wrap"
                                    TextAlignment="Center"
                                    FontSize="16"
@@ -55,6 +59,15 @@
                                    Foreground="#4B5B68"/>
                     </StackPanel>
                 </Border>
+
+                <!-- The pin, on this notice too. The map draws its own pin in its corner, but the map
+                     is hidden while this notice is up, and a pinned window has no title bar - without
+                     this one there would be no way to unpin it. -->
+                <Button x:Name="PlaceholderPinBtn" HorizontalAlignment="Right" VerticalAlignment="Top"
+                        Margin="0,-10,-10,0" Width="32" Height="28" Padding="0" Cursor="Hand"
+                        FontFamily="Segoe MDL2 Assets" FontSize="16" Foreground="#1E2A36"
+                        Background="#9FCBF5" BorderBrush="#4B76A0" BorderThickness="1"
+                        Content="&#xE718;" Click="PlaceholderPinBtn_Click"/>
             </Grid>
         </Border>
     </Grid>

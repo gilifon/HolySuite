@@ -50,6 +50,41 @@ namespace HolyLogger
             catch (Exception swallowed) { Log.Swallow(swallowed); return false; }
         }
 
+        // FOR A WINDOW THAT IS NOT ALWAYS WHERE THE OPERATOR PUT IT. The map window spends part of its
+        // life pinned onto the main window, and that place is not its own - so it cannot use Attach,
+        // which would save whatever it happened to be at closing. It stores its FLOATING placement
+        // itself, through these two, in the same one setting as every other window.
+        public static bool TryGetSaved(string key, out Rect rect)
+        {
+            rect = Rect.Empty;
+            try
+            {
+                if (string.IsNullOrWhiteSpace(key)) return false;
+                if (!Load().TryGetValue(key, out Box b) || b == null) return false;
+                if (!IsRealNumber(b.L) || !IsRealNumber(b.T) || b.W <= 0 || b.H <= 0) return false;
+                rect = new Rect(b.L, b.T, b.W, b.H);
+                return true;
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); return false; }
+        }
+
+        public static void SaveRect(string key, Rect r)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(key) || r.IsEmpty) return;
+                if (!IsRealNumber(r.Left) || !IsRealNumber(r.Top) || r.Width <= 0 || r.Height <= 0) return;
+                var all = Load();
+                all[key] = new Box { L = r.Left, T = r.Top, W = r.Width, H = r.Height };
+                Properties.Settings.Default.WindowBoundsJson = JsonConvert.SerializeObject(all);
+                Properties.Settings.Default.Save();
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        // The same rescue Attach runs after a restore, for a window that places itself.
+        public static void KeepOnScreen(Window window) => EnsureVisibleOnSomeScreen(window);
+
         // Saves the placement of every attached window that is still open.
         //
         // Closing a window yourself saves it, but when the PROGRAM closes the child windows are torn
