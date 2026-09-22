@@ -291,8 +291,11 @@ namespace HolyLogger
             if (_contestChannelBox == null) return;
             double.TryParse((TB_Frequency.Text ?? string.Empty).Trim(), NumberStyles.Float,
                 CultureInfo.InvariantCulture, out double mhz);
+            // WITHIN 100 Hz. It used to allow 500 Hz either side, so a radio tuned by hand to 145.249530
+            // still showed "S10 145.250" (4Z1ZV, 8.9.14). 100 Hz off or more, the box is empty.
+            long hz = (long)Math.Round(mhz * 1000000.0);
             object match = _contestChannelBox.Items.OfType<ComboBoxItem>()
-                .FirstOrDefault(i => i.Tag is Contests.ContestChannel ch && Math.Abs(ch.Mhz - mhz) < 0.0005);
+                .FirstOrDefault(i => i.Tag is Contests.ContestChannel ch && Math.Abs((long)Math.Round(ch.Mhz * 1000000.0) - hz) < 100);
             if (_contestChannelBox.SelectedItem == match) return;
             _syncingContestChannel = true;
             try { _contestChannelBox.SelectedItem = match; }
