@@ -54,8 +54,17 @@
                       DisplayMemberPath="Name"/>
         </StackPanel>
 
-        <TextBlock Grid.Row="1" FontSize="16" TextWrapping="Wrap" Margin="0,0,0,10"
+        <TextBlock Grid.Row="1" x:Name="TB_Hint" FontSize="16" TextWrapping="Wrap" Margin="0,0,0,10"
                    Foreground="{DynamicResource MutedTextBrush}"><Run Text="When a log of this contest is opened, these commands go to the radio on CAT, in this order."/><LineBreak/><Run Text="Each radio has its own commands. Pick the radio, and leave a command empty if the radio has none."/></TextBlock>
+
+        <!-- ADD RADIO says what to do HERE, at the top: the open list covers everything under the
+             Radio box, so a line written there cannot be seen while it is open. -->
+        <Border x:Name="Border_AddHint" Grid.Row="1" Visibility="Collapsed" Margin="0,0,0,10"
+                Background="#D6E9FA" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1"
+                Padding="8,6">
+            <TextBlock x:Name="TB_AddHint" FontSize="16" FontWeight="Bold" TextWrapping="Wrap"
+                       Foreground="{DynamicResource AccentBrush}"/>
+        </Border>
 
         <!-- ONE RADIO AT A TIME. Six commands side by side needed a window 1740 wide. The radio is
              picked on the left, its commands stand under each other, and Send now sits beside them. -->
@@ -69,9 +78,13 @@
             <StackPanel Grid.Column="0" Margin="0,0,16,0" VerticalAlignment="Top">
                 <TextBlock Text="Radio (OmniRig name)" FontSize="16" FontWeight="Bold" Margin="0,0,0,4"
                            Foreground="{DynamicResource TextBrush}"/>
-                <!-- Red when OmniRig has no file by this name (NotInOmniRigBrushConverter). Editable, so
-                     a file renamed in OmniRig can still be typed. -->
-                <ComboBox x:Name="RadioBox" IsEditable="True" Width="230" FontSize="16"
+                <!-- PICKED, NOT TYPED. Only a radio OmniRig has an .ini file for can be driven at
+                     all, and only 2m/70cm radios belong in a VHF/UHF contest - so the list holds
+                     exactly those, and a name that cannot work cannot be entered. Red when the file
+                     has gone from OmniRig since the commands were saved. -->
+                <!-- Tall enough that the starred (has-commands) radios, sorted to the top, keep
+                     growing room without the list needing to scroll to show them all. -->
+                <ComboBox x:Name="RadioBox" Width="230" FontSize="16" MaxDropDownHeight="420"
                           VerticalContentAlignment="Center"
                           ItemsSource="{Binding RigNames, RelativeSource={RelativeSource AncestorType=Window}}"
                           Foreground="{Binding Text, RelativeSource={RelativeSource Self}, Converter={StaticResource NotInOmniRig}}"/>
@@ -149,6 +162,9 @@
         </Grid>
 
         <StackPanel Grid.Row="3" Margin="0,12,0,0" Orientation="Horizontal" HorizontalAlignment="Center">
+            <Button x:Name="BtnAdd" Content="Add Radio" Padding="12,4" Margin="0,0,8,0" FontSize="16"
+                    ToolTip="Set up a radio that is not in the list - every radio OmniRig has a file for"
+                    Click="BtnAdd_Click"/>
             <Button x:Name="BtnDelete" Content="Delete this radio" Padding="12,4" Margin="0,0,8,0" FontSize="16"
                     ToolTip="Forget the commands kept for the radio shown above" Click="BtnDelete_Click"/>
             <Button x:Name="BtnClose" Content="Close" Padding="14,4" FontSize="16" Click="BtnClose_Click"/>
