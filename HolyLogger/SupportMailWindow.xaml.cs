@@ -53,7 +53,17 @@ namespace HolyLogger
                   "wrong inside HolyLogger and when - no passwords, and nothing you typed into a QSO."
                 : "There is no error log on this machine yet, so the message will be sent on its own.";
 
-            TB_Body.PreviewKeyDown += Body_PreviewKeyDown;
+            // Paste goes through the Paste COMMAND, not a Ctrl+V key check, so right-click > Paste takes
+            // a picture as well. The box itself only offers Paste when there is text on the clipboard,
+            // so it is told a picture counts too.
+            CommandManager.AddPreviewCanExecuteHandler(TB_Body, Body_PreviewCanPaste);
+            CommandManager.AddPreviewExecutedHandler(TB_Body, Body_PreviewPaste);
+
+            // A picture file dragged in from Explorer. Preview events: the text box would otherwise take
+            // the drop for itself and refuse it.
+            AllowDrop = true;
+            PreviewDragOver += Window_PreviewDragOver;
+            PreviewDrop += Window_PreviewDrop;
 
             // Send stays off until all five are filled. Checked on every keystroke rather than on the
             // press: a button that refuses to work says what is missing before the operator commits to
@@ -85,18 +95,31 @@ namespace HolyLogger
         // A subject and a screenshot is a real report. So the body is required only when there is no
         // picture, and when it IS the thing that is missing the line under the button says so by
         // name instead of pointing at a row of asterisks.
+        //
+        // AND NOW NOT EVEN THAT (4Z1ZV, 8.9.14): a subject can be the whole message. The server still
+        // needs a body, so Send puts a line in for it.
         private void UpdateSendEnabled()
         {
             bool named = TB_Name.Text.Trim().Length > 0
                       && TB_Callsign.Text.Trim().Length > 0
                       && TB_Email.Text.Trim().Length > 0;
             bool subject = TB_Subject.Text.Trim().Length > 0;
-            bool says = TB_Body.Text.Trim().Length > 0 || _pictures.Count > 0;
 
-            Btn_Send.IsEnabled = named && subject && says;
-            TB_Status.Text = !named || !subject ? "The fields marked * have to be filled in."
-                           : !says             ? "Write the message, or paste a picture of the problem."
-                                               : "";
+            Btn_Send.IsEnabled = named && subject;
+            TB_Status.Text = !named || !subject ? "The fields marked * have to be filled in." : "";
+        }
+
+        // ── ANY LANGUAGE HERE ───────────────────────────────────────────────────────────────────
+        //
+        // Every text box in HolyLogger takes English letters only (MainWindow's class handler), which
+        // is right for a log. It is wrong for a letter to the developers: a man who wanted to write in
+        // Hebrew got a beep on every key and no idea why (4Z1ZV, 8.9.14). Name, subject and message
+        // take any language; the callsign and the address stay English, as they must.
+        internal static bool TakesAnyLanguage(TextBox box)
+        {
+            if (box == null) return false;
+            var w = Window.GetWindow(box) as SupportMailWindow;
+            return w != null && (box == w.TB_Name || box == w.TB_Subject || box == w.TB_Body);
         }
 
         private Control FirstEmpty()
@@ -119,11 +142,25 @@ namespace HolyLogger
 
         // ── pasting a picture ─────────────────────────────────────────────
 
-        // Ctrl+V with a picture on the clipboard. A TextBox would simply refuse it - there is no text to
-        // paste - and the operator would conclude the program cannot take screenshots. It can.
-        private void Body_PreviewKeyDown(object sender, KeyEventArgs e)
+        // Paste (Ctrl+V or right-click) with a picture on the clipboard. A TextBox would simply refuse it
+        // - there is no text to paste - and the operator would conclude the program cannot take
+        // screenshots. It can.
+        private static bool ClipboardHasPicture()
         {
-            if (e.Key != Key.V || (Keyboard.Modifiers & ModifierKeys.Control) != ModifierKeys.Control) return;
+            try { return Clipboard.ContainsImage() || Clipboard.ContainsFileDropList(); }
+            catch (Exception ex) { Log.Swallow(ex); return false; }
+        }
+
+        private void Body_PreviewCanPaste(object sender, CanExecuteRoutedEventArgs e)
+        {
+            if (e.Command != ApplicationCommands.Paste || !ClipboardHasPicture()) return;
+            e.CanExecute = true;
+            e.Handled = true;
+        }
+
+        private void Body_PreviewPaste(object sender, ExecutedRoutedEventArgs e)
+        {
+            if (e.Command != ApplicationCommands.Paste) return;
 
             try
             {
@@ -137,15 +174,9 @@ namespace HolyLogger
                 // A picture file copied in Explorer counts too - it is the same intention.
                 if (Clipboard.ContainsFileDropList())
                 {
-                    bool took = false;
-                    foreach (string f in Clipboard.GetFileDropList())
-                    {
-                        if (string.IsNullOrEmpty(f) || !File.Exists(f)) continue;
-                        string ext = Path.GetExtension(f).ToLowerInvariant();
-                        if (ext != ".png" && ext != ".jpg" && ext != ".jpeg" && ext != ".gif" && ext != ".bmp") continue;
-                        if (CopyPicture(f)) took = true;
-                    }
-                    if (took) { RefreshPictures(); e.Handled = true; }
+                    var files = new List<string>();
+                    foreach (string f in Clipboard.GetFileDropList()) files.Add(f);
+                    if (AddPictureFiles(files)) e.Handled = true;
                 }
             }
             catch (Exception ex)
@@ -153,6 +184,58 @@ namespace HolyLogger
                 Log.Swallow(ex);
                 TB_Status.Text = "That picture could not be read.";
             }
+        }
+
+        private static bool IsPictureFile(string f)
+        {
+            if (string.IsNullOrEmpty(f) || !File.Exists(f)) return false;
+            string ext = Path.GetExtension(f).ToLowerInvariant();
+            return ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".gif" || ext == ".bmp";
+        }
+
+        // Adds every picture file in the list; true when at least one was taken.
+        private bool AddPictureFiles(IEnumerable<string> files)
+        {
+            bool took = false;
+            foreach (string f in files)
+                if (IsPictureFile(f) && CopyPicture(f)) took = true;
+            if (took) RefreshPictures();
+            return took;
+        }
+
+        // "Add picture..." - for a screenshot already saved as a file.
+        private void Btn_AddPicture_Click(object sender, RoutedEventArgs e)
+        {
+            var dlg = new Microsoft.Win32.OpenFileDialog
+            {
+                Title = "Add a picture",
+                Filter = "Pictures|*.png;*.jpg;*.jpeg;*.gif;*.bmp",
+                Multiselect = true
+            };
+            if (dlg.ShowDialog(this) != true) return;
+            if (!AddPictureFiles(dlg.FileNames) && !AtPictureLimit())
+                TB_Status.Text = "That picture could not be read.";
+        }
+
+        private static string[] DraggedFiles(DragEventArgs e)
+        {
+            return e.Data.GetDataPresent(DataFormats.FileDrop) ? e.Data.GetData(DataFormats.FileDrop) as string[] : null;
+        }
+
+        private void Window_PreviewDragOver(object sender, DragEventArgs e)
+        {
+            var files = DraggedFiles(e);
+            if (files == null) return;
+            e.Effects = files.Any(IsPictureFile) ? DragDropEffects.Copy : DragDropEffects.None;
+            e.Handled = true;
+        }
+
+        private void Window_PreviewDrop(object sender, DragEventArgs e)
+        {
+            var files = DraggedFiles(e);
+            if (files == null) return;
+            AddPictureFiles(files);
+            e.Handled = true;
         }
 
         private string PictureFolder()
@@ -301,19 +384,13 @@ namespace HolyLogger
             if (email.Length == 0) { Complain("Please put your email address in - without it there is nowhere to send the answer.", TB_Email); return; }
             if (!LooksLikeAnAddress(email)) { Complain("That does not look like an email address. Please check it - the answer goes there.", TB_Email); return; }
             if (subject.Length == 0) { Complain("Please give the message a subject.", TB_Subject); return; }
-            // A picture says it too. See UpdateSendEnabled: the subject alone is not enough to answer,
-            // but a subject and a screenshot of the thing that is wrong is.
-            if (body.Length == 0 && _pictures.Count == 0)
-            { Complain("Please write the message, or paste a picture of the problem - the subject alone "
-                       + "is not enough to answer.", TB_Body); return; }
-
             // THE MAIL STILL NEEDS A BODY, whatever the window accepts. The server refuses a message
-            // with nothing in it, so a report that IS its picture is sent with a line saying so -
-            // which is also what the developer wants to read at the other end, rather than a blank.
+            // with nothing in it, so a report that IS its subject or its picture is sent with a line
+            // saying so - which is also what the developer wants to read at the other end, not a blank.
             if (body.Length == 0)
-                body = _pictures.Count == 1
-                    ? "(No text - the picture below is the message.)"
-                    : "(No text - the " + _pictures.Count + " pictures below are the message.)";
+                body = _pictures.Count == 0 ? "(No text - the subject is the message.)"
+                     : _pictures.Count == 1 ? "(No text - the picture below is the message.)"
+                     : "(No text - the " + _pictures.Count + " pictures below are the message.)";
 
             // Remembered only once the operator has actually sent something with them.
             try
@@ -449,6 +526,7 @@ namespace HolyLogger
             _sending = sending;
             Btn_Send.IsEnabled = !sending;
             Btn_Cancel.IsEnabled = !sending;
+            Btn_AddPicture.IsEnabled = !sending;
             TB_Name.IsEnabled = TB_Callsign.IsEnabled = TB_Email.IsEnabled =
                 TB_Subject.IsEnabled = TB_Body.IsEnabled = !sending;
             TB_Status.Text = sending ? "Sending…" : string.Empty;
