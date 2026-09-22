@@ -24,18 +24,25 @@ namespace HolyLogger.Contests
         [JsonProperty("simplex")] public string Simplex { get; set; } = "";
         [JsonProperty("no_tone")] public string NoTone { get; set; } = "";
         [JsonProperty("no_tsql")] public string NoTsql { get; set; } = "";
+        // Wide FM, not FM-N: a narrow radio hears a wide station badly, and both are "FM" to OmniRig.
+        [JsonProperty("fm_wide")] public string FmWide { get; set; } = "";
+        // Auto Repeater puts a duplex shift back on by itself on the repeater part of the band, which
+        // undoes Simplex - so it is switched off before the shift is cleared.
+        [JsonProperty("no_auto_repeater")] public string NoAutoRepeater { get; set; } = "";
 
         [JsonIgnore]
         public bool IsEmpty => string.IsNullOrWhiteSpace(Radio) && string.IsNullOrWhiteSpace(Vfo)
                                && string.IsNullOrWhiteSpace(Simplex) && string.IsNullOrWhiteSpace(NoTone)
-                               && string.IsNullOrWhiteSpace(NoTsql);
+                               && string.IsNullOrWhiteSpace(NoTsql) && string.IsNullOrWhiteSpace(FmWide)
+                               && string.IsNullOrWhiteSpace(NoAutoRepeater);
 
         // The commands to send, in order, with the empty ones left out and No TSQL dropped when it is the
-        // same command as No Tone.
+        // same command as No Tone. Auto Repeater off comes before Simplex, or it would shift the radio
+        // again straight after.
         public List<string> CommandsToSend()
         {
             var list = new List<string>();
-            foreach (string c in new[] { Vfo, Simplex, NoTone })
+            foreach (string c in new[] { Vfo, FmWide, NoAutoRepeater, Simplex, NoTone })
                 if (!string.IsNullOrWhiteSpace(c)) list.Add(c.Trim());
             if (!string.IsNullOrWhiteSpace(NoTsql) && !SameCommand(NoTsql, NoTone)) list.Add(NoTsql.Trim());
             return list;
@@ -119,6 +126,14 @@ namespace HolyLogger.Contests
             Simplex = "FE FE 8C E0 0F 10 FD",
             NoTone = "FE FE 8C E0 16 5D 00 FD",
             NoTsql = "FE FE 8C E0 16 5D 00 FD",
+            // 06 = send operating mode, then the mode and the filter: FM is 05 01, FM-N is 05 02
+            // (ID-5100A/E full manual, section 13, "Operating mode"). Not checked on the radio yet.
+            FmWide = "FE FE 8C E0 06 05 01 FD",
+            // AUTO REPEATER IS LEFT EMPTY ON PURPOSE. The ID-5100's CI-V table has no 1A command at
+            // all, so the setting cannot be changed over CAT; and the menu item itself exists only in
+            // the U.S.A. and Korean versions - the European ID-5100E, which he has, has no such
+            // setting. The column stays for a radio that can do it.
+            NoAutoRepeater = "",
         };
 
         // The contest the operator picked in the window: the commands go out when a log of THIS contest
@@ -151,12 +166,28 @@ namespace HolyLogger.Contests
 
                 var setup = JsonConvert.DeserializeObject<ContestRadioSetup>(json) ?? new ContestRadioSetup();
                 if (setup.Radios == null) setup.Radios = new List<RadioCommandSet>();
+                FillNewCommandsFromDefaults(setup.Radios);
                 return setup;
             }
             catch (Exception swallowed)
             {
                 Log.Swallow(swallowed);
                 return new ContestRadioSetup { ContestId = DefaultContestId, Radios = Defaults() };
+            }
+        }
+
+        // A file written before FM wide and No Auto Repeater existed has those two empty. For a radio we
+        // ship commands for, they are filled in from the defaults, so the operator does not have to type
+        // them; anything he has typed himself is left alone.
+        private static void FillNewCommandsFromDefaults(List<RadioCommandSet> radios)
+        {
+            foreach (var saved in radios)
+            {
+                var d = Defaults().FirstOrDefault(x => string.Equals((x.Radio ?? "").Trim(), (saved.Radio ?? "").Trim(),
+                                                                     StringComparison.OrdinalIgnoreCase));
+                if (d == null) continue;
+                if (string.IsNullOrWhiteSpace(saved.FmWide)) saved.FmWide = d.FmWide;
+                if (string.IsNullOrWhiteSpace(saved.NoAutoRepeater)) saved.NoAutoRepeater = d.NoAutoRepeater;
             }
         }
 

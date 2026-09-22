@@ -46,10 +46,42 @@ namespace HolyLogger
             ContestBox.SelectedItem = picked ?? contests.FirstOrDefault();
 
             foreach (var s in setup.Radios) _sets.Add(s);
-            RadiosGrid.ItemsSource = _sets;
-            RadiosGrid.ColumnHeaderStyle = MainWindow.BuildLogTableHeaderStyle();
+
+            // The radios already set up come first in the box, so the operator's own are at hand.
+            var names = _sets.Select(s => (s.Radio ?? "").Trim()).Where(n => n.Length > 0).ToList();
+            names.AddRange(RigNames);
+            RadioBox.ItemsSource = names.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            RadioBox.Text = names.FirstOrDefault() ?? string.Empty;
+            ShowRadio(RadioBox.Text);
+            RadioBox.SelectionChanged += (s, e) => ShowRadio((RadioBox.SelectedItem as string) ?? RadioBox.Text);
+            RadioBox.LostFocus += (s, e) => ShowRadio(RadioBox.Text);
 
             Closing += Window_Closing;
+        }
+
+        // The commands shown at the moment; created for a radio that has none yet. An untouched one is
+        // dropped on save (Save leaves out the empty sets), so picking a radio costs nothing.
+        private RadioCommandSet _shown;
+
+        private void ShowRadio(string radioName)
+        {
+            string name = (radioName ?? "").Trim();
+            if (_shown != null && string.Equals((_shown.Radio ?? "").Trim(), name, StringComparison.OrdinalIgnoreCase))
+                return;
+
+            if (name.Length == 0) { _shown = null; CommandsPanel.DataContext = null; TB_RadioNote.Text = ""; return; }
+
+            _shown = _sets.FirstOrDefault(s => string.Equals((s.Radio ?? "").Trim(), name, StringComparison.OrdinalIgnoreCase));
+            bool isNew = _shown == null;
+            if (isNew)
+            {
+                _shown = new RadioCommandSet { Radio = name };
+                _sets.Add(_shown);
+            }
+            CommandsPanel.DataContext = _shown;
+            TB_RadioNote.Text = isNew
+                ? "No commands kept for this radio yet. Type them here; empty ones are not sent."
+                : "";
         }
 
         private static List<string> BuildRigNames(IEnumerable<string> omniRigRigs, HashSet<string> omniRigFiles)
@@ -65,29 +97,26 @@ namespace HolyLogger
             return names.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         }
 
-        private void BtnAdd_Click(object sender, RoutedEventArgs e)
-        {
-            var s = new RadioCommandSet();
-            _sets.Add(s);
-            RadiosGrid.SelectedItem = s;
-            RadiosGrid.ScrollIntoView(s);
-        }
-
         private void BtnDelete_Click(object sender, RoutedEventArgs e)
         {
-            if (!(RadiosGrid.SelectedItem is RadioCommandSet s)) return;
-            string name = string.IsNullOrWhiteSpace(s.Radio) ? "this radio" : "the " + s.Radio.Trim();
+            if (_shown == null) return;
+            string name = string.IsNullOrWhiteSpace(_shown.Radio) ? "this radio" : "the " + _shown.Radio.Trim();
             if (!HolyMessageBox.ShowConfirm("Delete the commands for " + name + "?", "Contest Radio Setup",
                                             HolyMsgType.Warning, this))
                 return;
-            _sets.Remove(s);
+            _sets.Remove(_shown);
+            _shown = null;
+            CommandsPanel.DataContext = null;
+            RadioBox.Text = string.Empty;
+            TB_RadioNote.Text = string.Empty;
         }
 
         private void BtnClose_Click(object sender, RoutedEventArgs e) => Close();
 
         private void BtnSendNow_Click(object sender, RoutedEventArgs e)
         {
-            if (!((sender as FrameworkElement)?.DataContext is RadioCommandSet s)) return;
+            var s = _shown;
+            if (s == null) return;
             if (!CheckCommands(new[] { s })) return;
             string result = _sendNow?.Invoke(s);
             if (!string.IsNullOrEmpty(result))
@@ -105,12 +134,14 @@ namespace HolyLogger
         {
             foreach (var s in sets)
             {
-                var cells = new[] { ("VFO", s.Vfo), ("Simplex", s.Simplex), ("No Tone", s.NoTone), ("No TSQL", s.NoTsql) };
+                var cells = new[] { ("VFO", s.Vfo), ("FM wide", s.FmWide), ("No Auto Repeater", s.NoAutoRepeater),
+                                    ("Simplex", s.Simplex), ("No Tone", s.NoTone), ("No TSQL", s.NoTsql) };
                 foreach (var (label, command) in cells)
                 {
                     if (ContestRadioCommands.LooksValid(command)) continue;
                     string radio = string.IsNullOrWhiteSpace(s.Radio) ? "a radio" : "the " + s.Radio.Trim();
-                    RadiosGrid.SelectedItem = s;
+                    RadioBox.Text = (s.Radio ?? "").Trim();
+                    ShowRadio(RadioBox.Text);
                     HolyMessageBox.ShowError("The " + label + " command for " + radio + " is not right.\n\n"
                                              + "Each byte needs two digits, with a space between: FE FE 8C E0 07 00 FD",
                                              "Contest Radio Setup", this);
