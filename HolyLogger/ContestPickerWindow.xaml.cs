@@ -15,8 +15,8 @@ namespace HolyLogger
             public Contest Contest { get; set; }
             public bool Supported { get; set; }
             public string Name => Contest.Name;
-            public string Sub => Contest.Sponsor
-                + (string.IsNullOrEmpty(Contest.Period) ? "" : "   ·   " + Contest.Period);
+            public string Sub => !string.IsNullOrWhiteSpace(Contest.Description) ? Contest.Description
+                : Contest.Sponsor + (string.IsNullOrEmpty(Contest.Period) ? "" : "   ·   " + Contest.Period);
             public string StatusTag => Supported ? "" : "coming soon";
             public double RowOpacity => Supported ? 1.0 : 0.45;
         }

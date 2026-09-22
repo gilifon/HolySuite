@@ -2288,6 +2288,7 @@
     {
       "id": "SUKKOT",
       "name": "Sukkot Contest",
+      "description": "4X 4Z VHF & UHF contest during Sukkot",
       "bands": [
         "2m",
         "70cm"
@@ -2302,6 +2303,11 @@
       ],
       "asymmetric": false,
       "no_satellite": true,
+      "extra_choices": {
+        "CATEGORY-BAND": [
+          "2M & 70CM"
+        ]
+      },
       "exchange": {
         "sent": [
           "GRID"

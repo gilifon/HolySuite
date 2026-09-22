@@ -19,6 +19,7 @@ namespace HolyLogger
     {
         private readonly bool _exportMode;
         private readonly HashSet<string> _required;
+        private readonly Dictionary<string, List<string>> _extraChoices;   // the contest's own additions
         private readonly Dictionary<string, FrameworkElement> _inputs = new Dictionary<string, FrameworkElement>();
 
         // Collected values (tag -> value); set on Save and Skip so partial input is never lost.
@@ -40,6 +41,7 @@ namespace HolyLogger
                 ? "These lines go into the Cabrillo log header. Fields marked * are required and must be filled before the file can be exported."
                 : "These lines go into the Cabrillo log header. Fill them now or later — fields marked * are required before you can export. You may Skip for now.";
 
+            _extraChoices = contest?.ExtraChoices;
             BuildFields(current ?? new Dictionary<string, string>());
 
             Btn_Primary.Content   = exportMode ? "Save & Export" : "Save";
@@ -84,9 +86,20 @@ namespace HolyLogger
                 if (field.Input == CabrilloFieldInput.Choice)
                 {
                     var combo = new ComboBox { FontSize = 16, Height = 26, IsEnabled = !field.ReadOnly };
-                    combo.Items.Add(string.Empty);   // blank = not specified
-                    foreach (var c in field.Choices) combo.Items.Add(c);
-                    combo.SelectedItem = combo.Items.Contains(val) ? val : string.Empty;
+                    // Each item SHOWS a label and HOLDS the Cabrillo value (Tag), so "LOW (Not more than
+                    // 100W)" can be read while "LOW" is what goes into the header.
+                    var values = new List<string> { string.Empty };   // blank = not specified
+                    values.AddRange(field.Choices);
+                    if (_extraChoices != null && _extraChoices.TryGetValue(field.Tag, out var extra) && extra != null)
+                        foreach (var c in extra)
+                            if (!string.IsNullOrWhiteSpace(c) && !values.Contains(c)) values.Add(c);
+                    foreach (var v in values)
+                    {
+                        var item = new ComboBoxItem { Content = CabrilloHeader.ChoiceLabel(field.Tag, v), Tag = v };
+                        combo.Items.Add(item);
+                        if (v == val) combo.SelectedItem = item;
+                    }
+                    if (combo.SelectedItem == null) combo.SelectedIndex = 0;
                     combo.SelectionChanged += (s, e) => Validate();
                     input = combo;
                 }
@@ -136,7 +149,7 @@ namespace HolyLogger
 
         private static string ReadValue(FrameworkElement input)
         {
-            if (input is ComboBox cb) return ((cb.SelectedItem as string) ?? cb.Text ?? string.Empty).Trim();
+            if (input is ComboBox cb) return (((cb.SelectedItem as ComboBoxItem)?.Tag as string) ?? string.Empty).Trim();
             if (input is TextBox tb) return (tb.Text ?? string.Empty).Trim();
             return string.Empty;
         }
