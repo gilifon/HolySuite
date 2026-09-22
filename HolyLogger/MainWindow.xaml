@@ -2622,7 +2622,7 @@
             <LineBreak />
             <Run Text="Callsign" />
         </TextBlock>
-        <TextBox Text="{Binding Default.Operator, Source={StaticResource Settings}}" x:Name="TB_Operator" HorizontalAlignment="Left" Height="28" Margin="85,47,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="99" CharacterCasing="Upper" Grid.Row="1"  TextChanged="TB_MyCallsign_TextChanged" PreviewKeyDown="PreventSpaceInCallsign" FontSize="16" VerticalContentAlignment="Center" MaxLength="14" TabIndex="2" Style="{StaticResource StationBox}"/>
+        <TextBox Text="{Binding Default.Operator, Source={StaticResource Settings}}" x:Name="TB_Operator" HorizontalAlignment="Left" Height="28" Margin="85,47,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="99" CharacterCasing="Upper" Grid.Row="1"  TextChanged="TB_MyCallsign_TextChanged" LostFocus="TB_Operator_LostFocus" PreviewKeyDown="PreventSpaceInCallsign" FontSize="16" VerticalContentAlignment="Center" MaxLength="14" TabIndex="2" Style="{StaticResource StationBox}"/>
         <Border Grid.Row="1" Margin="85,47,0,0" Width="99" Height="28" HorizontalAlignment="Left"
                 VerticalAlignment="Top" IsHitTestVisible="False">
             <Border.Style>

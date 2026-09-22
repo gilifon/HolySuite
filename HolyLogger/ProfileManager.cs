@@ -231,6 +231,36 @@ namespace HolyLogger
             catch (Exception ex) { return Failed(ex); }
         }
 
+        // Writes ONE setting's current value into the active profile file, leaving the rest of it as it
+        // was saved. For the station callsign and operator: startup reloads the profile, and when Windows
+        // shuts down with HolyLogger open the "save into the profile?" question is skipped - so a callsign
+        // typed in that session was lost on the next start (4Z1GY, 8.9.9). Also saves user.config, which
+        // is where the value lives when no profile is in use.
+        public static void SaveOneIntoActive(string settingName)
+        {
+            try
+            {
+                Properties.Settings.Default.Save();
+
+                string name = ActiveProfile;
+                if (string.IsNullOrWhiteSpace(name) || !Exists(name)) return;
+                if (Excluded.Contains(settingName) || IsWindowLayoutSetting(settingName)) return;
+
+                var value = Properties.Settings.Default.PropertyValues[settingName];
+                if (value == null) return;
+
+                var saved = JsonConvert.DeserializeObject<Dictionary<string, string>>(
+                    File.ReadAllText(PathFor(name))) ?? new Dictionary<string, string>();
+                string now = value.SerializedValue?.ToString() ?? string.Empty;
+                if (saved.TryGetValue(settingName, out string old) && string.Equals(old, now, StringComparison.Ordinal))
+                    return;
+
+                saved[settingName] = now;
+                File.WriteAllText(PathFor(name), JsonConvert.SerializeObject(saved, Formatting.Indented));
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
         // Loads the active profile at startup, so the program always begins from what that profile
         // holds. Anything changed last session and not saved into it is deliberately NOT carried over -
         // the operator is asked about that when closing.
