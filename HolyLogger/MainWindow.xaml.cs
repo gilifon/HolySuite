@@ -17619,7 +17619,15 @@ namespace HolyLogger
             QSODataGrid.ColumnHeaderStyle = BuildLogTableHeaderStyle();
         }
 
-        private async void GetQrzData()
+        // "Not found: <call>" is QRZ's answer about the callsign. Any other error is about the session
+        // itself - "Session Timeout", "Invalid session key" - and a new login is the cure.
+        private static bool IsQrzSessionError(string errorText)
+        {
+            return !string.IsNullOrWhiteSpace(errorText)
+                && !errorText.TrimStart().StartsWith("Not found", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private async void GetQrzData(bool isRetry = false)
         {
             // Snapshot the lookup revision up front. Typing another character, and clearing the form
             // with F9 or Add-with-F1 (both empty the DX-callsign box, which bumps this counter), all
@@ -17753,7 +17761,28 @@ namespace HolyLogger
                         }
                         else if (error.Count() > 0)
                         {
-                            string errorCall = error.FirstOrDefault().Value.Split(':')[1].Trim();
+                            string errorText = error.FirstOrDefault().Value ?? string.Empty;
+
+                            // THE SESSION ENDED. QRZ ends a login after a while - typically overnight -
+                            // and answers "Session Timeout" instead of the record. That answer used to
+                            // throw below (it has no ':' to split on) and nothing logged in again, so
+                            // lookups stayed dead until a restart (4X4ZP, 8.9.14). Log in and ask once more.
+                            if (IsQrzSessionError(errorText))
+                            {
+                                Log.Warn("QRZ lookup for " + bare_dxcall + ": QRZ answered \"" + errorText + "\" - "
+                                         + (isRetry ? "still failing after a new login, giving up" : "logging in again"));
+                                if (!isRetry && isNetworkAvailable)
+                                {
+                                    _SessionKey = await Helper.LoginToQRZAsync();
+                                    SetQrzConnected(!string.IsNullOrWhiteSpace(_SessionKey));
+                                    if (!string.IsNullOrWhiteSpace(_SessionKey) && revisionAtStart == callsignLookupRevision)
+                                        GetQrzData(isRetry: true);
+                                }
+                                return;
+                            }
+
+                            string[] errorParts = errorText.Split(':');
+                            string errorCall = errorParts.Length > 1 ? errorParts[1].Trim() : string.Empty;
                             if (errorCall == dxcall || errorCall == bare_dxcall)
                             {
                                 Log.Warn("QRZ photo for " + bare_dxcall + ": QRZ has no record of this callsign");
@@ -17953,7 +17982,7 @@ namespace HolyLogger
             catch (Exception swallowed) { Log.Swallow(swallowed); return null; }
         }
 
-        private async Task<(string Name, string Grid)> GetQrzForCall(string callsign)
+        private async Task<(string Name, string Grid)> GetQrzForCall(string callsign, bool isRetry = false)
         {
             try
             {
@@ -17989,6 +18018,15 @@ namespace HolyLogger
                     }
                     else
                     {
+                        // Session ended (see GetQrzData): log in again and ask once more.
+                        string errorText = xDoc.Root.Descendants(ns + "Error").FirstOrDefault()?.Value;
+                        if (!isRetry && IsQrzSessionError(errorText) && isNetworkAvailable)
+                        {
+                            Log.Warn("QRZ lookup for " + callsign + ": QRZ answered \"" + errorText + "\" - logging in again");
+                            _SessionKey = await Helper.LoginToQRZAsync();
+                            if (!string.IsNullOrWhiteSpace(_SessionKey))
+                                return await GetQrzForCall(callsign, isRetry: true);
+                        }
                         return ("", "");
                     }
                 }
