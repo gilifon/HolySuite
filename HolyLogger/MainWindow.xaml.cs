@@ -14173,6 +14173,13 @@ namespace HolyLogger
             CommitStationCallsignEdit();
         }
 
+        // Same as the callsign: write the operator into the active profile so a restart keeps it.
+        private void TB_Operator_LostFocus(object sender, RoutedEventArgs e)
+        {
+            Properties.Settings.Default.Operator = TB_Operator.Text?.Trim() ?? string.Empty;
+            ProfileManager.SaveOneIntoActive("Operator");
+        }
+
         // Runs the station-callsign change guard on a committed edit. Called on focus leave AND from
         // the lock button: locking approves whatever is typed, and the lock is a plain image whose
         // click never moves keyboard focus, so LostFocus alone would let a mismatched callsign be
@@ -14189,6 +14196,11 @@ namespace HolyLogger
             // and send the user to the Log Manager to open or create a log for this callsign. (The
             // operator may vary within one log -- multi-op -- so only the callsign is enforced.)
             if (HandleStationCallsignChange(now)) return;   // mismatch handled -> skip the services alert
+
+            // Keep it through a restart: startup reloads the profile, and a Windows shutdown skips
+            // the "save into the profile?" question on close.
+            Properties.Settings.Default.my_callsign = now;
+            ProfileManager.SaveOneIntoActive("my_callsign");
 
             // The callsign agrees with the active log again (e.g. a mismatch was typed and then
             // reverted) -> clear a leftover "Select Log" lock.
