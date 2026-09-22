@@ -14812,6 +14812,7 @@ namespace HolyLogger
         // is silent and looks like the field is broken.
         private void GlobalTextBox_EnglishOnly_PreviewTextInput(object sender, TextCompositionEventArgs e)
         {
+            if (SupportMailWindow.TakesAnyLanguage(sender as TextBox)) return;
             if (!IsEnglishOnly(e.Text))
             {
                 e.Handled = true;
@@ -14860,7 +14861,7 @@ namespace HolyLogger
             if (e.DataObject.GetDataPresent(DataFormats.UnicodeText) || e.DataObject.GetDataPresent(DataFormats.Text))
             {
                 string text = (e.DataObject.GetData(DataFormats.UnicodeText) ?? e.DataObject.GetData(DataFormats.Text)) as string;
-                if (!IsEnglishOnly((text ?? string.Empty).Replace("\t", "").Replace("\r", "").Replace("\n", "")))
+                if (!SupportMailWindow.TakesAnyLanguage(sender as TextBox) && !IsEnglishOnly((text ?? string.Empty).Replace("\t", "").Replace("\r", "").Replace("\n", "")))
                 {
                     e.CancelCommand();
                     return;

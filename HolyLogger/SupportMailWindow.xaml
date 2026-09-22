@@ -1,7 +1,7 @@
 <Window x:Class="HolyLogger.SupportMailWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Write to the people who make HolyLogger" Width="720" Height="820"
+        Title="Write to the people who make HolyLogger" Width="720" Height="650"
         MinWidth="620" MinHeight="580"
         WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
         Background="{DynamicResource WindowBg}">
@@ -76,11 +76,12 @@
                  of and the server refuses an empty one, so a subject line alone cannot be the whole
                  thing - but a screenshot of what went wrong is not nothing, and an operator who had
                  pasted one sat looking at a Send button that would not press. -->
-            <Run Text="What happened - or what you would like"/><Run Text=" *" Foreground="Red" FontWeight="Bold"/><Run
-                Text=".  A picture can be pasted straight in with Ctrl+V — and a picture on its own is enough to send."/>
+            <!-- No star any more: a subject on its own may be sent (4Z1ZV, 8.9.14). -->
+            <Run Text="What happened - or what you would like. Any language. A picture: paste it with Ctrl+V, drag it in, or use Add picture."/>
         </TextBlock>
+        <!-- No spell check: it checks English only, and underlined every word of a message in Hebrew. -->
         <TextBox   Grid.Row="6" Grid.ColumnSpan="2" x:Name="TB_Body" FontSize="16"
-                   AcceptsReturn="True" TextWrapping="Wrap" SpellCheck.IsEnabled="True"
+                   AcceptsReturn="True" TextWrapping="Wrap"
                    VerticalScrollBarVisibility="Auto" MinHeight="120"/>
 
         <!-- PASTED PICTURES. A screenshot says in one glance what a paragraph struggles to describe, and
@@ -114,6 +115,8 @@
 
         <StackPanel Grid.Row="10" Grid.ColumnSpan="2" Orientation="Horizontal"
                     HorizontalAlignment="Center" Margin="0,12,0,0">
+            <Button x:Name="Btn_AddPicture" Height="38" MinWidth="150" FontSize="16"
+                    Margin="0,0,14,0" Click="Btn_AddPicture_Click" Content="Add picture..."/>
             <Button x:Name="Btn_Cancel" Height="38" MinWidth="130" FontSize="16"
                     Margin="0,0,14,0" Click="Btn_Cancel_Click" Content="Cancel" IsCancel="True"/>
             <!-- Starts off. Nothing can be sent until every starred field has something in it, so the
