@@ -4689,6 +4689,15 @@ namespace HolyLogger
             if (string.IsNullOrWhiteSpace(b))
                 return string.Empty;
 
+            // 2m IS the cluster's VHF band, and must be said so BEFORE the plain "<digits>M" rule
+            // below turns it into "2" - a key no colour and no band checkbox has. That left the Radio
+            // Control Panel's 2m button wearing the fallback orange while the cluster showed the same
+            // band green (#5EFFA0), and a spot whose band arrived as "2m" matched no band filter at
+            // all. 6m and 4m stay as they are: 6 is a cluster band of its own, and 4m is not a cluster
+            // band at all (the panel paints it white, like 8m).
+            if (b == "2M")
+                return "VHF";
+
             if (Regex.IsMatch(b, "^\\d+M$"))
                 return b.Substring(0, b.Length - 1);
 

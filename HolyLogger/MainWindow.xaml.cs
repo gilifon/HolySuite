@@ -13152,6 +13152,10 @@ namespace HolyLogger
             RebuildClusterBandSelector();
             UpdateBandTextBoxColor();
 
+            // The Radio Control Panel wears the same colours on its band buttons, and paints them once
+            // when the buttons are built - so it has to be told, or it keeps the old one.
+            try { radioPanel?.RefreshBandColors(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+
             // Repaint everything already on screen with the new color instead of waiting for the
             // next spot to arrive: the cluster list's Freq color (FreqForeground is re-evaluated on
             // refresh) and the map spot dots.
