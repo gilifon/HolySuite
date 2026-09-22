@@ -17720,10 +17720,20 @@ namespace HolyLogger
                                     // which is not necessarily the main photo: for one user it returned a
                                     // picture embedded in the biography while another user, whose QRZ
                                     // account did return <image>, saw the right one for the same callsign.
+                                    // Why a photo was or was not shown, so a "no QRZ photo" report can be
+                                    // answered from the log. SubExp is QRZ's own word on the account's
+                                    // XML subscription ("non-subscriber" or an expiry date).
+                                    string subExp = xDoc.Root.Descendants(ns + "SubExp").Select(i => i.Value).FirstOrDefault();
+                                    Log.Warn("QRZ photo for " + bare_dxcall + ": "
+                                             + (string.IsNullOrWhiteSpace(xmlImageUrl) ? "QRZ sent no image" : "QRZ sent an image")
+                                             + " | Show Photo From QRZ=" + Properties.Settings.Default.ShowPhotoFromQRZ
+                                             + " | picture area mode=" + Properties.Settings.Default.MapAreaDisplayMode
+                                             + " | QRZ subscription=" + (subExp ?? "(not given)"));
                                     SetQrzPhoto(xmlImageUrl);
                                 }
-                                catch
+                                catch (Exception ex)
                                 {
+                                    Log.Warn("QRZ photo for " + bare_dxcall + ": failed - " + ex.Message);
                                     ClearQrzPhoto();
                                 }
                             }
@@ -17737,6 +17747,7 @@ namespace HolyLogger
                             string errorCall = error.FirstOrDefault().Value.Split(':')[1].Trim();
                             if (errorCall == dxcall || errorCall == bare_dxcall)
                             {
+                                Log.Warn("QRZ photo for " + bare_dxcall + ": QRZ has no record of this callsign");
                                 FName = "";
                                 TB_State.Text = "";
                                 TB_QTH.Text = "";
@@ -17747,8 +17758,9 @@ namespace HolyLogger
                         }
                     }
                 }
-                catch (Exception)
+                catch (Exception ex)
                 {
+                    Log.Warn("QRZ lookup for " + bare_dxcall + " failed, so no photo: " + ex.Message);
                     FName = "";
                     TB_State.Text = "";
                     TB_QTH.Text = "";
