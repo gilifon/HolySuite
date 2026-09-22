@@ -546,7 +546,18 @@ namespace HolyLogger
 
             // Pinned, it is put in its place BEFORE it appears, so it is never seen anywhere else.
             if (_pinned) { _pinnedRect = Rect.Empty; FollowMain(force: true); }
-            if (!IsVisible) Show();
+            if (!IsVisible)
+            {
+                // A floating map the operator maximized (double-click on its title bar, or dragged to
+                // the top of the screen) and then closed is still Maximized, and WPF refuses to show a
+                // maximized window without activating it: "Cannot show Window when ShowActivated is
+                // false and WindowState is set to Maximized" - the map never came back (4Z1KD). It
+                // comes back maximized, as he left it, taking the keyboard this one time.
+                bool maximized = WindowState == WindowState.Maximized;
+                if (maximized) ShowActivated = true;
+                try { Show(); }
+                finally { if (maximized) ShowActivated = false; }
+            }
             if (!_pinned) WindowBounds.KeepOnScreen(this);
         }
 
