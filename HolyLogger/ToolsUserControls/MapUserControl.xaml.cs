@@ -76,6 +76,11 @@ namespace HolyLogger.ToolsUserControls
     {
         private readonly string _tempMapFile;
         private int _currentRadiusKm = 1000;
+
+        // The flat (Leaflet) map's radius choices. It stops at 15000: that already shows the whole
+        // world, so a 20000 option changed nothing. The polar map keeps 20000 - it can show it.
+        private const int FlatMapMaxRadiusKm = 15000;
+        private static readonly int[] FlatMapRadii = { 100, 250, 500, 1000, 2000, 3500, 5000, 7500, 10000, 15000 };
         private double _currentLat, _currentLon;
         private double? _currentAzimuth, _currentHomeLat, _currentHomeLon;
         private double? _currentSpotterLat, _currentSpotterLon;  // spotter of the selected cluster spot (for the DE button)
@@ -433,11 +438,12 @@ namespace HolyLogger.ToolsUserControls
             string homeLatJs = homeLat.ToString(ic);
             string homeLonJs = homeLon.ToString(ic);
             string marginJs = marginMultiplier.ToString(ic);
+            if (radiusKm > FlatMapMaxRadiusKm) radiusKm = FlatMapMaxRadiusKm;   // see FlatMapRadii
             int radiusMeters = radiusKm * 1000;
             bool useMiles = string.Equals(Properties.Settings.Default.MapDistanceUnit, "Miles", System.StringComparison.OrdinalIgnoreCase);
             string useMilesJs = useMiles ? "true" : "false";
 
-            int[] radiiOptions = { 100, 250, 500, 1000, 2000, 3500, 5000, 7500, 10000, 15000, 20000 };
+            int[] radiiOptions = FlatMapRadii;
             var options = new System.Text.StringBuilder();
             foreach (int r in radiiOptions)
             {
@@ -1996,8 +2002,11 @@ window.addEventListener('resize', function() {
             string marginJs = marginMultiplier.ToString(System.Globalization.CultureInfo.InvariantCulture);
           bool useMiles = string.Equals(Properties.Settings.Default.MapDistanceUnit, "Miles", StringComparison.OrdinalIgnoreCase);
           string useMilesJs = useMiles ? "true" : "false";
+            // No 20000 on the flat map: at 15000 it already shows the whole world, so 20000 changed
+            // nothing (4Z1GY, 8.9.12). A radius saved from the polar map is brought down to match.
+            if (radiusKm > FlatMapMaxRadiusKm) radiusKm = FlatMapMaxRadiusKm;
             int radiusMeters = radiusKm * 1000;
-            int[] radiiOptions = { 100, 250, 500, 1000, 2000, 3500, 5000, 7500, 10000, 15000, 20000 };
+            int[] radiiOptions = FlatMapRadii;
           string azimuthJs = "0";
           if (azimuthDeg.HasValue)
           {
@@ -2194,6 +2203,13 @@ L.polyline([[0,-180],[0,-90],[0,0],[0,90],[0,180]], { color:'#000000', weight:1.
 
 // Create visible red circle to show the search radius (centered on home)
 var radiusCircle = L.circle([circleLat, circleLon], { radius: radiusMeters, color: '#E53935', fill: false, weight: 2 }).addTo(map);
+// A circle that runs past a pole cannot be drawn on a flat map - Leaflet draws an oval that is not
+// the real distance. Hide it then (transparent, not removed: the zoom-to-fit still uses its bounds).
+function updateCircleVisibility() {
+  var pastPole = radiusMeters / 111320 + Math.abs(circleLat) > 85;
+  radiusCircle.setStyle({ opacity: pastPole ? 0 : 1 });
+}
+updateCircleVisibility();
 
 function haversineMeters(lat1, lon1, lat2, lon2) {
   var toRad = Math.PI / 180;
@@ -2302,12 +2318,14 @@ function fitAll() {
 function onRadiusChange(km) {
     radiusMeters = km * 1000;
     radiusCircle.setRadius(radiusMeters);
+    updateCircleVisibility();
     fitAll();
     try { window.external.SetRadius(km); } catch(e) {}
 }
 function recenter() {
     radiusCircle.setLatLng([circleLat, circleLon]);
     radiusCircle.setRadius(radiusMeters);
+    updateCircleVisibility();
     fitAll();
 }
 function centerOnDx() {
