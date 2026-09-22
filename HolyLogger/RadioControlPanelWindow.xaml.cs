@@ -350,15 +350,32 @@ namespace HolyLogger
             // showed themselves even under an isolated reproduction of the same markup. Forcing the
             // template to exist (ApplyTemplate) and reaching directly into it by name (FindName) does
             // not depend on any binding resolving at all - it just sets Fill on the actual Path.
-            var cornerFill = (band.Name == "8m" || band.Name == "4m")
-                ? System.Windows.Media.Brushes.White
-                : MainWindow.GetBandBrush(band.Name);
             button.ApplyTemplate();
-            if (button.Template.FindName("CornerMark", button) is System.Windows.Shapes.Path cornerMark)
-                cornerMark.Fill = cornerFill;
+            PaintCornerMark(button);
 
             _bandButtons.Add(button);
             return button;
+        }
+
+        // The band's colour on one button. The mark is part of the template and sits over the face, so
+        // it reads the same whether the button is lit or not.
+        private static void PaintCornerMark(ToggleButton button)
+        {
+            var band = button.Tag as RadioBandPreset;
+            if (band == null) return;
+            var fill = (band.Name == "8m" || band.Name == "4m")
+                ? System.Windows.Media.Brushes.White
+                : (System.Windows.Media.Brush)MainWindow.GetBandBrush(band.Name);
+            var mark = button.Template == null ? null : button.Template.FindName("CornerMark", button) as System.Windows.Shapes.Path;
+            if (mark != null) mark.Fill = fill;
+        }
+
+        // Called when a band's colour is changed in the Cluster: the marks are painted once, when the
+        // buttons are built, so without this the panel kept the old colour while everything else - the
+        // cluster's own band boxes, its list, the map - had already moved to the new one.
+        internal void RefreshBandColors()
+        {
+            foreach (var button in _bandButtons) PaintCornerMark(button);
         }
 
         private ToggleButton MakeModeButton(string mode, Style style)
