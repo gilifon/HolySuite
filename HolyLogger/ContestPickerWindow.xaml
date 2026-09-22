@@ -18,9 +18,20 @@
         </StackPanel>
 
         <Border Grid.Row="1" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1" Background="{DynamicResource PanelBg}">
-            <ListBox x:Name="LB_Contests" BorderThickness="0"
+            <!-- Every other row shaded, in the same two colours as the log table. -->
+            <ListBox x:Name="LB_Contests" BorderThickness="0" AlternationCount="2"
                      SelectionChanged="LB_Contests_SelectionChanged"
                      MouseDoubleClick="LB_Contests_MouseDoubleClick">
+                <ListBox.ItemContainerStyle>
+                    <Style TargetType="ListBoxItem" BasedOn="{StaticResource {x:Type ListBoxItem}}">
+                        <Setter Property="Background" Value="{DynamicResource GridRowBg}"/>
+                        <Style.Triggers>
+                            <Trigger Property="ItemsControl.AlternationIndex" Value="1">
+                                <Setter Property="Background" Value="{DynamicResource GridAltRowBg}"/>
+                            </Trigger>
+                        </Style.Triggers>
+                    </Style>
+                </ListBox.ItemContainerStyle>
                 <ListBox.ItemTemplate>
                     <DataTemplate>
                         <Border Padding="6,5" Opacity="{Binding RowOpacity}">

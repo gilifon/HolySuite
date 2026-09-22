@@ -98,6 +98,22 @@ namespace HolyLogger.Contests
 
         public static CabrilloHeaderField Find(string tag) => Catalog.FirstOrDefault(f => f.Tag == tag);
 
+        // What a choice SAYS in the Contest Information window, where the bare Cabrillo word is not
+        // clear on its own. The value written to the log is still the bare word.
+        private static readonly Dictionary<string, string> PowerLabels = new Dictionary<string, string>
+        {
+            { "HIGH", "HIGH (More than 100W)" },
+            { "LOW",  "LOW (Not more than 100W)" },
+            { "QRP",  "QRP (Not more than 5W PEP)" },
+        };
+
+        public static string ChoiceLabel(string tag, string value)
+        {
+            if (tag == "CATEGORY-POWER" && value != null && PowerLabels.TryGetValue(value, out string label))
+                return label;
+            return value ?? string.Empty;
+        }
+
         // The required tags for a contest: the default set, plus the contest's own additions
         // (cabrillo_required in contests.json), minus any it explicitly drops (cabrillo_optional).
         public static HashSet<string> RequiredFor(Contest contest)

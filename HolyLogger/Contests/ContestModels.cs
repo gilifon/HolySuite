@@ -18,6 +18,8 @@ namespace HolyLogger.Contests
         [JsonProperty("name")] public string Name { get; set; }
         [JsonProperty("sponsor")] public string Sponsor { get; set; }
         [JsonProperty("period")] public string Period { get; set; }
+        // Optional line shown under the name in the contest picker, in place of sponsor and period.
+        [JsonProperty("description")] public string Description { get; set; }
         [JsonProperty("bands")] public List<string> Bands { get; set; }
         [JsonProperty("modes")] public List<string> Modes { get; set; }
         [JsonProperty("asymmetric")] public bool Asymmetric { get; set; }
@@ -38,6 +40,10 @@ namespace HolyLogger.Contests
         // default-required tags a given contest does not need.
         [JsonProperty("cabrillo_required")] public List<string> CabrilloRequired { get; set; }
         [JsonProperty("cabrillo_optional")] public List<string> CabrilloOptional { get; set; }
+
+        // Optional extra choices for a Contest Information drop-down, by Cabrillo tag, added after the
+        // standard ones. Sukkot has a "2M & 70CM" band category that no standard list offers.
+        [JsonProperty("extra_choices")] public Dictionary<string, List<string>> ExtraChoices { get; set; }
 
         // Optional fixed operating channels (Sukkot: the 2m / 70cm FM channels). When present, the
         // contest bar shows a Channel drop-down that fills the frequency, since most radios used on

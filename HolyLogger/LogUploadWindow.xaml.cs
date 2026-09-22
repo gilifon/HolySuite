@@ -129,11 +129,18 @@ namespace HolyLogger
                 CB_Band.SelectedIndex = 0;
 
             Power = dal.GetTableData("power");
+            // Shown with the same words as Contest Information ("LOW (Not more than 100W)"); what is
+            // sent is the item's Name (HIGH / LOW / QRP), which does not change.
+            foreach (var p in Power)
+                p.Description = Contests.CabrilloHeader.ChoiceLabel("CATEGORY-POWER", p.Name);
             CB_Power.SelectionChanged += CB_Power_SelectionChanged;
             CB_Power.DisplayMemberPath = "Description";
             CB_Power.SelectedValuePath = "id";
             CB_Power.ItemsSource = Power;
-            gi = Power.FirstOrDefault(t => t.Description == Properties.Settings.Default.selectedPower);
+            // The saved choice may be in the old words ("Low (<100W)"), so it also matches by name.
+            string savedPower = Properties.Settings.Default.selectedPower ?? string.Empty;
+            gi = Power.FirstOrDefault(t => t.Description == savedPower)
+              ?? Power.FirstOrDefault(t => !string.IsNullOrEmpty(t.Name) && savedPower.StartsWith(t.Name, StringComparison.OrdinalIgnoreCase));
             if (gi != null)
                 CB_Power.SelectedItem = gi;
             else
@@ -149,6 +156,57 @@ namespace HolyLogger
                 CB_Overlay.SelectedItem = gi;
             else
                 CB_Overlay.SelectedIndex = 0;
+
+            try { PrefillFromOpenLog(); }
+            catch (Exception ex) { Log.Swallow(ex); }
+        }
+
+        // ── STARTS FROM THE LOG THAT IS OPEN ────────────────────────────────────────────────────
+        //
+        // Every box used to open on whatever was sent LAST time, so a Sukkot log came up as "Holyland
+        // Contest, SSB, High" (4Z1ZV, 8.9.14). The event now follows the open log's contest, and the
+        // boxes follow what was chosen in that log's Contest Information. Only a value IARC's list
+        // actually has is picked; anything else is left as before, and every box can still be changed.
+        private void PrefillFromOpenLog()
+        {
+            string eventType = dal.GetLogEventType(dal.ActiveLogId);
+            string eventName = string.Equals(eventType, "SUKKOT", StringComparison.OrdinalIgnoreCase) ? "sukot"
+                             : string.Equals(eventType, "HOLYLAND", StringComparison.OrdinalIgnoreCase) ? "holyland"
+                             : null;
+            if (eventName == null) return;   // not an IARC contest log: leave everything as it was
+
+            var ev = RadioEvents.FirstOrDefault(r => string.Equals(r.Name, eventName, StringComparison.OrdinalIgnoreCase));
+            if (ev == null) return;
+            CB_Events.SelectedItem = ev;     // also reloads the Mode list for this event
+
+            var info = Contests.ContestHeaderStore.Load(eventType.ToUpperInvariant());
+            string V(string tag) => info != null && info.TryGetValue(tag, out string v) ? (v ?? "").Trim() : "";
+
+            Pick(CB_Operator, Operators, V("CATEGORY-OPERATOR"));
+            Pick(CB_Power, Power, V("CATEGORY-POWER"));
+
+            string band = V("CATEGORY-BAND");
+            if (eventName == "sukot")
+            {
+                // Sukot's "Mode" box holds its categories, chosen by band.
+                string category = band == "2M & 70CM" ? "VHF/UHF" : band == "2M" ? "VHF" : band == "70CM" ? "UHF" : "";
+                Pick(CB_Mode, Modes, category);
+            }
+            else
+            {
+                string mode = V("CATEGORY-MODE");
+                Pick(CB_Mode, Modes, mode == "MIXED" ? "MIX" : mode);
+                Pick(CB_Band, Bands, band);
+            }
+        }
+
+        // Selects the item whose name or shown text is the value; does nothing when there is none.
+        private static void Pick(ComboBox box, IEnumerable<GenericItem> items, string value)
+        {
+            if (string.IsNullOrEmpty(value) || items == null) return;
+            var hit = items.FirstOrDefault(i => string.Equals(i.Name, value, StringComparison.OrdinalIgnoreCase)
+                                             || string.Equals(i.Description, value, StringComparison.OrdinalIgnoreCase));
+            if (hit != null) box.SelectedItem = hit;
         }
 
         private void CB_Events_SelectionChanged(object sender, SelectionChangedEventArgs e)
