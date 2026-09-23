@@ -316,9 +316,100 @@ namespace HolyLogger
             _splashCloseTimer.Tick += SplashCloseTimer_Tick;
             _splashCloseTimer.Start();
 
-            // From here WPF builds the main window by itself (StartupUri), so the next mark - the first
-            // line of its constructor - measures how long that takes.
-            Log.Step("app: our startup work done, WPF now builds the window");
+            Log.Step("app: our startup work done, the window is built now");
+            StartTheMainWindow();
+        }
+
+        // ── NOTHING REMEMBERED MAY STOP THE PROGRAM FROM STARTING ───────────────────────────────
+        //
+        // The main window used to be built by WPF itself (StartupUri="MainWindow.xaml"). Nothing could
+        // catch a fault in its constructor, so one killed the whole program before anything appeared -
+        // and it came back at every attempt, because what caused it was a SETTING. A user could not
+        // start HolyLogger at all: he had closed it with the Sign Board open, that window was reopened
+        // from the constructor, and WPF refuses an owner window that has not been shown yet.
+        // Reinstalling did not help him; only deleting his settings by hand would have.
+        //
+        // So the window is built here instead, where a fault can be caught. If it fails, the settings
+        // that only say WHICH WINDOWS WERE OPEN are switched off - they are conveniences, and none of
+        // them is worth a program that will not run - and HolyLogger STARTS ITSELF AGAIN. His log, his
+        // QSOs and everything he typed are untouched; only "the Timer was open when you left" is
+        // forgotten.
+        //
+        // A FRESH PROCESS, NOT A SECOND TRY IN THIS ONE. A constructor that threw half way through can
+        // leave a great deal behind it - the window itself sits in Application.Windows, where the
+        // splash's "find the main window" would pick it and then wait forever for a window that is
+        // never shown; and whatever timers it had already started go on ticking against a window that
+        // was never finished. Starting again from nothing has none of that.
+        //
+        // ONCE. The new copy carries a mark on its command line, and a copy that was started this way
+        // does not do it again - a fault that is not about those windows would otherwise start the
+        // program for ever.
+        private const string StartedAgainFlag = "--started-again";
+        private const string SupportAddress = "holylogger@iarc.org";
+
+        private void StartTheMainWindow()
+        {
+            try
+            {
+                new MainWindow().Show();
+                return;
+            }
+            catch (System.Exception first)
+            {
+                Log.Fatal("MainWindow could not be built", first);
+            }
+
+            // THE SPLASH GOES FIRST. It is Topmost, and it would stand in front of the message below -
+            // the operator would be looking at a splash screen that never finishes, with the words
+            // that explain it hidden behind. It also must not be left over the new copy's own splash.
+            try { CloseSplash(); }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+
+            bool startedAgain = Environment.GetCommandLineArgs()
+                                           .Any(a => string.Equals(a, StartedAgainFlag, StringComparison.OrdinalIgnoreCase));
+            bool cleared = !startedAgain && ForgetWhichWindowsWereOpen();
+
+            if (cleared)
+            {
+                Log.Warn("Starting HolyLogger again without the windows that were left open.");
+                try
+                {
+                    ReleaseSingleInstanceMutex();   // the new copy must not meet its own guard
+                    System.Diagnostics.Process.Start(
+                        System.Reflection.Assembly.GetEntryAssembly().Location, StartedAgainFlag);
+                    Shutdown();
+                    return;
+                }
+                catch (System.Exception cannotRestart) { Log.Swallow(cannotRestart); }
+            }
+
+            HolyMessageBox.ShowError(
+                "HolyLogger could not start.\n\n"
+                + "What went wrong is written in this file:\n"
+                + Log.FilePath + "\n\n"
+                + "Please send that file to " + SupportAddress + " and we will tell you what to do.\n\n"
+                + "Your QSOs are safe. They are in logDB.db, in that same folder.",
+                "HolyLogger");
+            Shutdown();
+        }
+
+        // The settings that say no more than "this window was open when you closed the program".
+        // Answers true when at least one of them was on, so the operator is only told when something
+        // really was turned off.
+        private static bool ForgetWhichWindowsWereOpen()
+        {
+            bool any = false;
+            try
+            {
+                var s = HolyLogger.Properties.Settings.Default;
+                if (s.SignBoardWindowIsOpen) { s.SignBoardWindowIsOpen = false; any = true; }
+                if (s.MatrixWindowIsOpen) { s.MatrixWindowIsOpen = false; any = true; }
+                if (s.TimerWindowIsOpen) { s.TimerWindowIsOpen = false; any = true; }
+                if (s.ChannelsWindowPinned) { s.ChannelsWindowPinned = false; any = true; }
+                if (any) s.Save();
+            }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+            return any;
         }
 
         // THE SPLASH GETS A THREAD OF ITS OWN, and it has to.
