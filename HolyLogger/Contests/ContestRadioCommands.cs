@@ -140,6 +140,7 @@ namespace HolyLogger.Contests
             Ft991("FT-991-DATA"),
             Ft991("FT-991A"),
             Ft857("FT-857"),
+            Ft897("FT-897"),
             Ic910("IC-910"),
         };
 
@@ -232,6 +233,29 @@ namespace HolyLogger.Contests
             FmWide = "08 00 00 00 07",
             NoAutoRepeater = "",
             Simplex = "89 00 00 00 F9",
+            NoTone = "8A 00 00 00 0A",
+            NoTsql = "8A 00 00 00 0A",
+        };
+
+        // FT-897 / FT-897D. The same five-raw-bytes protocol as the FT-857, but the values below were read
+        // from the FT-897's OWN manual (page 62, "Opcode Command Chart", 17 opcodes), not copied from it:
+        //   07 = Operating Mode, "P1 = 08 : FM", "P1 = 88 : FMN"   -> FM wide = "08 00 00 00 07"
+        //   09 = Repeater Offset, "P1 = 89 : SIMPLEX"              -> Simplex = "89 00 00 00 09"
+        //        (F9 is a DIFFERENT opcode, Repeater Offset FREQUENCY, whose P1~P4 are frequency digits.)
+        //   0A = CTCSS/DCS Mode, "P1 = 8A : OFF" - the one command that turns off both the tone and the
+        //        tone/DCS decoder, so No Tone and No TSQL are the same command -> "8A 00 00 00 0A"
+        // NOT YET CHECKED ON A RADIO.
+        //
+        // VFO and No Auto Repeater are EMPTY, for the same reasons as the FT-857: the chart's only VFO
+        // entry is "VFO-A/B 81 Toggle" - a toggle says nothing about leaving memory mode - and there is
+        // no command that writes a menu item, so ARS cannot be reached over CAT at all.
+        private static RadioCommandSet Ft897(string name) => new RadioCommandSet
+        {
+            Radio = name,
+            Vfo = "",
+            FmWide = "08 00 00 00 07",
+            NoAutoRepeater = "",
+            Simplex = "89 00 00 00 09",
             NoTone = "8A 00 00 00 0A",
             NoTsql = "8A 00 00 00 0A",
         };
