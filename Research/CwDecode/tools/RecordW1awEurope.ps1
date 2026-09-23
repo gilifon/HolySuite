@@ -6,10 +6,16 @@
 # ARRL still publishes every word, so every letter is known. Each evening becomes new training
 # material with nobody at the radio.
 #
-# WHEN. W1AW's schedule is fixed in US Eastern time: the evening code bulletin begins at 17:00 ET
-# (21:00 UTC in summer, 22:00 in winter; midnight in Israel most of the year). This script works that
-# out itself through Windows' own time zones, so the daylight-saving changes on both sides of the
-# Atlantic need nobody. Recording starts three minutes early and runs 35 minutes.
+# WHEN. W1AW's schedule is fixed in US Eastern time, and this script works the hour out itself
+# through Windows' own time zones, so the daylight-saving changes on both sides of the Atlantic need
+# nobody. Recording starts three minutes early and runs 35 minutes.
+#
+# THE 17:00 ET BULLETIN IS NO USE HERE, MEASURED. Four nights of it (18, 19, 21, 22 September) were
+# recorded on all six receivers and hold no W1AW at all: 24 to 27 dB of something in the passband
+# against the American copies' 48, and the decoder reads nothing but stray letters. 17:00 ET is
+# broad daylight in Connecticut and the forty-metre path over the Atlantic is not open. So the
+# default is now the 20:00 ET bulletin - midnight UTC, three in the morning in Israel - when that
+# path usually is.
 #
 # RUN BY A WINDOWS SCHEDULED TASK ("HolySuite W1AW Europe"), started each evening well before the
 # bulletin; it waits here until the time. Started after the bulletin has begun, it does nothing - the
@@ -18,7 +24,7 @@
 # Receivers: each tested on W1AW's 40 m frequency on 18 September 2026 and recording past the
 # ten-second cut-off some receivers impose. Output: training\w1aw\<yyyyMMdd>-europe\.
 
-param([int]$Minutes = 35, [int]$SegmentSeconds = 600, [switch]$Now)
+param([int]$EasternHour = 20, [int]$Minutes = 35, [int]$SegmentSeconds = 600, [switch]$Now)
 
 $tools = $PSScriptRoot
 $py = Join-Path $tools "..\training\pyenv\Scripts\python.exe"
@@ -29,13 +35,13 @@ $receivers = @(
     @("f4joy.ddns.net",          "8073", "7047.5",  "F_Pradiers_40m"),
     @("hb9cwk.internet-box.ch",  "8073", "7047.5",  "HB_Heimiswil_40m"),
     @("dl2sba.ddns.net",         "8073", "7047.5",  "DL_Filderstadt_40m"),
-    @("websdr.heppen.be",        "8073", "14047.5", "ON_Heppen_20m")
+    @("websdr.heppen.be",        "8073", "3581.5",  "ON_Heppen_80m")   # 20 m is shut at midnight UTC; 80 m can be open
 )
 
 $eastern = [System.TimeZoneInfo]::FindSystemTimeZoneById("Eastern Standard Time")
 $nowUtc = (Get-Date).ToUniversalTime()
 $todayEastern = [System.TimeZoneInfo]::ConvertTimeFromUtc($nowUtc, $eastern).Date
-$bulletinEastern = [datetime]::SpecifyKind($todayEastern.AddHours(17), [System.DateTimeKind]::Unspecified)
+$bulletinEastern = [datetime]::SpecifyKind($todayEastern.AddHours($EasternHour), [System.DateTimeKind]::Unspecified)
 $bulletinUtc = [System.TimeZoneInfo]::ConvertTimeToUtc($bulletinEastern, $eastern)
 $startUtc = $bulletinUtc.AddMinutes(-3)
 
