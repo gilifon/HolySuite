@@ -2498,11 +2498,11 @@ namespace HolyLogger
             if (FindVisualParent<System.Windows.Controls.Primitives.DataGridColumnHeader>(
                     e.OriginalSource as DependencyObject) != null) return;
 
-            // NOT OVER THE TWO CALLSIGNS. Those cells are a click that opens QRZ, and they wear the
-            // hand to say so - a wheel that tuned the radio from under a hand would be two different
-            // promises in one place. The rest of the row is the wheel's.
+            // NOT OVER THE DX CALLSIGN. That cell wears the hand, and a wheel that tuned the radio
+            // from under a hand would be two different promises in one place. The rest of the row -
+            // the spotter's callsign with it - is the wheel's.
             DataGridCell under = FindVisualParent<DataGridCell>(e.OriginalSource as DependencyObject);
-            if (under != null && (under.Column == clusterDxColumn || under.Column == clusterSpotterColumn)) return;
+            if (under != null && under.Column == clusterDxColumn) return;
 
             double khz;
             try { khz = (double)Rig.GetRxFrequency() / 1000.0; }
@@ -3341,12 +3341,12 @@ namespace HolyLogger
                 ClearClusterMapHover();
             }
 
-            // THE HAND IS FOR THE TWO CALLSIGNS AND NOTHING ELSE. They are the only cells where a
-            // single click does something - it opens QRZ - and they are the only cells the wheel
-            // keeps out of. The frequency cell needs no single click of its own (the radio is sent
-            // there by a double-click on the row), so it belongs to the wheel like the rest of the
-            // row and wears the wheel's cursor.
-            bool isInteractiveColumn = cell.Column == clusterDxColumn || cell.Column == clusterSpotterColumn;
+            // THE HAND IS FOR THE DX CALLSIGN AND NOTHING ELSE - the station being worked, the one
+            // cell the wheel is kept out of. Everywhere else in the row, the spotter's callsign
+            // included, belongs to the list: it wears the list's pointer and the wheel tunes from it.
+            // A single click on the spotter still opens its QRZ page; the wheel and the click do not
+            // get in each other's way.
+            bool isInteractiveColumn = cell.Column == clusterDxColumn;
             SetClusterListCursor(isInteractiveColumn ? Cursors.Hand : ClusterIdleCursor());
 
             if (cell.Column == clusterDxColumn || cell.Column == clusterSpotterColumn)
