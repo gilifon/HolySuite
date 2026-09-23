@@ -690,6 +690,7 @@ namespace HolyLogger
             clusterWorkedCountries = GetWorkedCountriesFromLog();
             Log.Warn("STARTUP " + Log.SinceLaunch() + "  cluster window: showing");
             clusterWindow.Show();
+            ApplyAlwaysOnTop();   // Options > User Interface > Always on top
 
             // The cluster is up, so the CW keyer may open now if the radio is in CW. It is held back
             // until this point so that a radio already in CW at startup does not put the keyer on the
