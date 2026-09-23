@@ -163,7 +163,7 @@ namespace HolyLogger
                 byte[] received = udp.EndReceive(res, ref remote);
                 listener.FailuresInARow = 0;
 
-                await HandleUdpDatagram(received);
+                await HandleUdpDatagram(received, "UDP port " + listener.Port + " (" + listener.Name + ")");
 
                 // Listen again, unless the port was closed while we worked.
                 if (!_isShutdownCleanupDone && listener.Client != null)
@@ -198,7 +198,7 @@ namespace HolyLogger
         }
 
         // Decides what the datagram is (see the note at the top of this file) and acts on it.
-        private async Task HandleUdpDatagram(byte[] datagram)
+        private async Task HandleUdpDatagram(byte[] datagram, string arrivedOn)
         {
             if (datagram == null || datagram.Length == 0) return;
 
@@ -244,7 +244,7 @@ namespace HolyLogger
             if (data.IndexOf("<app>", StringComparison.OrdinalIgnoreCase) >= 0)
             {
                 if (data.IndexOf("<contactinfo", StringComparison.OrdinalIgnoreCase) >= 0)
-                    await LogQsoFromUdp(data);
+                    await LogQsoFromUdp(data, arrivedOn);
                 return;
             }
 
@@ -253,7 +253,7 @@ namespace HolyLogger
 
             // Nothing recognisable: hand the whole datagram to the reader the old fixed port used, for
             // the programs that send a bare field list with no <eor> at the end.
-            await LogQsoFromUdp(record ?? data);
+            await LogQsoFromUdp(record ?? data, arrivedOn);
         }
 
         // Cuts a single ADIF record out of a datagram: everything after an <eoh> header if there is one,
@@ -284,7 +284,7 @@ namespace HolyLogger
 
         // Reads a contact sent by another program and stores it. This is the body the old fixed UDP
         // port ran, unchanged apart from the duplicate check.
-        private async Task LogQsoFromUdp(string data)
+        private async Task LogQsoFromUdp(string data, string arrivedOn)
         {
             _holyLogParser = new HolyLogParser();
             QSO qso = _holyLogParser.ParseRawQSO(data);
@@ -355,6 +355,11 @@ namespace HolyLogger
                             }
 
                             QSO q = dal.Insert(qso);
+                            // The same line Add writes, so the two kinds of QSO can be told apart in
+                            // the log file afterwards. See _addRequestedBy in MainWindow.xaml.cs.
+                            Log.Warn("QSO logged: " + (qso.DXCall ?? "?") + " " + (qso.Band ?? "?") + " "
+                                     + (qso.Mode ?? "?") + " " + (qso.Date ?? "?") + " " + (qso.Time ?? "?")
+                                     + " | asked for by another program on " + (arrivedOn ?? "a UDP port"));
                             Qsos.Insert(0, q);
                             Properties.Settings.Default.RecentQSOCounter++;
                             isValid = true;

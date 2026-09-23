@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -195,7 +195,7 @@ namespace HolyLogger
                 foreach (string record in newRecords)
                 {
                     if (_isShutdownCleanupDone) return;
-                    try { await LogQsoFromUdp(record); }
+                    try { await LogQsoFromUdp(record, "the watched ADIF file"); }
                     catch (Exception swallowed) { Log.Swallow(swallowed); }
                 }
             }

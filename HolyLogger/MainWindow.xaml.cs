@@ -2054,8 +2054,30 @@ namespace HolyLogger
             return HolyLogParser.BandModeToFreq(band, CB_Mode != null ? CB_Mode.Text : null);
         }
 
+        // WHO ASKED FOR THIS QSO. Not for the operator - he never sees it - but for the log file, so a
+        // report of a contact nobody made can be answered with a fact instead of an argument. A QSO can
+        // reach the database from the Add button, from F1 (in the main window OR forwarded from the
+        // Cluster window), from Enter, from a CW message carrying {LOG}, from the unsaved-QSO question,
+        // or from another program over UDP. Until this line existed, all six looked identical afterwards.
+        //
+        // Set by AddQsoFrom just before the call and read once at the top of AddBtn_Click, so a click on
+        // the button itself - which sets nothing - is correctly reported as the button.
+        private string _addRequestedBy;
+
+        // Every road to Add except the button itself goes through here, so each one names itself.
+        private void AddQsoFrom(string requestedBy)
+        {
+            _addRequestedBy = requestedBy;
+            AddBtn_Click(null, null);
+        }
+
         private void AddBtn_Click(object sender, RoutedEventArgs e)
         {
+            // Taken now and cleared now: whatever happens below, the next Add starts from the button
+            // again unless something names itself.
+            string requestedBy = _addRequestedBy ?? "the Add button";
+            _addRequestedBy = null;
+
             // Work that runs only after the callsign box is empty again - see the end of this method.
             var afterTyping = new List<Action>();
 
@@ -2085,6 +2107,8 @@ namespace HolyLogger
             // an award program matching on it will never find "EU-5". Answering "log it anyway" keeps
             // what was typed - the operator's data is never silently dropped.
             if (!ConfirmActivityBeforeSave()) return;
+            // The same contact twice over, minutes apart, is almost never a contact - see the method.
+            if (!ConfirmNotJustLoggedBeforeSave()) return;
 
             // SET WHEN THE CONTACT DID NOT REACH THE DATABASE, so the form is left exactly as he typed
             // it instead of being emptied at the end of this method. Telling a man his QSO was not saved
@@ -2153,6 +2177,9 @@ namespace HolyLogger
                     lock (_syncLock)
                     {
                         LastQSO = dal.Insert(qso);
+                        Log.Warn("QSO logged: " + (qso.DXCall ?? "?") + " " + (qso.Band ?? "?") + " "
+                                 + (qso.Mode ?? "?") + " " + (qso.Date ?? "?") + " " + (qso.Time ?? "?")
+                                 + " | asked for by " + requestedBy);
                         Qsos.Insert(0, LastQSO);
                         Properties.Settings.Default.RecentQSOCounter++;
                     }
@@ -2752,7 +2779,7 @@ namespace HolyLogger
                 "NO — discard it and " + actionText + ".",
                 "Unsaved QSO", HolyMsgType.Warning, this);
             if (save)
-                AddBtn_Click(null, null);   // add the QSO to the log before the action proceeds
+                AddQsoFrom("the unsaved-QSO question");   // add the QSO to the log before the action proceeds
         }
 
         // Closes whatever log is open and leaves NONE open. Everything SwitchActiveLog does for a real
@@ -3149,7 +3176,7 @@ namespace HolyLogger
 
             if (e.Key == Key.Enter && Properties.Settings.Default.AddQSOWithEnter)
             {
-                AddBtn_Click(null, null);
+                AddQsoFrom("Enter (Add QSO with Enter is on)");
                 return;
             }
 
@@ -4134,7 +4161,7 @@ namespace HolyLogger
         // second kind of QSO.
         internal void LogQsoFromCwMacro()
         {
-            AddBtn_Click(null, null);
+            AddQsoFrom("a CW message carrying {LOG}");
         }
 
         // {WIPE} - the Clear button, reached from a message. N1MM has it too, and it does here what
@@ -11501,6 +11528,104 @@ namespace HolyLogger
             return logItAnyway;
         }
 
+        // THE SAME CONTACT TWICE, MINUTES APART.
+        //
+        // 4X4ZP reported it on 2026-09-23: he logged a station, then spotted it, and a second line for
+        // the same station appeared in his log as if he had worked it again. Nothing in the spotting
+        // code writes a QSO - a contact can only be created by Add or by a UDP port - so something ran
+        // Add a second time over a form that still held the whole contact. Which road it took is now in
+        // the log (see _addRequestedBy); this is the question that stops the line appearing at all.
+        //
+        // The test is the same station, the same band and the same mode within ten minutes OF EACH
+        // OTHER - the QSO times, not the clock, so a man typing an old paper log in the evening is
+        // never asked. Ten minutes because working one station twice on one band in one mode inside
+        // ten minutes is not something that happens; and in a contest it would not count anyway.
+        //
+        // IT ONLY ASKS. There is one honest reason to go ahead - a second genuine contact that really
+        // was made - and the operator is the only one who can know.
+        private bool ConfirmNotJustLoggedBeforeSave()
+        {
+            if (state != State.New) return true;        // editing a QSO is not adding one
+
+            string call = (TB_DXCallsign.Text ?? string.Empty).Trim();
+            if (call.Length == 0) return true;
+
+            string band = BandForLog();
+            string mode = CB_Mode.Text;
+            DateTime when;
+            if (!TryQsoMoment(
+                    TP_Date.Value.HasValue ? TP_Date.Value.Value : DateTime.MinValue,
+                    TP_Time.Value.HasValue ? TP_Time.Value.Value : DateTime.MinValue,
+                    out when)) return true;
+
+            QSO already = null;
+            try
+            {
+                foreach (QSO q in Qsos)
+                {
+                    if (q == null) continue;
+                    if (!CallsignIdentity.Same(q.DXCall, call)) continue;
+                    if (!string.Equals((q.Band ?? string.Empty).Trim(), (band ?? string.Empty).Trim(),
+                                       StringComparison.OrdinalIgnoreCase)) continue;
+                    if (!string.Equals((q.Mode ?? string.Empty).Trim(), (mode ?? string.Empty).Trim(),
+                                       StringComparison.OrdinalIgnoreCase)) continue;
+
+                    DateTime its;
+                    if (!TryQsoMoment(q.Date, q.Time, out its)) continue;
+                    if (Math.Abs((when - its).TotalMinutes) > 10) continue;
+
+                    already = q;
+                    break;
+                }
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); return true; }
+
+            if (already == null) return true;
+
+            int minutes = (int)Math.Round(Math.Abs((when - QsoMomentOrDefault(already, when)).TotalMinutes));
+            string howLongAgo = minutes <= 0 ? "a moment ago" : minutes + (minutes == 1 ? " minute ago" : " minutes ago");
+
+            Log.Warn("Add: " + call + " is already in the log on " + band + " " + mode + " ("
+                     + (already.Date ?? "?") + " " + (already.Time ?? "?") + ") - asking before logging it again.");
+
+            return HolyMessageBox.ShowConfirm(
+                "**" + call.ToUpperInvariant() + "** is already in this log on **" + band + " " + mode
+                + "**, " + howLongAgo + "." + Environment.NewLine + Environment.NewLine
+                + "Log this contact as well?",
+                "Already in the log", HolyMsgType.Warning, this, 0, "Log it as well", "Do not log it");
+        }
+
+        // A QSO's date and time as one moment. Both come from the database as plain digits - the date
+        // as yyyyMMdd, the time as HHmmss or HHmm - and either can be missing or malformed in an old
+        // or imported record, which is what the false is for.
+        private static bool TryQsoMoment(string date, string time, out DateTime moment)
+        {
+            moment = DateTime.MinValue;
+            string d = (date ?? string.Empty).Trim();
+            string t = (time ?? string.Empty).Trim();
+            if (d.Length != 8) return false;
+            if (t.Length == 4) t += "00";
+            if (t.Length != 6) return false;
+            return DateTime.TryParseExact(d + t, "yyyyMMddHHmmss",
+                                          CultureInfo.InvariantCulture,
+                                          DateTimeStyles.None, out moment);
+        }
+
+        // The same, from the two pickers on the entry form.
+        private static bool TryQsoMoment(DateTime date, DateTime time, out DateTime moment)
+        {
+            moment = DateTime.MinValue;
+            if (date == DateTime.MinValue || time == DateTime.MinValue) return false;
+            moment = new DateTime(date.Year, date.Month, date.Day, time.Hour, time.Minute, time.Second);
+            return true;
+        }
+
+        private static DateTime QsoMomentOrDefault(QSO q, DateTime fallback)
+        {
+            DateTime m;
+            return TryQsoMoment(q != null ? q.Date : null, q != null ? q.Time : null, out m) ? m : fallback;
+        }
+
         // Soft HAM-frequency guard on Add (F1). Returns true to let the save proceed, false to stop it.
         // Does nothing unless "Validate for HAM frequency" (Options > General) is ticked; a real amateur
         // band always passes. Otherwise it warns — Yes saves anyway, No stops, and the "here" link stops
@@ -14045,7 +14170,7 @@ namespace HolyLogger
         // Shared by the main window preview and the cluster window so the keys keep responding even
         // when a secondary window (e.g. the Cluster window) has keyboard focus.
         // Ignores auto-repeat for the F5-F8 message keys so a held key doesn't toggle CW on and off.
-        private bool HandleGlobalFunctionKey(Key key, bool isRepeat)
+        private bool HandleGlobalFunctionKey(Key key, bool isRepeat, string fromWindow = "the main window")
         {
             // THE KEYER TAKES ALL TWELVE WHILE IT IS OPEN. That is the set a contester's hands already
             // know from N1MM, and it is why the keyer exists - so F1 is his CQ and not Add QSO for as
@@ -14062,7 +14187,7 @@ namespace HolyLogger
 
             if (key == Key.F1)
             {
-                AddBtn_Click(null, null);
+                AddQsoFrom("F1 in " + fromWindow);
                 return true;
             }
             // F2, F3 AND F4 ARE NOT SHORTCUTS ANY MORE. They went to Options, Spot and the callsign
@@ -14158,7 +14283,7 @@ namespace HolyLogger
         // inherit the global function-key behavior.
         private void ForwardGlobalFunctionKeys(object sender, KeyEventArgs e)
         {
-            if (HandleGlobalFunctionKey(e.Key, e.IsRepeat))
+            if (HandleGlobalFunctionKey(e.Key, e.IsRepeat, "the Cluster window"))
             {
                 e.Handled = true;
             }
@@ -14199,7 +14324,7 @@ namespace HolyLogger
                 }
                 else if (Properties.Settings.Default.AddQSOWithEnter || !Properties.Settings.Default.DoNothing)
                 {
-                    AddBtn_Click(null, null);
+                    AddQsoFrom("Enter in the DX Callsign box");
                     e.Handled = true;
                 }
             }
