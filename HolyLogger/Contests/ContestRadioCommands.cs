@@ -189,7 +189,9 @@ namespace HolyLogger.Contests
         // parameters (unused ones are 00). From Yaesu's own FT-857D OPERATING MANUAL, "CAT OPERATION"
         // appendix, the 16-row opcode chart:
         //   07 = Operating Mode, P1 in byte 1: 08 = FM, 88 = FM-N  -> FM wide = "08 00 00 00 07"
-        //   F9 = Repeater Offset, P1 = 89 for SIMPLEX               -> Simplex = "89 00 00 00 F9"
+        //   09 = Repeater Offset, P1 = 89 for SIMPLEX               -> Simplex = "89 00 00 00 09"
+        //        (F9 is Repeater Offset FREQUENCY - the manual's own example is "05, 43, 21, 00, [F9] =
+        //        5.4321 MHz" - so the old "89 00 00 00 F9" set a 89.000000 MHz shift instead of simplex.)
         //   0A = CTCSS/DCS Mode, P1 = 8A for OFF - the ONE command that turns off both the tone encoder
         //        and the tone/DCS decoder, so No Tone and No TSQL are the same command here, as on the
         //        ID-5100 -> "8A 00 00 00 0A"
@@ -232,7 +234,7 @@ namespace HolyLogger.Contests
             Vfo = "",
             FmWide = "08 00 00 00 07",
             NoAutoRepeater = "",
-            Simplex = "89 00 00 00 F9",
+            Simplex = "89 00 00 00 09",
             NoTone = "8A 00 00 00 0A",
             NoTsql = "8A 00 00 00 0A",
         };
