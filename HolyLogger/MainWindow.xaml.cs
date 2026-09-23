@@ -742,21 +742,18 @@ namespace HolyLogger
             else
                 SetQrzConnected(false); // no network at startup -> QRZ.com is unreachable
 
-            if (Properties.Settings.Default.MatrixWindowIsOpen)
-            {
-                GenerateNewMatrixWindow();
-            }
-            if (Properties.Settings.Default.SignBoardWindowIsOpen)
-            {
-                GenerateNewSignboardWindow();
-            }
             Log.Step("ctor: QRZ login + extra windows");
-            if (Properties.Settings.Default.TimerWindowIsOpen)
-            {
-                GenerateNewTimerWindow();
-            }
-            // (Pinned My Favorite Channels is reopened in MainWindow_Loaded, not here: ChannelsWindow
-            //  sets Owner = this, and WPF refuses to take an owner that has not been shown yet.)
+            // THE MATRIX, THE SIGN BOARD AND THE TIMER ARE NOT OPENED HERE ANY MORE - see
+            // ReopenTheWindowsThatWereLeftOpen, called from MainWindow_Loaded.
+            //
+            // All three set Owner = this, and WPF throws "Cannot set Owner property to a Window that
+            // has not been shown previously" while the main window is still being built. It killed the
+            // whole program before it ever appeared: the exception came out of the constructor, so
+            // HolyLogger could not start AT ALL, at every attempt, for anyone who had closed it with
+            // one of those windows open - the setting that remembers them brought it straight back.
+            // Reported by 4X6OE's friend, whose log shows it on six starts in a row (2026-09-20), and
+            // who could not get in to turn it off. My Favorite Channels was moved out for this same
+            // reason long ago; these three were left behind.
 
             // Ctrl+C: tell every template column what it stands for, or the copy is headings only.
             GridCopy.Enable(QSODataGrid);
@@ -1471,6 +1468,8 @@ namespace HolyLogger
                 try { ShowChannelsWindow(); }
                 catch (Exception swallowed) { Log.Swallow(swallowed); }
             }
+
+            ReopenTheWindowsThatWereLeftOpen();
 
             // The Radio Control Panel comes back if it was left switched on - but NOT before the log
             // itself is on the screen. Opened from Loaded it stood alone on the desktop for the length
@@ -12131,6 +12130,30 @@ namespace HolyLogger
                 GenerateNewTimerWindow();
             }
 
+        }
+
+        // The Matrix, the Sign Board and the Timer come back if they were open when the program was
+        // last closed. HERE, not in the constructor: each one sets Owner = this, and an owner that has
+        // never been shown makes WPF throw - out of the constructor, which took the whole program down
+        // before its window appeared. One that fails now is caught and logged, and the rest still open:
+        // a window nobody can see must never again stop the log itself from coming up.
+        private void ReopenTheWindowsThatWereLeftOpen()
+        {
+            if (Properties.Settings.Default.MatrixWindowIsOpen)
+            {
+                try { GenerateNewMatrixWindow(); }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
+            }
+            if (Properties.Settings.Default.SignBoardWindowIsOpen)
+            {
+                try { GenerateNewSignboardWindow(); }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
+            }
+            if (Properties.Settings.Default.TimerWindowIsOpen)
+            {
+                try { GenerateNewTimerWindow(); }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
+            }
         }
 
         private void GenerateNewSignboardWindow()
