@@ -39,7 +39,6 @@ namespace HolyLogger.OptionsUserControls
         {
             if (!IsLoaded) return;
             HasChanged = true;
-            UpdateMapDisplayModeUI();   // greys (or frees) "Map" in the Graphics Box
             // The two-way binding has already written the setting; the main window reads it from there.
             ShowMapWindowChanged?.Invoke(this, EventArgs.Empty);
         }
@@ -66,6 +65,20 @@ namespace HolyLogger.OptionsUserControls
         private void HasChanged_Click(object sender, RoutedEventArgs e)
         {
             HasChanged = true;
+        }
+
+        // "Always on top", one tick per window. The two-way binding has already written the setting;
+        // the main window reads them all and puts each window it has open where the ticks say.
+        private void AlwaysOnTop_Changed(object sender, RoutedEventArgs e)
+        {
+            HasChanged = true;
+            try
+            {
+                Properties.Settings.Default.Save();
+                var main = Application.Current != null ? Application.Current.MainWindow as MainWindow : null;
+                if (main != null) main.ApplyAlwaysOnTop();
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
         }
 
         private void ShowPhotoFromQRZ_Click(object sender, RoutedEventArgs e)
@@ -272,7 +285,7 @@ namespace HolyLogger.OptionsUserControls
             else if (RB_MapDisplay_CustomImage.IsChecked == true)
                 mode = 3;
             else
-                mode = 0; // Map
+                mode = -1; // nothing picked: Empty
 
             // Update the display mode setting
             if (Properties.Settings.Default.MapAreaDisplayMode != mode)
@@ -338,22 +351,9 @@ namespace HolyLogger.OptionsUserControls
             // automatically select Map instead
             if (!showPhotoFromQRZ && RB_MapDisplay_QRZPhoto.IsChecked == true)
             {
-                RB_MapDisplay_Map.IsChecked = true;
-                Properties.Settings.Default.MapAreaDisplayMode = 0; // Map
-                Properties.Settings.Default.Save();
-            }
-
-            // "Map" in the Graphics Box means "keep this area free for the map". With the map window
-            // switched off there is nothing to keep it free for, so the choice is greyed, and if it
-            // was the one picked the area goes to Empty.
-            bool showMap = CBX_ShowMapWindow.IsChecked == true;
-            RB_MapDisplay_Map.IsEnabled = showMap;
-            if (!showMap && RB_MapDisplay_Map.IsChecked == true)
-            {
                 RB_MapDisplay_None.IsChecked = true;
                 Properties.Settings.Default.MapAreaDisplayMode = -1; // Empty
                 Properties.Settings.Default.Save();
-                GraphicsBoxModeChanged?.Invoke(this, EventArgs.Empty);
             }
 
             // Enable/disable custom image path controls based on selection
@@ -368,8 +368,9 @@ namespace HolyLogger.OptionsUserControls
             bool isShowAzimuth = Properties.Settings.Default.IsShowAzimuthControl;
             int mode = Properties.Settings.Default.MapAreaDisplayMode;
 
-            // If graphics box is hidden via old checkbox setting, select "None"
-            if (!isShowAzimuth || mode == -1)
+            // If graphics box is hidden via old checkbox setting, or the setting still says Map (a
+            // choice that no longer exists), select "Empty".
+            if (!isShowAzimuth || mode == -1 || mode == 0)
             {
                 RB_MapDisplay_None.IsChecked = true;
             }
@@ -388,7 +389,7 @@ namespace HolyLogger.OptionsUserControls
                         RB_MapDisplay_CustomImage.IsChecked = true;
                         break;
                     default:
-                        RB_MapDisplay_Map.IsChecked = true;
+                        RB_MapDisplay_None.IsChecked = true;
                         break;
                 }
             }

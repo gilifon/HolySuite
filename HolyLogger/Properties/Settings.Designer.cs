@@ -3433,6 +3433,79 @@ namespace HolyLogger.Properties {
                 this["ShowRadioControlPanel"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool TopmostMainWindow {
+            get {
+                return ((bool)(this["TopmostMainWindow"]));
+            }
+            set {
+                this["TopmostMainWindow"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool TopmostCluster {
+            get {
+                return ((bool)(this["TopmostCluster"]));
+            }
+            set {
+                this["TopmostCluster"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool TopmostControlPanel {
+            get {
+                return ((bool)(this["TopmostControlPanel"]));
+            }
+            set {
+                this["TopmostControlPanel"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool TopmostChannels {
+            get {
+                return ((bool)(this["TopmostChannels"]));
+            }
+            set {
+                this["TopmostChannels"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool TopmostCwKeyer {
+            get {
+                return ((bool)(this["TopmostCwKeyer"]));
+            }
+            set {
+                this["TopmostCwKeyer"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool TopmostQrzPhoto {
+            get {
+                return ((bool)(this["TopmostQrzPhoto"]));
+            }
+            set {
+                this["TopmostQrzPhoto"] = value;
+            }
+        }
+        
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]

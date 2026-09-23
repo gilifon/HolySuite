@@ -938,9 +938,8 @@ namespace HolyLogger
                     CompassBorder.Visibility = Visibility.Visible;
                     UpdateCompassDisplay();
                     break;
-                case 2: // QRZ Photo
-                    QRZGraphicsBorder.Visibility = Visibility.Visible;
-                    LoadCurrentQRZPhotoToGraphicsBox();
+                case 2: // QRZ Photo - in the box, or in its own window if a pinned map has the box
+                    ApplyQrzPhotoPlacement();
                     break;
                 case 3: // Custom Image
                     CustomGraphicsBorder.Visibility = Visibility.Visible;
@@ -952,6 +951,47 @@ namespace HolyLogger
                 default:
                     MapDisabledPanel.Visibility = Visibility.Visible;
                     break;
+            }
+        }
+
+        // WHERE THE QRZ PHOTO GOES. The operator picked "Photo from QRZ.com" for the picture area, but
+        // a PINNED map lies exactly over that area and hides it. Pinning wins - it is the later, more
+        // deliberate act - so the photo moves out into its own window, the same one that shows it when
+        // the area is given to something else, at the place and size it was left at. Unpin the map and
+        // the photo goes straight back into the area and that window closes.
+        private bool QrzPhotoFitsInBox =>
+            Properties.Settings.Default.IsShowAzimuthControl
+            && Properties.Settings.Default.MapAreaDisplayMode == 2
+            && !(_mapWindow != null && _mapWindow.IsVisible && _mapWindow.IsPinned);
+
+        private void ApplyQrzPhotoPlacement()
+        {
+            // Only the photo setting is moved out of the way by a pinned map. The compass and a custom
+            // image stay where they are; the operator said so.
+            if (Properties.Settings.Default.MapAreaDisplayMode != 2) return;
+            if (!Properties.Settings.Default.IsShowAzimuthControl) return;
+
+            if (QrzPhotoFitsInBox)
+            {
+                QRZGraphicsBorder.Visibility = Visibility.Visible;
+                MapDisabledPanel.Visibility = Visibility.Collapsed;
+                LoadCurrentQRZPhotoToGraphicsBox();
+                if (qrzPhotoWindow != null)
+                {
+                    SaveQrzPhotoWindowBounds(qrzPhotoWindow);
+                    qrzPhotoWindow.Close();      // its Closed handler nulls it
+                }
+                return;
+            }
+
+            // The map has the area: leave it empty underneath and put the photo in its own window.
+            QRZGraphicsBorder.Visibility = Visibility.Collapsed;
+            Img_QRZGraphics.Source = null;
+            MapDisabledPanel.Visibility = Visibility.Visible;
+            if (!string.IsNullOrWhiteSpace(currentQrzImageUrl))
+            {
+                try { ShowQrzPhotoWindow(currentQrzImageUrl); }
+                catch (System.Exception swallowed) { Log.Swallow(swallowed); }
             }
         }
 
@@ -1564,6 +1604,10 @@ namespace HolyLogger
             // check adds the contacts made while HolyLogger was closed (MainWindow.AdifMonitor.cs).
             Dispatcher.BeginInvoke(new Action(ApplyAdifMonitors),
                                    System.Windows.Threading.DispatcherPriority.Background);
+
+            // Options > User Interface > Always on top: the main window and whatever is already open.
+            // Each window applies it again as it is built, so one opened later comes up the same way.
+            ApplyAlwaysOnTop();
 
             Log.Step("loaded: END of the startup work");
 
@@ -4693,6 +4737,7 @@ namespace HolyLogger
             // Where the radio is listening, so the CQ button can tell a frequency it has already called
             // on from one it has only just arrived at - see ShouldAskQrl.
             cwKeyboard.RadioFrequencyHz = RxFrequencyHz;
+            ApplyAlwaysOnTop();   // Options > User Interface > Always on top
 
             cwKeyboard.Closed += (s, e) =>
             {
@@ -11591,6 +11636,37 @@ namespace HolyLogger
 
         private ChannelsWindow _channelsWindow;
 
+        // ── ABOVE EVERY OTHER PROGRAM ───────────────────────────────────────────────────────────
+        //
+        // Options > User Interface > "Always on top", one tick per window. Topmost, not Owner: Owner
+        // only holds a window above HolyLogger's own, and what he asked for is above the browser and
+        // the digital-mode programs as well.
+        //
+        // A TICK EACH, deliberately, and every one off by default. Topmost is heavy-handed - the QRZ
+        // photo window was Topmost once and buried the Channels window, which then could not be raised
+        // by clicking and had no title bar left to drag (see ShowQrzPhotoWindow). One window at a time,
+        // chosen by the operator, is the safe version of that.
+        //
+        // Called when a tick changes and when each window is built, so a window opened later comes up
+        // the way the ticks say. A window that is not open is simply skipped.
+        internal void ApplyAlwaysOnTop()
+        {
+            var s = Properties.Settings.Default;
+            SetTopmost(this, s.TopmostMainWindow);
+            SetTopmost(clusterWindow, s.TopmostCluster);
+            SetTopmost(radioPanel, s.TopmostControlPanel);
+            SetTopmost(_channelsWindow, s.TopmostChannels);
+            SetTopmost(cwKeyboard, s.TopmostCwKeyer);
+            SetTopmost(qrzPhotoWindow, s.TopmostQrzPhoto);
+        }
+
+        private static void SetTopmost(Window w, bool on)
+        {
+            if (w == null) return;
+            try { if (w.Topmost != on) w.Topmost = on; }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
         // Opening from the menu ALWAYS starts unpinned. Pinning is a deliberate act that means "bring
         // this back next time"; it must never be inherited just because the window was opened again.
         // Only the pin button itself turns it on, and only the startup path below opens it still pinned.
@@ -11623,6 +11699,7 @@ namespace HolyLogger
                 catch { _channelsWindow = null; }
             }
             _channelsWindow = new ChannelsWindow(this);
+            ApplyAlwaysOnTop();   // Options > User Interface > Always on top
             _channelsWindow.Closed += (s, ev) => _channelsWindow = null;
             _channelsWindow.Show();
         }
@@ -15151,14 +15228,13 @@ namespace HolyLogger
                 // Track current QRZ image URL
                 currentQrzImageUrl = normalized;
 
-                // Update graphics box if in QRZ Photo mode
-                if (Properties.Settings.Default.MapAreaDisplayMode == 2)
+                // Into the picture area when the photo is what that area is showing - and into its own
+                // window when it is not, or when a pinned map is lying over the area (QrzPhotoFitsInBox).
+                if (QrzPhotoFitsInBox)
                 {
                     LoadCurrentQRZPhotoToGraphicsBox();
                 }
-
-                // Show separate photo window only if NOT showing in graphics box
-                if (Properties.Settings.Default.MapAreaDisplayMode != 2)
+                else
                 {
                     ShowQrzPhotoWindow(normalized);
                 }
@@ -15286,6 +15362,7 @@ namespace HolyLogger
             if (qrzPhotoWindow == null)
             {
                 qrzPhotoWindow = new QRZPhotoWindow();
+                ApplyAlwaysOnTop();   // Options > User Interface > Always on top
                 // Owner alone keeps the photo above the MAIN window, which is all it ever needed.
                 // It used to be Topmost as well, which put it above every OTHER window too - the
                 // Channels window could not be raised over it by clicking, and its custom title bar

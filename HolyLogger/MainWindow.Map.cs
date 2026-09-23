@@ -396,6 +396,7 @@ namespace HolyLogger
             map.SpotHovered += OnMapSpotHovered;
             map.SpotHoverEnded += OnMapSpotHoverEnded;
             _mapWindow.ClosedByOperator += () => MapMenuItem.IsChecked = false;
+            _mapWindow.PlacementChanged += ApplyQrzPhotoPlacement;
             MapMenuItem.IsChecked = Properties.Settings.Default.ShowMapWindow;
 
             // THE MAP COMES UP AT EVERY START unless Options > User Interface > "Show the map window"
@@ -486,6 +487,10 @@ namespace HolyLogger
         // The X, pressed by the operator. The main window keeps its View > Map tick in step.
         public event Action ClosedByOperator;
 
+        // Pinned, unpinned, shown or hidden: the picture area of the main window has just been taken
+        // over or given back, and what the operator chose to have there has to follow.
+        public event Action PlacementChanged;
+
         public MapWindow(Window main, FrameworkElement pinArea)
         {
             _main = main;
@@ -559,12 +564,14 @@ namespace HolyLogger
                 finally { if (maximized) ShowActivated = false; }
             }
             if (!_pinned) WindowBounds.KeepOnScreen(this);
+            PlacementChanged?.Invoke();
         }
 
         public void HideMap()
         {
             SaveFloating();
             Hide();
+            PlacementChanged?.Invoke();
         }
 
         // Called by the main window as the program closes: from here on a close is a real one.
@@ -602,6 +609,8 @@ namespace HolyLogger
                 if (pinned && !floating.IsEmpty) WindowBounds.SaveRect(BoundsKey, floating);
                 else { try { Properties.Settings.Default.Save(); } catch (Exception swallowed) { Log.Swallow(swallowed); } }
             }), System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+
+            PlacementChanged?.Invoke();
         }
 
         // ── OUT OF SIGHT WHILE IT CHANGES SHAPE ───────────────────────────────────────────────

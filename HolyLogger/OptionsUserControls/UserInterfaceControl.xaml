@@ -53,7 +53,7 @@
         </GroupBox>
         <!-- Placed below the Color Theme box; the options pages sit in a ScrollViewer, so content
              past the design height is reachable rather than cut off. -->
-        <GroupBox Header="Log and Search tables" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,586,0,0" Width="360" FontSize="16">
+        <GroupBox Header="Log and Search tables" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,602,0,0" Width="360" Height="137" FontSize="16">
             <StackPanel Margin="10,6,10,8">
                 <!-- Same wording and the same RowLotwBg sample as the cluster's own checkbox, because
                      it is the same mark in the same colour, just applied to the log tables. -->
@@ -67,17 +67,19 @@
                            Foreground="{DynamicResource MutedTextBrush}"/>
             </StackPanel>
         </GroupBox>
-        <GroupBox Header="Color Theme" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,442,0,0" Width="360" FontSize="16">
+        <GroupBox Header="Color Theme" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,444,0,0" Width="360" Height="148" FontSize="16">
             <TextBlock Margin="6,8" FontSize="16" TextWrapping="Wrap"
                        Text="All application colors (form background, table headers, contest frames, …) are now edited in one place: View  ›  Color Scheme  ›  Customize Colors."/>
         </GroupBox>
         <!-- No fixed Height: five radio buttons, a path box and a Browse button at 16pt come to
              more than the 220 this was pinned at, and the button was sliced in half. Sized to its
              own content, it cannot be outgrown by its contents again. -->
-        <GroupBox Header="Graphics Box" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="370,0,0,0" Width="300" FontSize="16">
+        <GroupBox Header="Graphic Box when Map Unpinned" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="370,0,0,0" Width="300" FontSize="16">
             <StackPanel Margin="10">
                 <RadioButton x:Name="RB_MapDisplay_None" Content="Empty" GroupName="MapDisplay" FontSize="16" Margin="0,2" Checked="MapDisplayMode_Changed"/>
-                <RadioButton x:Name="RB_MapDisplay_Map" Content="Map" GroupName="MapDisplay" FontSize="16" Margin="0,2" Checked="MapDisplayMode_Changed"/>
+                <!-- "Map" is gone from this list. The map has its own window now; picking it here only
+                     left the area empty, which is what "Empty" already does. An old setting that says
+                     Map is read as Empty (LoadMapDisplayModeSettings). -->
                 <RadioButton x:Name="RB_MapDisplay_Compass" Content="Compass" GroupName="MapDisplay" FontSize="16" Margin="0,2" Checked="MapDisplayMode_Changed"/>
                 <RadioButton x:Name="RB_MapDisplay_QRZPhoto" Content="Photo from QRZ.com" GroupName="MapDisplay" FontSize="16" Margin="0,2" Checked="MapDisplayMode_Changed"/>
                 <RadioButton x:Name="RB_MapDisplay_CustomImage" Content="Custom image" GroupName="MapDisplay" FontSize="16" Margin="0,2" Checked="MapDisplayMode_Changed"/>
@@ -88,7 +90,10 @@
         <!-- NO FIXED HEIGHT: it hugs what it holds. The 178 was sized when this box also carried
              "Plot spots on map", which moved to the Cluster window's gear and left the empty band
              under the last radio button behind it. -->
-        <GroupBox Header="Map" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="370,250,0,0" Width="300" FontSize="16">
+        <!-- Height 184 is not what this box needs (176) but what lines its bottom up with the box to its
+             left, which ends at 434. The three rows of boxes across the two columns are set as pairs:
+             same top, same height, and the height is the taller of the two so neither is cut off. -->
+        <GroupBox Header="Map" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="370,250,0,0" Width="300" Height="184" FontSize="16">
             <StackPanel Margin="10">
                 <!-- THE ONLY WAY TO BE WITHOUT THE MAP FOR GOOD. Its window's X (and View > Map) hide
                      it until the next start; this is the one place that keeps it away. Acts at once. -->
@@ -106,7 +111,9 @@
         </GroupBox>
         <!-- Only whether the cluster RUNS and whether its window SHOWS live here. Everything about how
              the cluster looks/behaves is in the Cluster window's gear (Cluster Settings). -->
-        <GroupBox Header="Cluster" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="370,486,0,0" Width="330" Height="146" FontSize="16">
+        <!-- No fixed height: narrowed from 330 to 300 to match the boxes above, the note below the two
+             ticks wraps onto another line, and a pinned 146 would have cut it off. -->
+        <GroupBox Header="Cluster" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="370,444,0,0" Width="300" Height="148" FontSize="16">
             <StackPanel Margin="10">
                 <CheckBox x:Name="CBX_ClusterActive" Content="Active" FontSize="16" Margin="0,2" Checked="ClusterActive_Changed" Unchecked="ClusterActive_Changed"/>
                 <CheckBox x:Name="CBX_ClusterVisible" Content="Visible" FontSize="16" Margin="0,2" Checked="ClusterVisible_Changed" Unchecked="ClusterVisible_Changed"/>
@@ -114,15 +121,48 @@
                            TextWrapping="Wrap" Margin="0,8,0,0" Foreground="{DynamicResource MutedTextBrush}"/>
             </StackPanel>
         </GroupBox>
-        <!-- Below the Cluster box (which ends at y=632), in the right-hand column. Both moved down 50 when
-             the Map box above gained "Show the map window" and its note. -->
-        <GroupBox Header="Radio Control Panel" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="370,640,0,0" Width="330" FontSize="16">
+        <!-- Its BOTTOM lines up with "Log and Search tables" in the left column, which ends at
+             y=721; this box is 114 high, so it starts at 607. Measured, not guessed - the frames
+             are placed by hand here, and the Cluster box above had been put 16 px INSIDE the Map
+             box the same way. -->
+        <GroupBox Header="Radio Control Panel" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="370,602,0,0" Width="300" Height="137" FontSize="16">
             <StackPanel Margin="10,6,10,8">
                 <CheckBox x:Name="CBX_ShowRadioControlPanel" Content="Show Control Panel" FontSize="16" Margin="0,2"
                           IsChecked="{Binding Default.ShowRadioControlPanel, Source={StaticResource Settings}, Mode=TwoWay}"
                           Checked="ShowRadioControlPanel_Changed" Unchecked="ShowRadioControlPanel_Changed"/>
                 <TextBlock Text="A small window with buttons to set the Radio Bands and Modes."
                            FontSize="16" TextWrapping="Wrap" Margin="0,6,0,0"
+                           Foreground="{DynamicResource MutedTextBrush}"/>
+            </StackPanel>
+        </GroupBox>
+
+        <!-- A THIRD COLUMN. Owner keeps a window above HolyLogger's own; this is Topmost, which keeps
+             it above EVERY program - the browser, WSJT-X, anything. One tick per window and all of
+             them off to start with, because Topmost is heavy-handed: the QRZ photo window was Topmost
+             once and buried the Channels window, which could then neither be clicked to the front nor
+             dragged by a title bar that was underneath it. Acts at once, on the windows already open. -->
+        <GroupBox Header="Always on top" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="680,0,0,0" Width="250" FontSize="16">
+            <StackPanel Margin="10,6,10,8">
+                <CheckBox x:Name="CBX_TopMain" Content="Main window" FontSize="16" Margin="0,2"
+                          IsChecked="{Binding Default.TopmostMainWindow, Source={StaticResource Settings}, Mode=TwoWay}"
+                          Checked="AlwaysOnTop_Changed" Unchecked="AlwaysOnTop_Changed"/>
+                <CheckBox x:Name="CBX_TopCluster" Content="Cluster" FontSize="16" Margin="0,2"
+                          IsChecked="{Binding Default.TopmostCluster, Source={StaticResource Settings}, Mode=TwoWay}"
+                          Checked="AlwaysOnTop_Changed" Unchecked="AlwaysOnTop_Changed"/>
+                <CheckBox x:Name="CBX_TopControlPanel" Content="Control Panel" FontSize="16" Margin="0,2"
+                          IsChecked="{Binding Default.TopmostControlPanel, Source={StaticResource Settings}, Mode=TwoWay}"
+                          Checked="AlwaysOnTop_Changed" Unchecked="AlwaysOnTop_Changed"/>
+                <CheckBox x:Name="CBX_TopChannels" Content="My Favorite Channels" FontSize="16" Margin="0,2"
+                          IsChecked="{Binding Default.TopmostChannels, Source={StaticResource Settings}, Mode=TwoWay}"
+                          Checked="AlwaysOnTop_Changed" Unchecked="AlwaysOnTop_Changed"/>
+                <CheckBox x:Name="CBX_TopCwKeyer" Content="CW keyer" FontSize="16" Margin="0,2"
+                          IsChecked="{Binding Default.TopmostCwKeyer, Source={StaticResource Settings}, Mode=TwoWay}"
+                          Checked="AlwaysOnTop_Changed" Unchecked="AlwaysOnTop_Changed"/>
+                <CheckBox x:Name="CBX_TopQrzPhoto" Content="QRZ photo" FontSize="16" Margin="0,2"
+                          IsChecked="{Binding Default.TopmostQrzPhoto, Source={StaticResource Settings}, Mode=TwoWay}"
+                          Checked="AlwaysOnTop_Changed" Unchecked="AlwaysOnTop_Changed"/>
+                <TextBlock Text="A ticked window stays above other programs, not only above HolyLogger."
+                           FontSize="16" TextWrapping="Wrap" Margin="0,8,0,0"
                            Foreground="{DynamicResource MutedTextBrush}"/>
             </StackPanel>
         </GroupBox>
