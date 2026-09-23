@@ -471,7 +471,23 @@ namespace HolyLogger
             }
             catch (Exception e)
             {
-                Log.Warn("OmniRig could not be started: " + e.GetType().Name + ": " + e.Message);
+                // SAID ONCE, NOT FORTY-FOUR TIMES. 4X6OE's log carried the same line 44 times in one
+                // day - StartOmniRig runs at every start and every time the CAT setting is touched -
+                // which buries everything else in the log. The first one is written in full; the ones
+                // after it are counted, and only every twentieth says the fault is still there.
+                string what = e.GetType().Name + ": " + e.Message;
+                if (!string.Equals(what, _lastOmniRigFailure, StringComparison.Ordinal))
+                {
+                    _lastOmniRigFailure = what;
+                    _omniRigFailureRepeats = 0;
+                    Log.Warn("OmniRig could not be started: " + what);
+                }
+                else if (++_omniRigFailureRepeats % 20 == 0)
+                {
+                    Log.Warn("OmniRig still could not be started - the same fault, "
+                             + _omniRigFailureRepeats + " more times.");
+                }
+
                 OmniRigEngine = null;
                 Status = "Not installed";
 
@@ -484,14 +500,59 @@ namespace HolyLogger
                 //
                 // Only reached when CAT is switched ON in Options, so an operator with no radio
                 // interface is never shown it.
-                ReportOmniRigProblem(
-                    "HolyLogger could not start OmniRig, so radio control (CAT) will not work.\n\n"
-                    + "Reason: " + e.Message + "\n\n"
-                    + "OmniRig is a separate free program that HolyLogger uses to talk to the radio. If "
-                    + "it is not installed, install it and start HolyLogger again. If you do not use a "
-                    + "radio interface, switch CAT off in Options > General and this will not come back.");
+                ReportOmniRigProblem(OmniRigProblemText(e));
             }
         }
+
+        // WHAT WENT WRONG, AND WHAT TO DO ABOUT IT - in the message itself, so the operator can put it
+        // right without writing to anybody.
+        //
+        // The old text said "if it is not installed, install it" whatever had happened. 4X6OE read that
+        // with OmniRig installed and working for his other logger, and it told him nothing: his real
+        // fault was that OmniRig is set to run as administrator, and Windows will not let a program
+        // that is not elevated start one that is. Windows says which it is in the error code; these two
+        // are the ones that reach real operators.
+        private static string OmniRigProblemText(Exception e)
+        {
+            const int RequiresElevation = unchecked((int)0x800702E4);
+            const int ClassNotRegistered = unchecked((int)0x80040154);
+
+            string head = "HolyLogger could not start OmniRig, so radio control (CAT) will not work.\n\n";
+            string tail = "\n\nIf you do not use a radio interface, switch CAT off in "
+                        + "Options > General and this will not come back.";
+
+            int hr = e is System.Runtime.InteropServices.COMException com ? com.HResult : 0;
+
+            if (hr == RequiresElevation)
+                return head
+                    + "OmniRig on this computer is set to run as administrator, and Windows does not "
+                    + "let HolyLogger start it.\n\n"
+                    + "To put it right:\n"
+                    + "1. Find OmniRig.exe - usually in C:\\Program Files (x86)\\Afreet\\OmniRig\n"
+                    + "2. Right-click it and choose Properties, then the Compatibility tab.\n"
+                    + "3. Untick \"Run this program as an administrator\".\n"
+                    + "4. If there is a \"Change settings for all users\" button, untick it there too.\n"
+                    + "5. Restart the computer, then start HolyLogger."
+                    + tail;
+
+            if (hr == ClassNotRegistered)
+                return head
+                    + "Windows cannot find OmniRig on this computer.\n\n"
+                    + "OmniRig is a separate free program that HolyLogger uses to talk to the radio, "
+                    + "and HolyLogger works with OmniRig version 1. Install it, then start HolyLogger "
+                    + "again."
+                    + tail;
+
+            return head
+                + "Reason: " + e.Message + "\n\n"
+                + "OmniRig is a separate free program that HolyLogger uses to talk to the radio. If it "
+                + "is not installed, install it and start HolyLogger again."
+                + tail;
+        }
+
+        // See the catch in StartOmniRig: the same fault is written to the log once, not every time.
+        private string _lastOmniRigFailure;
+        private int _omniRigFailureRepeats;
 
         // SAID ONCE IN A RUN. StartOmniRig is called again every time the CAT setting is touched, and a
         // message box that comes back on every visit to Options is a message box nobody reads.
@@ -986,6 +1047,7 @@ namespace HolyLogger
                 if (radioPanel == null)
                 {
                     radioPanel = new RadioControlPanelWindow(this);
+                    ApplyAlwaysOnTop();   // Options > User Interface > Always on top
                     try { radioPanel.Owner = this; } catch (Exception swallowed) { Log.Swallow(swallowed); }
                     radioPanel.Closed += RadioPanel_Closed;
                     radioPanel.Show();
