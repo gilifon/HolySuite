@@ -1,0 +1,59 @@
+QST de W1AW
+
+Propagation Forecast Bulletin 38 ARLP038
+
+From ARRL Headquarters
+
+Newington, CT  September 17, 2026
+
+To all radio amateurs
+
+ 
+
+SB PROP ARL ARLP038
+
+ARLP038 The ARRL Solar Report
+
+ 
+
+Solar flare activity is expected to remain at very low levels, with a chance for isolated C-class flares through September 19, according to NOAA's Space Weather Prediction Center (SWPC). Solar wind speed was steady near 530 km/s, and negative polarity CH HSS (coronal hole high-speed stream) effects are anticipated to persist through September 18, with additional enhancements likely today due to flanking influences from CMEs (coronal mass ejections) that departed the Sun on September 13 and 14. Geomagnetic activity is expected to reach active to G1 (minor) storm levels today due to combined CH and CME influences.
+Unsettled to active conditions are likely on September 18-19 as
+
+enhancements wane.
+
+ 
+
+The Australian Space Weather Forecasting Centre reports that there are currently three numbered sunspot regions on the solar disk, and that all three are stable.
+No flares are expected over the next several days.
+The global HF propagation forecast for middle latitudes is normal to fair today, followed by normal propagation in the days that follow.
+
+ 
+
+Weekly Commentary on the Sun, the agnetosphere, and the Earth's Ionosphere, September 17, 2026, by F. K. Janda, OK1HH:
+
+ 
+
+On the solar disc, we observe not only a small number of sunspot groups.
+These groups are also relatively small and their magnetic structure is fairly simple.
+As a result, eruptive activity - including coronal mass ejections - is low. Although these phenomena do occur from time to time, they have had no impact on Earth recently.
+It is mainly the streams of high-speed solar wind that, upon entering the Earth's atmosphere, cause an increase in geomagnetic activity and can therefore be predicted more accurately.
+
+ 
+
+An increase in solar activity is not expected in the foreseeable future.
+The current slightly higher geomagnetic activity should be followed by a period of calm.
+The next period of higher geomagnetic activity is not expected until around the equinox; during that time, conditions for shortwave propagation through the ionosphere should be above average, although - due to low solar activity - this will not apply to the shortest shortwave bands.
+
+ 
+
+The latest report from Dr. Tamitha Skov, WX6SWW, can be found at https://www.youtube.com/watch?v=wdaQau3mlnk
+The Predicted Planetary A Index for September 18 to September 23 is 10, 5, 5, 5, 4, and 4 with a mean of 5.5. The Predicted Planetary K Index is 3, 2, 2, 2, 2, and 2 with a mean of 2.2. 10.7 centimeter flux is 90, 90, 95, 100, 110, and 105 with a mean of 98.3.
+
+ 
+
+For more information concerning shortwave radio propagation, see www.arrl.org/propagation
+and the ARRL Technical Information Service web page at www.arrl.org/propagation-of-rf-signals. For an explanation of numbers used in this bulletin, see www.arrl.org/the-sun-the-earth-the-ionosphere. Information and tutorials on propagation can be found at http://k9la.us.
+
+ 
+
+Also, check this: "Understanding Solar Indices" from September 2002 QST. https://bit.ly/3Rc8Njt

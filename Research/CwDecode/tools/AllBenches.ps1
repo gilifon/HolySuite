@@ -36,7 +36,7 @@ $bulletin = Join-Path $tools "..\training\w1aw\20260915-bulletin0000"
 $own = Join-Path $recordings "4z5sl"
 $own2 = Join-Path $recordings "4z5sl2"
 $own3 = Join-Path $recordings "4z5sl3"
-$py = "C:\Users\user\AppData\Local\Temp\claude\D--Dropbox-LAB-X230-PC-Holysuit-clone-HolySuite\2f8ddf56-5512-4cdb-af92-2976c1b4bafc\scratchpad\pyenv\Scripts\python.exe"
+$py = Join-Path $PSScriptRoot "..\training\pyenv\Scripts\python.exe"     # its own Python - the one in the session scratchpad was wiped
 $csc = "C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
 $src = [System.IO.File]::ReadAllText((Join-Path $app "CwDecoder.cs"))
 

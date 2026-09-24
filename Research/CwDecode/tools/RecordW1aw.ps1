@@ -15,7 +15,7 @@ param(
 )
 
 $tools = $PSScriptRoot
-$py = "C:\Users\user\AppData\Local\Temp\claude\D--Dropbox-LAB-X230-PC-Holysuit-clone-HolySuite\2f8ddf56-5512-4cdb-af92-2976c1b4bafc\scratchpad\pyenv\Scripts\python.exe"
+$py = Join-Path $PSScriptRoot "..\training\pyenv\Scripts\python.exe"     # its own Python - the one in the session scratchpad was wiped
 $day = (Get-Date).ToUniversalTime().ToString("yyyyMMdd")
 $dir = Join-Path $tools "..\training\w1aw\$day-$Name"
 New-Item -ItemType Directory -Force $dir | Out-Null

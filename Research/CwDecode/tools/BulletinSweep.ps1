@@ -20,7 +20,7 @@ $build = Join-Path $tools "..\build"
 $app = Join-Path $tools "..\..\..\HolyLogger"
 $recordings = Join-Path $tools "..\recordings"
 $bulletin = Join-Path $tools "..\training\w1aw\20260915-bulletin0000"
-$py = "C:\Users\user\AppData\Local\Temp\claude\D--Dropbox-LAB-X230-PC-Holysuit-clone-HolySuite\2f8ddf56-5512-4cdb-af92-2976c1b4bafc\scratchpad\pyenv\Scripts\python.exe"
+$py = Join-Path $PSScriptRoot "..\training\pyenv\Scripts\python.exe"     # its own Python - the one in the session scratchpad was wiped
 $csc = "C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
 
 $src = [System.IO.File]::ReadAllText((Join-Path $app "CwDecoder.cs"))
