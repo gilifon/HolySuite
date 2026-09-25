@@ -5398,6 +5398,11 @@ namespace HolyLogger
         {
             if (!CwByPort) { ClosePortKeyer(); return null; }
 
+            // NOT WHILE CLOSING. The log showed the port opened again a fifth of a second after
+            // shutdown had released it - a timer still asking whether CW could be sent - followed by
+            // three ObjectDisposedExceptions. Once the program is going, the port stays shut.
+            if (_isShutdownCleanupDone) return null;
+
             string port = (Properties.Settings.Default.CwKeyPort ?? string.Empty).Trim();
             bool rts = string.Equals(Properties.Settings.Default.CwKeyLine, "RTS", StringComparison.OrdinalIgnoreCase);
 
@@ -5517,6 +5522,23 @@ namespace HolyLogger
         {
             ClosePortKeyer();
             portCwKeyerTrouble = null;
+
+            // A CHANGE IN OPTIONS IS NOT THE RADIO GOING INTO CW. The keyer window opens by itself on the
+            // edge into "CW and able to send" (see UpdateVoiceMessageAvailabilityState), and choosing a
+            // port moved that edge: the keyer - owned by the main window - came up, and the main window
+            // jumped in front of Options while he was still choosing. So the edge is set to where it now
+            // stands before that runs, and nothing opens or closes because of a setting.
+            try
+            {
+                bool isCw = IsCwModeActive();
+                bool voice = TryGetVoiceMessageAvailability(out _, out _);
+                bool canSend = voice
+                               || (isCw && CwByPort && PortKeyer() != null)
+                               || (isCw && !CwByPort && Properties.Settings.Default.EnableOmniRigCAT && OmniRigEngine != null
+                                   && Rig != null && Rig.Status == OmniRig.RigStatusX.ST_ONLINE);
+                _cwKeyboardWasWanted = isCw && canSend && !Properties.Settings.Default.isManualMode;
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
 
             try
             {
@@ -11703,7 +11725,16 @@ namespace HolyLogger
 
                 if (existingWindow != null)
                 {
+                    // FORWARD, WHATEVER IT IS DOING. Activate alone does nothing for a minimized window,
+                    // and left one buried behind the main window: "pressing Tools > Options does not
+                    // open the setting window". Restored, shown, and lifted over everything for an
+                    // instant, then put back to an ordinary window.
+                    if (existingWindow.WindowState == WindowState.Minimized) existingWindow.WindowState = WindowState.Normal;
+                    existingWindow.Show();
                     existingWindow.Activate();
+                    existingWindow.Topmost = true;
+                    existingWindow.Topmost = false;
+                    existingWindow.Focus();
                 }
                 else
                 {

@@ -95,17 +95,32 @@
                 <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
                     <RadioButton x:Name="RB_CwViaPort" Content="Key from" GroupName="CwVia" FontSize="16"
                                  VerticalAlignment="Center" Checked="CwVia_Changed"/>
-                    <ComboBox x:Name="CB_CwKeyPort" Width="255" Margin="10,0,0,0" FontSize="16" VerticalAlignment="Center"
-                              SelectionChanged="CwVia_Changed"/>
+                    <!-- A port that appeared while this page was open is bold green - see InitCwViaPicker. -->
+                    <ComboBox x:Name="CB_CwKeyPort" Width="345" Margin="10,0,0,0" FontSize="16" VerticalAlignment="Center"
+                              SelectionChanged="CwVia_Changed">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding Text}" TextTrimming="CharacterEllipsis">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsNew}" Value="True">
+                                                    <Setter Property="FontWeight" Value="Bold"/>
+                                                    <Setter Property="Foreground" Value="#1B7F2E"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
                     <ComboBox x:Name="CB_CwKeyLine" Width="80" Margin="8,0,0,0" FontSize="16" VerticalAlignment="Center"
                               SelectionChanged="CwVia_Changed"
                               ToolTip="The line of the port that keys the radio. Most keying cables use DTR.">
                         <ComboBoxItem Content="DTR"/>
                         <ComboBoxItem Content="RTS"/>
                     </ComboBox>
-                    <Button x:Name="BTN_RefreshCwKeyPorts" Content="Refresh list" Margin="8,0,0,0" Padding="8,2" FontSize="16"
-                            VerticalAlignment="Center" Cursor="Hand" ToolTip="Look for ports again - use it after plugging the cable in"
-                            Click="BTN_RefreshCwKeyPorts_Click"/>
                 </StackPanel>
                 <TextBlock x:Name="CwViaNote" TextWrapping="Wrap" Margin="0,6,0,0" FontSize="16" Foreground="Gray"/>
             </StackPanel>
