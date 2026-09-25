@@ -55,6 +55,31 @@ def find_pitch(x, sr, rough):
     return g[np.argmax([loud(p) for p in g])]
 
 
+def tracked_frames(x, sr, window_s=10.0, switch=1.3):
+    """Complex frames mixed down at the note being followed, re-chosen every window_s seconds.
+
+    One note for a whole recording listened to the wrong station on bad.wav - four in the passband,
+    and the one worked there (LB2WD, ~690 Hz) was not the strongest on average (558 Hz). Like the plain
+    decoder, this follows the strongest note NOW, and moves only when another is clearly stronger
+    (switch) - otherwise it would flutter between two stations of about the same strength. The phase
+    reference is the absolute sample, so frames stay continuous while the note is unchanged."""
+    h = int(round(HOP * sr)); win = int(window_s * sr) // h * h
+    n = 4096; fr = np.fft.rfftfreq(n, 1 / sr); m = (fr > 300) & (fr < 900)
+    pitch = None; out = []; pitches = []
+    for a in range(0, len(x) // h * h, win):
+        seg = x[a:a + win]
+        if len(seg) < n:
+            seg = x[max(0, a + len(seg) - n):a + len(seg)]
+        S = np.abs(np.fft.rfft(np.lib.stride_tricks.sliding_window_view(seg, n)[::n // 2] * np.hanning(n), axis=1)).mean(0)
+        peak = fr[m][S[m].argmax()]
+        if pitch is None or S[m].max() > switch * S[np.argmin(np.abs(fr - pitch))]:
+            pitch = find_pitch(seg, sr, round(peak / 25) * 25) if len(seg) >= sr else peak
+        k = np.arange(a, a + len(x[a:a + win]) // h * h)
+        bb = x[k] * np.exp(-2j * np.pi * pitch * k / sr)
+        out.append(bb.reshape(-1, h).sum(axis=1)); pitches.append(pitch)
+    return np.concatenate(out), pitches
+
+
 def levels(z):
     noise = local(np.abs(z) ** 2, lambda s: np.percentile(s, 30) / 0.357)
     c = 8
