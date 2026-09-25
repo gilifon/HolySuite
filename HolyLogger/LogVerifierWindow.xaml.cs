@@ -962,6 +962,30 @@ namespace HolyLogger
             return (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '/';
         }
 
+        // Listener reports are often written "UA3-15132" or "NL-7280": a real DXCC prefix, a
+        // hyphen, then the listener's own number. That hyphen is not damage - it is how the
+        // report was written - so ONE hyphen with a legal prefix in front of it and a suffix
+        // after it is accepted as a correct callsign and never reported as odd characters.
+        private static bool IsPrefixHyphenSuffix(string call, CountryLookup lookup)
+        {
+            string s = call.ToUpperInvariant().Trim();
+            int dash = s.IndexOf('-');
+            if (dash <= 0 || dash != s.LastIndexOf('-')) return false;    // exactly one, not leading
+
+            string prefix = s.Substring(0, dash);
+            string suffix = s.Substring(dash + 1);
+            if (suffix.Length == 0) return false;
+            if (!CallsignIdentity.HasOnlyCallsignCharacters(prefix)) return false;
+            if (!CallsignIdentity.HasOnlyCallsignCharacters(suffix)) return false;
+
+            try
+            {
+                DXCC dxcc = lookup.Resolve(prefix);
+                return dxcc != null && dxcc.Name != "Unknown";
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); return false; }
+        }
+
         // Opened to LIST contacts rather than to check them - what the two "already checked" buttons
         // in the chooser ask for. The headline is the window's whole message.
         public static LogVerifierWindow AsList(IEnumerable<QSO> qsos, string title, string headline)
@@ -1893,7 +1917,7 @@ namespace HolyLogger
                     continue;   // nothing else can be judged without a callsign
                 }
 
-                if (!CallsignIdentity.HasOnlyCallsignCharacters(call))
+                if (!CallsignIdentity.HasOnlyCallsignCharacters(call) && !IsPrefixHyphenSuffix(call, lookup))
                 {
                     // Junk at the front or the back is padding that arrived with an import and can be
                     // trimmed off with confidence. Junk in the MIDDLE is a note the operator squeezed
