@@ -7,6 +7,13 @@
              mc:Ignorable="d" 
              d:DesignHeight="300" d:DesignWidth="380">
     <Grid ShowGridLines="false" VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
+        <!-- TWO COLUMNS. One ran taller than the window once "CW via" joined it. The things that are
+             not about the radio - the two managers and the alert sounds - moved to a narrow column on
+             the right, at its top, and the page is short enough to see whole again. -->
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="590"/>
+            <ColumnDefinition Width="Auto"/>
+        </Grid.ColumnDefinitions>
         <CheckBox x:Name="CBX_IsFilterGrid" Content="Filter QSOs table by DX callsign" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.IsFilterQSOs, Source={StaticResource Settings}, Mode=TwoWay}" FontSize="16"/>
         <CheckBox x:Name="CBX_IsAllowLiveLog" Content="Allow automatic upload during special events" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.isAllowLiveLog, Source={StaticResource Settings}, Mode=TwoWay}" Margin="0,26,0,0" FontSize="16"/>
         <CheckBox x:Name="CBX_ShowOnTheAir" Content="Send heartbeat to HolyLogger On The Air" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.ShowOnTheAir, Source={StaticResource Settings}, Mode=TwoWay}" Margin="0,51,0,0" FontSize="16"/>
@@ -77,6 +84,33 @@
             </StackPanel>
         </GroupBox>
 
+        <!-- CW VIA. How the CW goes out: the radio keys the text itself (CAT - what HolyLogger has always
+             done), or HolyLogger keys the radio through one line of a COM port, the way a straight key
+             does (PortCwKeyer). The port is saved and applied the moment it is chosen, like the decoder's
+             input device, so a keyer window already open follows it at once. -->
+        <GroupBox Header="CW via" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,12,0,0" Width="580" FontSize="16">
+            <StackPanel Margin="4,4,4,4">
+                <RadioButton x:Name="RB_CwViaCat" Content="CAT commands" GroupName="CwVia" FontSize="16"
+                             Checked="CwVia_Changed"/>
+                <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                    <RadioButton x:Name="RB_CwViaPort" Content="Key from" GroupName="CwVia" FontSize="16"
+                                 VerticalAlignment="Center" Checked="CwVia_Changed"/>
+                    <ComboBox x:Name="CB_CwKeyPort" Width="255" Margin="10,0,0,0" FontSize="16" VerticalAlignment="Center"
+                              SelectionChanged="CwVia_Changed"/>
+                    <ComboBox x:Name="CB_CwKeyLine" Width="80" Margin="8,0,0,0" FontSize="16" VerticalAlignment="Center"
+                              SelectionChanged="CwVia_Changed"
+                              ToolTip="The line of the port that keys the radio. Most keying cables use DTR.">
+                        <ComboBoxItem Content="DTR"/>
+                        <ComboBoxItem Content="RTS"/>
+                    </ComboBox>
+                    <Button x:Name="BTN_RefreshCwKeyPorts" Content="Refresh list" Margin="8,0,0,0" Padding="8,2" FontSize="16"
+                            VerticalAlignment="Center" Cursor="Hand" ToolTip="Look for ports again - use it after plugging the cable in"
+                            Click="BTN_RefreshCwKeyPorts_Click"/>
+                </StackPanel>
+                <TextBlock x:Name="CwViaNote" TextWrapping="Wrap" Margin="0,6,0,0" FontSize="16" Foreground="Gray"/>
+            </StackPanel>
+        </GroupBox>
+
         <!-- CW DECODE. The picker lives here rather than in the decode window itself: it is set once,
              when the station is wired up, and after that it is only in the way of the decoded text.
              The window now opens by itself whenever the radio goes to CW, so it has to know which
@@ -125,72 +159,48 @@
             </StackPanel>
         </GroupBox>
 
-        <!-- UDP PORTS. Two fixed ports used to sit here - one that logged a contact sent by another
-             program, one that followed N1MM+'s radio - and there was no way to add a third. They are
-             now lines in a table the operator writes himself (UdpPortsWindow), which is also where the
-             port numbers are kept. -->
-        <!-- Orange, the same keycap Try Again wears on the main form: this page is a wall of tick
-             boxes, and the one button on it that opens a table of its own was reading as part of the
-             wall. Width and Height are set here because the keycap template lays its content out
-             itself and ignores Padding; 120 keeps the key clear of the sentence beside it at 130. -->
-        <Grid Margin="0,22,0,0">
+        </StackPanel>
+
+        <!-- THE RIGHT COLUMN: the UDP and ADIF managers and the alert sounds. Narrow on purpose, so each
+             sentence sits under its button and the Audio Alerts frame is laid out top to bottom. -->
+        <StackPanel Grid.Column="1" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="20,0,0,0" Width="300">
+            <!-- UDP PORTS. The ports are lines in a table the operator writes himself (UdpPortsWindow). -->
             <Button x:Name="BTN_UdpPorts" Content="UDP Ports Manager" Style="{StaticResource OrangeActionButtonStyle}"
-                    HorizontalAlignment="Left" VerticalAlignment="Top" Width="190" Height="32"
-                    FontSize="16" Click="BTN_UdpPorts_Click"/>
-            <!-- The button grew with its longer label, so the sentence beside it starts further right; the
-                 width stops it at 580, where every group box on this page ends. -->
-            <TextBlock HorizontalAlignment="Left" VerticalAlignment="Top" Margin="200,5,0,0" FontSize="16"
-                       Foreground="Gray" TextWrapping="Wrap" Width="380"
+                    HorizontalAlignment="Left" Width="190" Height="32" FontSize="16" Click="BTN_UdpPorts_Click"/>
+            <TextBlock Margin="0,4,0,0" FontSize="16" Foreground="Gray" TextWrapping="Wrap"
                        Text="Receive information from other software, and send yours out to it."/>
-        </Grid>
 
-        <!-- ADIF MONITOR. For programs that write each contact to an ADIF file of their own (WSJT-X and
-             the like): the files listed there are watched and their new contacts added to the log. -->
-        <Grid Margin="0,12,0,0">
+            <!-- ADIF MONITOR. Files other programs (WSJT-X and the like) write each contact to. -->
             <Button x:Name="BTN_AdifMonitor" Content="ADIF Monitor Manager" Style="{StaticResource OrangeActionButtonStyle}"
-                    HorizontalAlignment="Left" VerticalAlignment="Top" Width="190" Height="32"
-                    FontSize="16" Click="BTN_AdifMonitor_Click"/>
-            <TextBlock HorizontalAlignment="Left" VerticalAlignment="Top" Margin="200,5,0,0" FontSize="16"
-                       Foreground="Gray" TextWrapping="Wrap" Width="380"
+                    HorizontalAlignment="Left" Width="190" Height="32" FontSize="16" Margin="0,16,0,0" Click="BTN_AdifMonitor_Click"/>
+            <TextBlock Margin="0,4,0,0" FontSize="16" Foreground="Gray" TextWrapping="Wrap"
                        Text="Add new contacts from ADIF files other software writes."/>
-        </Grid>
 
-        <!-- Audio Alerts: both sound options plus a single shared output-device picker, so alerts can
-             go to the speakers instead of a USB radio codec. Left-justified with the checkboxes. -->
-        <GroupBox Header="Audio Alerts" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,25,0,0" Width="580" FontSize="16">
-            <StackPanel Margin="4,4,4,4">
-                <!-- Beep when typing -->
-                <CheckBox x:Name="CBX_NonEnglishKeyBeep" HorizontalAlignment="Left" IsChecked="{Binding Default.NonEnglishKeyBeep, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16" Margin="0,2,0,0" Click="HasChanged_Click">
-                    <StackPanel Orientation="Horizontal">
-                        <!-- Fixed label width shared with the sound-alert row below, so the two Test buttons align. -->
-                        <TextBlock Text="Beep when typing in a non-English keyboard" VerticalAlignment="Center" Width="315"/>
-                        <Button x:Name="BTN_TestBeep" Margin="10,0,0,0" VerticalAlignment="Center" Padding="8,2"
-                                FontSize="16" Cursor="Hand" Click="BTN_TestBeep_Click"
-                                ToolTip="Click to test — plays the beep on the selected audio device">
-                            <StackPanel Orientation="Horizontal">
-                                <Viewbox Width="16" Height="16" VerticalAlignment="Center">
-                                    <Canvas Width="24" Height="24">
-                                        <Path Fill="#3B6EA5" Data="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
-                                    </Canvas>
-                                </Viewbox>
-                                <TextBlock Text="Test" Margin="5,0,0,0" VerticalAlignment="Center"/>
-                            </StackPanel>
-                        </Button>
-                    </StackPanel>
-                </CheckBox>
+            <!-- Audio Alerts: the typing beep and the one output device every alert sound uses (the
+                 cluster alerts too), so alerts can go to the speakers instead of a USB radio codec. -->
+            <GroupBox Header="Audio Alerts" HorizontalAlignment="Left" Margin="0,16,0,0" Width="300" FontSize="16">
+                <StackPanel Margin="4,4,4,4">
+                    <CheckBox x:Name="CBX_NonEnglishKeyBeep" HorizontalAlignment="Left" FontSize="16" Margin="0,2,0,0"
+                              IsChecked="{Binding Default.NonEnglishKeyBeep, Mode=TwoWay, Source={StaticResource Settings}}"
+                              Click="HasChanged_Click">
+                        <TextBlock Text="Beep when typing in a non-English keyboard" TextWrapping="Wrap" Width="250"/>
+                    </CheckBox>
+                    <Button x:Name="BTN_TestBeep" Margin="22,6,0,0" HorizontalAlignment="Left" Padding="8,2"
+                            FontSize="16" Cursor="Hand" Click="BTN_TestBeep_Click"
+                            ToolTip="Click to test - plays the beep on the selected audio device">
+                        <StackPanel Orientation="Horizontal">
+                            <Viewbox Width="16" Height="16" VerticalAlignment="Center">
+                                <Canvas Width="24" Height="24">
+                                    <Path Fill="#3B6EA5" Data="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
+                                </Canvas>
+                            </Viewbox>
+                            <TextBlock Text="Test" Margin="5,0,0,0" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
 
-                <!-- The two cluster sound alerts (new-country / Unconfirmed spot) moved to the Cluster
-                     window's gear (Cluster Settings). The output DEVICE picker below stays here: it is
-                     app-wide, not cluster-specific, and those alerts use it. -->
-
-                <!-- App-wide output device, used by every alert sound (including the cluster alerts,
-                     which are configured in the Cluster window's gear). -->
-                <StackPanel Orientation="Horizontal" Margin="0,12,0,2">
-                    <TextBlock Text="Select audio device:" Width="150" VerticalAlignment="Center" FontSize="16" Margin="0,0,8,0"/>
-                    <ComboBox x:Name="CB_SoundDevice" Width="175" VerticalAlignment="Center" FontSize="16"
+                    <TextBlock Text="Select audio device:" FontSize="16" Margin="0,12,0,4"/>
+                    <ComboBox x:Name="CB_SoundDevice" HorizontalAlignment="Stretch" FontSize="16"
                               SelectionChanged="CB_SoundDevice_SelectionChanged">
-                        <!-- Spelled out as a wrapping TextBlock rather than a plain ToolTip="..." string:
-                             as a string it rendered as one very long single line across the screen. -->
                         <ComboBox.ToolTip>
                             <ToolTip>
                                 <TextBlock MaxWidth="330" TextWrapping="Wrap" FontSize="16"
@@ -221,8 +231,7 @@
                         </ComboBox.ItemTemplate>
                     </ComboBox>
                 </StackPanel>
-            </StackPanel>
-        </GroupBox>
+            </GroupBox>
         </StackPanel>
 
     </Grid>

@@ -3265,6 +3265,42 @@ namespace HolyLogger.Properties {
                 this["CwKeyerWpm"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("CAT")]
+        public string CwVia {
+            get {
+                return ((string)(this["CwVia"]));
+            }
+            set {
+                this["CwVia"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string CwKeyPort {
+            get {
+                return ((string)(this["CwKeyPort"]));
+            }
+            set {
+                this["CwKeyPort"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("DTR")]
+        public string CwKeyLine {
+            get {
+                return ((string)(this["CwKeyLine"]));
+            }
+            set {
+                this["CwKeyLine"] = value;
+            }
+        }
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]

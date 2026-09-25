@@ -818,6 +818,15 @@
     <Setting Name="CwKeyerWpm" Type="System.Int32" Scope="User">
       <Value Profile="(Default)">20</Value>
     </Setting>
+    <Setting Name="CwVia" Type="System.String" Scope="User">
+      <Value Profile="(Default)">CAT</Value>
+    </Setting>
+    <Setting Name="CwKeyPort" Type="System.String" Scope="User">
+      <Value Profile="(Default)" />
+    </Setting>
+    <Setting Name="CwKeyLine" Type="System.String" Scope="User">
+      <Value Profile="(Default)">DTR</Value>
+    </Setting>
     <Setting Name="OpenCwKeyerOnCw" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">True</Value>
     </Setting>
