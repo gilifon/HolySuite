@@ -137,8 +137,182 @@ namespace HolyLogger.OptionsUserControls
             // Output-device picker: "System default" (Windows default
             // device) + each real output device, so sounds can go to the speakers instead of a USB codec.
             InitSoundDevicePicker(CB_SoundDevice, Properties.Settings.Default.SoundOutputDevice);
+            InitCwViaPicker();
 
             HasChanged = false;
+        }
+
+        // ── CW VIA: CAT commands, or a COM port HolyLogger keys itself ────────────────────────────
+        //
+        // Saved the moment it changes, like the decoder's input device, and MainWindow is told at once
+        // (OnCwViaChanged): it lets go of the old port, and a keyer window already open follows.
+        bool _loadingCwVia;
+
+        sealed class PortChoice
+        {
+            public string Port;
+            public string Text;
+            public override string ToString() { return Text; }
+        }
+
+        void InitCwViaPicker()
+        {
+            _loadingCwVia = true;
+            try
+            {
+                string saved = (Properties.Settings.Default.CwKeyPort ?? string.Empty).Trim();
+                string catPort = MainWindow.ReadOmniRigCatPortFromFile(Properties.Settings.Default.SelectedOmniRig2);
+
+                var present = new List<string>();
+                try { present.AddRange(System.IO.Ports.SerialPort.GetPortNames()); }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+                // A port chosen earlier and not plugged in now is still offered, so the choice is not
+                // silently lost - it just says it is not there.
+                var names = new List<string>(present);
+                if (saved.Length > 0 && !names.Contains(saved, StringComparer.OrdinalIgnoreCase)) names.Add(saved);
+
+                var friendly = FriendlyPortNames();
+                var items = names.Distinct(StringComparer.OrdinalIgnoreCase)
+                                 .OrderBy(n => PortNumber(n))
+                                 .Select(n =>
+                                 {
+                                     string what;
+                                     friendly.TryGetValue(n, out what);
+                                     string text = n + (string.IsNullOrEmpty(what) ? string.Empty : "  " + what);
+                                     if (catPort != null && string.Equals(n, catPort, StringComparison.OrdinalIgnoreCase))
+                                         text += "  (radio CAT)";
+                                     else if (!present.Contains(n, StringComparer.OrdinalIgnoreCase))
+                                         text += "  (not plugged in)";
+                                     return new PortChoice { Port = n, Text = text };
+                                 })
+                                 .ToList();
+
+                CB_CwKeyPort.ItemsSource = items;
+                CB_CwKeyPort.SelectedItem = items.FirstOrDefault(i => string.Equals(i.Port, saved, StringComparison.OrdinalIgnoreCase));
+
+                CB_CwKeyLine.SelectedIndex =
+                    string.Equals(Properties.Settings.Default.CwKeyLine, "RTS", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
+
+                bool byPort = string.Equals(Properties.Settings.Default.CwVia, "PORT", StringComparison.OrdinalIgnoreCase);
+                RB_CwViaPort.IsChecked = byPort;
+                RB_CwViaCat.IsChecked = !byPort;
+            }
+            finally { _loadingCwVia = false; }
+
+            ShowCwViaNote();
+        }
+
+        static int PortNumber(string name)
+        {
+            int n;
+            return name != null && name.StartsWith("COM", StringComparison.OrdinalIgnoreCase)
+                   && int.TryParse(name.Substring(3), out n) ? n : 9999;
+        }
+
+        // "COM7" -> "USB-SERIAL CH340": the names Device Manager shows, read from where Windows keeps
+        // them. Every serial device leaves "Device Parameters\PortName" under its entry in Enum.
+        static Dictionary<string, string> FriendlyPortNames()
+        {
+            var found = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            try
+            {
+                using (var enumKey = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Enum"))
+                {
+                    if (enumKey == null) return found;
+                    foreach (string bus in enumKey.GetSubKeyNames())
+                    {
+                        using (var busKey = enumKey.OpenSubKey(bus))
+                        {
+                            if (busKey == null) continue;
+                            foreach (string device in busKey.GetSubKeyNames())
+                            {
+                                using (var deviceKey = busKey.OpenSubKey(device))
+                                {
+                                    if (deviceKey == null) continue;
+                                    foreach (string instance in deviceKey.GetSubKeyNames())
+                                    {
+                                        using (var instanceKey = deviceKey.OpenSubKey(instance))
+                                        using (var parameters = instanceKey == null ? null : instanceKey.OpenSubKey("Device Parameters"))
+                                        {
+                                            string port = parameters == null ? null : parameters.GetValue("PortName") as string;
+                                            if (string.IsNullOrEmpty(port) || !port.StartsWith("COM", StringComparison.OrdinalIgnoreCase)) continue;
+
+                                            string name = instanceKey.GetValue("FriendlyName") as string;
+                                            if (string.IsNullOrEmpty(name)) continue;
+
+                                            // "USB-SERIAL CH340 (COM7)" - the port is already in front of it.
+                                            int at = name.LastIndexOf(" (COM", StringComparison.OrdinalIgnoreCase);
+                                            if (at > 0) name = name.Substring(0, at);
+                                            found[port] = name;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+            return found;
+        }
+
+        private void BTN_RefreshCwKeyPorts_Click(object sender, RoutedEventArgs e)
+        {
+            InitCwViaPicker();
+        }
+
+        private void CwVia_Changed(object sender, RoutedEventArgs e)
+        {
+            if (_loadingCwVia || RB_CwViaPort == null || CB_CwKeyPort == null || CB_CwKeyLine == null) return;
+
+            try
+            {
+                var choice = CB_CwKeyPort.SelectedItem as PortChoice;
+                bool byPort = RB_CwViaPort.IsChecked == true;
+
+                Properties.Settings.Default.CwVia = byPort ? "PORT" : "CAT";
+                Properties.Settings.Default.CwKeyPort = choice == null ? string.Empty : choice.Port;
+                Properties.Settings.Default.CwKeyLine = CB_CwKeyLine.SelectedIndex == 1 ? "RTS" : "DTR";
+                Properties.Settings.Default.Save();
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+            ShowCwViaNote();
+
+            try
+            {
+                var main = Application.Current != null ? Application.Current.MainWindow as MainWindow : null;
+                if (main != null) main.OnCwViaChanged();
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        // One short line under the choice: what it means, or what is wrong with it.
+        void ShowCwViaNote()
+        {
+            if (CwViaNote == null || RB_CwViaPort == null || CB_CwKeyPort == null) return;
+
+            bool byPort = RB_CwViaPort.IsChecked == true;
+            var choice = CB_CwKeyPort.SelectedItem as PortChoice;
+            string catPort = MainWindow.ReadOmniRigCatPortFromFile(Properties.Settings.Default.SelectedOmniRig2);
+            bool bad = false;
+            string text;
+
+            if (!byPort)
+                text = "The radio keys the CW itself, at the speed set on the radio.";
+            else if (choice == null)
+            { text = "Choose the port of the cable on the radio's KEY input."; bad = true; }
+            else if (catPort != null && string.Equals(choice.Port, catPort, StringComparison.OrdinalIgnoreCase))
+            { text = choice.Port + " is the radio's CAT port. Choose the keying cable's port."; bad = true; }
+            else
+                text = "HolyLogger keys the radio on " + choice.Port + ", at the speed set in the CW Keyer. "
+                     + "BK-IN must be on at the radio.";
+
+            CwViaNote.Text = text;
+            CwViaNote.Foreground = bad
+                ? new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0xC6, 0x28, 0x28))
+                : System.Windows.Media.Brushes.Gray;
         }
 
         // Sentinel dropdown entry for "use the Windows default device"; stored as an empty setting.

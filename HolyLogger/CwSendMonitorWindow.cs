@@ -258,6 +258,13 @@ namespace HolyLogger
             return cumulative.Length == 0 ? 0 : cumulative[cumulative.Length - 1];
         }
 
+        // ONE MORSE TABLE FOR THE PROGRAM. The COM-port keyer (PortCwKeyer) keys from the same table
+        // this window counts from, so what goes out and what the cursor walks can never disagree.
+        public static bool TryGetMorse(char c, out string pattern)
+        {
+            return Morse.TryGetValue(char.ToUpperInvariant(c), out pattern) && !string.IsNullOrEmpty(pattern);
+        }
+
         // The dits and dahs of one character, with the one-unit gaps between them. NO gap after it -
         // what follows the character is the business of whatever comes next.
         private static double ElementUnits(char c)
@@ -411,6 +418,371 @@ namespace HolyLogger
                 _glyphs[i].Foreground = UpcomingBrush;
                 _cells[i].Background = Brushes.Transparent;
             }
+        }
+    }
+
+    // -- CW KEYED FROM A COM PORT ------------------------------------------------------------------
+    //
+    // THE OTHER WAY TO SEND CW: not asking the radio to key a text (CAT), but keying it the way a
+    // straight key does - one line of a serial port, DTR or RTS, held on for every dit and dah. A
+    // cheap USB-to-serial adapter wired to the radio's KEY jack does it, and so does the radio's own
+    // USB port on the Icoms that can be told to key on DTR. Chosen in Options > General, "CW via".
+    //
+    // HOLYLOGGER THEN MAKES THE MORSE ITSELF, so three things become ours that used to be the radio's:
+    //
+    //   THE SPEED. The radio's KEY SPEED knob only drives its own keyer, which is not used here.
+    //   THE TIMING. Windows' ordinary timers tick every 15 ms or so, and a dit at 40 WPM is 30 ms - a
+    //     timer that coarse would key like a drunk. So the keying runs on a thread of its own at the
+    //     highest priority, with the system timer asked for 1 ms and the last millisecond of every
+    //     wait spun rather than slept. Every edge is placed on a schedule measured from the start of
+    //     the character, so small late wake-ups never add up along a message.
+    //   THE SAFETY. A key left down is a transmitter left on. The line is released: on every stop, at
+    //     the end of every element whatever else happens (a finally), when the port is closed, and by
+    //     a watchdog that lets it go if it has somehow been down for longer than any element at any
+    //     speed could last. Windows drops DTR and RTS itself when the program ends or the adapter is
+    //     unplugged.
+    public sealed class PortCwKeyer : IDisposable
+    {
+        // Longest any single element can be: a dah at 5 WPM is 720 ms. Anything down longer than
+        // this is a fault, and the watchdog releases it.
+        private const int LongestKeyDownMs = 3000;
+
+        // The speeds offered. Slower than 5 WPM nobody sends; faster than 60 the timing itself gets thin.
+        public const int SlowestWpm = 5;
+        public const int FastestWpm = 60;
+
+        private readonly System.IO.Ports.SerialPort _port;
+        private readonly bool _useRts;
+        private readonly object _gate = new object();
+        private readonly Queue<char> _waiting = new Queue<char>();
+        private readonly System.Threading.AutoResetEvent _wake = new System.Threading.AutoResetEvent(false);
+        private readonly System.Threading.Thread _thread;
+        private readonly System.Threading.Timer _watchdog;
+        private readonly System.Diagnostics.Stopwatch _clock = System.Diagnostics.Stopwatch.StartNew();
+
+        private volatile bool _closing;
+        // EVERY STOP IS A NEW GENERATION. A character remembers the generation it began in and gives up
+        // the moment it changes. A plain "stop asked" flag was tried first and had a trap in it: Esc
+        // pressed while nothing was sending left the flag up, and the NEXT message was swallowed.
+        private volatile int _stopGen;
+        private volatile bool _sending;
+        private volatile bool _reportedIdle = true;
+        private volatile bool _down;
+        private long _downSinceTicks;
+        private double _wpm = 20;
+
+        // Where the next letter may start: a letter gap after a letter, a word gap after a space.
+        private double _nextStartMs;
+        private bool _afterLetter;
+
+        public string PortName { get; private set; }
+        public string Line { get { return _useRts ? "RTS" : "DTR"; } }
+
+        /// <summary>Raised on the keying thread when sending starts (true) and when it has finished (false).</summary>
+        public event Action<bool> BusyChanged;
+
+        /// <summary>
+        /// Every edge as it happens, on the keying thread: down (true) or up, and the milliseconds on the
+        /// keyer's own clock. For measuring the timing, and for knowing exactly what went out when.
+        /// </summary>
+        public event Action<bool, double> Edge;
+
+        public double Wpm
+        {
+            get { lock (_gate) return _wpm; }
+            set { lock (_gate) _wpm = Math.Max(SlowestWpm, Math.Min(FastestWpm, value)); }
+        }
+
+        /// <summary>True from the moment text is handed over until its last element has ended.</summary>
+        public bool Busy
+        {
+            get { lock (_gate) return _sending || _waiting.Count > 0; }
+        }
+
+        /// <summary>True while the line is actually held on - the transmitter is keyed.</summary>
+        public bool KeyDown { get { return _down; } }
+
+        private PortCwKeyer(System.IO.Ports.SerialPort port, bool useRts, double wpm)
+        {
+            _port = port;
+            _useRts = useRts;
+            PortName = port == null ? "(no port)" : port.PortName;
+            Wpm = wpm;
+
+            _thread = new System.Threading.Thread(Run)
+            {
+                IsBackground = true,
+                Priority = System.Threading.ThreadPriority.Highest,
+                Name = "CW keying on " + PortName
+            };
+            _thread.Start();
+
+            _watchdog = new System.Threading.Timer(_ => Watch(), null, 250, 250);
+        }
+
+        /// <summary>
+        /// Opens the port with the keying line OFF. Null and a plain reason when it cannot be opened -
+        /// another program has it, or the adapter is not plugged in.
+        /// </summary>
+        public static PortCwKeyer Open(string portName, bool useRts, double wpm, out string whyNot)
+        {
+            whyNot = null;
+            System.IO.Ports.SerialPort port = null;
+            try
+            {
+                // BOTH LINES OFF BEFORE THE PORT OPENS. .NET applies these as it opens, so the radio
+                // never sees the line rise - some adapters raise DTR on open by default, and that
+                // would key the transmitter the moment the option was chosen.
+                port = new System.IO.Ports.SerialPort(portName)
+                {
+                    DtrEnable = false,
+                    RtsEnable = false,
+                    Handshake = System.IO.Ports.Handshake.None
+                };
+                port.Open();
+                port.DtrEnable = false;
+                port.RtsEnable = false;
+                return new PortCwKeyer(port, useRts, wpm);
+            }
+            catch (UnauthorizedAccessException)
+            {
+                whyNot = portName + " is being used by another program.";
+            }
+            catch (System.IO.IOException)
+            {
+                whyNot = portName + " is not there - is the keying cable plugged in?";
+            }
+            catch (Exception ex)
+            {
+                whyNot = portName + " could not be opened: " + ex.Message;
+            }
+
+            try { if (port != null) port.Dispose(); }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+            return null;
+        }
+
+        /// <summary>
+        /// A keyer with NO PORT behind it: everything runs - the thread, the timing, the edges - and no
+        /// line is touched. For measuring the timing without keying a transmitter.
+        /// </summary>
+        public static PortCwKeyer WithoutPort(double wpm)
+        {
+            return new PortCwKeyer(null, false, wpm);
+        }
+
+        /// <summary>Hands text over to be keyed after whatever is already waiting. False once closed.</summary>
+        public bool Send(string text)
+        {
+            if (_closing || string.IsNullOrEmpty(text)) return !_closing;
+
+            bool started;
+            lock (_gate)
+            {
+                started = !_sending && _waiting.Count == 0;
+                foreach (char c in text.ToUpperInvariant())
+                {
+                    string pattern;
+                    if (c == ' ' || CwSendMonitorWindow.TryGetMorse(c, out pattern)) _waiting.Enqueue(c);
+                }
+                if (_waiting.Count > 0) _sending = true;
+            }
+            if (started && _sending) RaiseBusy(true);
+            _wake.Set();
+            return true;
+        }
+
+        /// <summary>Stops NOW: the line goes off at once and everything still waiting is thrown away.</summary>
+        public void Stop()
+        {
+            lock (_gate)
+            {
+                _waiting.Clear();
+                _stopGen++;
+            }
+            Release();
+            _wake.Set();
+        }
+
+        public void Dispose()
+        {
+            _closing = true;
+            Stop();
+            try { _watchdog.Dispose(); } catch (Exception swallowed) { Log.Swallow(swallowed); }
+            try { _thread.Join(500); } catch (Exception swallowed) { Log.Swallow(swallowed); }
+            Release();
+            try { if (_port != null) { _port.Close(); _port.Dispose(); } } catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        [System.Runtime.InteropServices.DllImport("winmm.dll")]
+        private static extern uint timeBeginPeriod(uint ms);
+
+        [System.Runtime.InteropServices.DllImport("winmm.dll")]
+        private static extern uint timeEndPeriod(uint ms);
+
+        private void Run()
+        {
+            try { timeBeginPeriod(1); } catch (Exception swallowed) { Log.Swallow(swallowed); }
+            try
+            {
+                while (!_closing)
+                {
+                    char c;
+                    bool have;
+                    int gen;
+                    lock (_gate)
+                    {
+                        have = _waiting.Count > 0;
+                        c = have ? _waiting.Dequeue() : ' ';
+                        gen = _stopGen;
+                        if (!have && _sending) _sending = false;
+                    }
+
+                    if (!have)
+                    {
+                        if (!_sending) RaiseBusyIfIdle();
+                        _wake.WaitOne(50);
+                        continue;
+                    }
+
+                    KeyCharacter(c, gen);
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Warn("CW keying on " + PortName + " stopped: " + ex.Message);
+            }
+            finally
+            {
+                Release();
+                try { timeEndPeriod(1); } catch (Exception swallowed) { Log.Swallow(swallowed); }
+            }
+        }
+
+        private void RaiseBusyIfIdle()
+        {
+            if (_reportedIdle) return;
+            _reportedIdle = true;
+            var handler = BusyChanged;
+            if (handler != null) try { handler(false); } catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        private void RaiseBusy(bool busy)
+        {
+            _reportedIdle = !busy;
+            var handler = BusyChanged;
+            if (handler != null) try { handler(busy); } catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        private void KeyCharacter(char c, int gen)
+        {
+            double unit = 1200.0 / Wpm;
+            double now = _clock.Elapsed.TotalMilliseconds;
+
+            if (c == ' ')
+            {
+                // A run of spaces is one word gap, measured from the end of the last letter.
+                if (_afterLetter) _nextStartMs += (CwSendMonitorWindow.WordGapUnits - CwSendMonitorWindow.LetterGapUnits) * unit;
+                _afterLetter = false;
+                return;
+            }
+
+            string pattern;
+            if (!CwSendMonitorWindow.TryGetMorse(c, out pattern)) return;
+
+            // Never before the gap is over; and after a pause in the typing, not in the past either.
+            double at = Math.Max(now, _nextStartMs);
+
+            for (int i = 0; i < pattern.Length; i++)
+            {
+                if (gen != _stopGen || _closing) break;
+                if (!WaitUntil(at, gen)) break;
+
+                double length = (pattern[i] == '-' ? 3 : 1) * unit;
+                Press(gen);
+                try
+                {
+                    if (!WaitUntil(at + length, gen)) break;
+                }
+                finally
+                {
+                    Release();
+                }
+                at += length + unit;                    // the one-unit gap inside the letter
+            }
+
+            // The letter ends where its last element ended; the next may start a letter gap later.
+            _nextStartMs = at - unit + CwSendMonitorWindow.LetterGapUnits * unit;
+            _afterLetter = true;
+        }
+
+        // Sleeps most of the way, then spins the last stretch: Sleep alone wakes up to a millisecond or
+        // two late even with the 1 ms timer, and at 40 WPM two milliseconds is a fifteenth of a dit.
+        private bool WaitUntil(double targetMs, int gen)
+        {
+            while (true)
+            {
+                if (gen != _stopGen || _closing) return false;
+                double left = targetMs - _clock.Elapsed.TotalMilliseconds;
+                if (left <= 0) return true;
+                if (left > 3) System.Threading.Thread.Sleep((int)(left - 2));
+                else System.Threading.Thread.SpinWait(200);
+            }
+        }
+
+        private readonly object _lineGate = new object();
+
+        private void Press(int gen)
+        {
+            lock (_lineGate)
+            {
+                if (gen != _stopGen || _closing) return;
+                SetLine(true);
+                _downSinceTicks = DateTime.UtcNow.Ticks;
+                _down = true;
+            }
+            RaiseEdge(true);        // only reached when the line really went down
+        }
+
+        private void Release()
+        {
+            bool was;
+            lock (_lineGate)
+            {
+                was = _down;
+                SetLine(false);
+                _down = false;
+            }
+            if (was) RaiseEdge(false);
+        }
+
+        private void RaiseEdge(bool down)
+        {
+            var handler = Edge;
+            if (handler == null) return;
+            try { handler(down, _clock.Elapsed.TotalMilliseconds); }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        private void SetLine(bool on)
+        {
+            try
+            {
+                if (_port == null || !_port.IsOpen) return;
+                if (_useRts) _port.RtsEnable = on; else _port.DtrEnable = on;
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        // THE LAST LINE OF DEFENCE. Nothing in the keying holds the line longer than one element, so
+        // if it has been down for three seconds something has gone wrong - the thread stalled, the
+        // machine froze for a moment - and the transmitter is let go whatever the reason.
+        private void Watch()
+        {
+            if (!_down) return;
+            if (DateTime.UtcNow.Ticks - _downSinceTicks < TimeSpan.FromMilliseconds(LongestKeyDownMs).Ticks) return;
+            Log.Warn("CW keying on " + PortName + ": key held down too long - released by the watchdog.");
+            Stop();
         }
     }
 }

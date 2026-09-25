@@ -4650,6 +4650,9 @@ namespace HolyLogger
             cwKeyboard = new CwKeyboardWindow(
                 chunk =>
                 {
+                    // KEYED FROM A PORT: HolyLogger makes the Morse itself - see PortCwKeyer.
+                    if (CwByPort) return SendCwByPort(chunk);
+
                     AskIcomBreakInBeforeCw(rigType);
 
                     // A Yaesu takes two: the text into a memory, then the memory played.
@@ -4666,15 +4669,19 @@ namespace HolyLogger
                 },
                 () =>
                 {
+                    if (CwByPort) { StopCwByPort(); return; }
+
                     string stop = BuildCwStopCommand(rigType);
                     if (!string.IsNullOrWhiteSpace(stop)) TrySendOmniRigCustomCommand(stop);
                 },
-                () => cwLearnedWpm,
-                () => cwWpmMeasured,
+                // From a port the speed is HolyLogger's own and exact, so there is nothing to learn.
+                () => CwByPort ? CwPortWpm : cwLearnedWpm,
+                () => CwByPort || cwWpmMeasured,
                 CwChunkSizeFor(rigType),
                 // Whether the radio is keying RIGHT NOW. The keyer times its line breaks from this
-                // rather than from the program's estimate of how long the keying would take.
-                () => Rig != null && Rig.Tx == (OmniRig.RigParamX)PM_TX,
+                // rather than from the program's estimate of how long the keying would take. From a
+                // port it is known exactly: the keying thread says when it has finished.
+                () => CwByPort ? CwPortBusy : Rig != null && Rig.Tx == (OmniRig.RigParamX)PM_TX,
                 // Its eight buttons hold the same kind of text as the four here, so they get the same
                 // macros and the same editor rather than copies of either.
                 ExpandCwMacros,
@@ -4683,6 +4690,7 @@ namespace HolyLogger
                 // Same light smoothing, so one odd reading cannot swing the estimate.
                 measured =>
                 {
+                    if (CwByPort) return;       // the speed is set here, not measured
                     if (measured >= 5 && measured <= 80)
                     {
                         cwLearnedWpm = (cwLearnedWpm * 0.8) + (measured * 0.2);
@@ -4695,8 +4703,9 @@ namespace HolyLogger
                 // its own first four - see LoadButtonTexts. After that the two sets are apart.
                 GetCwMessageText,
                 // A Yaesu has no character buffer: the keyer must let each memory finish playing
-                // before it writes the next one over the top of it.
-                IsYaesuKeyer(rigType),
+                // before it writes the next one over the top of it. Not from a port: nothing is
+                // written to the radio's memory there at all.
+                !CwByPort && IsYaesuKeyer(rigType),
 
                 // The WPM readout in its title bar shows what speeds this radio will accept: a
                 // number read back from it that could not be one is dropped rather than shown, and
@@ -4849,6 +4858,9 @@ namespace HolyLogger
         // (SetCwMode), because it comes and goes with a knob rather than with the equipment.
         private string WhyTheKeyerCannotSend()
         {
+            // From a port, CAT is not needed at all - only the port.
+            if (CwByPort) return PortKeyer() != null ? null : PortKeyerTrouble();
+
             if (!Properties.Settings.Default.EnableOmniRigCAT || OmniRigEngine == null || Rig == null)
                 return "CAT is off, so nothing typed or pressed here will go out. Everything else "
                      + "works: right-click a button to write its macro, and the gear holds the rest. "
@@ -5114,6 +5126,10 @@ namespace HolyLogger
         // What this radio will accept, so the keyer can hold its own box to the same range.
         internal static void CwSpeedRange(string rigType, out int low, out int high)
         {
+            // FROM A PORT THE SPEED IS OURS, not the radio's, and it goes as slow and as fast as
+            // anybody sends by hand.
+            if (CwByPortSetting()) { low = PortCwKeyer.SlowestWpm; high = PortCwKeyer.FastestWpm; return; }
+
             string name = (rigType ?? string.Empty).Trim();
 
             if (IsYaesuKeyer(name))            { low = WpmYaesuLow;    high = WpmYaesuHigh;    return; }
@@ -5187,6 +5203,9 @@ namespace HolyLogger
         // wire in the middle of a message competes with the text going out on it.
         private void AskRadioCwSpeed()
         {
+            // From a port the radio's knob means nothing: the readout is HolyLogger's own speed.
+            if (CwByPort) { ShowCwPortSpeed(); return; }
+
             if (!IsCatLive()) return;
 
             int replyLength;
@@ -5278,9 +5297,9 @@ namespace HolyLogger
             cwLiteKeyer = new CwLiteKeyer(
                 SendCwChunkToRadio,
                 StopCwOnRadio,
-                () => Rig != null && Rig.Tx == (OmniRig.RigParamX)PM_TX,
+                () => CwByPort ? CwPortBusy : Rig != null && Rig.Tx == (OmniRig.RigParamX)PM_TX,
                 () => CwChunkSizeFor(NormalizeRigType(Rig != null ? Rig.RigType : null)),
-                () => IsYaesuKeyer(NormalizeRigType(Rig != null ? Rig.RigType : null)),
+                () => !CwByPort && IsYaesuKeyer(NormalizeRigType(Rig != null ? Rig.RigType : null)),
                 CanTypeCwOnTheBar,
                 AskRadioCwSpeed);
 
@@ -5298,6 +5317,8 @@ namespace HolyLogger
         // radios, or turn CAT off and on, without this line ever leaving the bar.
         private bool SendCwChunkToRadio(string chunk)
         {
+            if (CwByPort) return SendCwByPort(chunk);
+
             string rigType = NormalizeRigType(Rig != null ? Rig.RigType : null);
             AskIcomBreakInBeforeCw(rigType);
 
@@ -5316,8 +5337,189 @@ namespace HolyLogger
 
         private void StopCwOnRadio()
         {
+            if (CwByPort) { StopCwByPort(); return; }
+
             string stop = BuildCwStopCommand(NormalizeRigType(Rig != null ? Rig.RigType : null));
             if (!string.IsNullOrWhiteSpace(stop)) TrySendOmniRigCustomCommand(stop);
+        }
+
+        // -- CW VIA A COM PORT ------------------------------------------------------------------------
+        //
+        // Options > General > "CW via": CAT commands (the radio keys the text, as it always did) or a
+        // COM port, where HolyLogger keys the radio itself through one line of the port - see
+        // PortCwKeyer. Everything that sends CW asks CwByPort first and takes the port's road when it
+        // is chosen: the keyer window, the lite keyer on the bar, the Msg buttons and Run/S&P, which
+        // all come through the functions below.
+        //
+        // THE PORT IS OPENED WHEN IT IS FIRST NEEDED and held open after that, because opening one
+        // takes a moment and a keyer that opened the port per chunk would stutter. A change in Options
+        // closes it (OnCwViaChanged) and the next send opens the new one.
+        private PortCwKeyer portCwKeyer;
+        private string portCwKeyerTrouble;
+
+        internal static bool CwByPortSetting()
+        {
+            try
+            {
+                return string.Equals(Properties.Settings.Default.CwVia, "PORT", StringComparison.OrdinalIgnoreCase)
+                       && !string.IsNullOrWhiteSpace(Properties.Settings.Default.CwKeyPort);
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); return false; }
+        }
+
+        private bool CwByPort { get { return CwByPortSetting(); } }
+
+        // HolyLogger's own keyer speed, the one setting that has always been called that.
+        private static int CwPortWpm
+        {
+            get
+            {
+                int wpm = 20;
+                try { wpm = Properties.Settings.Default.CwKeyerWpm; }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
+                return Math.Max(PortCwKeyer.SlowestWpm, Math.Min(PortCwKeyer.FastestWpm, wpm <= 0 ? 20 : wpm));
+            }
+        }
+
+        private bool CwPortBusy { get { return portCwKeyer != null && portCwKeyer.Busy; } }
+
+        // The open keyer, opening it - or opening it again after the choice changed - if need be.
+        // Null when it cannot be opened; PortKeyerTrouble() then says why in words.
+        private PortCwKeyer PortKeyer()
+        {
+            if (!CwByPort) { ClosePortKeyer(); return null; }
+
+            string port = (Properties.Settings.Default.CwKeyPort ?? string.Empty).Trim();
+            bool rts = string.Equals(Properties.Settings.Default.CwKeyLine, "RTS", StringComparison.OrdinalIgnoreCase);
+
+            if (portCwKeyer != null
+                && string.Equals(portCwKeyer.PortName, port, StringComparison.OrdinalIgnoreCase)
+                && portCwKeyer.Line == (rts ? "RTS" : "DTR"))
+                return portCwKeyer;
+
+            ClosePortKeyer();
+
+            // NEVER THE RADIO'S OWN CAT PORT. OmniRig holds it open anyway, so it would fail - but it
+            // is worth saying plainly rather than as "being used by another program".
+            string catPort = ReadOmniRigCatPortFromFile(Properties.Settings.Default.SelectedOmniRig2);
+            if (Properties.Settings.Default.EnableOmniRigCAT && catPort != null
+                && string.Equals(catPort, port, StringComparison.OrdinalIgnoreCase))
+            {
+                portCwKeyerTrouble = port + " is the radio's CAT port. Choose the keying cable's port in Options > General.";
+                return null;
+            }
+
+            string whyNot;
+            portCwKeyer = PortCwKeyer.Open(port, rts, CwPortWpm, out whyNot);
+            portCwKeyerTrouble = whyNot == null ? null : whyNot + " Choose the port in Options > General.";
+
+            if (portCwKeyer != null)
+            {
+                portCwKeyer.BusyChanged += busy =>
+                    Dispatcher.BeginInvoke(new Action(() => OnCwPortBusyChanged(busy)));
+                Log.Warn("CW keying port " + port + " (" + portCwKeyer.Line + ") opened at " + CwPortWpm + " WPM.");
+            }
+            return portCwKeyer;
+        }
+
+        private string PortKeyerTrouble()
+        {
+            return portCwKeyerTrouble ?? "The keying port could not be opened. Choose it in Options > General.";
+        }
+
+        private void ClosePortKeyer()
+        {
+            var keyer = portCwKeyer;
+            portCwKeyer = null;
+            if (keyer == null) return;
+            try { keyer.Dispose(); }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        private bool SendCwByPort(string text)
+        {
+            var keyer = PortKeyer();
+            if (keyer == null) return false;
+
+            // The radio still has to be in break-in to transmit on the key, just as with CAT - asked
+            // over CAT when there is CAT to ask with.
+            if (IsCatLive()) AskIcomBreakInBeforeCw(NormalizeRigType(Rig != null ? Rig.RigType : null));
+
+            keyer.Wpm = CwPortWpm;
+            return keyer.Send(text);
+        }
+
+        private void StopCwByPort()
+        {
+            if (portCwKeyer != null) portCwKeyer.Stop();
+        }
+
+        // The keying thread started or finished. A Msg button's message is live from its first dit and
+        // over after its last, exactly - there is no transmit flag to wait for.
+        private void OnCwPortBusyChanged(bool busy)
+        {
+            if (busy && pendingVoiceMessageNumber.HasValue)
+            {
+                activeVoiceMessageNumber = pendingVoiceMessageNumber;
+                pendingVoiceMessageNumber = null;
+                cwTxOffSinceUtc = DateTime.MinValue;
+                OnCwTransmitStarted();
+            }
+            else if (!busy && !CwPortBusy && activeVoiceMessageNumber.HasValue && IsCwModeActive())
+            {
+                activeVoiceMessageNumber = null;
+                cwTxOffSinceUtc = DateTime.MinValue;
+                OnCwTransmitEnded();
+            }
+            UpdateVoiceMessageButtonHighlight();
+        }
+
+        // The readout shows HolyLogger's own speed: nothing to ask the radio.
+        private void ShowCwPortSpeed()
+        {
+            int wpm = CwPortWpm;
+            cwRadioWpm = wpm;
+            if (cwKeyboard != null) cwKeyboard.ShowSpeed(wpm);
+            if (cwLiteKeyer != null) cwLiteKeyer.ShowSpeed(wpm);
+            if (cwSendMonitor != null) cwSendMonitor.UpdateWpm(wpm);
+        }
+
+        // The wheel over the readout sets it - and a message already going out changes speed from its
+        // next character, as it does on a radio when the knob is turned.
+        private void SetCwPortSpeed(int wpm)
+        {
+            wpm = Math.Max(PortCwKeyer.SlowestWpm, Math.Min(PortCwKeyer.FastestWpm, wpm));
+            try
+            {
+                Properties.Settings.Default.CwKeyerWpm = wpm;
+                Properties.Settings.Default.Save();
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+            if (portCwKeyer != null) portCwKeyer.Wpm = wpm;
+            ShowCwPortSpeed();
+        }
+
+        /// <summary>
+        /// Options changed "CW via", the port or the line. The open port is let go - the next send opens
+        /// the new one - and the keyers are told what they can do now.
+        /// </summary>
+        internal void OnCwViaChanged()
+        {
+            ClosePortKeyer();
+            portCwKeyerTrouble = null;
+
+            try
+            {
+                if (cwKeyboard != null)
+                {
+                    cwKeyboard.CannotKey(WhyTheKeyerCannotSend());
+                    AskRadioCwSpeed();
+                }
+                if (cwLiteKeyer != null) AskRadioCwSpeed();
+                UpdateVoiceMessageAvailabilityState();
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
         }
 
         // NOT OFFERED WHERE IT CANNOT WORK. A line to type CW into is worth nothing with the radio in
@@ -5326,6 +5528,9 @@ namespace HolyLogger
         // it while the keyer window is open, which does the same job in a bigger space.
         private bool CanTypeCwOnTheBar()
         {
+            // From a port: CW mode (the radio's, or the Mode box when CAT is off) and a port that opens.
+            if (CwByPort) return IsCwModeActive() && _startupWindowsReady && PortKeyer() != null;
+
             if (!Properties.Settings.Default.EnableOmniRigCAT) return false;
             if (OmniRigEngine == null || Rig == null) return false;
             if (Rig.Status != OmniRig.RigStatusX.ST_ONLINE) return false;
@@ -5391,6 +5596,8 @@ namespace HolyLogger
 
         private void SetRadioCwSpeed(string rigType, int wpm)
         {
+            if (CwByPort) { SetCwPortSpeed(wpm); return; }
+
             string command = BuildCwSpeedCommand(rigType, wpm);
             if (command == null) return;
 
@@ -5422,6 +5629,7 @@ namespace HolyLogger
 
         private double CwWpmNow()
         {
+            if (CwByPort) return CwPortWpm;
             return cwRadioWpm > 0 ? cwRadioWpm : cwLearnedWpm;
         }
 
@@ -5594,6 +5802,10 @@ namespace HolyLogger
         // the radio busy anyway, and a short chunk is a short wait between typing and hearing it.
         private static int CwChunkSizeFor(string rigType)
         {
+            // From a port a chunk only waits in our own queue, and Escape empties that at once - so
+            // a long one costs nothing and saves the keyer holding the next one back.
+            if (CwByPortSetting()) return 60;
+
             // A YAESU GETS THE WHOLE MEMORY. Its text goes into a 50-character memory that is then
             // played, and nothing may be handed over until that playback has finished - so every chunk
             // costs a pause. Filling the memory makes the pause come once every 50 characters instead
@@ -5615,8 +5827,9 @@ namespace HolyLogger
         private void TriggerCwTextMessage(int messageNumber, string storedTextOverride = null)
         {
             string rigType = NormalizeRigType(Rig != null ? Rig.RigType : null);
+            bool byPort = CwByPort;
 
-            if (!Properties.Settings.Default.EnableOmniRigCAT || OmniRigEngine == null || Rig == null)
+            if (!byPort && (!Properties.Settings.Default.EnableOmniRigCAT || OmniRigEngine == null || Rig == null))
             {
                 HolyMessageBox.ShowWarning(
                     "OmniRig CAT is not available.\n\n"
@@ -5627,7 +5840,7 @@ namespace HolyLogger
                 return;
             }
 
-            if (Rig.Status != OmniRig.RigStatusX.ST_ONLINE)
+            if (!byPort && Rig.Status != OmniRig.RigStatusX.ST_ONLINE)
             {
                 HolyMessageBox.ShowWarning(
                     "The radio is offline.\n\n"
@@ -5642,7 +5855,13 @@ namespace HolyLogger
             // (same pattern as SSB voice messages, using the radio-specific CW stop command).
             int? currentMessageNumber = activeVoiceMessageNumber ?? pendingVoiceMessageNumber;
 
-            if (currentMessageNumber.HasValue)
+            if (currentMessageNumber.HasValue && byPort)
+            {
+                StopCwByPort();
+                ClearVoiceMessageState();
+                if (currentMessageNumber.Value == messageNumber) return;
+            }
+            else if (currentMessageNumber.HasValue)
             {
                 string stopCommand = BuildCwStopCommand(rigType);
 
@@ -5703,6 +5922,25 @@ namespace HolyLogger
                     + "Only letters, digits and  . , ? / @ = + -  go out over the air.\n\n"
                     + "Right-click the button to change its text.",
                     "CW Text", this);
+                return;
+            }
+
+            // FROM A PORT: HolyLogger keys it. The monitor and the button state follow the keying
+            // thread itself (OnCwPortBusyChanged) rather than the radio's transmit flag.
+            if (byPort)
+            {
+                if (!SendCwByPort(cwText))
+                {
+                    HolyMessageBox.ShowWarning(PortKeyerTrouble() + "\n\nNothing was sent.", "CW Text", this);
+                    return;
+                }
+
+                pendingVoiceMessageNumber = messageNumber;
+                activeVoiceMessageNumber = null;
+                pendingVoiceMessageDeadlineUtc = DateTime.UtcNow.AddSeconds(30);
+                if (isCqButton) CwKeyboardWindow.RememberCq(RxFrequencyHz());
+                ShowCwSendMonitor(cwText);
+                RunCwMacroActions(logsQso, wipesForm);
                 return;
             }
 
@@ -8428,7 +8666,11 @@ namespace HolyLogger
 
             string rigType = NormalizeRigType(Rig != null ? Rig.RigType : null);
 
-            if (IsCwModeActive())
+            if (IsCwModeActive() && CwByPort)
+            {
+                StopCwByPort();
+            }
+            else if (IsCwModeActive())
             {
                 string stopCommand = BuildCwStopCommand(rigType);
                 if (!string.IsNullOrWhiteSpace(stopCommand))
@@ -8550,6 +8792,20 @@ namespace HolyLogger
 
         private void UpdateVoiceMessageState()
         {
+            // From a port the keying thread says exactly when a message starts and ends - see
+            // OnCwPortBusyChanged - so the radio's transmit flag is not read for CW at all.
+            if (CwByPort && IsCwModeActive())
+            {
+                if (pendingVoiceMessageNumber.HasValue && !CwPortBusy
+                    && DateTime.UtcNow >= pendingVoiceMessageDeadlineUtc)
+                {
+                    pendingVoiceMessageNumber = null;
+                    CloseCwSendMonitor(false);
+                }
+                UpdateVoiceMessageButtonHighlight();
+                return;
+            }
+
             if (Rig == null)
             {
                 ClearVoiceMessageState();
@@ -8686,7 +8942,9 @@ namespace HolyLogger
 
             bool isCw = IsCwModeActive();
             bool isVoiceAvailable = TryGetVoiceMessageAvailability(out _, out string errorMessage);
-            bool isAvailable = isVoiceAvailable || (isCw && Properties.Settings.Default.EnableOmniRigCAT && OmniRigEngine != null && Rig != null && Rig.Status == OmniRig.RigStatusX.ST_ONLINE);
+            bool isAvailable = isVoiceAvailable
+                               || (isCw && CwByPort && PortKeyer() != null)
+                               || (isCw && !CwByPort && Properties.Settings.Default.EnableOmniRigCAT && OmniRigEngine != null && Rig != null && Rig.Status == OmniRig.RigStatusX.ST_ONLINE);
 
             _messageSendAvailable = isAvailable;
             // Keep the row ENABLED at all times so the buttons can always be right-clicked to edit the
@@ -10772,6 +11030,9 @@ namespace HolyLogger
             // moments before exit would otherwise be lost with the timer).
             SettingsFlush.FlushNow();
             _isShutdownCleanupDone = true;
+
+            // The keying port is let go first of all: a key left down is a transmitter left on.
+            try { ClosePortKeyer(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
 
             // Stop all timers before shutdown to prevent pending async operations
             try { if (HeartbeatTimer != null && HeartbeatTimer.IsEnabled) HeartbeatTimer.Stop(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }

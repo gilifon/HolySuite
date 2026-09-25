@@ -676,6 +676,37 @@ namespace HolyLogger
             return 0;
         }
 
+        // WHICH COM PORT OMNIRIG TALKS TO THE RADIO ON, out of the same file - "COM9", or null when it
+        // cannot be read. The CW keying port must never be that one: see PortKeyer.
+        internal static string ReadOmniRigCatPortFromFile(bool rig2)
+        {
+            try
+            {
+                string path = System.IO.Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                    "Afreet", "Products", "OmniRig", "OmniRig.ini");
+                if (!System.IO.File.Exists(path)) return null;
+
+                string wanted = rig2 ? "[RIG2]" : "[RIG1]";
+                bool inSection = false;
+                foreach (string raw in System.IO.File.ReadAllLines(path))
+                {
+                    string line = (raw ?? string.Empty).Trim();
+                    if (line.StartsWith("[", StringComparison.Ordinal))
+                    {
+                        inSection = string.Equals(line, wanted, StringComparison.OrdinalIgnoreCase);
+                        continue;
+                    }
+                    if (!inSection || !line.StartsWith("Port=", StringComparison.OrdinalIgnoreCase)) continue;
+
+                    int number;
+                    return int.TryParse(line.Substring(5).Trim(), out number) && number > 0 ? "COM" + number : null;
+                }
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+            return null;
+        }
+
         private void ShowPollIntervalAdvice(int pollMs)
         {
             var said = new System.Text.StringBuilder();
