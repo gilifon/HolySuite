@@ -36,6 +36,7 @@ $bulletin = Join-Path $tools "..\training\w1aw\20260915-bulletin0000"
 $own = Join-Path $recordings "4z5sl"
 $own2 = Join-Path $recordings "4z5sl2"
 $own3 = Join-Path $recordings "4z5sl3"
+$fist = Join-Path $recordings "fist1"     # hand-style keying, weak: see recordings\README.md
 $py = Join-Path $PSScriptRoot "..\training\pyenv\Scripts\python.exe"     # its own Python - the one in the session scratchpad was wiped
 $csc = "C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
 $src = [System.IO.File]::ReadAllText((Join-Path $app "CwDecoder.cs"))
@@ -86,5 +87,12 @@ foreach ($v in $Values) {
         if ($o -match "INVENTED (\d+)") { $ownInvented += [int]$Matches[1] }
     }
 
-    "{0} = {1,-8} generated {2,3}/{3}   his recordings {4,3}/34   W1AW read {5,5}  invented {6,5}   4Z5SL read {7,3}/{8}  invented {9,3}" -f $Label, $v, $pass, $tot, $real, $read, $invented, $ownRead, $ownOf, $ownInvented
+    # HAND-STYLE SENDING, WEAK - 25 September on 10112, FistKeyer imitating eight operators, heard
+    # 4 to 8 dB over the band in Hungary and Italy. Scored on its own: it is the case the others lack.
+    & "$build\AbBul.exe" $fist | Out-File "$build\fistout.txt" -Encoding utf8
+    $o = & $py "$tools\ScoreText.py" "$fist\SENT.txt" "$build\fistout.txt"
+    $fistRead = if ($o -match "READ (\d+) of (\d+)") { "$($Matches[1])/$($Matches[2])" } else { "0" }
+    $fistInvented = if ($o -match "INVENTED (\d+)") { [int]$Matches[1] } else { 0 }
+
+    "{0} = {1,-8} generated {2,3}/{3}   his recordings {4,3}/34   W1AW read {5,5}  invented {6,5}   4Z5SL read {7,3}/{8}  invented {9,3}   fist read {10}  invented {11}" -f $Label, $v, $pass, $tot, $real, $read, $invented, $ownRead, $ownOf, $ownInvented, $fistRead, $fistInvented
 }

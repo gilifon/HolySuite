@@ -173,3 +173,19 @@ Real audio made it much better - and it now only EQUALS the plain decoder. It re
 letters in the noise; gating it with the plain decoder's belief takes the noise out and most of the
 gain with it. W1AW comes in strong to the American receivers; what it lacks is weak, fading copies,
 which is where it would have to win. Not in the program.
+
+## recordings/fist1/ - hand-style keying, weak, every edge known
+
+25 September 2026 at 10:15 UTC, 30 W on 10112 kHz. Not his keyer this time: `tools/FistKeyer.cs`
+keyed his IC-7610 through the USB straight-key cable on COM4 (DTR), imitating eight operators - careful,
+average, fast, heavy, clipped, bug, sloppy, hesitant - with uneven element lengths, stretched gaps,
+drifting speed and pauses inside words (`plan.txt`, seed 925). Every key-down and key-up was logged to
+the millisecond (`edges.tsv`); `offsets.tsv` says where time zero of that log falls in each file, so
+every element in every recording has an exact label.
+
+Heard weakly in Hungary (HG5ACZ, elements about 12 dB over their gaps) and Hungary/Italy (HA2NA,
+Trecastelli, about 8 dB); Ischia did not hear it and was left out. Cut by `tools/CutFist.py`.
+
+What it showed: the plain decoder reads 3 words - its signal gate never opens at this level, and
+lowering the gate only reaches 6-9 words while breaking the other benches. A whole-element decoder
+told the speed and levels (`tools/ElementCoherent.py`, pieces of 4 frames, fading allowed) reads 27.
