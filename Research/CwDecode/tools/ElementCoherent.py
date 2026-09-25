@@ -47,6 +47,7 @@ HOP = 0.005
 KINDS = [(True, 1.0, 'dit'), (True, 3.0, 'dah'), (False, 1.0, 'egap'), (False, 3.0, 'lgap'), (False, 7.0, 'wgap')]
 DUR_SD = 0.30
 LONGEST_GAP_UNITS = 60
+MARK_COST = 0.0     # evidence a mark must bring beyond breaking even - see ElementBlind
 NORMALISE = False   # see decode: needed when scores at different speeds are compared
 CHUNK = 0      # 0 = one coherent sum over the whole mark; else pieces of this many frames, fading allowed
 
@@ -79,6 +80,7 @@ def decode(z, unit_frames, amp, noise):
         e2 = np.abs(S) ** 2
         llr = np.log(c * noise / (c * noise + c * c * P)) + e2 * (1 / (c * noise) - 1 / (c * noise + c * c * P))
         F = np.concatenate([[0.0], np.cumsum(llr / c)])
+        decode.F = F
     NEG = -1e18
     best = np.full((T + 1, len(KINDS)), NEG)
     back = np.zeros((T + 1, len(KINDS), 2), dtype=np.int32)
@@ -98,7 +100,7 @@ def decode(z, unit_frames, amp, noise):
             prev = best[starts][:, allowed[k]]
             pb = prev.max(axis=1); pa = np.array(allowed[k])[prev.argmax(axis=1)]
             if is_mark and CHUNK:
-                emit = F[t] - F[starts]
+                emit = F[t] - F[starts] - MARK_COST
             elif is_mark:
                 Y = np.abs(C[t] - C[starts])
                 emit = log_i0(2 * a * Y / s2) - d * a * a / s2

@@ -16,6 +16,7 @@ with open(out, 'w', encoding='utf-8') as f:
         rough = round(fr[m][S[m].argmax()] / 25) * 25
         pitch = B.find_pitch(x, sr, rough)
         z = E.mixed_frames(x, sr, pitch); amp, noise = B.levels(z); unit = B.speed(z, amp, noise)
-        text, _ = E.decode(z, unit, amp, noise)
+        _, segs = E.decode(z, unit, amp, noise)
+        text = B.gated_text(segs, E.decode.F)
         f.write('%s\t%s\n' % (name, text)); f.flush()
         print(name, pitch, text[:120]); sys.stdout.flush()

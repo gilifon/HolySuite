@@ -60,7 +60,19 @@ def levels(z):
     c = 8
     e8 = np.abs(coherent_sum(z, c)) ** 2
     tone = np.maximum((local(e8, lambda s: np.percentile(s, 85)) - c * noise) / (c * c), noise * 0.05)
+    # THE STATION'S STRENGTH IS REMEMBERED THROUGH A PAUSE. Measured only locally, it sank to the noise
+    # in every silence between overs, where "tone" and "no tone" then looked alike and noise was read
+    # as E I E EE - most of the invented words on session 3. Held at half of the strongest seen within
+    # HOLD frames either side, a silence is judged against the station as it was, and reads as silence.
+    if HOLD:
+        step = 200
+        held = np.array([tone[max(0, i - HOLD):i + HOLD].max() for i in range(0, len(tone), step)])
+        tone = np.maximum(tone, HOLD_SHARE * np.repeat(held, step)[:len(tone)])
     return np.sqrt(tone), noise
+
+
+HOLD = 2000          # frames either side (10 s); 0 = off
+HOLD_SHARE = 0.5
 
 
 def speed(z, amp, noise, window=4000, hop=2000):
@@ -88,6 +100,38 @@ def speed(z, amp, noise, window=4000, hop=2000):
         unit[a0:] = g
     E.DUR_SD = keep_sd
     return unit
+
+
+WORD_GATE = 0.6     # a word is shown only if its marks stood out by this much evidence per frame
+
+
+def gated_text(segs, F, gate=None):
+    """The decoded text, keeping only words whose dits and dahs stood out - see WORD_GATE.
+
+    MEASURED on session 3 before it was set: at 0.6 every correctly read word stayed (57 of 57 and 35
+    of 35 on two receivers) while half to two-thirds of the invented ones went - nearly all of them
+    the E I E EE the decoder drew out of the silences between overs, where nothing stands out."""
+    gate = WORD_GATE if gate is None else gate
+    out, letter, word, ev = [], '', '', []
+
+    def flush():
+        nonlocal word, ev
+        if word and (not ev or np.mean(ev) >= gate):
+            out.append(word)
+        word, ev = '', []
+    for n, a, b in segs:
+        if n in ('dit', 'dah'):
+            letter += '.' if n == 'dit' else '-'
+            ev.append((F[b] - F[a]) / (b - a))
+        else:
+            if n in ('lgap', 'wgap') and letter:
+                word += E.MORSE.get(letter, ''); letter = ''
+            if n == 'wgap':
+                flush()
+    if letter:
+        word += E.MORSE.get(letter, '')
+    flush()
+    return ' '.join(out)
 
 
 def main(folder, only, seconds=None):
