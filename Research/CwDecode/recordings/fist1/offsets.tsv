@@ -1,4 +1,4 @@
-file	zero_s	tone_hz	match	on_off_db
-HG5ACZ_Hungary.wav	0.496	500	0.56	7.7
-Trecastelli_Italy.wav	0.496	523	0.38	4.9
-HA2NA_Hungary.wav	0.496	516	0.32	3.9
+file	zero_s	tone_hz	match	on_off_db	drift_ppm
+HG5ACZ_Hungary.wav	0.4956	497.25	0.56	7.7	18.3
+Trecastelli_Italy.wav	0.4956	526.44	0.38	4.9	28.4
+HA2NA_Hungary.wav	0.4956	519.12	0.32	3.9	20.9

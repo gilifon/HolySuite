@@ -26,6 +26,7 @@ def main(folder, only):
     zero = float(o["zero_s"])
     parts = sorted({int(r["part"]) for r in rows})
     downs = np.array([float(r["actual_down_ms"]) / 1000 for r in rows]); ups = np.array([float(r["actual_up_ms"]) / 1000 for r in rows])
+    scale = 1 + float(o.get("drift_ppm") or 0) / 1e6          # the receiver's clock drifts - see CutFist.py
     part_of = np.array([int(r["part"]) for r in rows])
     ditms, span = {}, {}
     for p in parts:
@@ -34,12 +35,12 @@ def main(folder, only):
         span[p] = (downs[part_of == p][0], ups[part_of == p][-1])
     true_dah = np.array([(ups[i] - downs[i]) * 1000 > 2 * ditms[part_of[i]] for i in range(len(rows))])
 
-    pitch = float(sys.argv[3]) if len(sys.argv) > 3 else float(o["tone_hz"])
+    pitch = float(o["tone_hz"])
     z = E.mixed_frames(x, sr, pitch); T = len(z); t = np.arange(T) * E.HOP - zero
     key = np.zeros(T, bool)
-    for d0, u0 in zip(downs, ups): key[int((zero + d0) / E.HOP):int((zero + u0) / E.HOP)] = True
+    for d0, u0 in zip(downs * scale, ups * scale): key[int((zero + d0) / E.HOP):int((zero + u0) / E.HOP)] = True
     C = np.concatenate([[0j], np.cumsum(z)])
-    ea = ((zero + downs) / E.HOP).astype(int); eb = ((zero + ups) / E.HOP).astype(int)
+    ea = ((zero + downs * scale) / E.HOP).astype(int); eb = ((zero + ups * scale) / E.HOP).astype(int)
     elem_amp = np.abs(C[eb] - C[ea]) / (eb - ea); mid = (ea + eb) / 2
     amp = np.empty(T); noise = np.empty(T)
     for c in range(0, T, 200):

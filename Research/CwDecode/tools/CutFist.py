@@ -10,7 +10,8 @@ left out and said so.
 Written next to the cut files:
   SENT.txt          one part per paragraph, as the other 4Z5SL folders
   edges.tsv         copied from the keying run
-  offsets.tsv       per file: where time zero of edges.tsv falls in that file, in seconds, the tone
+  offsets.tsv       per file: where time zero of edges.tsv falls in that file, in seconds (edge time t
+                    sits at zero_s + t * (1 + drift_ppm / 1e6)), the exact tone
                     pitch, how well it matched and how far the tone stood above the gaps - so every
                     element in every file has an exact label
 
@@ -51,7 +52,7 @@ def main(session, out, rxdir, least=0.3):
         key[int(float(r["actual_down_ms"]) / 1000 / hop):int(float(r["actual_up_ms"]) / 1000 / hop)] = 1
 
     os.makedirs(out, exist_ok=True)
-    lines = ["file\tzero_s\ttone_hz\tmatch\ton_off_db"]
+    lines = ["file\tzero_s\ttone_hz\tmatch\ton_off_db\tdrift_ppm"]
     for p in sorted(glob.glob(os.path.join(session, rxdir, "*.wav"))):
         name = os.path.basename(p)
         stamp = name.rsplit("_", 1)[1][:6]
@@ -81,14 +82,42 @@ def main(session, out, rxdir, least=0.3):
         if best[0] < least:
             print("%-40s match %.2f - not heard, left out" % (name, best[0])); continue
 
+        # TO THE MILLISECOND, AND THE CLOCKS DO NOT AGREE. The PC's clock and the receiver's sample
+        # clock differ by some tens of parts per million - 14 ms by the end of a nine-minute run, a
+        # quarter of a dit. So the exact pitch is found first (the one at which the known elements add
+        # up loudest), then the best offset in each part, and a straight line through those offsets
+        # gives time zero and the drift: edge time t sits at zero + t * (1 + drift_ppm / 1e6) in the file.
+        downs = np.array([float(r["actual_down_ms"]) / 1000 for r in rows]); ups = np.array([float(r["actual_up_ms"]) / 1000 for r in rows])
+        part = np.array([int(r["part"]) for r in rows])
+        fine = 0.001; fh = int(fine * sr); nn = (len(x) // fh) * fh
+
+        def coherent(pitch):
+            zz = (x[:nn] * np.exp(-2j * np.pi * pitch * np.arange(nn) / sr)).reshape(-1, fh).sum(1)
+            return np.concatenate([[0j], np.cumsum(zz)])
+
+        def power(Cz, lag, m):
+            ia = ((zero + lag + downs[m]) / fine).astype(int); ib = ((zero + lag + ups[m]) / fine).astype(int)
+            return np.mean(np.abs(Cz[ib] - Cz[ia]) ** 2 / (ib - ia))
+        allm = np.ones(len(rows), bool)
+        grid = np.arange(tone - 6, tone + 6.01, 0.25)
+        pitch = grid[np.argmax([power(coherent(p), 0.0, allm) for p in grid])]
+        Cz = coherent(pitch)
+        mids, lags = [], []
+        for p in sorted(set(part)):
+            m = part == p
+            lg = np.arange(-0.03, 0.0301, 0.001)
+            lags.append(lg[np.argmax([power(Cz, l, m) for l in lg])]); mids.append(downs[m].mean())
+        slope, lag0 = np.polyfit(mids, lags, 1)
+        zero += lag0
+
         # cut: two seconds either side of the keying
-        c0 = max(0.0, zero + first - 2); c1 = zero + last + 2
+        c0 = max(0.0, zero + first - 2); c1 = zero + last * (1 + slope) + 2
         who = name.split("_")[0]
         dst = os.path.join(out, who + ".wav")
         o = wave.open(dst, "wb"); o.setnchannels(1); o.setsampwidth(2); o.setframerate(sr)
         o.writeframes(x[int(c0 * sr):int(c1 * sr)].astype(np.int16).tobytes()); o.close()
-        lines.append("%s\t%.3f\t%.0f\t%.2f\t%.1f" % (who + ".wav", zero - c0, tone, best[0], onoff))
-        print("%-40s match %.2f  tone %3.0f Hz  %4.1f dB above the gaps -> %s" % (name, best[0], tone, onoff, dst))
+        lines.append("%s\t%.4f\t%.2f\t%.2f\t%.1f\t%.1f" % (who + ".wav", zero - c0, pitch, best[0], onoff, slope * 1e6))
+        print("%-40s match %.2f  pitch %.2f Hz  %4.1f dB above the gaps  drift %+.0f ppm -> %s" % (name, best[0], pitch, onoff, slope * 1e6, dst))
 
     open(os.path.join(out, "offsets.tsv"), "w").write("\n".join(lines) + "\n")
     shutil.copy(os.path.join(keyed, "edges.tsv"), os.path.join(out, "edges.tsv"))

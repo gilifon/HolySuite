@@ -47,6 +47,7 @@ HOP = 0.005
 KINDS = [(True, 1.0, 'dit'), (True, 3.0, 'dah'), (False, 1.0, 'egap'), (False, 3.0, 'lgap'), (False, 7.0, 'wgap')]
 DUR_SD = 0.30
 LONGEST_GAP_UNITS = 60
+NORMALISE = False   # see decode: needed when scores at different speeds are compared
 CHUNK = 0      # 0 = one coherent sum over the whole mark; else pieces of this many frames, fading allowed
 
 
@@ -105,10 +106,15 @@ def decode(z, unit_frames, amp, noise):
                 emit = 0.0
             ld = np.log(d / want)
             dur = np.where(ld < 0, -0.5 * (ld / DUR_SD) ** 2, 0.0) if k == 4 else -0.5 * (ld / DUR_SD) ** 2
+            if NORMALISE:
+                # a proper density over the length in frames (log-normal), so that readings at
+                # different speeds - different numbers of segments - can be compared by their score
+                dur = dur - np.log(d * DUR_SD * 2.5066)
             score = pb + emit + dur
             i = int(np.argmax(score))
             if score[i] > best[t, k]:
                 best[t, k] = score[i]; back[t, k] = (starts[i], pa[i])
+    decode.score = float(np.max(best[T]))
     k = int(np.argmax(best[T])); t = T; segs = []
     while t > 0:
         s0, pk = back[t, k]
@@ -146,11 +152,14 @@ def main(folder, only=None):
         w = wave.open(os.path.join(folder, o["file"])); sr = w.getframerate()
         x = np.frombuffer(w.readframes(w.getnframes()), np.int16).astype(float); w.close()
         zero = float(o["zero_s"])
+        # the receiver's clock runs a little apart from the PC's - see CutFist.py
+        scale = 1 + float(o.get("drift_ppm") or 0) / 1e6
+        fd, fu = downs * scale, ups * scale
 
         # ORACLE PITCH: the one, to a tenth of a Hz, at which the known elements add up loudest
         def element_power(pitch):
             z = mixed_frames(x, sr, pitch); C = np.concatenate([[0j], np.cumsum(z)])
-            a = ((zero + downs) / HOP).astype(int); b = ((zero + ups) / HOP).astype(int)
+            a = ((zero + fd) / HOP).astype(int); b = ((zero + fu) / HOP).astype(int)
             ok = (a >= 0) & (b < len(z))
             return np.median(np.abs(C[b[ok]] - C[a[ok]]) ** 2 / (b[ok] - a[ok]))
         p0 = float(o["tone_hz"])
@@ -162,13 +171,13 @@ def main(folder, only=None):
         z = mixed_frames(x, sr, pitch)
         T = len(z); t = np.arange(T) * HOP - zero
         key = np.zeros(T, bool)
-        for d0, u0 in zip(downs, ups):
+        for d0, u0 in zip(fd, fu):
             key[int((zero + d0) / HOP):int((zero + u0) / HOP)] = True
 
         # ORACLE LEVELS, followed through fades: over +-5 s, the noise power in the gaps and the tone
         # amplitude from the elements' own coherent sums
         C = np.concatenate([[0j], np.cumsum(z)])
-        ea = ((zero + downs) / HOP).astype(int); eb = ((zero + ups) / HOP).astype(int)
+        ea = ((zero + fd) / HOP).astype(int); eb = ((zero + fu) / HOP).astype(int)
         elem_amp = np.abs(C[eb] - C[ea]) / (eb - ea)
         elem_mid = (ea + eb) / 2
         amp = np.empty(T); noise = np.empty(T)
