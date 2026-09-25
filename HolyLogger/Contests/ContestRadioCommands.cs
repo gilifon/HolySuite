@@ -58,6 +58,9 @@ namespace HolyLogger.Contests
     public class ContestRadioSetup
     {
         [JsonProperty("contest_id")] public string ContestId { get; set; }
+        // The radio shown when the window was last closed, so it opens on that radio again rather than
+        // whichever one happens to be first in the file.
+        [JsonProperty("last_radio")] public string LastRadio { get; set; }
         [JsonProperty("radios")] public List<RadioCommandSet> Radios { get; set; } = new List<RadioCommandSet>();
     }
 
@@ -142,6 +145,98 @@ namespace HolyLogger.Contests
             Ft857("FT-857"),
             Ft897("FT-897"),
             Ic910("IC-910"),
+            Ts2000("TS-2000"),
+            Ic9700("IC-9700"),
+            Ic9700("IC-9700-DATA"),
+            Ic9700("IC-9700-SAT"),
+            Ic7000("IC-7000"),
+            Ic7000("IC-7000v2"),
+            Ic705("IC-705"),
+            Ic705("IC-705-DATA"),
+        };
+
+        // TS-2000. Text commands, each ending in ';', from Kenwood's own TS-2000 INSTRUCTION MANUAL,
+        // "21 APPENDIX" command reference: FR0;FT0; = select VFO A as both the RX and TX source (i.e.
+        // leave Memory/Call mode); MD4; = FM, sent together with the filter width command so FM is
+        // already on before the simplex command runs (OS is "valid only in FM mode"); FW0001; = DSP
+        // receive filter WIDE (0000=Narrow); OS0; = simplex; TO0; = TONE (encode) OFF; CT0; = CTCSS
+        // (the TSQL function on this radio) OFF - kept apart from TO, unlike the Icoms' single command.
+        // NOT YET CHECKED ON A RADIO.
+        //
+        // No Auto Repeater is left EMPTY. Menu 43 ("Auto repeater offset") does exist (page 34), but the
+        // manual gives no example of the EX command's string for that menu, only the command's general
+        // format and a worked example for menu 00 - a guessed EX string was rejected by the operator.
+        private static RadioCommandSet Ts2000(string name) => new RadioCommandSet
+        {
+            Radio = name,
+            Vfo = "FR0;FT0;",
+            FmWide = "MD4;FW0001;",
+            NoAutoRepeater = "",
+            Simplex = "OS0;",
+            NoTone = "TO0;",
+            NoTsql = "CT0;",
+        };
+
+        // IC-9700, CI-V address A2. From Icom's IC-9700 CI-V REFERENCE GUIDE command table:
+        //   07 00 = Select the VFO mode, VFO A - UNLIKE the ID-5100/IC-7100/IC-910, this radio's "07"
+        //     is a group header with no command of its own; "00" (Select VFO A) is what is actually sent.
+        //   0F 10 = Set the simplex operation.
+        //   16 42 00 / 16 43 00 = Repeater tone OFF / Tone squelch OFF.
+        //   1A 05 0047 00 = Auto Repeater OFF (menu "SET > Function > Auto Repeater", 00=OFF, counted
+        //     off the guide's own sequential menu-number list, since the two-column PDF put the numbers
+        //     and their descriptions in different columns).
+        // FM wide is left EMPTY: mode 06 05 takes an FIL1/FIL2/FIL3 filter byte, but the guide never
+        // says which of the three is "wide" for FM (unlike the IC-7100's guide, which does). NOT YET
+        // CHECKED ON A RADIO.
+        private static RadioCommandSet Ic9700(string name) => new RadioCommandSet
+        {
+            Radio = name,
+            Vfo = "FE FE A2 E0 07 00 FD",
+            FmWide = "",
+            NoAutoRepeater = "FE FE A2 E0 1A 05 00 47 00 FD",
+            Simplex = "FE FE A2 E0 0F 10 FD",
+            NoTone = "FE FE A2 E0 16 42 00 FD",
+            NoTsql = "FE FE A2 E0 16 43 00 FD",
+        };
+
+        // IC-7000, CI-V default address 70h. From Icom's own IC-7000 INSTRUCTION MANUAL, "17 CONTROL
+        // COMMAND" section (its own command table, not borrowed from another radio):
+        //   07 alone = Select VFO mode (same bare command as the ID-5100/IC-7100/IC-910).
+        //   0F 10 = Select simplex operation.
+        //   16 42 00 / 16 43 00 = Repeater tone OFF / Tone squelch OFF.
+        //   1A 05 0060 00 = "auto repeater set", 0=OFF (the table's own name for the setting).
+        // FM wide is left EMPTY: command 06 (mode select) lists no filter-width sub-byte for FM at all,
+        // and the only wide/narrow SSB-bandwidth commands found (1A 05 0003 etc.) are for SSB, not FM.
+        // NOT YET CHECKED ON A RADIO.
+        private static RadioCommandSet Ic7000(string name) => new RadioCommandSet
+        {
+            Radio = name,
+            Vfo = "FE FE 70 E0 07 FD",
+            FmWide = "",
+            NoAutoRepeater = "FE FE 70 E0 1A 05 00 60 00 FD",
+            Simplex = "FE FE 70 E0 0F 10 FD",
+            NoTone = "FE FE 70 E0 16 42 00 FD",
+            NoTsql = "FE FE 70 E0 16 43 00 FD",
+        };
+
+        // IC-705, CI-V address A4. From Icom's IC-705 CI-V REFERENCE GUIDE command table:
+        //   07 00 = Select the VFO mode, VFO A (same group-header/sub-command split as the IC-9700).
+        //   0F 10 = Set the simplex operation.
+        //   16 42 00 / 16 43 00 = Repeater tone OFF / Tone squelch OFF.
+        //   1A 05 0049 00 = Auto Repeater OFF ("Send/read the Auto Repeater setting", 00=OFF; menu
+        //     number counted off the guide's own sequential list, same method as the IC-9700's).
+        // FM wide is left EMPTY, for the same reason as the IC-9700: no FIL1/2/3 filter is documented
+        // as "wide" for FM, and the radio's separate WFM mode (06) is FM broadcast reception, not a
+        // wider voice filter. NOT YET CHECKED ON A RADIO.
+        private static RadioCommandSet Ic705(string name) => new RadioCommandSet
+        {
+            Radio = name,
+            Vfo = "FE FE A4 E0 07 00 FD",
+            FmWide = "",
+            NoAutoRepeater = "FE FE A4 E0 1A 05 00 49 00 FD",
+            Simplex = "FE FE A4 E0 0F 10 FD",
+            NoTone = "FE FE A4 E0 16 42 00 FD",
+            NoTsql = "FE FE A4 E0 16 43 00 FD",
         };
 
         // IC-7100, CI-V address 88. Every command below is from Icom's IC-7100 ADVANCED INSTRUCTIONS,
@@ -352,7 +447,7 @@ namespace HolyLogger.Contests
             }
         }
 
-        public static void Save(string contestId, IEnumerable<RadioCommandSet> sets)
+        public static void Save(string contestId, string lastRadio, IEnumerable<RadioCommandSet> sets)
         {
             try
             {
@@ -360,6 +455,7 @@ namespace HolyLogger.Contests
                 var setup = new ContestRadioSetup
                 {
                     ContestId = contestId,
+                    LastRadio = string.IsNullOrWhiteSpace(lastRadio) ? null : lastRadio.Trim(),
                     // A row with a name and no commands is not worth keeping: it only shadows the
                     // commands HolyLogger ships for that radio the next time the window opens.
                     Radios = sets.Where(s => s != null && !s.IsEmpty && s.CommandsToSend().Count > 0).ToList()

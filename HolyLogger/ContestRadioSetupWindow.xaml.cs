@@ -50,8 +50,13 @@ namespace HolyLogger
 
             // The radios already set up come first in the box, so the operator's own are at hand.
             FillRadioBox();
-            string first = _sets.Select(s => (s.Radio ?? "").Trim()).FirstOrDefault(n => n.Length > 0)
-                           ?? RigNames.FirstOrDefault() ?? string.Empty;
+            // Opens on the radio he was last looking at - saved on Closing - and only falls back to the
+            // first radio with commands (or the first offered at all) the very first time the window
+            // is opened, before anything has been looked at yet.
+            string first = (setup.LastRadio ?? "").Trim();
+            if (first.Length == 0)
+                first = _sets.Select(s => (s.Radio ?? "").Trim()).FirstOrDefault(n => n.Length > 0)
+                        ?? RigNames.FirstOrDefault() ?? string.Empty;
             ShowRadio(first);
             SelectInBox(first);
             // The full list is for the one pick that follows Add Radio; DropDownClosed below puts the
@@ -304,7 +309,7 @@ namespace HolyLogger
         private void Window_Closing(object sender, CancelEventArgs e)
         {
             if (!CheckCommands(_sets)) { e.Cancel = true; return; }
-            ContestRadioCommands.Save((ContestBox.SelectedItem as Contest)?.Id, _sets);
+            ContestRadioCommands.Save((ContestBox.SelectedItem as Contest)?.Id, _shown?.Radio, _sets);
         }
 
         // Stops a byte typed with one digit ("07 0 FD") from being sent as text.
