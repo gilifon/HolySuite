@@ -139,6 +139,10 @@ namespace HolyLogger.OptionsUserControls
             InitSoundDevicePicker(CB_SoundDevice, Properties.Settings.Default.SoundOutputDevice);
             InitCwViaPicker();
 
+            // THE PORT LIST FOLLOWS THE USB PLUGS by itself while this page is open - see ListenForPorts.
+            Loaded += (sender, args) => ListenForPorts(true);
+            Unloaded += (sender, args) => ListenForPorts(false);
+
             HasChanged = false;
         }
 
@@ -148,15 +152,26 @@ namespace HolyLogger.OptionsUserControls
         // (OnCwViaChanged): it lets go of the old port, and a keyer window already open follows.
         bool _loadingCwVia;
 
-        sealed class PortChoice
+        // Properties, not fields: the list's template binds to IsNew to paint a new port bold green.
+        public sealed class PortChoice
         {
-            public string Port;
-            public string Text;
+            public string Port { get; set; }
+            public string Text { get; set; }
+            public bool IsNew { get; set; }
             public override string ToString() { return Text; }
         }
 
+        // WHICH PORT IS THE KEYING CABLE? Nobody knows COM numbers by heart, and the adapter's name in the
+        // list rarely says "keyer". So the page watches: every port that appears while it is open is
+        // painted bold green, and one that appears on its own is the cable just plugged in - it is
+        // chosen for him and the line underneath says so.
+        HashSet<string> _knownPorts;
+        readonly HashSet<string> _newPorts = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        string _justAppeared;
+
         void InitCwViaPicker()
         {
+            string choose = null;
             _loadingCwVia = true;
             try
             {
@@ -166,6 +181,19 @@ namespace HolyLogger.OptionsUserControls
                 var present = new List<string>();
                 try { present.AddRange(System.IO.Ports.SerialPort.GetPortNames()); }
                 catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+                // What changed since the list was last read. Nothing is "new" on the first look - every
+                // port was already there when the page opened.
+                if (_knownPorts != null)
+                {
+                    var appeared = present.Where(p => !_knownPorts.Contains(p)).ToList();
+                    foreach (string p in appeared) _newPorts.Add(p);
+                    if (appeared.Count == 1) { _justAppeared = appeared[0]; choose = appeared[0]; }
+                    else if (appeared.Count > 1) _justAppeared = null;
+                }
+                _newPorts.RemoveWhere(p => !present.Contains(p, StringComparer.OrdinalIgnoreCase));
+                if (_justAppeared != null && !present.Contains(_justAppeared, StringComparer.OrdinalIgnoreCase)) _justAppeared = null;
+                _knownPorts = new HashSet<string>(present, StringComparer.OrdinalIgnoreCase);
 
                 // A port chosen earlier and not plugged in now is still offered, so the choice is not
                 // silently lost - it just says it is not there.
@@ -184,7 +212,7 @@ namespace HolyLogger.OptionsUserControls
                                          text += "  (radio CAT)";
                                      else if (!present.Contains(n, StringComparer.OrdinalIgnoreCase))
                                          text += "  (not plugged in)";
-                                     return new PortChoice { Port = n, Text = text };
+                                     return new PortChoice { Port = n, Text = text, IsNew = _newPorts.Contains(n) };
                                  })
                                  .ToList();
 
@@ -200,7 +228,59 @@ namespace HolyLogger.OptionsUserControls
             }
             finally { _loadingCwVia = false; }
 
+            // The cable just plugged in is chosen - and saved, through the same path as a click - unless
+            // it is the radio's own CAT port, which is never a keying cable.
+            if (choose != null && CB_CwKeyPort.ItemsSource is List<PortChoice>)
+            {
+                var item = ((List<PortChoice>)CB_CwKeyPort.ItemsSource)
+                           .FirstOrDefault(i => string.Equals(i.Port, choose, StringComparison.OrdinalIgnoreCase));
+                string catPort = MainWindow.ReadOmniRigCatPortFromFile(Properties.Settings.Default.SelectedOmniRig2);
+                if (item != null && !string.Equals(choose, catPort, StringComparison.OrdinalIgnoreCase))
+                    CB_CwKeyPort.SelectedItem = item;      // raises CwVia_Changed, which saves it
+            }
+
             ShowCwViaNote();
+        }
+
+        // -- LISTENING FOR USB PLUGS --------------------------------------------------------------
+        //
+        // Windows tells every open window when a device comes or goes (WM_DEVICECHANGE) - it is how
+        // Device Manager refreshes itself. For a serial port it can even name the port, but not every
+        // driver says so (virtual ports made by software may not), so the port-specific news is not
+        // trusted alone: ANY device change makes the page read the port list again and compare it with
+        // the last one. That is also why there is no Refresh button any more.
+        //
+        // A plug-in arrives as several messages, and the port may not be in the list at the first of
+        // them, so the list is read once they have been quiet for a moment.
+        const int WM_DEVICECHANGE = 0x0219;
+        System.Windows.Interop.HwndSource _hookedTo;
+        System.Windows.Threading.DispatcherTimer _portSettle;
+
+        void ListenForPorts(bool on)
+        {
+            try
+            {
+                if (_hookedTo != null) { _hookedTo.RemoveHook(DeviceChangeHook); _hookedTo = null; }
+                if (!on) { if (_portSettle != null) _portSettle.Stop(); return; }
+
+                _hookedTo = PresentationSource.FromVisual(this) as System.Windows.Interop.HwndSource;
+                if (_hookedTo != null) _hookedTo.AddHook(DeviceChangeHook);
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        IntPtr DeviceChangeHook(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+        {
+            if (msg != WM_DEVICECHANGE) return IntPtr.Zero;
+
+            if (_portSettle == null)
+            {
+                _portSettle = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(700) };
+                _portSettle.Tick += (sender, args) => { _portSettle.Stop(); InitCwViaPicker(); };
+            }
+            _portSettle.Stop();
+            _portSettle.Start();
+            return IntPtr.Zero;
         }
 
         static int PortNumber(string name)
@@ -257,11 +337,6 @@ namespace HolyLogger.OptionsUserControls
             return found;
         }
 
-        private void BTN_RefreshCwKeyPorts_Click(object sender, RoutedEventArgs e)
-        {
-            InitCwViaPicker();
-        }
-
         private void CwVia_Changed(object sender, RoutedEventArgs e)
         {
             if (_loadingCwVia || RB_CwViaPort == null || CB_CwKeyPort == null || CB_CwKeyLine == null) return;
@@ -299,20 +374,27 @@ namespace HolyLogger.OptionsUserControls
             bool bad = false;
             string text;
 
+            bool fresh = choice != null && _justAppeared != null
+                         && string.Equals(choice.Port, _justAppeared, StringComparison.OrdinalIgnoreCase);
+
             if (!byPort)
                 text = "The radio keys the CW itself, at the speed set on the radio.";
             else if (choice == null)
-            { text = "Choose the port of the cable on the radio's KEY input."; bad = true; }
+            { text = "Plug in your keying cable - or unplug it and plug it back in - and its port will be chosen."; bad = true; }
             else if (catPort != null && string.Equals(choice.Port, catPort, StringComparison.OrdinalIgnoreCase))
             { text = choice.Port + " is the radio's CAT port. Choose the keying cable's port."; bad = true; }
+            else if (fresh)
+                text = choice.Port + " just appeared - this is probably your keying cable. BK-IN must be on at the radio.";
             else
                 text = "HolyLogger keys the radio on " + choice.Port + ", at the speed set in the CW Keyer. "
                      + "BK-IN must be on at the radio.";
 
             CwViaNote.Text = text;
+            CwViaNote.FontWeight = fresh ? FontWeights.Bold : FontWeights.Normal;
             CwViaNote.Foreground = bad
                 ? new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0xC6, 0x28, 0x28))
-                : System.Windows.Media.Brushes.Gray;
+                : fresh ? new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x1B, 0x7F, 0x2E))
+                        : System.Windows.Media.Brushes.Gray;
         }
 
         // Sentinel dropdown entry for "use the Windows default device"; stored as an empty setting.
