@@ -134,7 +134,7 @@ def speed(z, amp, noise, window=4000, hop=2000):
     return unit
 
 
-WORD_GATE = 0.6     # a word is shown only if its marks stood out by this much evidence per frame
+WORD_GATE = float(__import__('os').environ.get('WORD_GATE', '0.6'))     # a word is shown only if its marks stood out by this much evidence per frame
 
 
 def gated_text(segs, F, gate=None):

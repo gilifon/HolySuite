@@ -4,6 +4,8 @@ import sys, os, glob, wave
 import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import ElementBlind as B, ElementCoherent as E
+STRONG_DB = float(os.environ.get('STRONG_DB', '0'))
+STRONG_CHUNK = int(os.environ.get('STRONG_CHUNK', '2'))
 TRACK = os.environ.get('TRACK_PITCH', '1') == '1'
 LEARN = os.environ.get('LEARN_TIMING', '1') == '1'
 ADAPT = os.environ.get('ADAPT_CHUNK', '1') == '1'
@@ -29,6 +31,10 @@ with open(out, 'w', encoding='utf-8') as f:
         # (the fast French QSO went from 5 of 9 words to 8).
         u = np.median(unit)
         if ADAPT and u < 9: E.CHUNK = int(np.clip(round(u / 3), 2, 4))
+        # A STRONG SIGNAL NEEDS NO PIECES: a piece of c frames smears each tone c-1 frames into the gaps
+        # around it, which on a weak signal buys noise protection and on a strong one only blurs the gaps.
+        snr = 10 * np.log10(np.median(amp ** 2) / np.median(noise))
+        if STRONG_DB and snr > STRONG_DB: E.CHUNK = min(E.CHUNK, STRONG_CHUNK)
         _, segs = E.decode(z, unit, amp, noise)
         if LEARN:
             # THE OPERATOR'S OWN TIMING. The first reading assumes the book - dah 3, gaps 1, 3, 7 -

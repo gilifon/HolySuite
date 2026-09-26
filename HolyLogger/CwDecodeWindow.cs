@@ -94,10 +94,15 @@ namespace HolyLogger
         static bool _netTried;
         CwNeuralDecoder _neural;
 
+        // THE NEW DECODER, ON TEST (see CwElementDecoder): judges whole dits and dahs. Fed always,
+        // like the others, so switching to it is instant. In Both it is the one under the plain
+        // decoder - comparing those two on the air is what it is here for.
+        CwElementDecoder _element;
+
         CwDecodedText _text;
         TextBlock _speedText;
         Ellipse _lamp;
-        Button _plainBtn, _networkBtn, _bothBtn;
+        Button _plainBtn, _networkBtn, _bothBtn, _newBtn;
         CwDecodedText _networkText;
         Border _networkFrame;
         TextBlock _plainLabel, _networkLabel;
@@ -108,10 +113,11 @@ namespace HolyLogger
         // hops a minute for something the eye cannot see happening that fast anyway.
         readonly StringBuilder _pendingPlain = new StringBuilder();
         readonly StringBuilder _pendingNetwork = new StringBuilder();
+        readonly StringBuilder _pendingElement = new StringBuilder();
         readonly object _pendingGate = new object();
 
         /// <summary>Which reader's letters are shown.</summary>
-        public enum Reader { Plain, Network, Both }
+        public enum Reader { Plain, Network, Both, New }
 
         // The lamp falls back gently instead of snapping to grey between characters. Without it it
         // flickers on CW - which is silence half the time - and cannot be read at all.
@@ -120,13 +126,16 @@ namespace HolyLogger
         public CwDecodeWindow()
         {
             Title = "CW Decoder";
-            Width = 620;
+            Width = 660;
             Height = 300;
 
             // WIDE ENOUGH FOR THE BAR, SHORT ENOUGH FOR ONE LINE. The floor on the height is the bar
             // plus a single row of text: an operator who wants a one-line ticker along the bottom of
             // his screen must be able to have one, and any taller floor than this would refuse him.
-            MinWidth = 380;
+            // The width floor is the whole bar - title, lamp, speed, the four reader keys, Clear and
+            // the close cross - measured at 618 px with the speed showing; at the old 380 the Clear key
+            // and the close cross were pushed out of the window.
+            MinWidth = 630;
 
             // The bar, plus the framed paper with one row of text in it. Anything taller than this
             // would refuse an operator who wants a one-line ticker along the edge of his screen.
@@ -195,7 +204,7 @@ namespace HolyLogger
             _networkFrame.Visibility = Visibility.Collapsed;
 
             _plainLabel = Label("Plain");
-            _networkLabel = Label("Network");
+            _networkLabel = Label("New (test)");
             _plainLabel.Visibility = Visibility.Collapsed;
 
             var titleBar = BuildTitleBar();
@@ -354,9 +363,11 @@ namespace HolyLogger
             // question with two answers rather than as two separate switches.
             _plainBtn = BarButton("Plain", "The arithmetic decoder - no network, and the one that has been on the air longest.");
             _networkBtn = BarButton("Net", "The neural network. Better on some signals, worse on others.");
-            _bothBtn = BarButton("Both", "Both at once, one under the other, reading the same signal - the only fair way to see which suits your station.");
+            _newBtn = BarButton("New", "The new decoder, on test. Better on weak signals, still worse on some strong fast ones.");
+            _bothBtn = BarButton("Both", "Plain and New at once, one under the other, reading the same signal - the only fair way to see which suits your station.");
             _plainBtn.Click += (s, e) => ShowWhich(Reader.Plain);
             _networkBtn.Click += (s, e) => ShowWhich(Reader.Network);
+            _newBtn.Click += (s, e) => ShowWhich(Reader.New);
             _bothBtn.Click += (s, e) => ShowWhich(Reader.Both);
 
             var whichPanel = new StackPanel
@@ -366,6 +377,7 @@ namespace HolyLogger
             };
             whichPanel.Children.Add(_plainBtn);
             whichPanel.Children.Add(_networkBtn);
+            whichPanel.Children.Add(_newBtn);
             whichPanel.Children.Add(_bothBtn);
 
             var right = new StackPanel { Orientation = Orientation.Horizontal };
@@ -419,7 +431,7 @@ namespace HolyLogger
 
         void ShowWhich(Reader which)
         {
-            if (which != Reader.Plain && !SharedNet.Loaded) return;
+            if (which == Reader.Network && !SharedNet.Loaded) return;
 
             try
             {
@@ -439,16 +451,13 @@ namespace HolyLogger
             PaintChoice(_plainBtn, which == Reader.Plain);
             PaintChoice(_networkBtn, which == Reader.Network);
             PaintChoice(_bothBtn, which == Reader.Both);
+            PaintChoice(_newBtn, which == Reader.New);
 
-            if (!SharedNet.Loaded)
+            if (!SharedNet.Loaded && _networkBtn != null)
             {
-                foreach (var b in new[] { _networkBtn, _bothBtn })
-                {
-                    if (b == null) continue;
-                    b.IsEnabled = false;
-                    b.Opacity = 0.45;
-                    b.ToolTip = "The network file is missing, so only the plain decoder can run.";
-                }
+                _networkBtn.IsEnabled = false;
+                _networkBtn.Opacity = 0.45;
+                _networkBtn.ToolTip = "The network file is missing, so the network cannot run.";
             }
         }
 
@@ -485,7 +494,8 @@ namespace HolyLogger
                 try
                 {
                     var which = (Reader)Properties.Settings.Default.CwDecodeShow;
-                    if (which != Reader.Plain && !SharedNet.Loaded) return Reader.Plain;
+                    if (which == Reader.Network && !SharedNet.Loaded) return Reader.Plain;
+                    if (which < Reader.Plain || which > Reader.New) return Reader.Plain;
                     return which;
                 }
                 catch (Exception swallowed) { Log.Swallow(swallowed); return Reader.Plain; }
@@ -713,6 +723,10 @@ namespace HolyLogger
                 _neural = neural;
             }
 
+            var element = new CwElementDecoder(_recorder.ActualSampleRate);
+            element.Text += OnElementText;
+            _element = element;
+
             _shownLevel = 0;
             _screenTimer.Start();
         }
@@ -731,6 +745,10 @@ namespace HolyLogger
             _neural = null;
             if (neural != null) neural.Text -= OnNetworkText;
 
+            var element = _element;
+            _element = null;
+            if (element != null) { element.Text -= OnElementText; element.Dispose(); }
+
             FlushPendingText();
 
             _shownLevel = 0;
@@ -740,7 +758,7 @@ namespace HolyLogger
 
         void ClearEverything()
         {
-            lock (_pendingGate) { _pendingPlain.Clear(); _pendingNetwork.Clear(); }
+            lock (_pendingGate) { _pendingPlain.Clear(); _pendingNetwork.Clear(); _pendingElement.Clear(); }
             _text.Clear();
             if (_networkText != null) _networkText.Clear();
 
@@ -749,6 +767,9 @@ namespace HolyLogger
 
             var neural = _neural;
             if (neural != null) neural.Reset();
+
+            var element = _element;
+            if (element != null) element.Reset();
         }
 
         void ShowTrouble(string message)
@@ -766,6 +787,14 @@ namespace HolyLogger
 
             try { decoder.Process(samples, count); }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+            // Only copied here; the reading itself runs on the new decoder's own thread.
+            var element = _element;
+            if (element != null)
+            {
+                try { element.Process(samples, count); }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
+            }
 
             // BOTH READERS ARE FED, WHICHEVER IS ON SHOW, so changing the choice on the bar is
             // instant and the one that was hidden is not starting from cold.
@@ -787,14 +816,23 @@ namespace HolyLogger
         // show is still running and still being fed - its letters are simply dropped here.
         void OnPlainText(string text)
         {
-            if (Showing == Reader.Network) return;
+            var showing = Showing;
+            if (showing == Reader.Network || showing == Reader.New) return;
             lock (_pendingGate) _pendingPlain.Append(text);
         }
 
         void OnNetworkText(string text)
         {
-            if (Showing == Reader.Plain) return;
+            if (Showing != Reader.Network) return;
             lock (_pendingGate) _pendingNetwork.Append(text);
+        }
+
+        // On the new decoder's own thread.
+        void OnElementText(string text)
+        {
+            var showing = Showing;
+            if (showing != Reader.New && showing != Reader.Both) return;
+            lock (_pendingGate) _pendingElement.Append(text);
         }
 
         void ScreenTimer_Tick(object sender, EventArgs e)
@@ -806,13 +844,15 @@ namespace HolyLogger
 
         void FlushPendingText()
         {
-            string plain, network;
+            string plain, network, element;
             lock (_pendingGate)
             {
                 plain = _pendingPlain.ToString();
                 network = _pendingNetwork.ToString();
+                element = _pendingElement.ToString();
                 _pendingPlain.Clear();
                 _pendingNetwork.Clear();
+                _pendingElement.Clear();
             }
 
             // The readers are told the note and the speed before they are given the letters: it is
@@ -826,13 +866,15 @@ namespace HolyLogger
                 if (_networkText != null) { _networkText.ToneHz = note; _networkText.Wpm = speed; }
             }
 
-            // In Plain and Network the one on show writes into the top box; in Both each has its
-            // own. So the top box is the plain reader's, unless only the network is on show.
-            if (Showing == Reader.Network) AppendTo(_text, network);
+            // With one reader on show it writes into the top box; in Both the plain decoder has the
+            // top box and the new one the box under it.
+            var showing = Showing;
+            if (showing == Reader.Network) AppendTo(_text, network);
+            else if (showing == Reader.New) AppendTo(_text, element);
             else
             {
                 AppendTo(_text, plain);
-                if (Showing == Reader.Both) AppendTo(_networkText, network);
+                if (showing == Reader.Both) AppendTo(_networkText, element);
             }
         }
 
