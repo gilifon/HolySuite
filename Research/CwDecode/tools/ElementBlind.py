@@ -93,9 +93,16 @@ def levels(z):
         step = 200
         held = np.array([tone[max(0, i - HOLD):i + HOLD].max() for i in range(0, len(tone), step)])
         tone = np.maximum(tone, HOLD_SHARE * np.repeat(held, step)[:len(tone)])
+    # A STRONG STATION NEVER FALLS QUITE TO SILENCE between its own elements - the receiver's filter
+    # rings and its AGC swings - and against a noise floor 30 dB down that leftover reads as tone. On
+    # W3PIE (29 dB) most of the mistakes were the FIRST letter of a word (SUN -> NUN, FROM -> GROM),
+    # two dits bridged into a dah. So "no tone" is allowed to hold a small share of the station itself.
+    if LEAK:
+        noise = np.maximum(noise, LEAK * tone)
     return np.sqrt(tone), noise
 
 
+LEAK = float(__import__('os').environ.get('TONE_LEAK', '0.01'))   # 1%: W3PIE 134 read / 29 invented -> 156 / 6; W1AW 1036/298 -> 1158/168; RealBench 23 -> 26; air sessions unchanged
 HOLD = 2000          # frames either side (10 s); 0 = off
 HOLD_SHARE = 0.5
 
