@@ -576,6 +576,19 @@ namespace HolyLogger
         private void ActivitySig_DropDownOpened(object sender, EventArgs e)
         {
             activitySigBeforeDropDown = (CB_ActivitySig.Text ?? "").Trim();
+
+            // THE BLANK LINE STAYS IN SIGHT. WPF opens the list scrolled to the chosen program, and with
+            // WWFF chosen that pushed the blank "No Activity" line - the way out of a program - one row
+            // off the top. The list goes back to its first line; a program further down is then brought
+            // into view, which scrolls only when it would otherwise be hidden.
+            Dispatcher.BeginInvoke(new Action(delegate
+            {
+                ContestRadioSetupWindow.ScrollToTop(CB_ActivitySig);
+                int index = CB_ActivitySig.SelectedIndex;
+                var chosen = index < 0 ? null
+                             : CB_ActivitySig.ItemContainerGenerator.ContainerFromIndex(index) as FrameworkElement;
+                if (chosen != null) chosen.BringIntoView();
+            }), System.Windows.Threading.DispatcherPriority.Background);
         }
 
         // Choosing Contest EXPLAINS; it does not select. The word is on the list because that is where
