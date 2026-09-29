@@ -53,6 +53,11 @@ namespace HolyLogger.Contests
         // True for a contest not worked through satellites (Sukkot): opening its log turns Satellite
         // Mode off.
         [JsonProperty("no_satellite")] public bool NoSatellite { get; set; }
+
+        // Optional boxes in the received row that are NOT part of the exchange (not in SRX, not in
+        // Cabrillo): what is typed there is added to the QSO's Comment, so it travels in every ADIF
+        // export. Sukkot: HOLYLAND_AREA - the other station's Holyland square, when he gives it.
+        [JsonProperty("comment_fields")] public List<string> CommentFields { get; set; }
     }
 
     public class ContestChannel

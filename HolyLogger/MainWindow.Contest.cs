@@ -250,6 +250,7 @@ namespace HolyLogger
             double gap = Math.Max(10, dateRight - ContestTxPanel.Margin.Left - used - comboWidth);
 
             var col = new StackPanel { Orientation = Orientation.Vertical, Margin = new Thickness(gap, 0, 10, 0) };
+            _contestChannelLeft = ContestTxPanel.Margin.Left + used + gap;
             col.Children.Add(ContestCellLabel("Channel"));
             var combo = new ComboBox
             {
@@ -446,6 +447,8 @@ namespace HolyLogger
 
             foreach (var b in _contestRxBoxes) b.TextChanged -= ContestRxBox_TextChanged;
             _contestRxBoxes.Clear();
+            foreach (var cb in _contestCommentBoxes) cb.PreviewLostKeyboardFocus -= ContestCommentBox_PreviewLostKeyboardFocus;
+            _contestCommentBoxes.Clear();
             if (_contestRxGridBox != null)
             {
                 _contestRxGridBox.TextChanged -= ContestRxGridBox_TextChanged;
@@ -527,6 +530,26 @@ namespace HolyLogger
                 _contestRxBoxes.Add(box);
             }
 
+            // Boxes that are NOT the exchange (see Contest.CommentFields): after the exchange, in the
+            // same row, but kept out of _contestRxBoxes so they never reach TB_Exchange / SRX.
+            if (contest.CommentFields != null)
+                foreach (string field in contest.CommentFields)
+                {
+                    ContestFieldUi(field, out string label, out double width);
+                    TextBox box = AddContestCell(label, width, tab++, ContestRxPanel);
+                    box.Tag = (field ?? string.Empty).ToUpperInvariant();
+                    // As wide as its label, both starting at the same left edge (his layout).
+                    if (box.Parent is StackPanel cell && cell.Children.Count > 0 && cell.Children[0] is TextBlock caption)
+                    {
+                        caption.HorizontalAlignment = HorizontalAlignment.Left;
+                        box.HorizontalAlignment = HorizontalAlignment.Left;
+                        caption.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+                        box.Width = Math.Max(width, Math.Ceiling(caption.DesiredSize.Width));
+                    }
+                    box.PreviewLostKeyboardFocus += ContestCommentBox_PreviewLostKeyboardFocus;
+                    _contestCommentBoxes.Add(box);
+                }
+
             // SEND frame: RST(S) first (aligned under RST-R), then EVERY field of the SENT exchange
             // (asymmetric contests switch on MY callsign). Each is auto-filled (serial/zone/area) or a
             // remembered editable value, and skipped by Tab — the operator types received data.
@@ -553,8 +576,10 @@ namespace HolyLogger
                     if (fieldKey == "SERIAL") _contestSendSerialBox = sbox;
                     _contestSendBoxes.Add(sbox);
                 }
+                _contestChannelLeft = double.NaN;
                 if (contest.Channels != null && contest.Channels.Count > 0)
                     AddContestChannelCell(contest.Channels);
+                AlignContestCommentCells();
                 ContestTxPanel.Visibility = Visibility.Visible;
             }
             SetExchangeLabel(L_SendLabel, "Exchange", "send", true);
@@ -768,7 +793,9 @@ namespace HolyLogger
             WarnInvalidField(_contestRxGridBox, ContestRxGridMessage(grid), "Wrong Grid Locator");
         }
 
-        // Called by Add: false (and the warning shown) when the received grid is not a grid locator.
+        // Called by Add: false (and the warning shown) when the received grid is not a grid locator -
+        // or is EMPTY: in a contest that asks for the grid it is the exchange, and a QSO without it
+        // was saved all the same (nothing else checks the contest boxes).
         // Not while HolyLogger is closing: pressing X always closes it. If he answered "save" to the
         // unsaved-QSO question on the way out, the QSO is saved as typed rather than lost - a wrong
         // grid can be put right later in the Log Workshop, a lost QSO cannot.
@@ -776,7 +803,13 @@ namespace HolyLogger
 
         internal bool ContestRxGridOkBeforeSave()
         {
-            if (_closeInProgress) return true;
+            if (_closeInProgress || _contestRxGridBox == null) return true;
+            if (string.IsNullOrWhiteSpace(_contestRxGridBox.Text))
+            {
+                if (!_fieldWarningOpen)
+                    WarnInvalidField(_contestRxGridBox, "The Grid Locator is empty.\n\nType the grid the station gave you.", "No Grid Locator");
+                return false;
+            }
             if (!ContestRxGridIsWrong(out string grid)) return true;
             if (!_fieldWarningOpen)
                 WarnInvalidField(_contestRxGridBox, ContestRxGridMessage(grid), "Wrong Grid Locator");
@@ -790,6 +823,83 @@ namespace HolyLogger
         {
             foreach (var b in _contestRxBoxes)
                 b.Text = string.Empty;
+            foreach (var b in _contestCommentBoxes)
+                b.Text = string.Empty;
+        }
+
+        // THE COMMENT BOXES (Contest.CommentFields - Sukkot's Holyland Square): not the exchange, not
+        // Cabrillo; on Add what is typed in them is put after whatever he typed in the Comment, so it is
+        // in every ADIF export. Only the value itself - "K07YZ", no label (his wording).
+        private readonly List<TextBox> _contestCommentBoxes = new List<TextBox>();
+
+        // Sukkot: the Holyland Square box starts exactly under the Channel box above it (his layout).
+        // Where the Channel box starts is kept by AddContestChannelCell; the gap in front of the first
+        // comment box is whatever takes it there. No Channel box (another contest): left as it is.
+        private double _contestChannelLeft = double.NaN;
+
+        private void AlignContestCommentCells()
+        {
+            if (double.IsNaN(_contestChannelLeft) || _contestCommentBoxes.Count == 0) return;
+            if (!(_contestCommentBoxes[0].Parent is StackPanel first)) return;
+            double used = 0;
+            foreach (UIElement cell in ContestRxPanel.Children)
+            {
+                if (cell == first) break;
+                cell.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+                used += cell.DesiredSize.Width;     // includes the cell's own right margin
+            }
+            double gap = Math.Max(10, _contestChannelLeft - ContestRxPanel.Margin.Left - used);
+            first.Margin = new Thickness(gap, first.Margin.Top, first.Margin.Right, first.Margin.Bottom);
+        }
+
+        internal string CommentWithContestNotes(string typedComment)
+        {
+            if (_contestCommentBoxes.Count == 0) return typedComment;   // not such a contest: unchanged
+            string comment = (typedComment ?? string.Empty).Trim();
+            foreach (var b in _contestCommentBoxes)
+            {
+                string value = ContestNoteValue(b);
+                if (value.Length == 0) continue;
+                comment = comment.Length == 0 ? value : comment + " " + value;
+            }
+            return comment;
+        }
+
+        // A square is stored the way it is typed on the form: no dashes, capitals (K07YZ).
+        private static string ContestNoteValue(TextBox box)
+            => (box.Text ?? string.Empty).Trim().Replace("-", string.Empty).Replace(" ", string.Empty).ToUpperInvariant();
+
+        private bool ContestNoteIsWrong(TextBox box, out string value)
+        {
+            value = ContestNoteValue(box);
+            return value.Length > 0 && string.Equals(box.Tag as string, "HOLYLAND_AREA") && !IsHolylandSquare(value);
+        }
+
+        private static string HolylandSquareMessage(string value)
+            => "\"" + value + "\" is not a Holyland square.\n\nA square is a letter, 2 digits and 2 letters (e.g. K07YZ), and must be one of the official Holyland squares.";
+
+        // Checked like the Grid Locator: on moving to another box, and again on Add. Empty is fine.
+        private void ContestCommentBox_PreviewLostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
+        {
+            if (_fieldWarningOpen) return;
+            var box = sender as TextBox;
+            var to = e.NewFocus as DependencyObject;
+            if (box == null || !(to is TextBox || to is ComboBox) || Window.GetWindow(to) != this) return;
+            if (!ContestNoteIsWrong(box, out string value)) return;
+            e.Handled = true;
+            WarnInvalidField(box, HolylandSquareMessage(value), "Wrong Holyland Square");
+        }
+
+        internal bool ContestNotesOkBeforeSave()
+        {
+            if (_closeInProgress) return true;   // X wins, as for the Grid Locator
+            foreach (var b in _contestCommentBoxes)
+                if (ContestNoteIsWrong(b, out string value))
+                {
+                    if (!_fieldWarningOpen) WarnInvalidField(b, HolylandSquareMessage(value), "Wrong Holyland Square");
+                    return false;
+                }
+            return true;
         }
 
         private static bool IsSerialField(string field)
