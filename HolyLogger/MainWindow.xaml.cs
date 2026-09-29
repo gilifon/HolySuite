@@ -1568,6 +1568,7 @@ namespace HolyLogger
             ApplyContestModeForActiveLog();
             UpdateContestIndicator();
             ApplyContestExchangeUI();
+            ApplySukkotMap();   // a regular log after a Sukkot one gets its old map back
 
             // eQSL queue: show how many QSOs are waiting (only for callsigns the user added to the
             // eQSL table). Nothing is sent automatically here.
