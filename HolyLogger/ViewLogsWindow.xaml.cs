@@ -50,6 +50,9 @@ namespace HolyLogger
         {
             InitializeComponent();
             WindowBounds.Attach(this, "ViewLogs");   // remember position + size
+            // Once the buttons have their real widths (the margin it sets moves the ones after it).
+            Loaded += (s, e) => Dispatcher.BeginInvoke(new Action(AlignEditContestInfo),
+                System.Windows.Threading.DispatcherPriority.Loaded);
             _main = main;
             _dal = dal;
             _filterCallsign = (filterCallsign ?? string.Empty).Trim();
@@ -281,6 +284,37 @@ namespace HolyLogger
             // Callsigns applies to any selected log: one that has none yet gets its first here, and one
             // that has one can be given another.
             Btn_Callsigns.IsEnabled = Selected != null;
+            // A general log has no contest information to edit.
+            Btn_EditContestInfo.IsEnabled = Selected != null && Selected.IsContest;
+        }
+
+        private void Btn_EditContestInfo_Click(object sender, RoutedEventArgs e)
+        {
+            if (!RequireSelection()) return;
+            if (!Selected.IsContest) return;
+            _main.EditContestInfo(Selected.Id, this);
+        }
+
+        // RIGHT UNDER "Create New Contest Log", RIGHT EDGES ON ONE LINE (his request). The buttons before
+        // it on row 2 are narrower than the two Create buttons above, so a left margin fills the gap;
+        // Copy QSO to... and the rest move right with it. Worked out from the real, laid-out widths,
+        // so a different font or theme cannot put it off by a few pixels.
+        private void AlignEditContestInfo()
+        {
+            try
+            {
+                if (Btn_NewContestLog.ActualWidth <= 0 || Btn_EditContestInfo.ActualWidth <= 0) return;
+                Point contestRight = Btn_NewContestLog.TranslatePoint(new Point(Btn_NewContestLog.ActualWidth, 0), this);
+                Thickness m = Btn_EditContestInfo.Margin;
+                // Where its left edge would be with no margin at all.
+                Point editLeft = Btn_EditContestInfo.TranslatePoint(new Point(0, 0), this);
+                double natural = editLeft.X - m.Left;
+                double left = contestRight.X - Btn_EditContestInfo.ActualWidth - natural;
+                if (left < 0) left = 0;   // the buttons before it are wider: it simply follows them
+                if (Math.Abs(left - m.Left) < 0.5) return;
+                Btn_EditContestInfo.Margin = new Thickness(left, m.Top, m.Right, m.Bottom);
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
         }
 
         // Searches ANY log, not just the one being logged into. The Search window works on the QSO

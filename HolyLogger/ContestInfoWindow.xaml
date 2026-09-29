@@ -1,8 +1,7 @@
 ﻿<Window x:Class="HolyLogger.ContestInfoWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Contest Information" Width="560" Height="660"
-        MinWidth="480" MinHeight="420"
+        Title="Contest Information" SizeToContent="WidthAndHeight"
         WindowStartupLocation="CenterOwner"
         Background="{DynamicResource WindowBg}">
     <Grid Margin="16">
@@ -15,12 +14,32 @@
 
         <TextBlock x:Name="TB_Title" Grid.Row="0" FontSize="17" FontWeight="Bold"
                    Foreground="{DynamicResource AccentBrush}" TextWrapping="Wrap"/>
-        <TextBlock x:Name="TB_Sub" Grid.Row="1" Margin="0,4,0,8" TextWrapping="Wrap"
+        <TextBlock x:Name="TB_Sub" Grid.Row="1" Margin="0,4,0,8" TextWrapping="Wrap" MaxWidth="760" HorizontalAlignment="Left"
                    FontSize="16" Foreground="{DynamicResource MutedTextBrush}"/>
 
         <Border Grid.Row="2" BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1">
-            <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="12,4,12,8">
-                <StackPanel x:Name="SP_Fields"/>
+            <!-- TWO COLUMNS, SEEN WHOLE (his request): "Station & operator" on the left, "This contest"
+                 on the right, each label beside its box rather than above it, so the whole form fits
+                 on the screen without scrolling. The ScrollViewer stays only as a net for a small
+                 screen (MaxHeight is set in code from the monitor the window is on). -->
+            <ScrollViewer x:Name="SV_Fields" VerticalScrollBarVisibility="Auto" Padding="12,4,12,8">
+                <!-- SP_More holds the contest fields moved under the left column (BalanceColumns).
+                     Three sibling panels, so TabIndex can put Tab in reading order: the left column's
+                     own fields, the right column, then the moved ones - not "all of the left first". -->
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="28"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <StackPanel x:Name="SP_Personal" Grid.Column="0" Grid.Row="0" KeyboardNavigation.TabIndex="0"/>
+                    <StackPanel x:Name="SP_Contest" Grid.Column="2" Grid.Row="0" Grid.RowSpan="2" KeyboardNavigation.TabIndex="1"/>
+                    <StackPanel x:Name="SP_More" Grid.Column="0" Grid.Row="1" KeyboardNavigation.TabIndex="2"/>
+                </Grid>
             </ScrollViewer>
         </Border>
 

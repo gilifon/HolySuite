@@ -49,102 +49,201 @@ namespace HolyLogger
             Validate();
         }
 
+        // Label and box side by side: the label column is as wide as the longest label in that
+        // column (SharedSizeGroup across the column's rows), the box a fixed width - wide enough for
+        // the longest choice ("LOW (Not more than 100W)") without the old window-wide boxes.
+        private const double InputWidth = 220;
+
         private void BuildFields(IDictionary<string, string> current)
         {
+            Grid.SetIsSharedSizeScope(SP_Contest, true);
+            // The moved fields share the LEFT column's label width, so both left blocks line up.
+            Grid.SetIsSharedSizeScope(SP_Personal.Parent as Grid, true);
+
+            var contestRows = new List<FrameworkElement>();
             CabrilloFieldScope? lastScope = null;
             foreach (var field in CabrilloHeader.Catalog)
             {
+                StackPanel column = field.Scope == CabrilloFieldScope.Personal ? SP_Personal : SP_Contest;
                 if (lastScope != field.Scope)
                 {
                     lastScope = field.Scope;
-                    SP_Fields.Children.Add(new TextBlock
-                    {
-                        Text = field.Scope == CabrilloFieldScope.Personal ? "Station & operator" : "This contest",
-                        FontSize = 16,
-                        FontWeight = FontWeights.Bold,
-                        Foreground = ThemeManager.Brush("AccentBrush"),
-                        Margin = new Thickness(0, 12, 0, 4)
-                    });
+                    column.Children.Add(Heading(field.Scope == CabrilloFieldScope.Personal ? "Station & operator" : "This contest"));
                 }
 
-                bool required = _required.Contains(field.Tag);
-                current.TryGetValue(field.Tag, out string val);
-                val = val ?? string.Empty;
+                FrameworkElement row = BuildFieldRow(field, current);
+                column.Children.Add(row);
+                if (field.Scope == CabrilloFieldScope.Contest) contestRows.Add(row);
+            }
 
-                var label = new TextBlock
+            BalanceColumns(contestRows);
+
+            // Never taller than the screen it opens on: past that the list scrolls, rather than the
+            // buttons going off the bottom.
+            Loaded += (s, e) =>
+            {
+                try
+                {
+                    var screen = System.Windows.Forms.Screen.FromHandle(new System.Windows.Interop.WindowInteropHelper(this).Handle);
+                    var source = PresentationSource.FromVisual(this);
+                    double scale = source?.CompositionTarget != null ? source.CompositionTarget.TransformToDevice.M22 : 1.0;
+                    MaxHeight = screen.WorkingArea.Height / scale;
+                }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
+            };
+        }
+
+        private static TextBlock Heading(string text)
+        {
+            return new TextBlock
+            {
+                Text = text,
+                FontSize = 16,
+                FontWeight = FontWeights.Bold,
+                Foreground = ThemeManager.Brush("AccentBrush"),
+                Margin = new Thickness(0, 8, 0, 4)
+            };
+        }
+
+        // NO EMPTY CORNER (his request, from a screenshot): the personal fields are fewer than the
+        // contest ones, which left a hole under the left column while the right one ran on. So the
+        // LAST contest fields move under the left column, beneath a "This contest" heading of their
+        // own - as many as make the two columns closest in height, measured, not guessed. The order
+        // of the contest fields is kept: right column top to bottom, then the left column's tail.
+        private void BalanceColumns(List<FrameworkElement> contestRows)
+        {
+            try
+            {
+                var infinite = new Size(double.PositiveInfinity, double.PositiveInfinity);
+                SP_Personal.Measure(infinite);
+                SP_Contest.Measure(infinite);
+                double left = SP_Personal.DesiredSize.Height;
+                double right = SP_Contest.DesiredSize.Height;
+
+                TextBlock heading = Heading("This contest");
+                heading.Measure(infinite);
+                double headingH = heading.DesiredSize.Height + heading.Margin.Top + heading.Margin.Bottom;
+
+                // How many trailing contest fields to move: the k with the shortest taller column.
+                int bestK = 0;
+                double best = Math.Max(left, right);
+                double moved = 0;
+                for (int k = 1; k < contestRows.Count; k++)
+                {
+                    FrameworkElement r = contestRows[contestRows.Count - k];
+                    moved += r.DesiredSize.Height + r.Margin.Top + r.Margin.Bottom;
+                    double tallest = Math.Max(left + headingH + moved, right - moved);
+                    if (tallest < best - 0.5) { best = tallest; bestK = k; }
+                }
+                if (bestK == 0) return;
+
+                SP_More.Children.Add(heading);
+                for (int i = contestRows.Count - bestK; i < contestRows.Count; i++)
+                {
+                    SP_Contest.Children.Remove(contestRows[i]);
+                    SP_More.Children.Add(contestRows[i]);
+                }
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        // One field: its label and its box side by side, and its hint (if any) under the box.
+        private FrameworkElement BuildFieldRow(CabrilloHeaderField field, IDictionary<string, string> current)
+        {
+            var grid = new Grid();
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto, SharedSizeGroup = "Label" });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(InputWidth) });
+            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+
+            bool required = _required.Contains(field.Tag);
+            current.TryGetValue(field.Tag, out string val);
+            val = val ?? string.Empty;
+
+            var label = new TextBlock
+            {
+                FontSize = 16,
+                Margin = new Thickness(0, 4, 10, 4),
+                VerticalAlignment = field.Input == CabrilloFieldInput.MultiLineText
+                    ? VerticalAlignment.Top : VerticalAlignment.Center,
+                Foreground = ThemeManager.Brush("TextBrush")
+            };
+            label.Inlines.Add(new Run(field.Label));
+            if (required)
+                label.Inlines.Add(new Run("  *") { Foreground = Brushes.Red, FontWeight = FontWeights.Bold });
+            Grid.SetColumn(label, 0);
+            grid.Children.Add(label);
+
+            FrameworkElement input;
+            if (field.Input == CabrilloFieldInput.Choice)
+            {
+                var combo = new ComboBox { FontSize = 16, Height = 26, IsEnabled = !field.ReadOnly };
+                // Each item SHOWS a label and HOLDS the Cabrillo value (Tag), so "LOW (Not more than
+                // 100W)" can be read while "LOW" is what goes into the header.
+                var values = new List<string> { string.Empty };   // blank = not specified
+                values.AddRange(field.Choices);
+                if (_extraChoices != null && _extraChoices.TryGetValue(field.Tag, out var extra) && extra != null)
+                    foreach (var c in extra)
+                        if (!string.IsNullOrWhiteSpace(c) && !values.Contains(c)) values.Add(c);
+                foreach (var v in values)
+                {
+                    var item = new ComboBoxItem { Content = CabrilloHeader.ChoiceLabel(field.Tag, v), Tag = v };
+                    combo.Items.Add(item);
+                    if (v == val) combo.SelectedItem = item;
+                }
+                if (combo.SelectedItem == null) combo.SelectedIndex = 0;
+                combo.SelectionChanged += (s, e) => Validate();
+                input = combo;
+            }
+            else
+            {
+                var tb = new TextBox
                 {
                     FontSize = 16,
-                    Margin = new Thickness(0, 6, 0, 2),
-                    Foreground = ThemeManager.Brush("TextBrush")
+                    Text = val,
+                    VerticalContentAlignment = VerticalAlignment.Center,
+                    IsReadOnly = field.ReadOnly,
+                    IsTabStop = !field.ReadOnly
                 };
-                label.Inlines.Add(new Run(field.Label));
-                if (required)
-                    label.Inlines.Add(new Run("  *") { Foreground = Brushes.Red, FontWeight = FontWeights.Bold });
-                SP_Fields.Children.Add(label);
-
-                FrameworkElement input;
-                if (field.Input == CabrilloFieldInput.Choice)
+                if (field.ReadOnly)
+                    tb.Background = ThemeManager.Brush("PanelBg");   // signal it's not editable here
+                if (field.Input == CabrilloFieldInput.MultiLineText)
                 {
-                    var combo = new ComboBox { FontSize = 16, Height = 26, IsEnabled = !field.ReadOnly };
-                    // Each item SHOWS a label and HOLDS the Cabrillo value (Tag), so "LOW (Not more than
-                    // 100W)" can be read while "LOW" is what goes into the header.
-                    var values = new List<string> { string.Empty };   // blank = not specified
-                    values.AddRange(field.Choices);
-                    if (_extraChoices != null && _extraChoices.TryGetValue(field.Tag, out var extra) && extra != null)
-                        foreach (var c in extra)
-                            if (!string.IsNullOrWhiteSpace(c) && !values.Contains(c)) values.Add(c);
-                    foreach (var v in values)
-                    {
-                        var item = new ComboBoxItem { Content = CabrilloHeader.ChoiceLabel(field.Tag, v), Tag = v };
-                        combo.Items.Add(item);
-                        if (v == val) combo.SelectedItem = item;
-                    }
-                    if (combo.SelectedItem == null) combo.SelectedIndex = 0;
-                    combo.SelectionChanged += (s, e) => Validate();
-                    input = combo;
+                    tb.AcceptsReturn = true;
+                    tb.TextWrapping = TextWrapping.Wrap;
+                    tb.Height = 48;
+                    tb.VerticalContentAlignment = VerticalAlignment.Top;   // multiline: text starts at the top
+                    tb.VerticalScrollBarVisibility = ScrollBarVisibility.Auto;
                 }
                 else
                 {
-                    var tb = new TextBox
-                    {
-                        FontSize = 16,
-                        Text = val,
-                        VerticalContentAlignment = VerticalAlignment.Center,
-                        IsReadOnly = field.ReadOnly,
-                        IsTabStop = !field.ReadOnly
-                    };
-                    if (field.ReadOnly)
-                        tb.Background = ThemeManager.Brush("PanelBg");   // signal it's not editable here
-                    if (field.Input == CabrilloFieldInput.MultiLineText)
-                    {
-                        tb.AcceptsReturn = true;
-                        tb.TextWrapping = TextWrapping.Wrap;
-                        tb.Height = 48;
-                        tb.VerticalContentAlignment = VerticalAlignment.Top;   // multiline: text starts at the top
-                        tb.VerticalScrollBarVisibility = ScrollBarVisibility.Auto;
-                    }
-                    else
-                    {
-                        tb.Height = 26;
-                    }
-                    tb.TextChanged += (s, e) => Validate();
-                    input = tb;
+                    tb.Height = 26;
                 }
-                _inputs[field.Tag] = input;
-                SP_Fields.Children.Add(input);
-
-                if (!string.IsNullOrWhiteSpace(field.Hint))
-                {
-                    SP_Fields.Children.Add(new TextBlock
-                    {
-                        Text = field.Hint,
-                        FontSize = 16,
-                        TextWrapping = TextWrapping.Wrap,
-                        Foreground = ThemeManager.Brush("MutedTextBrush"),
-                        Margin = new Thickness(0, 1, 0, 0)
-                    });
-                }
+                tb.TextChanged += (s, e) => Validate();
+                input = tb;
             }
+            input.Margin = new Thickness(0, 3, 0, 3);
+            Grid.SetColumn(input, 1);
+            grid.Children.Add(input);
+            _inputs[field.Tag] = input;
+
+            // A hint goes under its box, in the box's own fixed-width column, so it wraps there
+            // instead of widening the form.
+            if (!string.IsNullOrWhiteSpace(field.Hint))
+            {
+                grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                var hint = new TextBlock
+                {
+                    Text = field.Hint,
+                    FontSize = 16,
+                    TextWrapping = TextWrapping.Wrap,
+                    Foreground = ThemeManager.Brush("MutedTextBrush"),
+                    Margin = new Thickness(0, 0, 0, 4)
+                };
+                Grid.SetRow(hint, 1);
+                Grid.SetColumn(hint, 1);
+                grid.Children.Add(hint);
+            }
+            return grid;
         }
 
         private static string ReadValue(FrameworkElement input)

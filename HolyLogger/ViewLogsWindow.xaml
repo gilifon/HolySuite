@@ -129,6 +129,64 @@
                     <Button x:Name="Btn_DeletedLogs" Content="Deleted Logs" Height="32" Padding="9,0" FontSize="16"
                             Margin="0,0,8,0" Click="Btn_DeletedLogs_Click"
                             ToolTip="Open the folder where deleted logs are saved as ADIF files, so you can bring one back with Import ADIF"/>
+                    <!-- EDIT CONTEST INFO: the Cabrillo header asked for when the contest log was made
+                         (name, category, club...), open again at any time. The Create New Contest Log
+                         button's own yellow, and placed right under it with the two right edges on one
+                         line - AlignEditContestInfo sets the left margin after layout, which pushes Copy
+                         QSO to... and everything after it to the right. "Contest Info", not "Edit Contest
+                         Info": measured, the longer name ends 17.6px past the Create button's right edge,
+                         because Rename, Delete and Deleted Logs before it already reach 295px. -->
+                    <!-- ITS OWN TEMPLATE, so that OFF LOOKS OFF: with the standard one, the yellow face
+                         went pale but the black bold words stayed, and the button still looked
+                         pressable when no contest log was picked. Grey face, grey edge, grey words while
+                         disabled; the Create button's yellow, blue edge and light-blue hover otherwise.
+                         ToolTipService.ShowOnDisabled so the reason can still be read when it is grey. -->
+                    <Button x:Name="Btn_EditContestInfo" Height="32" Padding="6,0" FontSize="16" FontWeight="Bold"
+                            Margin="0,0,8,0" Click="Btn_EditContestInfo_Click" IsEnabled="False"
+                            ToolTipService.ShowOnDisabled="True"
+                            ToolTip="Change the contest information of a contest log (for the Cabrillo file). Select a contest log first.">
+                        <!-- A pencil (Segoe MDL2 "Edit") before the words - asked for so it reads as
+                             "edit". Padding 6, not the row's 9: with the pencil the key must still end
+                             on the Create button's right edge (measured). -->
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#xE70F;" FontFamily="Segoe MDL2 Assets" FontSize="16" FontWeight="Normal"
+                                       VerticalAlignment="Center" Margin="0,1,5,0"/>
+                            <TextBlock Text="Contest Info" VerticalAlignment="Center"/>
+                        </StackPanel>
+                        <Button.Style>
+                            <Style TargetType="Button">
+                                <Setter Property="Background" Value="#FFC107"/>
+                                <Setter Property="Foreground" Value="#1A1A1A"/>
+                                <Setter Property="BorderBrush" Value="#1565C0"/>
+                                <Setter Property="BorderThickness" Value="1.5"/>
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="Button">
+                                            <Border x:Name="Face" Background="{TemplateBinding Background}"
+                                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                                    Padding="{TemplateBinding Padding}" SnapsToDevicePixels="True">
+                                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            </Border>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                                <Style.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter Property="Background" Value="#BEE6FD"/>
+                                    </Trigger>
+                                    <Trigger Property="IsPressed" Value="True">
+                                        <Setter Property="Background" Value="#C4E5F6"/>
+                                    </Trigger>
+                                    <Trigger Property="IsEnabled" Value="False">
+                                        <Setter Property="Background" Value="#E0E0E0"/>
+                                        <Setter Property="BorderBrush" Value="#BDBDBD"/>
+                                        <Setter Property="Foreground" Value="#9E9E9E"/>
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
                     <Button x:Name="Btn_CopySettings" Content="Copy QSO to..." Height="32" Padding="9,0" FontSize="16"
                             Margin="0,0,8,0" Click="Btn_CopySettings_Click"
                             ToolTip="Set, change or stop copying this log's new QSOs into another log"/>
