@@ -26,8 +26,23 @@ def fill(draw,path,color):
 
 
 SEA=(170,211,223); LAND=(239,235,216); URBAN=(224,218,208)
+# LAND COLOUR: STYLE='north-south' (the default he chose): green in the north fading to sand in
+# the south.
+import os
+STYLE=os.environ.get('LAND_STYLE','north-south')   # his choice, 2026-09-29
+if 'LAND_RGB' in os.environ: LAND=tuple(int(os.environ['LAND_RGB'][i:i+2],16) for i in (0,2,4))
 base=Image.new('RGB',(Wpx,Hpx),SEA); d=ImageDraw.Draw(base)
 fill(d,'ne_10m_land.geojson',LAND)
+if STYLE=='north-south':
+    NORTH=(200,224,170); SAND=(242,224,178)      # green in the north, sand in the south (his choice)
+    grad=Image.new('RGB',(Wpx,Hpx))
+    gd=ImageDraw.Draw(grad)
+    for row in range(Hpx):
+        lat=math.degrees(2*math.atan(math.exp(my(N0)-row/ky))-math.pi/2)
+        t=min(1,max(0,(32.6-lat)/(32.6-30.6)))      # 0 north of 32.6, 1 south of 30.6
+        gd.line([(0,row),(Wpx,row)],fill=tuple(int(NORTH[k]*(1-t)+SAND[k]*t) for k in range(3)))
+    lm=Image.new('L',(Wpx,Hpx),0); fill(ImageDraw.Draw(lm),'ne_10m_land.geojson',255)
+    base.paste(grad,mask=lm)
 fill(d,'ne_10m_urban_areas.geojson',URBAN)
 landmask=Image.new('L',(Wpx,Hpx),0); dm=ImageDraw.Draw(landmask)
 fill(dm,'ne_10m_land.geojson',255)
@@ -54,7 +69,7 @@ lut=[max(0,min(255,int(255*(0.62+0.38*v/med)))) for v in range(256)]
 sh=shade.point(lut).filter(ImageFilter.GaussianBlur(1))
 shaded=ImageChops.multiply(base,Image.merge('RGB',(sh,sh,sh)))
 out=Image.composite(shaded,base,landmask)
-out.save('israel4x.jpg',quality=85,optimize=True)
+out.save(os.environ.get('OUT_JPG','israel4x.jpg'),quality=85,optimize=True)
 
 # vectors, clipped loosely to the region, 4 decimals
 def lines(path,keep=lambda p:True):

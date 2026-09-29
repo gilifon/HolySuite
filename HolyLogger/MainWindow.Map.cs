@@ -128,6 +128,15 @@ namespace HolyLogger
 
         private void AfterGridTypingPause(Action action)
         {
+            // The 4X map moves the station in place in a few ms (MapUserControl.ShowMap), so there is
+            // nothing to wait for: it follows every letter at once.
+            if (MapIs4X)
+            {
+                if (_gridTypingTimer != null) _gridTypingTimer.Stop();
+                _gridTypingAction = null;
+                action();
+                return;
+            }
             _gridTypingAction = action;
             if (_gridTypingTimer == null)
             {
@@ -147,7 +156,7 @@ namespace HolyLogger
         private void DxLocatorSettled()
         {
             string grid = (TB_DXLocator.Text ?? string.Empty).Trim();
-            if (grid.Length < 4 || !MaidenheadLocator.IsValidLocator(grid)) return;
+            if (MapGridOf(grid) == null) return;
             if (string.Equals(grid, QRZGrid, StringComparison.OrdinalIgnoreCase)) return;
             if (string.IsNullOrWhiteSpace(TB_DXCallsign.Text) && !MapIs4X) return;
             SetAzimuth();
@@ -159,10 +168,19 @@ namespace HolyLogger
         private bool MapIs4X => MapControl != null && MapControl.Is4X;
 
         private bool HasTypedDxGrid()
+            => MapGridOf(_contestRxGridBox != null ? _contestRxGridBox.Text : TB_DXLocator.Text) != null;
+
+        // THE GRID THE MAP USES from what is typed: the whole grid, or - while the last pair is half
+        // typed (KM72O) - the grid without that last letter (KM72), so the dot and line stay on the
+        // map instead of vanishing for one letter. Null when there is no usable grid. The map only:
+        // the grid saved with the QSO is still checked whole (ContestRxGridIsWrong).
+        private static string MapGridOf(string typed)
         {
-            string grid = _contestRxGridBox != null ? _contestRxGridBox.Text : TB_DXLocator.Text;
-            grid = (grid ?? string.Empty).Trim();
-            return grid.Length >= 4 && MaidenheadLocator.IsValidLocator(grid);
+            string grid = (typed ?? string.Empty).Trim();
+            if (grid.Length >= 4 && MaidenheadLocator.IsValidLocator(grid)) return grid;
+            if (grid.Length >= 5 && grid.Length % 2 == 1 && MaidenheadLocator.IsValidLocator(grid.Substring(0, grid.Length - 1)))
+                return grid.Substring(0, grid.Length - 1);
+            return null;
         }
 
         private void SetAzimuth()
@@ -182,8 +200,8 @@ namespace HolyLogger
                     // 0. A grid in the DX Locator box - typed by the operator, who heard it from the
                     //    station itself. (The box is emptied with every change of the callsign, and QRZ
                     //    fills it with its own grid, so it never holds another station's grid.)
-                    string typedGrid = (TB_DXLocator.Text ?? string.Empty).Trim();
-                    if (typedGrid.Length >= 4 && MaidenheadLocator.IsValidLocator(typedGrid))
+                    string typedGrid = MapGridOf(TB_DXLocator.Text);
+                    if (typedGrid != null)
                         locator = typedGrid;
 
                     // In a contest that asks for the grid, ONLY the grid typed into the contest's Grid
@@ -191,8 +209,8 @@ namespace HolyLogger
                     // yet -> no line.
                     if (_contestRxGridBox != null)
                     {
-                        string contestGrid = (_contestRxGridBox.Text ?? string.Empty).Trim();
-                        if (contestGrid.Length < 4 || !MaidenheadLocator.IsValidLocator(contestGrid))
+                        string contestGrid = MapGridOf(_contestRxGridBox.Text);
+                        if (contestGrid == null)
                         {
                             ClearAzimuth();
                             return;
