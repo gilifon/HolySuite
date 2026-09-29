@@ -14424,9 +14424,15 @@ namespace HolyLogger
                                 {
                                     File.Delete(filename);
                                 }
-                                WebClient wc = new WebClient();
-                                wc.DownloadFileAsync(uri, filename);
-                                wc.DownloadFileCompleted += new AsyncCompletedEventHandler(wc_DownloadFileCompleted);
+                                // FROM THE RELEASE OF THAT VERSION FIRST, so GitHub counts the download
+                                // (it counts files on a Release, not files in the repository). The exact
+                                // version the Version file offered, not "latest": a Release that was not
+                                // made would otherwise hand out the one before. No such Release: the
+                                // repository copy, as always (wc_DownloadFileCompleted).
+                                _msiFallbackUri = uri;
+                                var releaseUri = new Uri("https://github.com/4Z1KD/HolyLogger/releases/download/v"
+                                                         + responseFromServer.Trim() + "/HolyLogger_x86.msi");
+                                StartMsiDownload(releaseUri, filename);
                             }
                             catch (Exception ex)
                             {
@@ -14468,6 +14474,22 @@ namespace HolyLogger
                 Process.Start(filename);
                 Application.Current.Dispatcher.Invoke(() => Application.Current.Shutdown());
             }
+            else if (_msiFallbackUri != null)
+            {
+                // The Release was not there (or not reachable): the repository copy, once.
+                Log.Swallow(e.Error);
+                var fallback = _msiFallbackUri;
+                _msiFallbackUri = null;
+                try
+                {
+                    if (File.Exists(filename)) File.Delete(filename);
+                    StartMsiDownload(fallback, filename);
+                }
+                catch (Exception ex)
+                {
+                    HolyMessageBox.ShowError(ex.Message, "Download Error", this);
+                }
+            }
             else
             {
                 HolyMessageBox.ShowError(
@@ -14477,6 +14499,15 @@ namespace HolyLogger
                     + "Help → Visit HolyLogger site.",
                     "Download Failed", this);
             }
+        }
+
+        private Uri _msiFallbackUri;   // the repository copy, tried when the Release download fails
+
+        private void StartMsiDownload(Uri from, string filename)
+        {
+            WebClient wc = new WebClient();
+            wc.DownloadFileCompleted += new AsyncCompletedEventHandler(wc_DownloadFileCompleted);
+            wc.DownloadFileAsync(from, filename);
         }
 
         private bool CompareVersions(string current, string server)
