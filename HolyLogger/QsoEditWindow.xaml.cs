@@ -178,6 +178,7 @@ namespace HolyLogger
             TB_SotaRef.Text   = S(_qso.SotaRef);
             TB_PotaRef.Text   = S(_qso.PotaRef);
             TB_WwffRef.Text   = S(_qso.WwffRef);
+            TB_MyWwffRef.Text = S(_qso.MyWwffRef);
             // The program drop-down carries the same eight names the main form's Other window offers,
             // and its tooltip spells out whichever one is in the box - "ARLHS" means nothing on its own.
             TB_Sig.ItemsSource = OtherActivityWindow.Known;
@@ -388,6 +389,7 @@ namespace HolyLogger
                 _qso.SotaRef   = TB_SotaRef.Text.Trim();
                 _qso.PotaRef   = TB_PotaRef.Text.Trim();
                 _qso.WwffRef   = TB_WwffRef.Text.Trim();
+                _qso.MyWwffRef = TB_MyWwffRef.Text.Trim();
                 // Upper-cased here rather than by CharacterCasing, which a ComboBox does not have.
                 _qso.Sig       = (TB_Sig.Text ?? string.Empty).Trim().ToUpperInvariant();
                 _qso.SigInfo   = TB_SigInfo.Text.Trim();

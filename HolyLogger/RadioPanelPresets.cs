@@ -33,11 +33,45 @@ namespace HolyLogger
             return khz >= LowKhz && khz <= HighKhz;
         }
 
+        // THE WWFF FREQUENCIES (the WWFF folder on the Options page). 0 means this band has none -
+        // WWFF names one SSB and one CW spot on eight HF bands only, and never SSB on 30m - and then
+        // the band's ordinary frequency above is used instead.
+        public int WwffSsbKhz { get; set; }
+        public int WwffCwKhz { get; set; }
+
+        // The WWFF folder's own Select (his request, 2026-09-29: "the select band shall belong to the
+        // activation and not be global"). While Activity is WWFF this - not Enabled - decides whether
+        // the band's button works. True by default, so nothing changes until he unticks one.
+        public bool WwffEnabled { get; set; } = true;
+
+        // Whether the band's button is offered: the WWFF folder's Select during a WWFF activation,
+        // the Regular folder's otherwise.
+        public bool IsOffered(bool wwff) => wwff ? WwffEnabled : Enabled;
+
         public int FrequencyFor(string mode)
         {
             if (string.Equals(mode, "CW", StringComparison.OrdinalIgnoreCase)) return CwKhz;
             if (string.Equals(mode, "RTTY", StringComparison.OrdinalIgnoreCase)) return RttyKhz;
             return SsbKhz;   // SSB, and AM/FM, which have no frequency of their own
+        }
+
+        // While the operator is in a WWFF activation (Activity = WWFF on the main window) SSB and CW
+        // go to the WWFF spot, where this band has one. RTTY, AM and FM have no WWFF frequency and
+        // keep their ordinary one.
+        public int FrequencyFor(string mode, bool wwff)
+        {
+            if (wwff)
+            {
+                if (string.Equals(mode, "CW", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (WwffCwKhz > 0) return WwffCwKhz;
+                }
+                else if (string.Equals(mode, "SSB", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (WwffSsbKhz > 0) return WwffSsbKhz;
+                }
+            }
+            return FrequencyFor(mode);
         }
     }
 
@@ -120,6 +154,25 @@ namespace HolyLogger
             new object[] { "10368","3cm",10000000,10500000,10368200,10368200,10368200 },
         };
 
+        // THE OFFICIAL WWFF FREQUENCIES, from wwff.co "How to activate a WWFF reference" (read
+        // 2026-09-29): Phone 3.744, 7.144, 14.244, 18.144, 21.244, 24.944, 28.444; CW 3.544, 7.024,
+        // 10.124, 14.044, 18.084, 21.044, 24.894, 28.044 MHz. Every other band has none (0), and 30m
+        // has no SSB. The operator can change them in the WWFF folder if WWFF ever does.
+        // DECLARED BEFORE Edges ON PURPOSE: static fields are filled top to bottom, and Edges calls
+        // Defaults(), which reads this table - below Edges it was still null and the program crashed.
+        private static readonly Dictionary<string, int[]> WwffFactory = new Dictionary<string, int[]>
+        {
+            //          label       ssb     cw
+            { "3.5", new[] {  3744,  3544 } },
+            { "7",   new[] {  7144,  7024 } },
+            { "10",  new[] {     0, 10124 } },
+            { "14",  new[] { 14244, 14044 } },
+            { "18",  new[] { 18144, 18084 } },
+            { "21",  new[] { 21244, 21044 } },
+            { "24",  new[] { 24944, 24894 } },
+            { "28",  new[] { 28444, 28044 } },
+        };
+
         // The band EDGES never change and are not the operator's to edit - only the two frequencies
         // inside each band are - so they are worked out once and answered from here, rather than
         // re-reading and re-parsing the settings string for every notch of the mouse wheel.
@@ -137,15 +190,25 @@ namespace HolyLogger
 
         public static List<RadioBandPreset> Defaults()
         {
-            return Factory.Select(row => new RadioBandPreset
+            return Factory.Select(row =>
             {
-                Label = (string)row[0],
-                Name = (string)row[1],
-                LowKhz = (int)row[2],
-                HighKhz = (int)row[3],
-                SsbKhz = (int)row[4],
-                CwKhz = (int)row[5],
-                RttyKhz = (int)row[6],
+                var band = new RadioBandPreset
+                {
+                    Label = (string)row[0],
+                    Name = (string)row[1],
+                    LowKhz = (int)row[2],
+                    HighKhz = (int)row[3],
+                    SsbKhz = (int)row[4],
+                    CwKhz = (int)row[5],
+                    RttyKhz = (int)row[6],
+                };
+                int[] wwff;
+                if (WwffFactory.TryGetValue(band.Label, out wwff))
+                {
+                    band.WwffSsbKhz = wwff[0];
+                    band.WwffCwKhz = wwff[1];
+                }
+                return band;
             }).ToList();
         }
 
@@ -189,7 +252,57 @@ namespace HolyLogger
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
 
+            LoadWwff(bands);
             return bands;
+        }
+
+        // The WWFF folder, kept in a setting of its own as "label=ssb/cw/select" (select 1 or 0; a
+        // setting saved before Select existed has no third part, and every band stays selected). Every band is written, and
+        // 0 is written too: an operator who empties a box means "no WWFF frequency here", and that
+        // must not come back as the factory value at the next start.
+        private static void LoadWwff(List<RadioBandPreset> bands)
+        {
+            string saved = Properties.Settings.Default.RadioPanelWwffBands;
+            if (string.IsNullOrWhiteSpace(saved)) return;
+
+            try
+            {
+                foreach (string entry in saved.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries))
+                {
+                    string[] halves = entry.Split('=');
+                    if (halves.Length != 2) continue;
+
+                    var band = bands.FirstOrDefault(b => string.Equals(b.Label, halves[0].Trim(), StringComparison.OrdinalIgnoreCase));
+                    if (band == null) continue;
+
+                    string[] parts = halves[1].Split('/');
+                    if (parts.Length < 2) continue;
+
+                    if (int.TryParse(parts[0].Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out int ssb) && ssb >= 0)
+                        band.WwffSsbKhz = ssb;
+                    if (int.TryParse(parts[1].Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out int cw) && cw >= 0)
+                        band.WwffCwKhz = cw;
+                    if (parts.Length >= 3)
+                        band.WwffEnabled = parts[2].Trim() != "0";
+                }
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        public static void SaveWwff(IEnumerable<RadioBandPreset> bands)
+        {
+            var text = new StringBuilder();
+            foreach (var band in bands)
+            {
+                if (text.Length > 0) text.Append(';');
+                text.Append(band.Label).Append('=')
+                    .Append(band.WwffSsbKhz.ToString(CultureInfo.InvariantCulture)).Append('/')
+                    .Append(band.WwffCwKhz.ToString(CultureInfo.InvariantCulture)).Append('/')
+                    .Append(band.WwffEnabled ? "1" : "0");
+            }
+
+            Properties.Settings.Default.RadioPanelWwffBands = text.ToString();
+            Properties.Settings.Default.Save();
         }
 
         public static void Save(IEnumerable<RadioBandPreset> bands)

@@ -23,10 +23,214 @@ namespace HolyLogger.OptionsUserControls
         /// <summary>True once anything here was edited, so the open panel can be rebuilt.</summary>
         public bool HasChanged { get; private set; }
 
+        private readonly List<TextBox> _wwffSsbBoxes = new List<TextBox>();
+        private readonly List<TextBox> _wwffCwBoxes = new List<TextBox>();
+        // The WWFF folder's own Select boxes (RadioBandPreset.WwffEnabled): they belong to the WWFF
+        // activation, not to the Regular folder - his call, 2026-09-29.
+        private readonly List<CheckBox> _wwffEnabledBoxes = new List<CheckBox>();
+
         public RadioControlPanelControl()
         {
             InitializeComponent();
-            BuildRows(RadioPanelPresets.Load());
+            var bands = RadioPanelPresets.Load();
+            BuildRows(bands);
+            BuildWwffRows(bands);
+        }
+
+        private bool WwffFolderOpen => LB_Folder != null && LB_Folder.SelectedIndex == 1;
+
+        private void LB_Folder_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (RegularIntro == null || WwffIntro == null || BandGrid == null || WwffGrid == null) return;
+            // Hidden, not Collapsed: the folder not shown keeps its space, so the table does not move.
+            var regular = WwffFolderOpen ? Visibility.Hidden : Visibility.Visible;
+            var wwff = WwffFolderOpen ? Visibility.Visible : Visibility.Hidden;
+            RegularIntro.Visibility = regular;
+            BandGrid.Visibility = regular;
+            WwffIntro.Visibility = wwff;
+            WwffGrid.Visibility = wwff;
+            // The frame wears the open folder's colour (the tab's own Background), as in Statistics.
+            if (FolderFrame != null && LB_Folder.SelectedItem is ListBoxItem open)
+                FolderFrame.Background = open.Background;
+            if (TB_OutOfBand != null) TB_OutOfBand.Visibility = Visibility.Collapsed;
+        }
+
+        // THE WWFF FOLDER: the same two column-groups as the Regular one, with SSB and CW only - WWFF
+        // names no RTTY frequency. Its Select column is its OWN (WwffEnabled): it decides which band
+        // buttons work while Activity is WWFF, and leaves the Regular folder's Select alone. An empty
+        // frequency box is allowed here and means "no WWFF frequency".
+        // EXACTLY the Regular folder's columns (Cols, same widths), so the table does not shift when
+        // the folder changes; the RTTY column is simply left empty here.
+        private const int WwffCols = Cols;
+
+        private void BuildWwffRows(List<RadioBandPreset> bands)
+        {
+            var standards = new Dictionary<string, RadioBandPreset>();
+            foreach (var d in RadioPanelPresets.Defaults()) standards[d.Label] = d;
+            _wwffSsbBoxes.Clear();
+            _wwffCwBoxes.Clear();
+            _wwffEnabledBoxes.Clear();
+
+            WwffGrid.Children.Clear();
+            WwffGrid.RowDefinitions.Clear();
+            WwffGrid.ColumnDefinitions.Clear();
+
+            for (int g = 0; g < 2; g++)
+            {
+                // Same widths as BuildRows: Select, Band, SSB, CW, RTTY (empty here), gap.
+                WwffGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(55) });
+                WwffGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(140) });
+                WwffGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(80) });
+                WwffGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(80) });
+                WwffGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(92) });
+                if (g == 0) WwffGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(30) });
+            }
+
+            int perGroup = (bands.Count + 1) / 2;
+            for (int r = 0; r <= perGroup; r++)
+                WwffGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+
+            for (int group = 0; group < 2; group++)
+            {
+                int colBase = group * WwffCols;
+                AddHeader(WwffGrid, "Select", colBase + 0);
+                AddHeader(WwffGrid, "Band", colBase + 1);
+                AddHeader(WwffGrid, "SSB (kHz)", colBase + 2);
+                AddHeader(WwffGrid, "CW (kHz)", colBase + 3);
+            }
+
+            for (int i = 0; i < bands.Count; i++)
+            {
+                var band = bands[i];
+                int group = i < perGroup ? 0 : 1;
+                int row = (i % perGroup) + 1;
+                int colBase = group * WwffCols;
+
+                var enabled = new CheckBox
+                {
+                    IsChecked = band.WwffEnabled,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Margin = new Thickness(0, 4, 8, 4),
+                    ToolTip = "Offer this band's button on the Radio Control Panel while Activity is WWFF"
+                };
+                enabled.Checked += EnabledBox_Changed;
+                enabled.Unchecked += EnabledBox_Changed;
+                Grid.SetRow(enabled, row);
+                Grid.SetColumn(enabled, colBase + 0);
+                WwffGrid.Children.Add(enabled);
+                _wwffEnabledBoxes.Add(enabled);
+
+                var label = new TextBlock
+                {
+                    Text = band.Label + " MHz  (" + band.Name + ")",
+                    FontSize = 16,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Margin = new Thickness(0, 4, 8, 4)
+                };
+                Grid.SetRow(label, row);
+                Grid.SetColumn(label, colBase + 1);
+                WwffGrid.Children.Add(label);
+
+                RadioBandPreset standard;
+                standards.TryGetValue(band.Label, out standard);
+
+                TextBox ssb = null;
+                if (string.Equals(band.Name, "30m", StringComparison.OrdinalIgnoreCase))
+                {
+                    var dash = new TextBlock
+                    {
+                        Text = "—",
+                        FontSize = 16,
+                        VerticalAlignment = VerticalAlignment.Center,
+                        Margin = new Thickness(0, 4, 8, 4)
+                    };
+                    dash.SetResourceReference(TextBlock.ForegroundProperty, "MutedTextBrush");
+                    Grid.SetRow(dash, row);
+                    Grid.SetColumn(dash, colBase + 2);
+                    WwffGrid.Children.Add(dash);
+                }
+                else
+                {
+                    ssb = MakeWwffBox(band.WwffSsbKhz, standard == null ? 0 : standard.WwffSsbKhz, row, colBase + 2);
+                }
+                var cw = MakeWwffBox(band.WwffCwKhz, standard == null ? 0 : standard.WwffCwKhz, row, colBase + 3);
+                _wwffSsbBoxes.Add(ssb);
+                _wwffCwBoxes.Add(cw);
+            }
+        }
+
+        private static void AddHeader(Grid grid, string text, int column)
+        {
+            var header = new TextBlock { Text = text, FontSize = 16, FontWeight = FontWeights.Bold, Margin = new Thickness(0, 0, 8, 4) };
+            Grid.SetRow(header, 0);
+            Grid.SetColumn(header, column);
+            grid.Children.Add(header);
+        }
+
+        private static string WwffText(int khz)
+        {
+            return khz > 0 ? khz.ToString(CultureInfo.InvariantCulture) : string.Empty;
+        }
+
+        // Light red when the box differs from WWFF's own frequency, as on the Regular folder.
+        private static void MarkWwffIfNotStandard(TextBox box)
+        {
+            int standard = box.Tag is int ? (int)box.Tag : 0;
+            string typed = (box.Text ?? string.Empty).Trim();
+            int khz;
+            if (typed.Length == 0) khz = 0;
+            else if (!int.TryParse(typed, NumberStyles.Integer, CultureInfo.InvariantCulture, out khz)) khz = -1;
+
+            if (khz == standard) box.ClearValue(Control.BackgroundProperty);
+            else box.Background = ChangedBrush;
+        }
+
+        private TextBox MakeWwffBox(int khz, int standardKhz, int row, int column)
+        {
+            var box = new TextBox
+            {
+                Text = WwffText(khz),
+                FontSize = 16,
+                Height = 28,
+                Width = 70,
+                HorizontalAlignment = HorizontalAlignment.Left,
+                VerticalContentAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 4, 8, 4),
+                Tag = standardKhz
+            };
+            MarkWwffIfNotStandard(box);
+            box.TextChanged += (s, e) => MarkWwffIfNotStandard(box);
+            box.LostFocus += Box_LostFocus;
+            Grid.SetRow(box, row);
+            Grid.SetColumn(box, column);
+            WwffGrid.Children.Add(box);
+            return box;
+        }
+
+        // Empty is allowed (no WWFF frequency on this band); anything else must be a frequency inside
+        // the band, or the box goes back to what it held.
+        private static bool ReadWwffBox(TextBox box, RadioBandPreset band, Action<int> set, int current, ref string rejected)
+        {
+            string typed = (box.Text ?? string.Empty).Trim();
+            int khz;
+            if (typed.Length == 0) khz = 0;
+            else if (!int.TryParse(typed, NumberStyles.Integer, CultureInfo.InvariantCulture, out khz) || khz <= 0)
+            {
+                box.Text = WwffText(current);
+                return false;
+            }
+
+            if (khz > 0 && !band.Contains(khz))
+            {
+                rejected = khz.ToString(CultureInfo.InvariantCulture) + " is outside the " + band.Name + " band ("
+                    + band.LowKhz.ToString(CultureInfo.InvariantCulture) + " - "
+                    + band.HighKhz.ToString(CultureInfo.InvariantCulture) + " kHz). Not saved.";
+                box.Text = WwffText(current);
+                return false;
+            }
+            if (khz == current) return false;
+            set(khz);
+            return true;
         }
 
         // Two column-groups side by side (Select/Band/SSB/CW/RTTY, a gap, then the same five again),
@@ -247,6 +451,26 @@ namespace HolyLogger.OptionsUserControls
                 changed |= ReadBox(_rttyBoxes[i], _bands[i], value => _bands[i].RttyKhz = value, _bands[i].RttyKhz, ref rejected);
             }
 
+            bool wwffChanged = false;
+            for (int i = 0; i < _bands.Count && i < _wwffCwBoxes.Count; i++)
+            {
+                var band = _bands[i];
+                bool wantWwff = i < _wwffEnabledBoxes.Count && _wwffEnabledBoxes[i].IsChecked == true;
+                if (i < _wwffEnabledBoxes.Count && wantWwff != band.WwffEnabled)
+                {
+                    band.WwffEnabled = wantWwff;
+                    wwffChanged = true;
+                }
+                if (_wwffSsbBoxes[i] != null)
+                    wwffChanged |= ReadWwffBox(_wwffSsbBoxes[i], band, value => band.WwffSsbKhz = value, band.WwffSsbKhz, ref rejected);
+                wwffChanged |= ReadWwffBox(_wwffCwBoxes[i], band, value => band.WwffCwKhz = value, band.WwffCwKhz, ref rejected);
+            }
+            if (wwffChanged)
+            {
+                RadioPanelPresets.SaveWwff(_bands);
+                HasChanged = true;
+            }
+
             // The message stays until the next save that rejects nothing, so it is still there to
             // read after focus has moved on to the next box.
             if (rejected != null)
@@ -302,11 +526,36 @@ namespace HolyLogger.OptionsUserControls
             SpectrumWidthManagerWindow.Show(Window.GetWindow(this), rig);
         }
 
+        // Restores the open folder only: putting WWFF back must not undo the operator's own Regular
+        // frequencies, and the other way round.
         private void Btn_RestoreDefaults_Click(object sender, RoutedEventArgs e)
         {
             var defaults = RadioPanelPresets.Defaults();
-            RadioPanelPresets.Save(defaults);
-            BuildRows(defaults);
+            if (WwffFolderOpen)
+            {
+                foreach (var band in _bands)
+                {
+                    var d = defaults.First(x => x.Label == band.Label);
+                    band.WwffSsbKhz = d.WwffSsbKhz;
+                    band.WwffCwKhz = d.WwffCwKhz;
+                    band.WwffEnabled = d.WwffEnabled;   // the WWFF folder's own Select, back on
+                }
+                RadioPanelPresets.SaveWwff(_bands);
+                BuildWwffRows(_bands);
+            }
+            else
+            {
+                foreach (var d in defaults)
+                {
+                    var band = _bands.First(x => x.Label == d.Label);
+                    d.WwffSsbKhz = band.WwffSsbKhz;
+                    d.WwffCwKhz = band.WwffCwKhz;
+                    d.WwffEnabled = band.WwffEnabled;   // Regular's restore leaves WWFF's Select alone
+                }
+                RadioPanelPresets.Save(defaults);
+                BuildRows(defaults);
+            }
+            TB_OutOfBand.Visibility = Visibility.Collapsed;
             HasChanged = true;
         }
     }

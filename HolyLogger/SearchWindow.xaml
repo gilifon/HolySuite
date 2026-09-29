@@ -1031,6 +1031,16 @@
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
+                <!-- MY park while activating a WWFF reference (ADIF MY_WWFF_REF). Far right, after
+                     Notes, so no column moves. The other station's park is in Activity ("WWFF ..."). -->
+                <DataGridTemplateColumn Header="My Fauna" IsReadOnly="True" SortMemberPath="MyWwffRef"
+                                        Width="Auto">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding MyWwffRef}" HorizontalAlignment="Center" Padding="5,0,5,0"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
             </DataGrid.Columns>
         </DataGrid>
 

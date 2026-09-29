@@ -113,6 +113,7 @@ namespace HolyParser
             qso_row.SotaRef = Trimmed(AdifValue(row, "sota_ref"));
             qso_row.PotaRef = Trimmed(AdifValue(row, "pota_ref"));
             qso_row.WwffRef = Trimmed(AdifValue(row, "wwff_ref"));
+            qso_row.MyWwffRef = Trimmed(AdifValue(row, "my_wwff_ref"));
             qso_row.SigInfo = Trimmed(AdifValue(row, "sig_info"));
 
             // <sig> needs one guard. HolyLogger itself used to export the CONTEST exchange in this
@@ -985,7 +986,7 @@ namespace HolyParser
             "band", "mode", "submode", "comment", "dxcc", "freq", "srx_string", "stx_string",
             "srx", "stx", "name", "country", "gridsquare", "my_gridsquare", "prop_mode",
             "sat_name", "soapbox", "lotw_qsl_sent", "cqz", "ituz",
-            "iota", "sota_ref", "pota_ref", "wwff_ref", "sig", "sig_info",
+            "iota", "sota_ref", "pota_ref", "wwff_ref", "my_wwff_ref", "sig", "sig_info",
             "lotw_qsl_rcvd", "lotw_qslrdate", "eqsl_qsl_rcvd", "eqsl_qslrdate", "qsl_rcvd", "state",
             "qth",
             // The award / QSL record, each in a column of its own since 8.8.4.

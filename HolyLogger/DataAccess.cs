@@ -1045,7 +1045,7 @@ Environment.NewLine +
             {
             if (con != null && con.State == System.Data.ConnectionState.Open)
             {
-                SQLiteCommand insertSQL = new SQLiteCommand("INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,cq_zone,itu_zone,state,qth,dxcc,prop_mode,sat_name,soapbox,iota,sota_ref,pota_ref,wwff_ref,sig,sig_info,log_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?," + ActiveLogId + ")", con);
+                SQLiteCommand insertSQL = new SQLiteCommand("INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,cq_zone,itu_zone,state,qth,dxcc,prop_mode,sat_name,soapbox,iota,sota_ref,pota_ref,wwff_ref,sig,sig_info,my_wwff_ref,log_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?," + ActiveLogId + ")", con);
                 insertSQL.Parameters.Add(new SQLiteParameter("my_callsign", qso.MyCall));
                 insertSQL.Parameters.Add(new SQLiteParameter("operator", qso.Operator));
                 insertSQL.Parameters.Add(new SQLiteParameter("my_square", qso.STX));
@@ -1101,8 +1101,8 @@ Environment.NewLine +
         {
             const int es = 1, qs = 1, ls = 1, cs = 1;
             using (var ins = new SQLiteCommand(
-                "INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,cq_zone,itu_zone,state,qth,dxcc,prop_mode,sat_name,soapbox,iota,sota_ref,pota_ref,wwff_ref,sig,sig_info," + CarriedColumns + ",eqsl_status,qrz_status,lotw_status,clublog_status,log_id,source_qso_id) " +
-                "VALUES (@my_callsign,@operator,@my_square,@my_locator,@dx_locator,@frequency,@band,@dx_callsign,@rst_rcvd,@rst_sent,@date,@time,@mode,@submode,@exchange,@comment,@name,@country,@continent,@cq_zone,@itu_zone,@state,@qth,@dxcc,@prop_mode,@sat_name,@soapbox,@iota,@sota_ref,@pota_ref,@wwff_ref,@sig,@sig_info," + CarriedValues + ",@es,@qs,@ls,@cs,@log_id,@src)", con))
+                "INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,cq_zone,itu_zone,state,qth,dxcc,prop_mode,sat_name,soapbox,iota,sota_ref,pota_ref,wwff_ref,sig,sig_info,my_wwff_ref," + CarriedColumns + ",eqsl_status,qrz_status,lotw_status,clublog_status,log_id,source_qso_id) " +
+                "VALUES (@my_callsign,@operator,@my_square,@my_locator,@dx_locator,@frequency,@band,@dx_callsign,@rst_rcvd,@rst_sent,@date,@time,@mode,@submode,@exchange,@comment,@name,@country,@continent,@cq_zone,@itu_zone,@state,@qth,@dxcc,@prop_mode,@sat_name,@soapbox,@iota,@sota_ref,@pota_ref,@wwff_ref,@sig,@sig_info,@my_wwff_ref," + CarriedValues + ",@es,@qs,@ls,@cs,@log_id,@src)", con))
             {
                 ins.Parameters.Add(new SQLiteParameter("@my_callsign", qso.MyCall));
                 ins.Parameters.Add(new SQLiteParameter("@operator", qso.Operator));
@@ -1231,7 +1231,7 @@ Environment.NewLine +
                 SQLiteTransaction T = con.BeginTransaction();
                 foreach (var qso in qsos)
                 {
-                    SQLiteCommand insertSQL = new SQLiteCommand("INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,cq_zone,itu_zone,prop_mode,sat_name,soapbox,iota,sota_ref,pota_ref,wwff_ref,sig,sig_info,eqsl_status,qrz_status,lotw_status,clublog_status,log_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,1,1,1," + ActiveLogId + ")", con);
+                    SQLiteCommand insertSQL = new SQLiteCommand("INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,cq_zone,itu_zone,prop_mode,sat_name,soapbox,iota,sota_ref,pota_ref,wwff_ref,sig,sig_info,my_wwff_ref,eqsl_status,qrz_status,lotw_status,clublog_status,log_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,1,1,1," + ActiveLogId + ")", con);
                     insertSQL.Transaction = T;
                     insertSQL.Parameters.Add(new SQLiteParameter("my_callsign", qso.MyCall));
                     insertSQL.Parameters.Add(new SQLiteParameter("operator", qso.Operator));
@@ -1294,7 +1294,7 @@ Environment.NewLine +
             int processedQso = 0;
 
             using (SQLiteTransaction transaction = con.BeginTransaction())
-            using (SQLiteCommand insertSQL = new SQLiteCommand("INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,prop_mode,sat_name,soapbox,cq_zone,itu_zone,eqsl_status,qrz_status,lotw_status,clublog_status,lotw_qsl_rcvd,lotw_qsl_rdate,lotw_deleted_entity,qrz_qsl_rcvd,qrz_qsl_rdate,qrz_deleted_entity,eqsl_qsl_rcvd,eqsl_qsl_rdate,eqsl_deleted_entity,clublog_qsl_rcvd,clublog_qsl_rdate,clublog_deleted_entity,paper_qsl_rcvd,state,iota,sota_ref,pota_ref,wwff_ref,sig,sig_info,credit_granted,cnty,qsl_via,qsl_rdate,qsl_sent,contest_id,time_off,date_off,extra_adif,qth,dxcc,notes,log_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,1,?,1,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?," + ActiveLogId + ")", con, transaction))
+            using (SQLiteCommand insertSQL = new SQLiteCommand("INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,prop_mode,sat_name,soapbox,cq_zone,itu_zone,eqsl_status,qrz_status,lotw_status,clublog_status,lotw_qsl_rcvd,lotw_qsl_rdate,lotw_deleted_entity,qrz_qsl_rcvd,qrz_qsl_rdate,qrz_deleted_entity,eqsl_qsl_rcvd,eqsl_qsl_rdate,eqsl_deleted_entity,clublog_qsl_rcvd,clublog_qsl_rdate,clublog_deleted_entity,paper_qsl_rcvd,state,iota,sota_ref,pota_ref,wwff_ref,sig,sig_info,credit_granted,cnty,qsl_via,qsl_rdate,qsl_sent,contest_id,time_off,date_off,extra_adif,qth,dxcc,notes,my_wwff_ref,log_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,1,?,1,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?," + ActiveLogId + ")", con, transaction))
             {
                 insertSQL.Parameters.Add(new SQLiteParameter("my_callsign"));
                 insertSQL.Parameters.Add(new SQLiteParameter("operator"));
@@ -1365,6 +1365,8 @@ Environment.NewLine +
                 // ADIF NOTES, appended at the end rather than beside the other carried fields above - these
                 // parameters are POSITIONAL, and adding it there would shift every index below it.
                 insertSQL.Parameters.Add(new SQLiteParameter("notes"));
+                // ADIF MY_WWFF_REF, last for the same reason.
+                insertSQL.Parameters.Add(new SQLiteParameter("my_wwff_ref"));
 
                 foreach (var qso in qsos)
                 {
@@ -1426,6 +1428,7 @@ Environment.NewLine +
 
                     insertSQL.Parameters[55].Value = qso.DxccCode > 0 ? (object)qso.DxccCode : DBNull.Value;
                     insertSQL.Parameters[56].Value = Blank(qso.Notes);
+                    insertSQL.Parameters[57].Value = Blank(qso.MyWwffRef);
 
                     try
                     {
@@ -1516,7 +1519,7 @@ Environment.NewLine +
                 // suspect - the edit lands on this QSO and its copy in the other log keeps the old text.
                 catch (Exception ex) { Log.Swallow(ex); }
 
-                const string sql = "UPDATE qso SET my_callsign = @my_callsign ,operator = @operator ,my_square = @my_square,my_locator = @my_locator,dx_locator = @dx_locator,frequency = @frequency,band = @band,dx_callsign = @dx_callsign,rst_rcvd = @rst_rcvd,rst_sent = @rst_sent,date = @date,time = @time,mode = @mode,submode = @submode,exchange = @exchange,comment = @comment,name = @name,country = @country,continent = @continent,cq_zone = @cq_zone,itu_zone = @itu_zone,state = @state,qth = @qth,dxcc = @dxcc,prop_mode = @prop_mode,sat_name = @sat_name, soapbox = @soapbox,iota = @iota,sota_ref = @sota_ref,pota_ref = @pota_ref,wwff_ref = @wwff_ref,sig = @sig,sig_info = @sig_info,notes = @notes,contest_id = @contest_id,cnty = @cnty,credit_granted = @credit_granted WHERE id = @id";
+                const string sql = "UPDATE qso SET my_callsign = @my_callsign ,operator = @operator ,my_square = @my_square,my_locator = @my_locator,dx_locator = @dx_locator,frequency = @frequency,band = @band,dx_callsign = @dx_callsign,rst_rcvd = @rst_rcvd,rst_sent = @rst_sent,date = @date,time = @time,mode = @mode,submode = @submode,exchange = @exchange,comment = @comment,name = @name,country = @country,continent = @continent,cq_zone = @cq_zone,itu_zone = @itu_zone,state = @state,qth = @qth,dxcc = @dxcc,prop_mode = @prop_mode,sat_name = @sat_name, soapbox = @soapbox,iota = @iota,sota_ref = @sota_ref,pota_ref = @pota_ref,wwff_ref = @wwff_ref,sig = @sig,sig_info = @sig_info,my_wwff_ref = @my_wwff_ref,notes = @notes,contest_id = @contest_id,cnty = @cnty,credit_granted = @credit_granted WHERE id = @id";
                 try
                 {
                     foreach (var uid in ids)
@@ -1695,6 +1698,7 @@ Environment.NewLine +
             if ((o = Ordinal(rdr, "wwff_ref")) >= 0) q.WwffRef = rdr.GetValue(o) as string;
             if ((o = Ordinal(rdr, "sig")) >= 0) q.Sig = rdr.GetValue(o) as string;
             if ((o = Ordinal(rdr, "sig_info")) >= 0) q.SigInfo = rdr.GetValue(o) as string;
+            if ((o = Ordinal(rdr, "my_wwff_ref")) >= 0) q.MyWwffRef = rdr.GetValue(o) as string;
             // The award / QSL record and the carried remainder. Read alongside the activity references for
             // the same reason: this is the ONE place every reader goes through, and a field that is
             // written but not read back is a field silently lost on the next export.
@@ -1731,6 +1735,8 @@ Environment.NewLine +
             cmd.Parameters.Add(new SQLiteParameter(prefix + "wwff_ref", Blank(qso.WwffRef)));
             cmd.Parameters.Add(new SQLiteParameter(prefix + "sig", Blank(qso.Sig)));
             cmd.Parameters.Add(new SQLiteParameter(prefix + "sig_info", Blank(qso.SigInfo)));
+            // MY park (ADIF MY_WWFF_REF). Seventh, after sig_info, in every statement that binds these.
+            cmd.Parameters.Add(new SQLiteParameter(prefix + "my_wwff_ref", Blank(qso.MyWwffRef)));
         }
 
         // ── the fields a QSO CARRIES from the file it was imported from ───
@@ -4577,8 +4583,8 @@ Environment.NewLine +
             lock (_dbLock)
             {
                 if (con == null || con.State != System.Data.ConnectionState.Open) return 0;
-                const string sql = "INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,cq_zone,itu_zone,state,qth,dxcc,prop_mode,sat_name,soapbox,eqsl_status,qrz_status,lotw_status,clublog_status,lotw_qsl_rcvd,lotw_qsl_rdate,lotw_deleted_entity,qrz_qsl_rcvd,qrz_qsl_rdate,qrz_deleted_entity,eqsl_qsl_rcvd,eqsl_qsl_rdate,eqsl_deleted_entity,clublog_qsl_rcvd,clublog_qsl_rdate,clublog_deleted_entity,paper_qsl_rcvd,iota,sota_ref,pota_ref,wwff_ref,sig,sig_info," + CarriedColumns + ",log_id) " +
-                    "VALUES (@my,@op,@mysq,@myloc,@dxloc,@freq,@band,@dx,@rr,@rs,@date,@time,@mode,@sub,@exch,@com,@name,@country,@cont,@cqz,@ituz,@state,@qth,@dxcc,@prop,@sat,@soap,@es,@qs,@ls,@cs,@lr,@lrd,@lde,@qr,@qrd,@qde,@er,@erd,@ede,@cr,@crd,@cde,@paper,@iota,@sota_ref,@pota_ref,@wwff_ref,@sig,@sig_info," + CarriedValues + ",@log)";
+                const string sql = "INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,cq_zone,itu_zone,state,qth,dxcc,prop_mode,sat_name,soapbox,eqsl_status,qrz_status,lotw_status,clublog_status,lotw_qsl_rcvd,lotw_qsl_rdate,lotw_deleted_entity,qrz_qsl_rcvd,qrz_qsl_rdate,qrz_deleted_entity,eqsl_qsl_rcvd,eqsl_qsl_rdate,eqsl_deleted_entity,clublog_qsl_rcvd,clublog_qsl_rdate,clublog_deleted_entity,paper_qsl_rcvd,iota,sota_ref,pota_ref,wwff_ref,sig,sig_info,my_wwff_ref," + CarriedColumns + ",log_id) " +
+                    "VALUES (@my,@op,@mysq,@myloc,@dxloc,@freq,@band,@dx,@rr,@rs,@date,@time,@mode,@sub,@exch,@com,@name,@country,@cont,@cqz,@ituz,@state,@qth,@dxcc,@prop,@sat,@soap,@es,@qs,@ls,@cs,@lr,@lrd,@lde,@qr,@qrd,@qde,@er,@erd,@ede,@cr,@crd,@cde,@paper,@iota,@sota_ref,@pota_ref,@wwff_ref,@sig,@sig_info,@my_wwff_ref," + CarriedValues + ",@log)";
                 using (var cmd = new SQLiteCommand(sql, con))
                 {
                     cmd.Parameters.AddWithValue("@my", (object)qso.MyCall ?? DBNull.Value);
@@ -6145,6 +6151,7 @@ Environment.NewLine +
             , [wwff_ref] nvarchar(30) NULL COLLATE NOCASE
             , [sig] nvarchar(50) NULL COLLATE NOCASE
             , [sig_info] nvarchar(100) NULL COLLATE NOCASE
+            , [my_wwff_ref] nvarchar(30) NULL COLLATE NOCASE
             , [credit_granted] nvarchar(200) NULL COLLATE NOCASE
             , [cnty] nvarchar(100) NULL COLLATE NOCASE
             , [qsl_via] nvarchar(100) NULL COLLATE NOCASE
@@ -6301,6 +6308,8 @@ Environment.NewLine +
             AddColToTable("qso", "wwff_ref", "nvarchar(30) NULL");
             AddColToTable("qso", "sig", "nvarchar(50) NULL");
             AddColToTable("qso", "sig_info", "nvarchar(100) NULL");
+            // MY park while activating one (ADIF MY_WWFF_REF), from the box beside Activity = WWFF.
+            AddColToTable("qso", "my_wwff_ref", "nvarchar(30) NULL");
             // The operator's AWARD and QSL record, imported from whatever program they used before.
             // credit_granted is the ARRL's own list of awards granted for a QSO, and is the only thing in
             // a log that can answer "what have I actually been credited with" - a different question from

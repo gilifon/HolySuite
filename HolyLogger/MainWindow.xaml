@@ -2128,8 +2128,15 @@
             </ComboBox>
             <TextBox x:Name="TB_ActivitySigInfo" Canvas.Left="177" Canvas.Top="34" Width="150" Height="28" FontSize="16"
                      CharacterCasing="Upper" MaxLength="60" TabIndex="25" TextWrapping="NoWrap"
-                     VerticalContentAlignment="Center"
+                     VerticalContentAlignment="Center" TextChanged="ActivitySigInfo_TextChanged"
                      ToolTip="The reference within that activity, e.g. OK-00234"/>
+            <!-- "My Fauna", on two lines, only while Activity is WWFF: the box then moves right to make
+                 room and holds MY OWN park (ADIF MY_WWFF_REF) - the WWFF box above is the other
+                 station's. Placed and shown by ApplyWwffMode. LineHeight 15 keeps the two lines inside
+                 the box's own 28px height plus 2, so they never reach the band matrix below. -->
+            <TextBlock x:Name="TB_MyWwffLabel" Canvas.Left="185" Canvas.Top="32" FontSize="16"
+                       LineHeight="15" LineStackingStrategy="BlockLineHeight" Visibility="Collapsed"
+                       ToolTip="Your own WWFF park, e.g. 4XFF-0016"><Bold>My</Bold><LineBreak/>Fauna</TextBlock>
             <!-- UNDO, and only when there is something to undo.
                  The main window could put back a deleted QSO but not an edited one, so a mistyped
                  callsign or a date changed by accident had to be found and retyped from memory. Edits

@@ -3654,6 +3654,30 @@ namespace HolyLogger.Properties {
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string RadioPanelWwffBands {
+            get {
+                return ((string)(this["RadioPanelWwffBands"]));
+            }
+            set {
+                this["RadioPanelWwffBands"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string LastMyWwffRef {
+            get {
+                return ((string)(this["LastMyWwffRef"]));
+            }
+            set {
+                this["LastMyWwffRef"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
         public string SpectrumWidths {
             get {
                 return ((string)(this["SpectrumWidths"]));
