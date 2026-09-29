@@ -7,31 +7,94 @@
              mc:Ignorable="d"
              d:DesignHeight="420" d:DesignWidth="960">
 
-    <!-- 940, not the old 680: the band table now runs in two column-groups side by side rather than
-         one column of twenty rows, and needs the width to lay both out without crowding. -->
-    <StackPanel HorizontalAlignment="Left" Width="940">
+    <!-- 950: the band table runs in two column-groups side by side (924) inside the folder's frame. -->
+    <StackPanel HorizontalAlignment="Left" Width="950">
         <TextBlock Text="Radio Control Panel" FontSize="18" FontWeight="Bold" Margin="0,0,0,6"/>
-        <TextBlock FontSize="16" TextWrapping="Wrap" Margin="0,0,0,10"
-                   Text="Each band button on the panel holds three frequencies. Pressing the button moves the radio to the SSB one when the panel is on SSB, the CW one when it is on CW, and the RTTY one when it is on RTTY. Frequencies are in kHz. Uncheck Select for a band your radio does not cover - its button on the panel goes grey and stops responding."/>
 
-        <TextBlock Text="You may edit any frequency" FontSize="16" FontWeight="Bold" Foreground="Blue" Margin="0,0,0,10"/>
+        <!-- TWO FOLDERS, the way Statistics has them: the ordinary frequencies, and the ones used while
+             Activity on the main window is WWFF. The same layout in both. -->
+        <ListBox x:Name="LB_Folder" Panel.ZIndex="1" Margin="0,4,0,0" HorizontalAlignment="Left"
+                 BorderThickness="0" Background="Transparent" ClipToBounds="False"
+                 SelectionChanged="LB_Folder_SelectionChanged">
+            <ListBox.Template>
+                <ControlTemplate TargetType="ListBox">
+                    <ItemsPresenter/>
+                </ControlTemplate>
+            </ListBox.Template>
+            <ListBox.ItemsPanel>
+                <ItemsPanelTemplate><StackPanel Orientation="Horizontal" ClipToBounds="False"/></ItemsPanelTemplate>
+            </ListBox.ItemsPanel>
+            <ListBox.ItemContainerStyle>
+                <Style TargetType="ListBoxItem">
+                    <Setter Property="Padding" Value="20,7,20,7"/>
+                    <Setter Property="FontSize" Value="16"/>
+                    <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
+                    <Setter Property="Background" Value="{DynamicResource ButtonBg}"/>
+                    <Setter Property="Template">
+                        <Setter.Value>
+                            <ControlTemplate TargetType="ListBoxItem">
+                                <Border x:Name="Bd" Background="{Binding Background, RelativeSource={RelativeSource TemplatedParent}}"
+                                        BorderBrush="{DynamicResource ThemeBorderBrush}"
+                                        BorderThickness="1" CornerRadius="7,7,0,0"
+                                        Margin="2,0,0,0" Padding="{TemplateBinding Padding}">
+                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsSelected" Value="True">
+                                        <Setter Property="FontWeight" Value="Bold"/>
+                                        <!-- The tab keeps its own colour when open, and the frame below
+                                             takes the same colour - as the Statistics folders do. -->
+                                        <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                                        <Setter TargetName="Bd" Property="BorderThickness" Value="1,1,1,0"/>
+                                        <Setter TargetName="Bd" Property="Margin" Value="2,0,0,-2"/>
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Setter.Value>
+                    </Setter>
+                </Style>
+            </ListBox.ItemContainerStyle>
+            <!-- Each folder its own colour, as in Statistics: Regular the Worked green, WWFF the eQSL purple. -->
+            <ListBoxItem Content="Regular" IsSelected="True" Background="{DynamicResource RowOnFreqBg}"/>
+            <ListBoxItem Content="WWFF" Background="#E6CCFF"/>
+        </ListBox>
 
-        <!-- The rows are built in code from the band list, so a band cannot be listed here and
-             missing from the panel, or the other way round. -->
-        <Grid x:Name="BandGrid"/>
+        <Border x:Name="FolderFrame" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1" Padding="8,10,8,10"
+                Background="{DynamicResource RowOnFreqBg}">
+            <StackPanel>
+                <!-- THE TABLE STAYS STILL between folders (his request): each folder's text shares ONE
+                     cell with the other's, and so does each table, and the one not shown is Hidden, not
+                     Collapsed - a Hidden item still takes its space, so the cell is always as tall as
+                     the taller of the two and the table starts at the same height in both folders. The
+                     two tables also use the same column widths (see BuildWwffRows). -->
+                <Grid Margin="0,0,0,10">
+                    <TextBlock x:Name="RegularIntro" FontSize="16" TextWrapping="Wrap"
+                               Text="Each band button on the panel holds three frequencies. Pressing the button moves the radio to the SSB one when the panel is on SSB, the CW one when it is on CW, and the RTTY one when it is on RTTY. Frequencies are in kHz. Uncheck Select for a band your radio does not cover - its button on the panel goes grey and stops responding."/>
+                    <TextBlock x:Name="WwffIntro" FontSize="16" TextWrapping="Wrap" Visibility="Hidden"
+                               Text="Used while Activity on the main window is WWFF. An empty box means the band has no WWFF frequency, and the Regular one is used. RTTY always uses the Regular one. Frequencies are in kHz. Uncheck Select for a band you do not want in WWFF - its button on the panel goes grey while Activity is WWFF."/>
+                </Grid>
+                <TextBlock Text="You may edit any frequency" FontSize="16" FontWeight="Bold" Foreground="Blue" Margin="0,0,0,10"/>
+                <Grid>
+                    <!-- The rows are built in code from the band list, so a band cannot be listed here and
+                         missing from the panel, or the other way round. -->
+                    <Grid x:Name="BandGrid"/>
+                    <Grid x:Name="WwffGrid" Visibility="Hidden"/>
+                </Grid>
 
-        <!-- Shown only after a typed frequency fell outside its band and was put back. -->
-        <TextBlock x:Name="TB_OutOfBand" FontSize="16" FontWeight="Bold" Foreground="Red" TextWrapping="Wrap"
-                   Margin="0,6,0,0" Visibility="Collapsed"/>
+                <!-- Shown only after a typed frequency fell outside its band and was put back. -->
+                <TextBlock x:Name="TB_OutOfBand" FontSize="16" FontWeight="Bold" Foreground="Red" TextWrapping="Wrap"
+                           Margin="0,6,0,0" Visibility="Collapsed"/>
 
-        <!-- One above the other, the same width. The page sits in the Options window's ScrollViewer,
-             so the extra row can never be cut off. -->
-        <Button x:Name="Btn_RestoreDefaults" Content="Restore standard frequencies" FontSize="16"
-                Height="32" Width="280" HorizontalAlignment="Left" Margin="0,14,0,0"
-                Background="#2E7D32" Foreground="White" BorderBrush="#1B5E20"
-                Click="Btn_RestoreDefaults_Click"/>
+                <!-- Restores the folder that is open, and only that one. -->
+                <Button x:Name="Btn_RestoreDefaults" Content="Restore standard frequencies" FontSize="16"
+                        Height="32" Width="280" HorizontalAlignment="Left" Margin="0,14,0,0"
+                        Background="#2E7D32" Foreground="White" BorderBrush="#1B5E20"
+                        Click="Btn_RestoreDefaults_Click"/>
+            </StackPanel>
+        </Border>
+
         <Button x:Name="Btn_SpectrumWidths" Content="Spectrum width manager" FontSize="16"
-                Height="32" Width="280" HorizontalAlignment="Left" Margin="0,10,0,0"
+                Height="32" Width="280" HorizontalAlignment="Left" Margin="0,14,0,0"
                 Background="#1565C0" Foreground="White" BorderBrush="#0D47A1"
                 Click="Btn_SpectrumWidths_Click"/>
     </StackPanel>

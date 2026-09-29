@@ -143,6 +143,11 @@ namespace HolyParser
         [JsonProperty("wwff_ref")]
         public string WwffRef { get; set; }
 
+        // MY OWN park while activating one, e.g. 4XFF-0016 - ADIF MY_WWFF_REF. WwffRef above is the
+        // OTHER station's park.
+        [JsonProperty("my_wwff_ref")]
+        public string MyWwffRef { get; set; }
+
         // The name of any other program, e.g. WCA - and the reference within it, e.g. OK-00234.
         // Two fields rather than one so that everyone spells the program the same way and an award
         // check can group them; that is exactly why ADIF splits them.

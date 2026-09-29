@@ -27,6 +27,10 @@ namespace HolyLogger
         // brush: that one is for text, and behind 16pt characters it is far too dark to read through.
         private static readonly Brush BadReferenceBrush = new SolidColorBrush(Color.FromRgb(0xFF, 0xE1, 0xE1));
 
+        // My Fauna's own, stronger red, asked for by eye: the pale one above was too easy to miss on
+        // the box that must be filled before an activation starts. Still light enough for black text.
+        private static readonly Brush MyWwffMissingBrush = new SolidColorBrush(Color.FromRgb(0xFF, 0x9E, 0x9E));
+
 
         // What an activity box should look like when it has nothing to complain about: the form's
         // ordinary input colour, or the edit-mode yellow while a logged QSO is open for editing.
@@ -38,6 +42,7 @@ namespace HolyLogger
         {
             activityNormalBg = background;
             foreach (TextBox box in ActivityBoxes()) ApplyActivityBoxColour(box);
+            ApplyMyWwffColour();
         }
 
         private IEnumerable<TextBox> ActivityBoxes()
@@ -86,6 +91,52 @@ namespace HolyLogger
             ApplyActivityBoxColour(sender as TextBox);
         }
 
+        // ── A PARK TYPED IN EXCHANGE, IN A WWFF ACTIVATION ────────────────────────────────────────
+        //
+        // In WWFF the exchange that matters is the other station's park, and it is natural to type it
+        // in Exchange. At Add it is moved to the WWFF box - corrected when it is a near miss (4XFF16 ->
+        // 4XFF-0016) - so it is saved as WWFF_REF and not as a loose SRX_STRING. Anything that is not a
+        // park stays in Exchange exactly as before. Nothing is moved when the WWFF box already holds a
+        // different park: which one is right is the operator's call, not the program's.
+        //
+        // LIVE, TOO: while it is typed, Exchange is copied into the WWFF box on every keystroke, so the
+        // operator SEES where it is going. The WWFF box can still be typed in directly.
+        private bool WwffExchangeOn
+        {
+            get { return IsWwffActivity && ActivityRow != null && ActivityRow.Visibility == Visibility.Visible; }
+        }
+
+        private void Exchange_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            // Only the operator's own typing is copied. Exchange is also written by the program - emptied
+            // by Clear and by the move at Add, filled when a QSO is opened for editing - and none of
+            // those may overwrite the WWFF box.
+            if (movingExchange || !WwffExchangeOn || !TB_Exchange.IsKeyboardFocusWithin) return;
+            string ex = (TB_Exchange.Text ?? "").Trim();
+            if (!string.Equals(TB_WwffRef.Text, ex, StringComparison.Ordinal)) TB_WwffRef.Text = ex;
+        }
+
+        private void MoveExchangeParkToWwff()
+        {
+            if (!WwffExchangeOn) return;
+            string ex = (TB_Exchange.Text ?? "").Trim().ToUpperInvariant();
+            if (ex.Length == 0) return;
+            string have = (TB_WwffRef.Text ?? "").Trim();
+            // Typed over in the WWFF box after Exchange: that box wins, Exchange is left alone.
+            if (have.Length > 0 && !string.Equals(have, ex, StringComparison.OrdinalIgnoreCase)) return;
+            // A near miss is corrected; anything else goes as typed, and the WWFF box's own check
+            // (pale red, and the "how to fix" question at Add) speaks for it.
+            string park = IsValidWwff(ex) ? ex : GuessWwff(ex);
+            TB_WwffRef.Text = park ?? ex;
+            // F1 can be pressed with the cursor still in Exchange, so the live copy must not answer
+            // this emptying by emptying the WWFF box as well.
+            movingExchange = true;
+            try { TB_Exchange.Text = ""; }
+            finally { movingExchange = false; }
+        }
+
+        private bool movingExchange;
+
         // Pale red while the box holds something that is not a reference; otherwise back to whatever
         // the rest of the form's editable boxes are wearing - white normally, yellow in edit mode.
         private void ApplyActivityBoxColour(TextBox box)
@@ -119,14 +170,64 @@ namespace HolyLogger
             if (!string.IsNullOrWhiteSpace(TB_PotaRef.Text) && !IsValidPota(TB_PotaRef.Text))
                 bad.Add("POTA \"" + TB_PotaRef.Text.Trim() + "\" - a park reference looks like K-0001. Two parks at once are written K-0001,US-4578.");
             if (!string.IsNullOrWhiteSpace(TB_WwffRef.Text) && !IsValidWwff(TB_WwffRef.Text))
-                bad.Add("WWFF \"" + TB_WwffRef.Text.Trim() + "\" - a nature reference looks like 4XFF-0016.");
+                bad.Add(WwffHowToFix("WWFF", TB_WwffRef.Text));
+            if (IsWwffActivity && !string.IsNullOrWhiteSpace(TB_ActivitySigInfo.Text) && !IsValidWwff(TB_ActivitySigInfo.Text))
+                bad.Add(WwffHowToFix("My Fauna", TB_ActivitySigInfo.Text));
             return bad;
+        }
+
+        // HOW TO FIX A WWFF PARK, not just "wrong". Says how one is written, and when the mistake is a
+        // usual one - no dash, the zeros left out, one F, a space - gives the number it was surely
+        // meant to be: "4XFF16" -> 4XFF-0016.
+        private static string WwffHowToFix(string boxName, string typed)
+        {
+            string t = (typed ?? "").Trim();
+            string text = boxName + " \"" + t + "\" is not a park number."
+                + Environment.NewLine + "Write it as: country, FF, a dash, four digits - 4XFF-0016.";
+            string guess = GuessWwff(t);
+            // A statement, not "did you mean ...?": the dialog ends with its own yes/no question, and a
+            // second question above it would leave "Yes" answering the wrong one.
+            if (guess != null) text += Environment.NewLine + "It is probably " + guess + ".";
+            return text;
+        }
+
+        private static readonly Regex WwffLoosePattern =
+            new Regex(@"^([A-Z0-9]{1,4}?)F{1,2}[\s\-_/.]*(\d{1,4})$", RegexOptions.Compiled);
+
+        // The park a mistyped reference was meant to be, or null when there is no safe guess.
+        public static string GuessWwff(string typed)
+        {
+            string t = (typed ?? "").Trim().ToUpperInvariant();
+            Match m = WwffLoosePattern.Match(t);
+            if (!m.Success) return null;
+            string guess = m.Groups[1].Value + "FF-" + m.Groups[2].Value.PadLeft(4, '0');
+            return IsValidWwff(guess) && guess != t ? guess : null;
         }
 
         // Called just before a QSO is saved. Returns false only when the operator chooses to go back and
         // fix a malformed reference; saying "log it anyway" keeps their typing rather than dropping it.
         private bool ConfirmActivityBeforeSave()
         {
+            MoveExchangeParkToWwff();
+
+            // MY PARK MISSING. Asked, never blocked: the operator may still be setting up when the
+            // contact of the day calls, and that contact must be loggable - the park can be added
+            // later in the QSO editor.
+            if (IsWwffActivity && string.IsNullOrWhiteSpace(TB_ActivitySigInfo.Text))
+            {
+                bool logAnyway = HolyMessageBox.ShowConfirm(
+                    "Your park is not typed in My Fauna."
+                    + Environment.NewLine + Environment.NewLine
+                    + "Type it there, e.g. 4XFF-0016, so this QSO counts for your activation.",
+                    "My Fauna is empty", HolyMsgType.Warning, this, 0,
+                    "Log anyway", "Type my park");
+                if (!logAnyway)
+                {
+                    TB_ActivitySigInfo.Focus();
+                    return false;
+                }
+            }
+
             List<string> bad = ActivityComplaints();
             if (bad.Count == 0) return true;
             string message = (bad.Count == 1 ? "This reference is not in the standard form:" : "These references are not in the standard form:")
@@ -134,7 +235,10 @@ namespace HolyLogger
                 + string.Join(Environment.NewLine + Environment.NewLine, bad.ToArray())
                 + Environment.NewLine + Environment.NewLine
                 + "Log the QSO with it as typed anyway?";
-            return HolyMessageBox.ShowConfirm(message, "Check the reference", HolyMsgType.Warning, this);
+            // fitLongestLine: the WWFF lines end on the example park, and a wrap there left "4XFF-0016"
+            // alone on a line of its own (measured).
+            return HolyMessageBox.ShowConfirm(message, "Check the reference", HolyMsgType.Warning, this,
+                fitLongestLine: true);
         }
 
         private void ActivityToQso(QSO qso)
@@ -148,6 +252,16 @@ namespace HolyLogger
             // only the Other window ever wrote.
             qso.Sig = (CB_ActivitySig.Text ?? "").Trim();
             qso.SigInfo = (TB_ActivitySigInfo.Text ?? "").Trim();
+
+            // WWFF HAS ITS OWN ADIF FIELDS, so it is never written as SIG: the box beside it is MY park,
+            // MY_WWFF_REF. The other station's park stays in the WWFF box above (WWFF_REF).
+            qso.MyWwffRef = "";
+            if (IsWwffActivity)
+            {
+                qso.MyWwffRef = (TB_ActivitySigInfo.Text ?? "").Trim();
+                qso.Sig = "";
+                qso.SigInfo = "";
+            }
         }
 
         private void ActivityFromQso(QSO qso)
@@ -157,9 +271,110 @@ namespace HolyLogger
             TB_SotaRef.Text = qso.SotaRef ?? "";
             TB_PotaRef.Text = qso.PotaRef ?? "";
             TB_WwffRef.Text = qso.WwffRef ?? "";
-            CB_ActivitySig.Text = qso.Sig ?? "";
-            TB_ActivitySigInfo.Text = qso.SigInfo ?? "";
+            if (!string.IsNullOrWhiteSpace(qso.MyWwffRef))
+            {
+                myWwffRef = qso.MyWwffRef.Trim();
+                CB_ActivitySig.Text = WwffListEntry;
+                TB_ActivitySigInfo.Text = myWwffRef;
+            }
+            else
+            {
+                CB_ActivitySig.Text = qso.Sig ?? "";
+                TB_ActivitySigInfo.Text = qso.SigInfo ?? "";
+            }
             ShowActivitySigMeaning();
+        }
+
+        // ── MY FAUNA ──────────────────────────────────────────────────────────────────────────────
+        //
+        // While Activity is WWFF the box beside the list is MY park. It is kept apart from what the box
+        // holds for any other program - switching to castles must not log my park as a castle - and it
+        // survives Clear and a restart, because it stays the same for the whole activation.
+        private string myWwffRef = (Properties.Settings.Default.LastMyWwffRef ?? "").Trim();
+        private bool wwffModeShown;
+
+        private void ApplyWwffMode()
+        {
+            if (TB_ActivitySigInfo == null || TB_MyWwffLabel == null) return;
+            bool wwff = IsWwffActivity;
+            if (wwff == wwffModeShown) return;
+            wwffModeShown = wwff;
+
+            if (wwff)
+            {
+                // Label, box and hint all 8px further right than the plain row, asked for by eye so
+                // "My Fauna" does not crowd the list's chevron.
+                TB_MyWwffLabel.Visibility = Visibility.Visible;
+                System.Windows.Controls.Canvas.SetLeft(TB_MyWwffLabel, 185);
+                System.Windows.Controls.Canvas.SetLeft(TB_ActivitySigInfo, 233);
+                System.Windows.Controls.Canvas.SetLeft(TB_ActivitySigHint, 343);
+                TB_ActivitySigInfo.Width = 102;
+                TB_ActivitySigInfo.MaxLength = 20;
+                TB_ActivitySigInfo.ToolTip = "Your own WWFF park, e.g. 4XFF-0016";
+                TB_ActivitySigInfo.Text = myWwffRef;
+
+                // No park yet: the cursor goes straight to where it is typed. After the list has
+                // closed, or the list takes the focus back.
+                if (myWwffRef.Length == 0)
+                    Dispatcher.BeginInvoke(new Action(delegate
+                    {
+                        try { if (IsWwffActivity) TB_ActivitySigInfo.Focus(); }
+                        catch (Exception swallowed) { Log.Swallow(swallowed); }
+                    }), System.Windows.Threading.DispatcherPriority.Input);
+            }
+            else
+            {
+                TB_MyWwffLabel.Visibility = Visibility.Collapsed;
+                System.Windows.Controls.Canvas.SetLeft(TB_ActivitySigInfo, 177);
+                System.Windows.Controls.Canvas.SetLeft(TB_ActivitySigHint, 335);
+                TB_ActivitySigInfo.Width = 150;
+                TB_ActivitySigInfo.MaxLength = 60;
+                TB_ActivitySigInfo.ToolTip = "The reference within that activity, e.g. OK-00234";
+                TB_ActivitySigInfo.Text = "";
+            }
+            ApplyMyWwffColour();
+        }
+
+        private void ActivitySigInfo_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (IsWwffActivity && wwffModeShown)
+            {
+                myWwffRef = (TB_ActivitySigInfo.Text ?? "").Trim();
+                try
+                {
+                    if (!string.Equals(Properties.Settings.Default.LastMyWwffRef, myWwffRef, StringComparison.Ordinal))
+                    {
+                        Properties.Settings.Default.LastMyWwffRef = myWwffRef;
+                        SettingsFlush.RequestSave();
+                    }
+                }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
+            }
+            ApplyMyWwffColour();
+        }
+
+        // Pale red while My Fauna holds something that is not a WWFF park, like the other boxes on the row.
+        private void ApplyMyWwffColour()
+        {
+            if (TB_ActivitySigInfo == null) return;
+            string text = (TB_ActivitySigInfo.Text ?? "").Trim();
+            // EMPTY IS RED TOO: an activation without my park is not an activation - the WWFF log needs
+            // it on every QSO - so the empty box says "type me" until it is filled.
+            bool bad = IsWwffActivity && (text.Length == 0 || !IsValidWwff(text));
+            if (IsWwffActivity)
+            {
+                // The red box explains itself on hover, with the corrected number when there is one.
+                string guess = bad && text.Length > 0 ? GuessWwff(text) : null;
+                TB_ActivitySigInfo.ToolTip = !bad
+                    ? "Your own WWFF park, e.g. 4XFF-0016"
+                    : text.Length == 0
+                        ? "Type your own WWFF park here, e.g. 4XFF-0016"
+                        : "Write it as: country, FF, a dash, four digits - 4XFF-0016"
+                          + (guess != null ? Environment.NewLine + "It is probably " + guess : "");
+            }
+            if (bad) { TB_ActivitySigInfo.Background = MyWwffMissingBrush; return; }
+            if (activityNormalBg != null) TB_ActivitySigInfo.Background = activityNormalBg;
+            else TB_ActivitySigInfo.ClearValue(Control.BackgroundProperty);
         }
 
         // THE PROGRAM SURVIVES A CLEAR. Everything else on this row belongs to the contact just logged
@@ -173,7 +388,8 @@ namespace HolyLogger
             TB_SotaRef.Clear();
             TB_PotaRef.Clear();
             TB_WwffRef.Clear();
-            TB_ActivitySigInfo.Clear();
+            // My Fauna is MY park for the whole activation, so it stays, like the program itself.
+            if (!IsWwffActivity) TB_ActivitySigInfo.Clear();
             ShowActivitySigMeaning();
         }
 
@@ -197,7 +413,10 @@ namespace HolyLogger
             var list = new List<KeyValuePair<string, string>>
             {
                 new KeyValuePair<string, string>("", "No Activity was selected"),
-                new KeyValuePair<string, string>(ContestListEntry, "in a contest? read this")
+                new KeyValuePair<string, string>(ContestListEntry, "in a contest? read this"),
+                // Right under Contest. Picking it says "I am activating a WWFF park": the Radio
+                // Control Panel's band buttons then go to the WWFF frequencies (IsWwffActivity).
+                new KeyValuePair<string, string>(WwffListEntry, "World Wide Flora and Fauna activation")
             };
             list.AddRange(OtherActivityWindow.Known);
             CB_ActivitySig.ItemsSource = list;
@@ -207,6 +426,7 @@ namespace HolyLogger
             // choosing something.
             CB_ActivitySig.DropDownOpened += ActivitySig_DropDownOpened;
             CB_ActivitySig.SelectionChanged += ActivitySig_SelectionChanged;
+            TB_Exchange.TextChanged += Exchange_TextChanged;
 
             ShowActivitySigMeaning();
         }
@@ -238,11 +458,15 @@ namespace HolyLogger
             string typed = (CB_ActivitySig == null ? "" : CB_ActivitySig.Text ?? "").Trim();
 
             if (TB_ActivitySigHint != null)
-                TB_ActivitySigHint.Text = OtherActivityWindow.DescriptionOf(typed);
+                TB_ActivitySigHint.Text = string.Equals(typed, WwffListEntry, StringComparison.OrdinalIgnoreCase)
+                    ? "WWFF activation"
+                    : OtherActivityWindow.DescriptionOf(typed);
 
             // The word "Program" shows only while the box is empty - it is a label, not a value.
             if (TB_ActivitySigPlaceholder != null)
                 TB_ActivitySigPlaceholder.Visibility = typed.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
+
+            ApplyWwffMode();
 
             UpdateActivityHintWidth();
         }
@@ -260,7 +484,10 @@ namespace HolyLogger
         {
             if (TB_ActivitySigHint == null) return;
 
-            const double hintLeft = 335, gap = 6;
+            const double gap = 6;
+            // 335 normally, 343 while My Fauna is showing (ApplyWwffMode moves it).
+            double hintLeft = System.Windows.Controls.Canvas.GetLeft(TB_ActivitySigHint);
+            if (double.IsNaN(hintLeft)) hintLeft = 335;
             double stopAt = 638;
             if (Btn_TryAgain != null && Btn_TryAgain.Visibility == Visibility.Visible)
             {
@@ -277,6 +504,18 @@ namespace HolyLogger
 
         // THE ONE LINE ON THE LIST THAT IS NOT A PROGRAM.
         private const string ContestListEntry = "Contest";
+
+        private const string WwffListEntry = "WWFF";
+
+        /// <summary>True while Activity is WWFF - the Radio Control Panel then uses the WWFF frequencies.</summary>
+        internal bool IsWwffActivity
+        {
+            get
+            {
+                string now = CB_ActivitySig == null ? "" : (CB_ActivitySig.Text ?? "").Trim();
+                return string.Equals(now, WwffListEntry, StringComparison.OrdinalIgnoreCase);
+            }
+        }
 
         // What the box held before the list was opened, so choosing Contest can put it back. Taken when
         // the list opens rather than from the selection's RemovedItems: the box is editable, and a typed
@@ -380,6 +619,7 @@ namespace HolyLogger
         {
             ShowActivitySigMeaning();
             RememberActivityProgram();
+            try { radioPanel?.ShowWwffHint(); } catch (Exception swallowed) { Log.Swallow(swallowed); }
         }
 
         // ESC MUST NOT THROW THE PROGRAM AWAY. A WPF ComboBox treats Escape as "undo what I typed" and

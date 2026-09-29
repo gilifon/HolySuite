@@ -178,9 +178,18 @@
             <!-- kHz, and under it the sign that the box can be rolled. A wheel over a text box is not
                  something anybody expects, so it has to be shown rather than discovered: the two
                  arrows say it in the one place the wheel works. -->
-            <TextBlock Grid.Column="2" Text="kHz" FontSize="14" FontWeight="Bold"
-                       HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="3,0,0,-3"
-                       Foreground="{DynamicResource TextBrush}"/>
+            <!-- WWFF in red over "kHz" while Activity on the main window is WWFF: the band buttons
+                 then go to the WWFF frequencies. The -8 right margin lets the word use the window's
+                 own 8px edge; the column alone is a few pixels narrower than the word. Measured: at a
+                 1px left margin the word ends 4px inside the window. -->
+            <StackPanel Grid.Column="2" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="1,0,-8,-3">
+                <TextBlock x:Name="WwffHint" Text="WWFF" FontSize="16" FontWeight="Bold"
+                           LineHeight="16" LineStackingStrategy="BlockLineHeight"
+                           Foreground="{DynamicResource Danger}" Visibility="Collapsed"
+                           ToolTip="WWFF activation: the band buttons go to the WWFF frequencies"/>
+                <TextBlock Text="kHz" FontSize="14" FontWeight="Bold"
+                           Foreground="{DynamicResource TextBrush}"/>
+            </StackPanel>
         </Grid>
 
         <!-- Fifteen band buttons, five rows of three: twelve bands three to a row, then the last band

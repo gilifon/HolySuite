@@ -896,6 +896,12 @@
     <Setting Name="RadioPanelBands" Type="System.String" Scope="User">
       <Value Profile="(Default)" />
     </Setting>
+    <Setting Name="RadioPanelWwffBands" Type="System.String" Scope="User">
+      <Value Profile="(Default)" />
+    </Setting>
+    <Setting Name="LastMyWwffRef" Type="System.String" Scope="User">
+      <Value Profile="(Default)" />
+    </Setting>
     <Setting Name="SpectrumWidths" Type="System.String" Scope="User">
       <Value Profile="(Default)" />
     </Setting>

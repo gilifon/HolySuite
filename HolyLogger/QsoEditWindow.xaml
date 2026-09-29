@@ -276,6 +276,7 @@
                     <ColumnDefinition Width="110"/>
                     <ColumnDefinition Width="100"/>
                     <ColumnDefinition Width="140"/>
+                    <ColumnDefinition Width="120"/>
                 </Grid.ColumnDefinitions>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
@@ -297,6 +298,8 @@
                 <TextBlock Grid.Row="0" Grid.Column="3" Text="WWFF"      Style="{StaticResource Hdr}" FontSize="16"/>
                 <TextBlock Grid.Row="0" Grid.Column="4" Text="Program" Style="{StaticResource Hdr}" FontSize="16"/>
                 <TextBlock Grid.Row="0" Grid.Column="5" Text="Reference" Style="{StaticResource Hdr}" FontSize="16"/>
+                <!-- MY park while activating one (ADIF MY_WWFF_REF). Far right, so nothing moves. -->
+                <TextBlock Grid.Row="0" Grid.Column="6" Text="My Fauna" Style="{StaticResource Hdr}" FontSize="16"/>
 
                 <TextBox Grid.Row="1" Grid.Column="0" x:Name="TB_Iota"    Style="{StaticResource Cell}" FontSize="16" CharacterCasing="Upper" MaxLength="20"
                          ToolTip="Islands on the Air: two letters for the continent, then three digits — EU-005"/>
@@ -331,6 +334,8 @@
                 </ComboBox>
                 <TextBox Grid.Row="1" Grid.Column="5" x:Name="TB_SigInfo" Style="{StaticResource Cell}" FontSize="16" CharacterCasing="Upper" MaxLength="60"
                          ToolTip="The reference within that program, e.g. OK-00234"/>
+                <TextBox Grid.Row="1" Grid.Column="6" x:Name="TB_MyWwffRef" Style="{StaticResource Cell}" FontSize="16" CharacterCasing="Upper" MaxLength="20"
+                         ToolTip="Your own WWFF park when you activated one, e.g. 4XFF-0016"/>
             </Grid>
 
             <!-- Row 4: this end of the contact. -->

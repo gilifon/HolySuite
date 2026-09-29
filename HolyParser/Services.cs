@@ -190,6 +190,7 @@ namespace HolyParser
                 if (!string.IsNullOrWhiteSpace(qso.SotaRef)) adif.AppendFormat("<sota_ref:{0}>{1}", qso.SotaRef.Trim().Length, qso.SotaRef.Trim());
                 if (!string.IsNullOrWhiteSpace(qso.PotaRef)) adif.AppendFormat("<pota_ref:{0}>{1}", qso.PotaRef.Trim().Length, qso.PotaRef.Trim());
                 if (!string.IsNullOrWhiteSpace(qso.WwffRef)) adif.AppendFormat("<wwff_ref:{0}>{1}", qso.WwffRef.Trim().Length, qso.WwffRef.Trim());
+                if (!string.IsNullOrWhiteSpace(qso.MyWwffRef)) adif.AppendFormat("<my_wwff_ref:{0}>{1}", qso.MyWwffRef.Trim().Length, qso.MyWwffRef.Trim());
 
                 // <sig> can only be written once, and two things want it: the activity program the
                 // operator entered (which is what the field is FOR - "the contacted station's special

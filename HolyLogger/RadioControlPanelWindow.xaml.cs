@@ -402,6 +402,7 @@ namespace HolyLogger
             _rigKhz = khz;
             _transmitting = transmitting;
             ShowTxRx(rigOnline ? transmitting : null);
+            ShowWwffHint();
 
             if (_modeButtons != null && _modeButtons.Any(m => string.Equals(m.Mode, mode, StringComparison.OrdinalIgnoreCase)))
             {
@@ -445,11 +446,8 @@ namespace HolyLogger
             // page stays disabled and grey no matter what the radio itself is doing - it never comes
             // back with the rig, the way every other button does. The corner mark dims right along
             // with it for free: it is part of the same template, under the same IsEnabled trigger.
-            foreach (var button in _bandButtons)
-            {
-                var band = button.Tag as RadioBandPreset;
-                button.IsEnabled = rigOnline && (band == null || band.Enabled);
-            }
+            // During a WWFF activation it is the WWFF folder's Select that counts (IsOffered).
+            ApplyBandsOffered();
             TB_Frequency.IsEnabled = rigOnline;
 
             // A dead box marks nothing: the band goes out with the radio.
@@ -462,6 +460,29 @@ namespace HolyLogger
 
             // The digits may have shifted under a mouse that never moved.
             ShowWheelZone();
+        }
+
+        /// <summary>
+        /// The red WWFF above "kHz": shown while Activity on the main window is WWFF, because then the
+        /// band buttons go to the WWFF frequencies and not the ordinary ones.
+        /// </summary>
+        public void ShowWwffHint()
+        {
+            WwffHint.Visibility = _main != null && _main.IsWwffActivity ? Visibility.Visible : Visibility.Collapsed;
+            // Activity just changed, maybe: the WWFF folder has its own Select, so the band buttons
+            // that work may be different now - without waiting for the radio's next report.
+            ApplyBandsOffered();
+        }
+
+        private void ApplyBandsOffered()
+        {
+            if (_bandButtons == null) return;
+            bool wwff = _main != null && _main.IsWwffActivity;
+            foreach (var button in _bandButtons)
+            {
+                var band = button.Tag as RadioBandPreset;
+                button.IsEnabled = _rigOnline && (band == null || band.IsOffered(wwff));
+            }
         }
 
         /// <summary>
@@ -558,7 +579,7 @@ namespace HolyLogger
             // whatever mode the panel was on, rather than repeating whatever the operator was last
             // doing on a band that allows it. Every other band keeps the panel's current mode.
             string mode = string.Equals(band.Name, "30m", StringComparison.OrdinalIgnoreCase) ? "CW" : _mode;
-            _main.TuneRadioToKhz(band.FrequencyFor(mode), mode);
+            _main.TuneRadioToKhz(band.FrequencyFor(mode, _main.IsWwffActivity), mode);
         }
 
         private void ModeButton_Click(object sender, RoutedEventArgs e)
@@ -579,7 +600,7 @@ namespace HolyLogger
             bool hasOwnFrequency = string.Equals(mode, "SSB", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(mode, "CW", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(mode, "RTTY", StringComparison.OrdinalIgnoreCase);
-            double khz = hasOwnFrequency && _currentBand != null ? _currentBand.FrequencyFor(mode) : _rigKhz;
+            double khz = hasOwnFrequency && _currentBand != null ? _currentBand.FrequencyFor(mode, _main.IsWwffActivity) : _rigKhz;
             if (khz <= 0) return;
 
             _main.TuneRadioToKhz(khz, mode);
