@@ -115,9 +115,60 @@ namespace HolyLogger
                 this.MinWidth = squareMinWidth;
         }
 
+        // A grid typed into the DX Locator box moves the station on the map (the line and the
+        // distance) as soon as it is a whole grid. Not when QRZ's own grid is put there: SetAzimuth has
+        // already drawn that one.
+        private void TB_DXLocator_TextChanged(object sender, TextChangedEventArgs e)
+            => AfterGridTypingPause(DxLocatorSettled);
+
+        // THE MAP WAITS FOR A PAUSE IN THE TYPING. Redrawing it on every letter held the window, so
+        // the letters of a grid appeared late in the box. The last change wins; earlier ones are dropped.
+        private System.Windows.Threading.DispatcherTimer _gridTypingTimer;
+        private Action _gridTypingAction;
+
+        private void AfterGridTypingPause(Action action)
+        {
+            _gridTypingAction = action;
+            if (_gridTypingTimer == null)
+            {
+                _gridTypingTimer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(350) };
+                _gridTypingTimer.Tick += (s, e) =>
+                {
+                    _gridTypingTimer.Stop();
+                    Action run = _gridTypingAction;
+                    _gridTypingAction = null;
+                    run?.Invoke();
+                };
+            }
+            _gridTypingTimer.Stop();
+            _gridTypingTimer.Start();
+        }
+
+        private void DxLocatorSettled()
+        {
+            string grid = (TB_DXLocator.Text ?? string.Empty).Trim();
+            if (grid.Length < 4 || !MaidenheadLocator.IsValidLocator(grid)) return;
+            if (string.Equals(grid, QRZGrid, StringComparison.OrdinalIgnoreCase)) return;
+            if (string.IsNullOrWhiteSpace(TB_DXCallsign.Text) && !MapIs4X) return;
+            SetAzimuth();
+        }
+
+        // THE 4X MAP DRAWS FROM THE GRID ALONE: a whole grid typed (in the contest's Grid Locator box,
+        // or else the DX Locator box) is enough for the line, with no callsign. The other maps still
+        // wait for a callsign.
+        private bool MapIs4X => MapControl != null && MapControl.Is4X;
+
+        private bool HasTypedDxGrid()
+        {
+            string grid = _contestRxGridBox != null ? _contestRxGridBox.Text : TB_DXLocator.Text;
+            grid = (grid ?? string.Empty).Trim();
+            return grid.Length >= 4 && MaidenheadLocator.IsValidLocator(grid);
+        }
+
         private void SetAzimuth()
         {
-            if (!string.IsNullOrWhiteSpace(TB_MyLocator.Text) && !string.IsNullOrWhiteSpace(TB_DXCallsign.Text))
+            bool hasCall = !string.IsNullOrWhiteSpace(TB_DXCallsign.Text);
+            if (!string.IsNullOrWhiteSpace(TB_MyLocator.Text) && (hasCall || (MapIs4X && HasTypedDxGrid())))
             {
                 try
                 {
@@ -128,7 +179,28 @@ namespace HolyLogger
                     //       operator's home address which can be in a different country.
                     string locator = null;
 
-                    if (!string.IsNullOrWhiteSpace(QRZGrid))
+                    // 0. A grid in the DX Locator box - typed by the operator, who heard it from the
+                    //    station itself. (The box is emptied with every change of the callsign, and QRZ
+                    //    fills it with its own grid, so it never holds another station's grid.)
+                    string typedGrid = (TB_DXLocator.Text ?? string.Empty).Trim();
+                    if (typedGrid.Length >= 4 && MaidenheadLocator.IsValidLocator(typedGrid))
+                        locator = typedGrid;
+
+                    // In a contest that asks for the grid, ONLY the grid typed into the contest's Grid
+                    // box: the station may be far from its QRZ grid or its home (Sukkot). None typed
+                    // yet -> no line.
+                    if (_contestRxGridBox != null)
+                    {
+                        string contestGrid = (_contestRxGridBox.Text ?? string.Empty).Trim();
+                        if (contestGrid.Length < 4 || !MaidenheadLocator.IsValidLocator(contestGrid))
+                        {
+                            ClearAzimuth();
+                            return;
+                        }
+                        locator = contestGrid;
+                    }
+
+                    if (string.IsNullOrWhiteSpace(locator) && !string.IsNullOrWhiteSpace(QRZGrid))
                         locator = QRZGrid;
 
                     if (string.IsNullOrWhiteSpace(locator))

@@ -1989,7 +1989,7 @@
         </TextBlock>
         <!-- MaxLength 10, not 8: same reason as My Locator above - the extended subsquare pair is
              part of the format, and a spot or a QRZ lookup can arrive carrying one. -->
-        <TextBox x:Name="TB_DXLocator" HorizontalAlignment="Left" Margin="69,201,0,0" Grid.Row="1" TextWrapping="NoWrap" VerticalAlignment="Top" CharacterCasing="Upper" Width="74" Height="28" FontSize="16" MaxLength="10" TabIndex="18"/>
+        <TextBox x:Name="TB_DXLocator" TextChanged="TB_DXLocator_TextChanged" HorizontalAlignment="Left" Margin="69,201,0,0" Grid.Row="1" TextWrapping="NoWrap" VerticalAlignment="Top" CharacterCasing="Upper" Width="74" Height="28" FontSize="16" MaxLength="10" TabIndex="18"/>
         <Label Content="ITU" HorizontalAlignment="Left" Margin="142,199,0,0" VerticalAlignment="Top" Height="28" VerticalContentAlignment="Center" Grid.Row="1" FontSize="16" ToolTip="ITU Zone (from QRZ.com)"/>
         <TextBox x:Name="TB_ITUZone" HorizontalAlignment="Left" Height="28" Margin="177,201,0,0" VerticalAlignment="Top" Width="31" Grid.Row="1" FontSize="16" MaxLength="2" PreviewTextInput="ZoneTextBox_PreviewTextInput" VerticalContentAlignment="Center" IsTabStop="False"/>
         <Label Content="CQ" HorizontalAlignment="Left" Margin="212,199,0,0" VerticalAlignment="Top" Height="28" VerticalContentAlignment="Center" Grid.Row="1" FontSize="16" ToolTip="CQ Zone (from QRZ.com)"/>

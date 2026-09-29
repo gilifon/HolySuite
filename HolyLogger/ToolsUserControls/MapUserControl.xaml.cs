@@ -85,6 +85,8 @@ namespace HolyLogger.ToolsUserControls
         private double? _currentAzimuth, _currentHomeLat, _currentHomeLon;
         private double? _currentSpotterLat, _currentSpotterLon;  // spotter of the selected cluster spot (for the DE button)
         private bool _isPolar;
+        // THE 4X MAP: the flat map, held on the whole of Israel. Never true together with _isPolar.
+        private bool _is4X;
         private bool _isClusterMode;
         private System.Collections.Generic.List<ClusterSpotInfo> _clusterSpots;
         private double _clusterHomeLat, _clusterHomeLon;
@@ -186,21 +188,146 @@ namespace HolyLogger.ToolsUserControls
         }
 
         public bool IsPolarProjection => _isPolar;
+        public bool Is4X => _is4X;
 
         public void EnsureFlatProjection()
         {
-            if (_isPolar)
+            while (_isPolar || _is4X)
             {
                 ToggleProjection();
             }
         }
 
+        // THE 4X MAP. One fixed picture of Israel, whether a callsign is typed or not, and fully
+        // offline: a real-looking map built into HolyLogger (MapAssetProvider.Israel4XScriptTag -
+        // land, sea, hills, lakes, towns, rivers, borders and city names), never the online
+        // street map. Typing a callsign only adds the line from home to a green dot for the station,
+        // and the distance - no pin, no compass, no zoom. The Home / DE / DX buttons, the radius list
+        // and the radius circle are gone: they are about distances around the world.
+        //
+        // Made from the flat map pages (home/DX and cluster) rather than written as a page of its
+        // own, so the line, the distance and the cluster spots stay the same code as on the flat map.
+        private static string Make4X(string html)
+        {
+            html = html.Replace(
+                "<button id='proj-btn' onclick='toggleProjection()' title='Switch to polar azimuthal map'>&#127757; Polar</button>",
+                "<button id='proj-btn' onclick='toggleProjection()' title='Switch to flat map'>&#9974; Flat</button>");
+            // No zoom animation: with a DX typed, the page's own animated zoom-to-DX finished AFTER
+            // the Israel fit below and overrode it (measured: 500 km view instead of Israel).
+            html = html.Replace("zoomSnap: 0 })", "zoomSnap: 0, zoomAnimation: false })")
+                       .Replace("zoomSnap:0 })", "zoomSnap:0, zoomAnimation:false })");
+
+            // Home/DX page: no online street map. Its line and dots are drawn by the 4X script below.
+            html = html.Replace("L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18 }).addTo(map);", "");
+            // Cluster page: no day/night shading (its country shapes are taken off below).
+            html = html.Replace("var showDayNight = true;", "var showDayNight = false;");
+
+            string head = "<style>#bottom-ctrl, #dx-center-btn, #compass-ctrl { display:none !important; } #map { background:#AAD3DF !important; }"
+                        + " .il4x-label { white-space:nowrap; font-family:Segoe UI, Tahoma, sans-serif; font-size:16px; color:#333;"
+                        + " text-shadow:0 0 3px #fff, 0 0 3px #fff, 0 0 2px #fff; }</style>\n"
+                        + MapAssetProvider.Israel4XScriptTag + "\n";
+            html = html.Replace("</head>", head + "</head>");
+            const string fourX = @"
+<script>
+(function() {
+    var IL = window.ISRAEL4X;
+    if (IL) {
+        // The cluster page's simple country shapes would sit on top of the map; take them off.
+        map.eachLayer(function(l) { if (l instanceof L.GeoJSON) map.removeLayer(l); });
+        // Its own panes: under the line, the dots and the spots; the names over them.
+        map.createPane('il4x').style.zIndex = 250;
+        var lp = map.createPane('il4xLabels'); lp.style.zIndex = 450; lp.style.pointerEvents = 'none';
+        L.imageOverlay(IL.img, IL.bounds, { pane: 'il4x', interactive: false }).addTo(map);
+        function draw(list, style) {
+            style.pane = 'il4x'; style.interactive = false;
+            for (var i = 0; i < list.length; i++) L.polyline(list[i], style).addTo(map);
+        }
+        draw(IL.rivers,   { color: '#6FAFD0', weight: 1.5, opacity: 0.9 });
+        draw(IL.borders,  { color: '#8E5E9C', weight: 1.5, opacity: 0.8, dashArray: '6,3' });
+        var labels = [];
+        for (var i = 0; i < IL.cities.length; i++) {
+            var c = IL.cities[i];
+            var dot = L.circleMarker([c[1], c[2]], { pane: 'il4x', interactive: false, radius: 2.5, color: '#fff', weight: 1, fillColor: '#444', fillOpacity: 1 }).addTo(map);
+            var m = L.marker([c[1], c[2]], { pane: 'il4xLabels', interactive: false, keyboard: false,
+                icon: L.divIcon({ className: 'il4x-label', html: c[0], iconSize: null, iconAnchor: [-5, 11] }) }).addTo(map);
+            labels.push({ el: m.getElement ? m.getElement() : m._icon, dot: dot, rank: c[3] });
+        }
+        labels.sort(function(a, b) { return a.rank - b.rank; });
+        // NAMES NEVER OVERLAP: the more important city keeps its name, one that would cover it is
+        // hidden - and its dot with it, so no dot is left without a name.
+        window.declutter4X = function() {
+            var kept = [];
+            for (var i = 0; i < labels.length; i++) {
+                var el = labels[i].el; if (!el) continue;
+                el.style.display = '';
+                var r = el.getBoundingClientRect(), hit = false;
+                for (var j = 0; j < kept.length && !hit; j++) {
+                    var k = kept[j];
+                    hit = !(r.right + 4 < k.left || r.left - 4 > k.right || r.bottom < k.top || r.top > k.bottom);
+                }
+                if (hit) el.style.display = 'none'; else kept.push(r);
+                labels[i].dot.setStyle(hit ? { opacity: 0, fillOpacity: 0 } : { opacity: 1, fillOpacity: 1 });
+            }
+        };
+        map.on('zoomend moveend resize', function() { window.declutter4X(); });
+    }
+    // THE LINE, THE DOTS AND THE DISTANCE are drawn here rather than by the page, so a new grid can
+    // move them without reloading it (updateDx, called by TryUpdateDxViaJs) - each reload of this
+    // page held the window for up to a second while he typed the grid. Home/DX page only: the
+    // cluster page has no operatorLat and draws its spots itself.
+    if (typeof gcArcPoints === 'function' && typeof operatorLat !== 'undefined') {
+        map.eachLayer(function(l) {
+            var p = l.options && l.options.pane;
+            if (p !== 'il4x' && p !== 'il4xLabels' && (l instanceof L.Marker || l instanceof L.Polyline)) map.removeLayer(l);
+        });
+        var hLat = (operatorLat !== null) ? operatorLat : homeLat, hLon = (operatorLat !== null) ? operatorLon : homeLon;
+        var mine = [];
+        function dot(lat, lon, color) {
+            return L.marker([lat, lon], { interactive: false, keyboard: false, icon: L.divIcon({ className: '', iconAnchor: [5, 5],
+                html: '<div style=""width:10px;height:10px;background:' + color + ';border:2px solid #fff;border-radius:50%;box-shadow:0 0 3px rgba(0,0,0,0.6)""></div>' }) });
+        }
+        // The DX station is a green dot at the end of the line, the same size as the home dot.
+        function show4X(hasDx, lat, lon) {
+            for (var i = 0; i < mine.length; i++) map.removeLayer(mine[i]);
+            mine = [];
+            if (hasDx) {
+                mine.push(L.polyline(gcArcPoints(hLat, hLon, lat, lon, 100), { color: '#1565C0', weight: 2, dashArray: '6,5', opacity: 0.8, interactive: false }).addTo(map));
+                mine.push(dot(lat, lon, '#43B843').addTo(map));
+            }
+            mine.push(dot(hLat, hLon, '#1565C0').addTo(map));
+            document.getElementById('distance-box').innerHTML = hasDx ? formatDistanceText(haversineMeters(hLat, hLon, lat, lon)) : 'DIST --';
+        }
+        window.updateDx = function(hasDx, lat, lon) { show4X(hasDx === '1', parseFloat(lat), parseFloat(lon)); };
+        show4X(operatorLat !== null, dxLat, dxLon);
+    }
+    var israel = L.latLngBounds([29.45, 34.2], [33.4, 35.95]);
+    function fitIsrael() {
+        map.invalidateSize(false); map.fitBounds(israel, { padding: [2, 2], animate: false });
+        if (window.declutter4X) window.declutter4X();
+    }
+    if (typeof radiusCircle !== 'undefined') { radiusCircle.setStyle({ opacity: 0 }); updateCircleVisibility = function() {}; }
+    fitAll = fitIsrael;
+    recenter = fitIsrael;
+    fitIsrael();
+    window.addEventListener('resize', fitIsrael);
+})();
+</script>
+</body>";
+            int at = html.LastIndexOf("</body>", StringComparison.Ordinal);
+            return at < 0 ? html : html.Substring(0, at) + fourX + html.Substring(at + "</body>".Length);
+        }
+
+        // The corner button rolls through the three maps: Flat -> Polar -> 4X -> Flat.
         internal void ToggleProjection()
         {
-            _isPolar = !_isPolar;
+            if (_is4X) { _is4X = false; _isPolar = false; }
+            else if (_isPolar) { _isPolar = false; _is4X = true; }
+            else { _isPolar = true; }
             _clusterMapLoaded = false;
             _homeMapLoaded = false;
+            _lastRenderedHtml = null;
             Properties.Settings.Default.MapUsePolar = _isPolar;
+            Properties.Settings.Default.MapUse4X = _is4X;
             Properties.Settings.Default.Save();
             if (_isClusterMode)
                 RenderClusterMap();
@@ -211,7 +338,8 @@ namespace HolyLogger.ToolsUserControls
         public MapUserControl()
         {
             InitializeComponent();
-            _isPolar = Properties.Settings.Default.MapUsePolar;
+            _is4X = Properties.Settings.Default.MapUse4X;
+            _isPolar = !_is4X && Properties.Settings.Default.MapUsePolar;
             _tempMapFile = Path.Combine(Path.GetTempPath(), "holylogger_map.html");
             MapBrowser.ObjectForScripting = new MapScriptHelper(this);
             // The IE WebBrowser control resets its "Silent" flag on every navigation, so a script
@@ -225,7 +353,7 @@ namespace HolyLogger.ToolsUserControls
                 InjectPinButton();
                 if (_isClusterMode)
                     _clusterMapLoaded = true;
-                else if (_isPolar)
+                else if (_isPolar || _is4X)
                     _homeMapLoaded = true;
             };
             this.SizeChanged += MapUserControl_SizeChanged;
@@ -971,6 +1099,7 @@ window.addEventListener('resize', function() {
 </script>
 </body>
 </html>";
+            if (_is4X) html = Make4X(html);
 
             File.WriteAllText(_tempMapFile, html, System.Text.Encoding.UTF8);
             var uriBuilder = new UriBuilder(new Uri(_tempMapFile));
@@ -1121,7 +1250,7 @@ window.addEventListener('resize', function() {
 </head>
 <body>
 <svg id='polar-svg'></svg>
-<button id='proj-btn' onclick='toggleProjection()'>&#9974; Flat</button>
+<button id='proj-btn' onclick='toggleProjection()' title='Switch to the map of Israel'>4X</button>
 <div id='autozoom-wrap' onclick='toggleAutoZoom()' title='Auto Zoom: fit all spots in view'>
   <div id='autozoom-toggle'><div class='knob'></div></div>
   <div id='autozoom-label'>Auto Zoom</div>
@@ -1910,7 +2039,8 @@ window.addEventListener('resize', function() {
             // country rebuild). This is what makes clearing the DX callsign (F9) react quickly.
             double centerLatNow = _currentHomeLat ?? _currentLat;
             double centerLonNow = _currentHomeLon ?? _currentLon;
-            if (_isPolar && !_isClusterMode && _homeMapLoaded
+            // The 4X home page has the same updateDx (see Make4X), so a new grid moves the line in place.
+            if ((_isPolar || _is4X) && !_isClusterMode && _homeMapLoaded
                 && _renderedHomeLat.HasValue && _renderedHomeLon.HasValue
                 && Math.Abs(_renderedHomeLat.Value - centerLatNow) < 1e-9
                 && Math.Abs(_renderedHomeLon.Value - centerLonNow) < 1e-9)
@@ -1925,6 +2055,7 @@ window.addEventListener('resize', function() {
             string html = _isPolar
                 ? BuildPolarMapHtml(_currentLat, _currentLon, _currentRadiusKm, _currentAzimuth, _currentHomeLat, _currentHomeLon, marginMultiplier, _currentSpotterLat, _currentSpotterLon)
                 : BuildFlatMapHtml(_currentLat, _currentLon, _currentRadiusKm, _currentAzimuth, _currentHomeLat, _currentHomeLon, marginMultiplier, _currentSpotterLat, _currentSpotterLon);
+            if (_is4X) html = Make4X(html);
 
             // Identical map: nothing changed, skip the costly IE reload.
             if (html == _lastRenderedHtml) return;
@@ -2497,7 +2628,7 @@ window.addEventListener('resize', function() {
 </head>
 <body>
 <svg id='polar-svg'></svg>
-<button id='proj-btn' onclick='toggleProjection()'>&#9974; Flat</button>
+<button id='proj-btn' onclick='toggleProjection()' title='Switch to the map of Israel'>4X</button>
 <div id='az-only'>AZ 0&deg;</div>
 <div id='bottom-ctrl'>
   <div id='radius-stack'>
