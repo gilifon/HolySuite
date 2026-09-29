@@ -2037,7 +2037,10 @@
             <!-- Widened to the LEFT (asked for by eye: "OHFF-0888" measures 80px and 85 left it touching
                  the frame). The right edge stays at 638 - Undo and the Activity hint line up with it -
                  so the label moved left too, to 6px after the POTA box (489). "WWFF" is 45.5px. -->
-            <Label Content="WWFF" Canvas.Left="495" Canvas.Top="0" Height="28" Padding="0" FontSize="16"
+            <!-- Right-aligned in a fixed 50px, ending 4px before the box: the word turns BOLD during a
+                 WWFF activation (ApplyWwffMode) and bold is 48.8px against 45.5 - it grows to the left
+                 instead of running into the box. -->
+            <Label x:Name="L_WwffRef" Content="WWFF" Canvas.Left="491" Canvas.Top="0" Width="50" HorizontalContentAlignment="Right" Height="28" Padding="0" FontSize="16"
                    VerticalContentAlignment="Center" ToolTip="World Wide Flora and Fauna, e.g. 4XFF-0016"/>
             <TextBox x:Name="TB_WwffRef" Canvas.Left="545" Canvas.Top="0" Width="93" Height="28" FontSize="16"
                      CharacterCasing="Upper" MaxLength="20" TabIndex="23" TextWrapping="NoWrap"

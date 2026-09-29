@@ -89,6 +89,7 @@ namespace HolyLogger
         private void ActivityBox_TextChanged(object sender, TextChangedEventArgs e)
         {
             ApplyActivityBoxColour(sender as TextBox);
+            if (sender == TB_WwffRef) UpdateParkSuggestions(TB_WwffRef);
         }
 
         // ── A PARK TYPED IN EXCHANGE, IN A WWFF ACTIVATION ────────────────────────────────────────
@@ -114,6 +115,11 @@ namespace HolyLogger
             if (movingExchange || !WwffExchangeOn || !TB_Exchange.IsKeyboardFocusWithin) return;
             string ex = (TB_Exchange.Text ?? "").Trim();
             if (!string.Equals(TB_WwffRef.Text, ex, StringComparison.Ordinal)) TB_WwffRef.Text = ex;
+
+            // "Worked before" sits under the callsign and covers part of Exchange; once a park is
+            // being typed there it has been read, and it is in the way.
+            if (L_Legal != null) L_Legal.Visibility = Visibility.Hidden;
+            UpdateParkSuggestions(TB_Exchange);
         }
 
         private void MoveExchangeParkToWwff()
@@ -144,10 +150,23 @@ namespace HolyLogger
             if (box == null) return;
             string text = (box.Text ?? "").Trim();
             bool ok = text.Length == 0 || IsValidActivityBox(box, text);
+            if (box == TB_WwffRef)
+            {
+                // The park's NAME on hover once it is on the list; orange and a warning when the
+                // format is right but no such park exists.
+                WwffDirectory.Park park = ok && text.Length > 0 ? WwffDirectory.Find(text) : null;
+                bool unknown = ok && text.Length > 0 && WwffDirectory.IsKnown(text) == false;
+                box.ToolTip = park != null ? park.Ref + " - " + park.Name
+                    : unknown ? ParkNotListedTip(text)
+                    : WwffBoxTip;
+                if (unknown) { box.Background = UnknownParkBrush; return; }
+            }
             if (!ok) { box.Background = BadReferenceBrush; return; }
             if (activityNormalBg != null) box.Background = activityNormalBg;
             else box.ClearValue(Control.BackgroundProperty);
         }
+
+        private const string WwffBoxTip = "World Wide Flora and Fauna: the nature-reserve reference - 4XFF-0016";
 
         private bool IsValidActivityBox(TextBox box, string text)
         {
@@ -299,6 +318,8 @@ namespace HolyLogger
             bool wwff = IsWwffActivity;
             if (wwff == wwffModeShown) return;
             wwffModeShown = wwff;
+            if (L_WwffRef != null) L_WwffRef.FontWeight = wwff ? FontWeights.Bold : FontWeights.Normal;
+            if (wwff) WwffDirectory.EnsureLoaded(this, RefreshWwffColours);
 
             if (wwff)
             {
@@ -351,6 +372,7 @@ namespace HolyLogger
                 catch (Exception swallowed) { Log.Swallow(swallowed); }
             }
             ApplyMyWwffColour();
+            UpdateParkSuggestions(TB_ActivitySigInfo);
         }
 
         // Pale red while My Fauna holds something that is not a WWFF park, like the other boxes on the row.
@@ -373,6 +395,17 @@ namespace HolyLogger
                           + (guess != null ? Environment.NewLine + "It is probably " + guess : "");
             }
             if (bad) { TB_ActivitySigInfo.Background = MyWwffMissingBrush; return; }
+            if (IsWwffActivity)
+            {
+                WwffDirectory.Park park = WwffDirectory.Find(text);
+                if (park != null) TB_ActivitySigInfo.ToolTip = "Your park: " + park.Ref + " - " + park.Name;
+                else if (WwffDirectory.IsKnown(text) == false)
+                {
+                    TB_ActivitySigInfo.ToolTip = ParkNotListedTip(text);
+                    TB_ActivitySigInfo.Background = UnknownParkBrush;
+                    return;
+                }
+            }
             if (activityNormalBg != null) TB_ActivitySigInfo.Background = activityNormalBg;
             else TB_ActivitySigInfo.ClearValue(Control.BackgroundProperty);
         }
@@ -427,6 +460,9 @@ namespace HolyLogger
             CB_ActivitySig.DropDownOpened += ActivitySig_DropDownOpened;
             CB_ActivitySig.SelectionChanged += ActivitySig_SelectionChanged;
             TB_Exchange.TextChanged += Exchange_TextChanged;
+            WireParkSuggest(TB_WwffRef);
+            WireParkSuggest(TB_ActivitySigInfo);
+            WireParkSuggest(TB_Exchange);
 
             ShowActivitySigMeaning();
         }
@@ -654,10 +690,455 @@ namespace HolyLogger
         // Contest mode has no room for this row - the contest layout already reaches the bottom of the
         // form - and no use for it either: in a contest the exchange is the contest's own. Hiding it
         // leaves every contest position exactly as it was before the row existed.
+        // ── PARK SUGGESTIONS ─────────────────────────────────────────────────────────────────────────
+        //
+        // The DX callsign's Suggest, for parks: typing in WWFF, in My Fauna, or in Exchange during a
+        // WWFF activation opens a list of matching parks with their names under the box. Up/Down
+        // move, Enter or Tab or a click takes one, Esc closes. The list is built in code, one popup
+        // shared by the three boxes.
+        private System.Windows.Controls.Primitives.Popup parkPopup;
+        private ListBox parkList;
+        private Border parkFrame;
+        private static readonly Brush ParkListTypingBrush = new SolidColorBrush(Color.FromRgb(0xE3, 0xF2, 0xFD));
+        private TextBox parkTarget;
+        private bool fillingPark;
+        private const int MaxParkSuggestions = 30;
+
+        private void WireParkSuggest(TextBox box)
+        {
+            box.PreviewKeyDown += ParkBox_PreviewKeyDown;
+            box.LostKeyboardFocus += (s, e) => { if (parkTarget == box) CloseParkSuggestions(); };
+        }
+
+        private bool ParkSuggestApplies(TextBox box)
+        {
+            if (box == TB_WwffRef) return true;
+            // My Fauna and Exchange are parks only while the activity is WWFF.
+            return WwffExchangeOn && (box == TB_ActivitySigInfo || box == TB_Exchange);
+        }
+
+        private void UpdateParkSuggestions(TextBox box)
+        {
+            if (fillingPark || box == null) return;
+            if (!box.IsKeyboardFocusWithin || !ParkSuggestApplies(box)) { if (parkTarget == box) CloseParkSuggestions(); return; }
+
+            if (!WwffDirectory.Loaded)
+            {
+                // First use: fetch the list, and answer this same typing once it is here.
+                WwffDirectory.EnsureLoaded(this, delegate { RefreshWwffColours(); UpdateParkSuggestions(box); });
+                return;
+            }
+            WwffDirectory.EnsureLoaded(this, RefreshWwffColours);   // a no-op unless the list is old
+
+            string typed = (box.Text ?? "").Trim();
+            List<WwffDirectory.Park> matches = WwffDirectory.Suggest(typed, MaxParkSuggestions);
+            // Nothing to offer, or the box already holds exactly the one park: no list.
+            if (matches.Count == 0 || (matches.Count == 1 && string.Equals(matches[0].Ref, typed, StringComparison.OrdinalIgnoreCase)))
+            {
+                CloseParkSuggestions();
+                return;
+            }
+
+            EnsureParkPopup();
+            parkTarget = box;
+            parkPopup.PlacementTarget = box;
+            parkList.ItemsSource = matches;
+            // Very light blue while what is typed is not yet a whole park, white once it is. Light
+            // blue, not the box's pale red (tried, and he did not like it) - and lighter than the
+            // #7FBFFF highlight, so the row Up/Down is on still stands out.
+            parkFrame.Background = IsValidWwff(typed) && WwffDirectory.IsKnown(typed) != false
+                ? Brushes.White : ParkListTypingBrush;
+            parkList.SelectedIndex = 0;
+            parkList.ScrollIntoView(parkList.SelectedItem);
+            parkPopup.IsOpen = true;
+        }
+
+        private void EnsureParkPopup()
+        {
+            if (parkPopup != null) return;
+
+            // Not focusable, list or rows: the cursor has to stay in the box being typed in.
+            // ITS OWN HIGHLIGHT, the callsign list's blue. A list that never has the focus paints its
+            // selected row in the "inactive" colour, and that was measured at #F2F2F2 - white on
+            // white - so Up/Down moved the selection and nobody could see it move. #7FBFFF: a shade darker than
+            // the callsign list's #A9D4FF, asked for by eye.
+            var rowStyle = (Style)System.Windows.Markup.XamlReader.Parse(
+                "<Style xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation'" +
+                " xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml' TargetType='ListBoxItem'>" +
+                "<Setter Property='Focusable' Value='False'/>" +
+                "<Setter Property='Foreground' Value='Black'/>" +
+                "<Setter Property='Template'><Setter.Value>" +
+                "<ControlTemplate TargetType='ListBoxItem'>" +
+                "<Border x:Name='Bd' Background='Transparent' Padding='4,2,8,2'><ContentPresenter/></Border>" +
+                "<ControlTemplate.Triggers>" +
+                "<Trigger Property='IsSelected' Value='True'><Setter TargetName='Bd' Property='Background' Value='#7FBFFF'/></Trigger>" +
+                "</ControlTemplate.Triggers>" +
+                "</ControlTemplate></Setter.Value></Setter></Style>");
+
+            parkList = new ListBox
+            {
+                FontSize = 16,
+                MaxHeight = 330,
+                MinWidth = 260,
+                MaxWidth = 560,
+                Focusable = false,
+                Background = Brushes.Transparent,
+                BorderThickness = new Thickness(0),
+                ItemContainerStyle = rowStyle
+            };
+            ScrollViewer.SetHorizontalScrollBarVisibility(parkList, ScrollBarVisibility.Disabled);
+            parkList.PreviewMouseLeftButtonUp += (s, e) =>
+            {
+                var item = ItemsControl.ContainerFromElement(parkList, e.OriginalSource as DependencyObject) as ListBoxItem;
+                if (item == null) return;
+                TakePark(item.DataContext as WwffDirectory.Park);
+                e.Handled = true;
+            };
+
+            parkPopup = new System.Windows.Controls.Primitives.Popup
+            {
+                Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom,
+                StaysOpen = true,
+                AllowsTransparency = true,
+                Child = parkFrame = new Border
+                {
+                    BorderBrush = Brushes.Gray,
+                    BorderThickness = new Thickness(1),
+                    Background = Brushes.White,
+                    Child = parkList
+                }
+            };
+        }
+
+        private void CloseParkSuggestions()
+        {
+            if (parkPopup != null) parkPopup.IsOpen = false;
+            parkTarget = null;
+        }
+
+        private void ParkBox_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+        {
+            if (parkPopup == null || !parkPopup.IsOpen || parkTarget != sender || parkList.Items.Count == 0) return;
+            switch (e.Key)
+            {
+                case System.Windows.Input.Key.Down:
+                    parkList.SelectedIndex = Math.Min(parkList.SelectedIndex + 1, parkList.Items.Count - 1);
+                    parkList.ScrollIntoView(parkList.SelectedItem);
+                    e.Handled = true;
+                    break;
+                case System.Windows.Input.Key.Up:
+                    parkList.SelectedIndex = Math.Max(parkList.SelectedIndex - 1, 0);
+                    parkList.ScrollIntoView(parkList.SelectedItem);
+                    e.Handled = true;
+                    break;
+                case System.Windows.Input.Key.Enter:
+                case System.Windows.Input.Key.Tab:
+                    TakePark(parkList.SelectedItem as WwffDirectory.Park);
+                    // Enter is taken by the list; Tab still moves on to the next box as usual.
+                    if (e.Key == System.Windows.Input.Key.Enter) e.Handled = true;
+                    break;
+                case System.Windows.Input.Key.Escape:
+                    CloseParkSuggestions();
+                    e.Handled = true;
+                    break;
+            }
+        }
+
+        private void TakePark(WwffDirectory.Park park)
+        {
+            TextBox box = parkTarget;
+            CloseParkSuggestions();
+            if (park == null || box == null) return;
+            fillingPark = true;
+            try
+            {
+                box.Text = park.Ref;
+                box.CaretIndex = box.Text.Length;
+            }
+            finally { fillingPark = false; }
+        }
+
+        // ── A PARK THAT IS NOT ON THE LIST ───────────────────────────────────────────────────────────
+        //
+        // Right format, but no such park (or a deleted one) - a typo the format check cannot see,
+        // like GIFF-1001 for GIFF-0101. Orange, not red: the list is refreshed monthly, and a park
+        // added last week may truly exist; the tooltip says which list it was checked against.
+        private static readonly Brush UnknownParkBrush = new SolidColorBrush(Color.FromRgb(0xFF, 0xCC, 0x80));
+
+        private static string ParkNotListedTip(string reference)
+        {
+            return reference + " is not on the WWFF park list. Check the number.";
+        }
+
+        private void RefreshWwffColours()
+        {
+            ApplyActivityBoxColour(TB_WwffRef);
+            ApplyMyWwffColour();
+        }
+
         private void SetActivityRowVisible(bool visible)
         {
             if (ActivityRow == null) return;
             ActivityRow.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+        }
+    }
+
+    // ── THE WWFF PARK LIST, AND SUGGESTIONS FROM IT ─────────────────────────────────────────────────
+    //
+    // The official directory (wwff.co/wwff-data/wwff_directory.csv, read 2026-09-29: 68,861 rows -
+    // 67,453 active, 1,374 deleted, 33 "national"; every real reference matches WwffPattern). It is
+    // 24 MB, of which only the reference, the name and the locator are wanted, so it is boiled down
+    // to a ~3 MB text file beside the log database and read from there. Refreshed when older than
+    // RefreshDays, in the background, only once somebody actually uses WWFF - nobody who never
+    // activates a park pays for the download.
+    internal static class WwffDirectory
+    {
+        private const string Url = "https://wwff.co/wwff-data/wwff_directory.csv";
+        private const int RefreshDays = 30;
+
+        internal sealed class Park
+        {
+            public string Ref;
+            public string Name;
+            public string Locator;
+            public override string ToString() { return Ref + "   " + Name; }
+        }
+
+        private static List<Park> _parks;                   // sorted by Ref, ordinal
+        private static Dictionary<string, Park> _byRef;
+        private static int _busy;                            // 1 while a load/download runs
+        private static readonly List<Action> _waiting = new List<Action>();
+
+        public static bool Loaded { get { return _parks != null; } }
+
+        /// <summary>The list as it stands on disk, for Help > About: the number of parks and the day
+        /// it was downloaded. False when it has never been downloaded.</summary>
+        public static bool OnDisk(out int parks, out DateTime updated)
+        {
+            parks = 0;
+            updated = DateTime.MinValue;
+            try
+            {
+                string path = LocalPath;
+                if (!System.IO.File.Exists(path)) return false;
+                updated = System.IO.File.GetLastWriteTime(path);
+                List<Park> loaded = _parks;
+                if (loaded != null) parks = loaded.Count;
+                else foreach (string line in System.IO.File.ReadLines(path)) if (line.Length > 0) parks++;
+                return parks > 0;
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); return false; }
+        }
+
+        private static string LocalPath
+        {
+            get
+            {
+                var asm = System.Reflection.Assembly.GetExecutingAssembly();
+                var fvi = System.Diagnostics.FileVersionInfo.GetVersionInfo(asm.Location);
+                string appData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+                return System.IO.Path.Combine(appData, fvi.CompanyName, fvi.ProductName, "wwff_parks.txt");
+            }
+        }
+
+        /// <summary>Loads the list (and downloads it when missing or old) off the UI thread; onReady
+        /// runs on the window's thread once it is there. Safe to call as often as you like.</summary>
+        public static void EnsureLoaded(Window owner, Action onReady)
+        {
+            string path = LocalPath;
+            bool fresh = false;
+            try { fresh = System.IO.File.Exists(path) && (DateTime.Now - System.IO.File.GetLastWriteTime(path)).TotalDays < RefreshDays; }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+            if (Loaded && (fresh || _triedDownload)) return;
+
+            if (onReady != null) lock (_waiting) _waiting.Add(onReady);
+            if (System.Threading.Interlocked.Exchange(ref _busy, 1) == 1) return;
+
+            System.Threading.Tasks.Task.Run(delegate
+            {
+                try
+                {
+                    // What is on disk first, so suggestions work at once - and offline.
+                    if (!Loaded && System.IO.File.Exists(path)) Use(ReadLocal(path));
+                    if (!fresh && !_triedDownload)
+                    {
+                        // Once per run: a failed download is not retried on every keystroke.
+                        _triedDownload = true;
+                        List<Park> downloaded = Download();
+                        // A short answer is a moved or broken link, never the real list.
+                        if (downloaded != null && downloaded.Count > 10000)
+                        {
+                            WriteLocal(path, downloaded);
+                            Use(downloaded);
+                        }
+                    }
+                }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
+                finally { System.Threading.Interlocked.Exchange(ref _busy, 0); }
+
+                Action[] calls;
+                lock (_waiting) { calls = _waiting.ToArray(); _waiting.Clear(); }
+                if (owner != null && calls.Length > 0)
+                    owner.Dispatcher.BeginInvoke(new Action(delegate
+                    {
+                        foreach (Action a in calls)
+                            try { a(); } catch (Exception swallowed) { Log.Swallow(swallowed); }
+                    }));
+            });
+        }
+
+        private static bool _triedDownload;
+
+        private static void Use(List<Park> parks)
+        {
+            parks.Sort((a, b) => string.CompareOrdinal(a.Ref, b.Ref));
+            var byRef = new Dictionary<string, Park>(StringComparer.OrdinalIgnoreCase);
+            foreach (Park p in parks) byRef[p.Ref] = p;
+            _byRef = byRef;
+            _parks = parks;
+        }
+
+        private static List<Park> ReadLocal(string path)
+        {
+            var list = new List<Park>();
+            foreach (string line in System.IO.File.ReadAllLines(path, System.Text.Encoding.UTF8))
+            {
+                string[] f = line.Split('\t');
+                if (f.Length < 2) continue;
+                list.Add(new Park { Ref = f[0], Name = f[1], Locator = f.Length > 2 ? f[2] : "" });
+            }
+            return list;
+        }
+
+        private static void WriteLocal(string path, List<Park> parks)
+        {
+            System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(path));
+            var sb = new System.Text.StringBuilder(parks.Count * 48);
+            foreach (Park p in parks)
+                sb.Append(p.Ref).Append('\t').Append(p.Name).Append('\t').Append(p.Locator).Append('\n');
+            string tmp = path + ".new";
+            System.IO.File.WriteAllText(tmp, sb.ToString(), System.Text.Encoding.UTF8);
+            if (System.IO.File.Exists(path)) System.IO.File.Delete(path);
+            System.IO.File.Move(tmp, path);
+        }
+
+        // Only the parks one can still work: "active", and the 33 "national" ones. Deleted parks and
+        // the few junk rows ("Select-0001") are dropped.
+        private static List<Park> Download()
+        {
+            try { System.Net.ServicePointManager.SecurityProtocol |= System.Net.SecurityProtocolType.Tls12; }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+            using (var http = new System.Net.Http.HttpClient { Timeout = TimeSpan.FromMinutes(3) })
+            using (var stream = http.GetStreamAsync(Url).GetAwaiter().GetResult())
+            using (var reader = new System.IO.StreamReader(stream, System.Text.Encoding.UTF8))
+            {
+                var list = new List<Park>();
+                List<string> header = ReadCsvRow(reader);
+                if (header == null) return null;
+                int iRef = header.IndexOf("reference"), iStatus = header.IndexOf("status"),
+                    iName = header.IndexOf("name"), iLoc = header.IndexOf("iaruLocator");
+                if (iRef < 0 || iStatus < 0 || iName < 0) return null;
+
+                List<string> row;
+                while ((row = ReadCsvRow(reader)) != null)
+                {
+                    if (row.Count <= Math.Max(iRef, Math.Max(iStatus, iName))) continue;
+                    string status = row[iStatus].Trim();
+                    if (status != "active" && status != "national") continue;
+                    string reference = row[iRef].Trim().ToUpperInvariant();
+                    if (!MainWindow.IsValidWwff(reference)) continue;
+                    string loc = iLoc >= 0 && iLoc < row.Count ? row[iLoc].Trim() : "";
+                    if (loc == "-") loc = "";
+                    list.Add(new Park
+                    {
+                        Ref = reference,
+                        Name = row[iName].Replace('\t', ' ').Replace('\r', ' ').Replace('\n', ' ').Trim(),
+                        Locator = loc
+                    });
+                }
+                return list;
+            }
+        }
+
+        // One CSV record: commas between fields, a field in double quotes may hold commas, line
+        // breaks and "" for a quote. Null at the end of the file.
+        private static List<string> ReadCsvRow(System.IO.TextReader r)
+        {
+            int c = r.Peek();
+            if (c < 0) return null;
+            var fields = new List<string>();
+            var field = new System.Text.StringBuilder();
+            bool quoted = false;
+            while (true)
+            {
+                c = r.Read();
+                if (c < 0) { fields.Add(field.ToString()); return fields; }
+                char ch = (char)c;
+                if (quoted)
+                {
+                    if (ch == '"')
+                    {
+                        if (r.Peek() == '"') { r.Read(); field.Append('"'); }
+                        else quoted = false;
+                    }
+                    else field.Append(ch);
+                }
+                else if (ch == '"') quoted = true;
+                else if (ch == ',') { fields.Add(field.ToString()); field.Clear(); }
+                else if (ch == '\n') { fields.Add(field.ToString().TrimEnd('\r')); return fields; }
+                else field.Append(ch);
+            }
+        }
+
+        /// <summary>True/false once the list is loaded; null before, when nothing can be said.</summary>
+        public static bool? IsKnown(string reference)
+        {
+            Dictionary<string, Park> byRef = _byRef;
+            if (byRef == null) return null;
+            return byRef.ContainsKey((reference ?? "").Trim());
+        }
+
+        public static Park Find(string reference)
+        {
+            Dictionary<string, Park> byRef = _byRef;
+            Park p;
+            return byRef != null && byRef.TryGetValue((reference ?? "").Trim(), out p) ? p : null;
+        }
+
+        /// <summary>Parks whose reference starts with what was typed; when that finds few and the
+        /// typing has letters, parks whose NAME holds it as well ("HULA").</summary>
+        public static List<Park> Suggest(string typed, int max)
+        {
+            var result = new List<Park>();
+            List<Park> parks = _parks;
+            string t = (typed ?? "").Trim().ToUpperInvariant();
+            if (parks == null || t.Length == 0) return result;
+
+            int lo = 0, hi = parks.Count;
+            while (lo < hi)
+            {
+                int mid = (lo + hi) / 2;
+                if (string.CompareOrdinal(parks[mid].Ref, t) < 0) lo = mid + 1; else hi = mid;
+            }
+            for (int i = lo; i < parks.Count && result.Count < max; i++)
+            {
+                if (!parks[i].Ref.StartsWith(t, StringComparison.Ordinal)) break;
+                result.Add(parks[i]);
+            }
+
+            bool hasLetters = false;
+            foreach (char ch in t) if (char.IsLetter(ch)) { hasLetters = true; break; }
+            if (result.Count < max && t.Length >= 3 && hasLetters)
+            {
+                foreach (Park p in parks)
+                {
+                    if (result.Count >= max) break;
+                    if (p.Name.IndexOf(t, StringComparison.OrdinalIgnoreCase) >= 0 && !result.Contains(p))
+                        result.Add(p);
+                }
+            }
+            return result;
         }
     }
 }
