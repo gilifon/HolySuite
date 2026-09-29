@@ -68,6 +68,7 @@ namespace HolyLogger
                 Properties.Settings.Default.Save();
                 UpdateContestIndicator();
                 ApplyContestExchangeUI();
+                ApplySukkotMap();
                 PrepareStationForContest(contest);
                 UpdateDup();
             }
@@ -428,6 +429,7 @@ namespace HolyLogger
             Properties.Settings.Default.Save();
             UpdateContestIndicator();
             ApplyContestExchangeUI();
+            ApplySukkotMap();
             UpdateDup();
         }
 
@@ -876,6 +878,53 @@ namespace HolyLogger
             }
             if (L_ContestName != null)
                 L_ContestName.Text = Contests.ContestService.Active.Name + " — Active";
+        }
+
+        // THE SUKKOT LOG OPENS THE 4X MAP, or the operator may never learn it exists. Entering Sukkot
+        // (from the Log Manager, or starting with a Sukkot log) opens the map window and shows 4X;
+        // leaving it for another log puts back the map he had before. That map is kept in the
+        // settings (MapBeforeSukkot, -1 = none), so it comes back even after a restart in between.
+        // Inside Sukkot he may still change maps with the corner button.
+        private void ApplySukkotMap()
+        {
+            bool sukkot = Properties.Settings.Default.ContestMode && Contests.ContestService.Active != null
+                          && string.Equals(Contests.ContestService.Active.Id, "SUKKOT", StringComparison.OrdinalIgnoreCase);
+            int before = Properties.Settings.Default.MapBeforeSukkot;
+            var map = _mapWindow != null ? _mapWindow.Map : null;
+            int now = map != null ? map.Projection
+                    : Properties.Settings.Default.MapUse4X ? 2 : Properties.Settings.Default.MapUsePolar ? 1 : 0;
+
+            if (sukkot)
+            {
+                // Every time the Sukkot log is opened it starts on 4X; the map from before Sukkot is
+                // remembered only the first time, so a map chosen inside Sukkot never replaces it.
+                if (before < 0)
+                {
+                    Properties.Settings.Default.MapBeforeSukkot = now;
+                    Properties.Settings.Default.Save();
+                }
+                SetMapProjection(2);
+                // After the window is up (at startup this runs before the main window is shown).
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    try { ShowMapWindow(); }
+                    catch (Exception swallowed) { Log.Swallow(swallowed); }
+                }), System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+            }
+            else if (!sukkot && before >= 0)
+            {
+                Properties.Settings.Default.MapBeforeSukkot = -1;
+                Properties.Settings.Default.Save();
+                SetMapProjection(before);
+            }
+        }
+
+        private void SetMapProjection(int projection)
+        {
+            if (_mapWindow != null) { _mapWindow.Map.SetProjection(projection); return; }
+            Properties.Settings.Default.MapUsePolar = projection == 1;
+            Properties.Settings.Default.MapUse4X = projection == 2;
+            Properties.Settings.Default.Save();
         }
 
         // Right-click either contest frame to pick its colour in place. The frames are palette

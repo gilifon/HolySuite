@@ -398,11 +398,17 @@ namespace HolyLogger.ToolsUserControls
         }
 
         // The corner button rolls through the three maps: Flat -> Polar -> 4X -> Flat.
-        internal void ToggleProjection()
+        internal void ToggleProjection() => SetProjection(_is4X ? 0 : _isPolar ? 2 : 1);
+
+        // Which map is showing: 0 Flat, 1 Polar, 2 4X.
+        public int Projection => _is4X ? 2 : _isPolar ? 1 : 0;
+
+        public void SetProjection(int projection)
         {
-            if (_is4X) { _is4X = false; _isPolar = false; }
-            else if (_isPolar) { _isPolar = false; _is4X = true; }
-            else { _isPolar = true; }
+            bool polar = projection == 1, fourX = projection == 2;
+            if (polar == _isPolar && fourX == _is4X) return;
+            _isPolar = polar;
+            _is4X = fourX;
             _clusterMapLoaded = false;
             _homeMapLoaded = false;
             _lastRenderedHtml = null;
@@ -1844,7 +1850,10 @@ function haversineKm(lat1, lon1, lat2, lon2) {
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
 }
 function applyAutoZoom() {
-    if (!clusterSpots || clusterSpots.length === 0) return;
+    // NO SPOTS YET (the program just started and the cluster is still being read): the whole world,
+    // not the fixed radius - that was often small, showed only Israel, and then jumped out to the
+    // world when the spots came. Auto Zoom then shrinks to them as usual.
+    var WORLD_KM = 20000;
     // Helper: validate a [lon,lat] pair and push its distance from the CURRENT view center.
     // Using the view center (not home) means that when the user drags the map in auto-zoom
     // mode, the radius re-fits so every spotted station stays inside the circle. At first
@@ -1882,7 +1891,7 @@ function applyAutoZoom() {
         }
     }
     var distances = [];
-    for (var i = 0; i < clusterSpots.length; i++) {
+    for (var i = 0; clusterSpots && i < clusterSpots.length; i++) {
         var sp = clusterSpots[i];
         pushDist(sp.c,  distances);   // DX endpoint
         pushDist(sp.sp, distances);   // Spotter endpoint
@@ -1891,12 +1900,11 @@ function applyAutoZoom() {
         // Previously this was sampling arc points which made the zoom radius too large:
         // if (sp.sp && sp.c) pushArcDists(sp.sp, sp.c, 10, distances);
     }
-    if (distances.length === 0) return;
-    // Radius = farthest station (DX or spotter) + 10% padding.
+    // Radius = farthest station (DX or spotter) + 10% padding; the world when there are none.
     var maxKm = 0;
     for (var j = 0; j < distances.length; j++) { if (distances[j] > maxKm) maxKm = distances[j]; }
     if (maxKm < 100) maxKm = 100;
-    var newKm = Math.ceil(maxKm * 1.10);
+    var newKm = distances.length === 0 ? WORLD_KM : Math.ceil(maxKm * 1.10);
     // Update label
     var lbl = document.getElementById('radius-label');
     if (lbl) lbl.textContent = useMiles ? (Math.round(newKm * 0.621371) + ' mi') : (newKm + ' km');
