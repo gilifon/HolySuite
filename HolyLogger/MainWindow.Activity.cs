@@ -560,6 +560,11 @@ namespace HolyLogger
         {
             get
             {
+                // A CONTEST TURNS WWFF OFF. The contest log hides the Activity row, and a WWFF choice
+                // left behind it must not keep the Radio Control Panel on WWFF frequencies (his bug
+                // report, 2026-09-29). SetActivityRowVisible also clears the choice and My Fauna.
+                // A WWFF contest, if one is ever added, will be dealt with on its own.
+                if (Properties.Settings.Default.ContestMode) return false;
                 string now = CB_ActivitySig == null ? "" : (CB_ActivitySig.Text ?? "").Trim();
                 return string.Equals(now, WwffListEntry, StringComparison.OrdinalIgnoreCase);
             }
@@ -905,6 +910,27 @@ namespace HolyLogger
         {
             if (ActivityRow == null) return;
             ActivityRow.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+
+            // A CONTEST ENDS THE ACTIVATION. Somebody who opens a contest log is home again, not in the
+            // park (his call, 2026-09-29), so WWFF and My Fauna are forgotten, not kept for later:
+            // after the contest the row is empty, and a new activation starts from scratch.
+            if (!visible && CB_ActivitySig != null
+                && string.Equals((CB_ActivitySig.Text ?? "").Trim(), WwffListEntry, StringComparison.OrdinalIgnoreCase))
+            {
+                myWwffRef = "";
+                try
+                {
+                    Properties.Settings.Default.LastMyWwffRef = "";
+                    SettingsFlush.RequestSave();
+                }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
+                CB_ActivitySig.Text = "";   // saved as the remembered program by ActivitySig_TextChanged
+            }
+
+            // Called as a contest starts and as it ends: the panel's WWFF frequencies, its red WWFF
+            // and the My Fauna layout all follow at once, not at the next radio report.
+            ApplyWwffMode();
+            try { radioPanel?.ShowWwffHint(); } catch (Exception swallowed) { Log.Swallow(swallowed); }
         }
     }
 
