@@ -382,6 +382,29 @@ namespace HolyLogger
             return EnterContest(picker.SelectedContest);
         }
 
+        /// <summary>
+        /// Log Manager > Edit Contest Info: the same contest information window the contest log was
+        /// made with, open again for that log's contest - stored under the same key the Cabrillo
+        /// export reads, so what is changed here is what the next export starts from.
+        /// </summary>
+        internal void EditContestInfo(long logId, Window owner)
+        {
+            try
+            {
+                string eventType = dal.GetLogEventType(logId);
+                if (string.IsNullOrWhiteSpace(eventType)) return;
+                Contests.Contest contest = Contests.ContestService.FindById(eventType);
+                string storeKey = !string.IsNullOrWhiteSpace(contest?.Id) ? contest.Id : eventType;
+
+                var values = Contests.ContestHeaderStore.Load(storeKey);
+                var info = new ContestInfoWindow(contest, values, exportMode: false) { Owner = owner ?? this };
+                info.ShowDialog();
+                // Closed with the X: nothing to save. Save or Skip: what is in the boxes is kept.
+                if (info.Values != null) Contests.ContestHeaderStore.Save(storeKey, info.Values);
+            }
+            catch (Exception ex) { Log.Swallow(ex); }
+        }
+
         // Entering a contest selects its profile AND turns on Contest Mode (duplicate flagging).
         // Returns true if the contest log was created and activated; false if cancelled.
         private bool EnterContest(Contests.Contest c)
