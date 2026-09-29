@@ -1,0 +1,16 @@
+﻿# Build and Output Folders
+bin/
+obj/
+[packages]/
+[Installer]/
+
+# Data & Report Files
+*.csv
+*.key
+*.txt
+*.htm
+*.nsi
+
+# Logs & Git
+*.log
+.git/
