@@ -24,6 +24,20 @@ namespace HolyLogger
             string only = args.Length > 1 ? args[1] : null;
             string hold = Environment.GetEnvironmentVariable("HOLD_BACK");
             if (!string.IsNullOrEmpty(hold)) CwElementDecoder.HoldBackSeconds = double.Parse(hold, System.Globalization.CultureInfo.InvariantCulture);
+            string gm = Environment.GetEnvironmentVariable("GATE_MODE");
+            if (!string.IsNullOrEmpty(gm)) CwElementDecoder.GateMode = int.Parse(gm);
+            string sp = Environment.GetEnvironmentVariable("SPEED_FROM_PLAIN");
+            if (!string.IsNullOrEmpty(sp)) CwElementDecoder.SpeedFromPlain = int.Parse(sp);
+            string nfp = Environment.GetEnvironmentVariable("NOTE_FROM_PLAIN");
+            if (!string.IsNullOrEmpty(nfp)) CwElementDecoder.NoteFromPlain = nfp == "1";
+            string lk = Environment.GetEnvironmentVariable("TONE_LEAK");
+            if (!string.IsNullOrEmpty(lk)) CwElementDecoder.Leak = double.Parse(lk, System.Globalization.CultureInfo.InvariantCulture);
+            string al = Environment.GetEnvironmentVariable("ADAPTIVE_LEAK");
+            if (!string.IsNullOrEmpty(al)) CwElementDecoder.AdaptiveLeak = al == "1";
+            string wg = Environment.GetEnvironmentVariable("WORDGAP_NO_PAUSES");
+            if (!string.IsNullOrEmpty(wg)) CwElementDecoder.WordGapWithoutPauses = wg == "1";
+            string sl = Environment.GetEnvironmentVariable("STRONG_LETTER");
+            if (!string.IsNullOrEmpty(sl)) CwElementDecoder.StrongLetter = double.Parse(sl, System.Globalization.CultureInfo.InvariantCulture);
 
             foreach (string path in Directory.GetFiles(folder, "*.wav"))
             {

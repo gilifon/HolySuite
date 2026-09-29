@@ -342,6 +342,10 @@ namespace HolyLogger
         /// <summary>True while the decoder can see a signal above the noise.</summary>
         public bool SignalPresent { get; private set; }
 
+        // Whether what is heard has been PROVED to be dits and dahs (the Morse score is up) - the
+        // new decoder (CwElementDecoder) shows its letters only where this decoder hears a station.
+        internal bool ProvedMorse { get { return _looksLikeMorse; } }
+
         /// <summary>
         /// Decoded characters as they are finished, one or a few at a time. Raised on whichever
         /// thread feeds Process - the capture thread - so a screen handler must marshal.

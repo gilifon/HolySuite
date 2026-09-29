@@ -189,3 +189,10 @@ Trecastelli, about 8 dB); Ischia did not hear it and was left out. Cut by `tools
 What it showed: the plain decoder reads 3 words - its signal gate never opens at this level, and
 lowering the gate only reaches 6-9 words while breaking the other benches. A whole-element decoder
 told the speed and levels (`tools/ElementCoherent.py`, pieces of 4 frames, fading allowed) reads 27.
+
+## recordings/live1/ - his IC-7610, live, no known text
+
+29 September 2026, from the radio's USB audio through tools/Recorder.cs while he watched the decode
+window: `air_233059.wav` (R6ODZ and LZ5BB in QSO, 7 MHz, strong) and `yt3t_002235.wav` (IK1QHB and YT3T).
+The first showed the new decoder's worst fault on his radio: the IC-7610 leaves the tone trailing ~50 ms
+after every mark, letters ran together and the callsigns were lost. No SENT.txt - read by eye.
