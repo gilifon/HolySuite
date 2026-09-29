@@ -2128,6 +2128,18 @@
                                 <Setter TargetName="KeyCap" Property="Padding" Value="8,1,8,1"/>
                                 <Setter TargetName="RowFrame" Property="BorderThickness" Value="0,0,0,1.5"/>
                             </DataTrigger>
+                            <!-- THE BLANK LINE AT THE TOP says what it is: "Regular" in white on green,
+                                 a key like Contest's yellow one (his call, 2026-09-29). Only the picture
+                                 changes - the item is still "", so choosing it leaves the box empty. The
+                                 green is the one on the contest window's "open a contest log" button. -->
+                            <DataTrigger Binding="{Binding Key}" Value="">
+                                <Setter TargetName="ProgramName" Property="Text" Value="Regular"/>
+                                <Setter TargetName="ProgramName" Property="Foreground" Value="White"/>
+                                <Setter TargetName="ProgramName" Property="HorizontalAlignment" Value="Center"/>
+                                <Setter TargetName="KeyCap" Property="Background" Value="#1B5E20"/>
+                                <Setter TargetName="KeyCap" Property="BorderBrush" Value="#1B5E20"/>
+                                <Setter TargetName="KeyCap" Property="Padding" Value="8,1,8,1"/>
+                            </DataTrigger>
                         </DataTemplate.Triggers>
                     </DataTemplate>
                 </ComboBox.ItemTemplate>

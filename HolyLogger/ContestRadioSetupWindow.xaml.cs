@@ -241,7 +241,7 @@ namespace HolyLogger
         // own children, so looking for the ScrollViewer under the ComboBox found nothing every time
         // (measured in a test harness: null, both right after opening and after the queue drained).
         // It is reached through the template's PART_Popup instead.
-        private static void ScrollToTop(ComboBox box)
+        internal static void ScrollToTop(ComboBox box)
         {
             var popup = box.Template == null ? null
                         : box.Template.FindName("PART_Popup", box) as System.Windows.Controls.Primitives.Popup;
