@@ -651,7 +651,10 @@ namespace HolyLogger
                 Top = Properties.Settings.Default.ClusterWindowTop,
                 Content = clusterFrame
             };
-            clusterWindow.Owner = this;
+            // NO OWNER, OWN TASKBAR BUTTON. App.RemoveMinimiseFromTaskbarlessWindows switches minimise
+            // off for any owned window (Windows gives it no button, so it would just vanish), which is
+            // why this window's minimise did nothing. Unowned + ShowInTaskbar keeps it minimisable.
+            clusterWindow.ShowInTaskbar = true;
             // Resource reference, not a brush snapshot, so the body follows live scheme switches.
             clusterWindow.SetResourceReference(Window.BackgroundProperty, "WindowBg");
 
@@ -3518,9 +3521,9 @@ namespace HolyLogger
 
         private void ClusterWindow_LocationChanged(object sender, EventArgs e)
         {
-            if (clusterWindow == null)
+            if (clusterWindow == null || clusterWindow.WindowState == WindowState.Minimized)
             {
-                return;
+                return;   // a minimised window reports -32000; never save that as its place
             }
 
             Properties.Settings.Default.ClusterWindowLeft = clusterWindow.Left;
