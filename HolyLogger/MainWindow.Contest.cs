@@ -92,11 +92,12 @@ namespace HolyLogger
         //                               -> radio to VFO, simplex, no tone, no TSQL
         //                                  (ApplyContestRadioSetup; also when the radio comes on CAT later)
         //     4. "modes": ["FM"]        -> logger and radio to FM     (ApplyContestFmOnly)
+        //     5. "modes" without "CW"   -> the CW keyer closes        (CloseCwKeyerForContest)
         //     Satellite goes first, so nothing after it is read or tuned with the transverter shift.
         //     The radio leaves memory mode before FM is set, so FM lands on the VFO.
         //
         //   while logging:
-        //     5. "channels": [...]      -> Channel drop-down in the send bar (AddContestChannelCell,
+        //     6. "channels": [...]      -> Channel drop-down in the send bar (AddContestChannelCell,
         //                                  built with the exchange cells); picking a channel fills
         //                                  the frequency, tries CAT, and falls back to Manual
         //                                  (TuneToContestChannelAsync)
@@ -109,6 +110,20 @@ namespace HolyLogger
             _contestRadioSetupDoneFor = null;   // a log just opened: the radio gets set again
             ApplyContestRadioSetup();
             ApplyContestFmOnly(c);
+            CloseCwKeyerForContest(c);
+        }
+
+        // 5. A contest that is not worked in CW closes the CW keyer. Leaving CW closes it only when it
+        // opened by itself - one he opened by hand stays, by design - so after working CW and then
+        // opening the Sukkot log the keyer sat over the FM contest saying the radio was not in CW.
+        // The next time the radio comes into CW it opens again as usual.
+        private void CloseCwKeyerForContest(Contests.Contest c)
+        {
+            if (c?.Modes == null || c.Modes.Count == 0) return;
+            foreach (string mode in c.Modes)
+                if (string.Equals(mode, "CW", StringComparison.OrdinalIgnoreCase)) return;
+            CloseCwKeyboard();
+            _cwKeyboardWasWanted = false;
         }
 
         // 1. A contest not worked through satellites turns Satellite Mode off. Left on, every QSO would
@@ -577,6 +592,7 @@ namespace HolyLogger
             // (asymmetric contests switch on MY callsign). Each is auto-filled (serial/zone/area) or a
             // remembered editable value, and skipped by Tab — the operator types received data.
             _contestSendSerialBox = null;
+            _contestSendGridBox = null;
             _contestSendBoxes.Clear();
             if (ContestTxPanel != null)
             {
@@ -592,6 +608,12 @@ namespace HolyLogger
                     ContestFieldUi(sf, out string slabel, out double swidth);
                     TextBox sbox = AddContestCell(slabel, swidth, null, ContestTxPanel);
                     sbox.IsTabStop = false;                 // auto-filled, but editable; skipped by Tab
+                    if (string.Equals(sf, "GRID", StringComparison.OrdinalIgnoreCase))
+                    {
+                        ShowAsCopyOfMyLocator(sbox);
+                        _contestSendBoxes.Add(sbox);
+                        continue;
+                    }
                     sbox.Text = GetSendFieldValue(sf, myCall);   // set before wiring, so it isn't "an edit"
                     string fieldKey = (sf ?? string.Empty).ToUpperInvariant();
                     sbox.TextChanged += (s, e2) => SaveSendFieldEdit(fieldKey, sbox.Text);
@@ -823,6 +845,57 @@ namespace HolyLogger
         // unsaved-QSO question on the way out, the QSO is saved as typed rather than lost - a wrong
         // grid can be put right later in the Log Workshop, a lost QSO cannot.
         private bool _closeInProgress;
+
+        // THE GRID YOU SEND IS MY LOCATOR. There were two boxes for the station's own grid - My Locator
+        // and the Grid Locator in the Exchange send row - and the log took one for ADIF MY_GRIDSQUARE and
+        // the other for the sent exchange (STX, the Cabrillo QSO line), so changing one left the log
+        // carrying two grids. His rule: the send-row grid is a copy of My Locator, shown as text that
+        // cannot be typed in, and My Locator must be a good grid before a QSO is added.
+        private TextBox _contestSendGridBox;
+        private bool _myLocatorCopyWired;
+
+        private string MyLocatorForExchange()
+            => TB_MyLocator != null ? (TB_MyLocator.Text ?? string.Empty).Trim().ToUpperInvariant() : string.Empty;
+
+        private void ShowAsCopyOfMyLocator(TextBox box)
+        {
+            _contestSendGridBox = box;
+            box.IsReadOnly = true;
+            box.Focusable = false;
+            box.IsTabStop = false;
+            box.Background = System.Windows.Media.Brushes.Transparent;
+            box.BorderThickness = new Thickness(0);
+            box.FontWeight = FontWeights.Bold;
+            box.Cursor = System.Windows.Input.Cursors.Arrow;
+            box.ToolTip = "Copied from My Locator - change it there.";
+            box.Text = MyLocatorForExchange();
+
+            // One handler for the life of the window: the send row is rebuilt on every callsign change,
+            // and a handler added per rebuild would pile up.
+            if (_myLocatorCopyWired || TB_MyLocator == null) return;
+            _myLocatorCopyWired = true;
+            TB_MyLocator.TextChanged += (s, e) =>
+            {
+                if (_contestSendGridBox != null) _contestSendGridBox.Text = MyLocatorForExchange();
+            };
+        }
+
+        // Called by Add in a contest that sends the grid: false (and the warning shown) when My Locator
+        // is empty or not a grid square, since that is what goes out as the exchange.
+        internal bool ContestMyGridOkBeforeSave()
+        {
+            if (_closeInProgress || _contestSendGridBox == null || _fieldWarningOpen) return true;
+            string grid = MyLocatorForExchange();
+            if (grid.Length > 0 && MaidenheadLocator.IsValidLocator(grid)) return true;
+
+            string message = grid.Length == 0
+                ? "My Locator is empty.\n\nThis contest sends your grid locator. Type it in My Locator."
+                : "\"" + grid + "\" in My Locator is not a valid grid square.\n\n" + MaidenheadLocator.FormatHint;
+            if (Properties.Settings.Default.isLocked)
+                message += "\n\nThe station boxes are locked - press the lock to change it.";
+            WarnInvalidField(TB_MyLocator, message, grid.Length == 0 ? "No My Locator" : "Invalid My Locator");
+            return false;
+        }
 
         internal bool ContestRxGridOkBeforeSave()
         {

@@ -2163,6 +2163,7 @@ namespace HolyLogger
             if (!Validate()) return;
             // A received contest grid that is not a grid locator is not saved (see the method).
             if (!ContestRxGridOkBeforeSave()) return;
+            if (!ContestMyGridOkBeforeSave()) return;   // the grid you send is My Locator
             if (!ContestNotesOkBeforeSave()) return;   // and the Holyland Square box
             // Soft callsign guard: warn when what is in the callsign box is not shaped like a callsign,
             // and let him log it anyway. Runs before the frequency question so the most basic thing
