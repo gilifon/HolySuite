@@ -2088,6 +2088,7 @@ namespace HolyLogger
             if (!Validate()) return;
             // A received contest grid that is not a grid locator is not saved (see the method).
             if (!ContestRxGridOkBeforeSave()) return;
+            if (!ContestNotesOkBeforeSave()) return;   // and the Holyland Square box
             // Soft callsign guard: warn when what is in the callsign box is not shaped like a callsign,
             // and let him log it anyway. Runs before the frequency question so the most basic thing
             // about the contact is settled first.
@@ -2123,7 +2124,7 @@ namespace HolyLogger
             if (state == State.New)
             {
                 QSO qso = new QSO();
-                qso.Comment = TB_Comment.Text;
+                qso.Comment = CommentWithContestNotes(TB_Comment.Text);   // + Sukkot's Holyland Square
                 qso.DXCall = TB_DXCallsign.Text;
                 qso.Mode = CB_Mode.Text;
                 qso.SRX = TB_Exchange.Text;

@@ -2303,6 +2303,9 @@
       ],
       "asymmetric": false,
       "no_satellite": true,
+      "comment_fields": [
+        "HOLYLAND_AREA"
+      ],
       "extra_choices": {
         "CATEGORY-BAND": [
           "2M & 70CM"
