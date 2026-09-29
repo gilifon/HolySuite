@@ -41,6 +41,12 @@ namespace HolyLogger
             L_CallsignCount.Text = callsignCount > 0
                 ? "Callsigns in this program: " + callsignCount.ToString("N0")
                 : "Callsigns in this program: still loading";
+            // The WWFF park list on disk: how many parks, and when it was last downloaded.
+            int parks;
+            DateTime updated;
+            L_WwffParks.Text = WwffDirectory.OnDisk(out parks, out updated)
+                ? "WWFF parks: " + parks.ToString("N0") + ", updated " + updated.ToString("dd-MM-yyyy")
+                : "WWFF parks: not downloaded yet";
             L_LastUpdate.Text = "Last Update: " + GetLinkerDateTime(Assembly.GetExecutingAssembly()).ToShortDateString();
         }
 
