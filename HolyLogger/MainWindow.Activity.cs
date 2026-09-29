@@ -460,6 +460,18 @@ namespace HolyLogger
             CB_ActivitySig.DropDownOpened += ActivitySig_DropDownOpened;
             CB_ActivitySig.SelectionChanged += ActivitySig_SelectionChanged;
             TB_Exchange.TextChanged += Exchange_TextChanged;
+
+            // THE PARK LIST IS KEPT FRESH FOR EVERYBODY, not only for whoever has used WWFF (his call,
+            // 2026-09-29): checked at every start and downloaded again once it is 30 days old. Half a
+            // minute in, in the background, so it never competes with the program opening.
+            var parkListTimer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(30) };
+            parkListTimer.Tick += delegate
+            {
+                parkListTimer.Stop();
+                WwffDirectory.EnsureLoaded(this, RefreshWwffColours);
+            };
+            parkListTimer.Start();
+
             WireParkSuggest(TB_WwffRef);
             WireParkSuggest(TB_ActivitySigInfo);
             WireParkSuggest(TB_Exchange);
@@ -889,8 +901,7 @@ namespace HolyLogger
     // 67,453 active, 1,374 deleted, 33 "national"; every real reference matches WwffPattern). It is
     // 24 MB, of which only the reference, the name and the locator are wanted, so it is boiled down
     // to a ~3 MB text file beside the log database and read from there. Refreshed when older than
-    // RefreshDays, in the background, only once somebody actually uses WWFF - nobody who never
-    // activates a park pays for the download.
+    // RefreshDays, in the background - checked at every start (FillActivitySigList), for everybody.
     internal static class WwffDirectory
     {
         private const string Url = "https://wwff.co/wwff-data/wwff_directory.csv";
