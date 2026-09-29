@@ -2034,9 +2034,12 @@
                      CharacterCasing="Upper" MaxLength="90" TabIndex="22" TextWrapping="NoWrap"
                      VerticalContentAlignment="Center" TextChanged="ActivityBox_TextChanged"
                      ToolTip="Parks on the Air: the park reference - K-0001. Two parks at once are written K-0001,US-4578"/>
-            <Label Content="WWFF" Canvas.Left="501" Canvas.Top="0" Height="28" Padding="0" FontSize="16"
+            <!-- Widened to the LEFT (asked for by eye: "OHFF-0888" measures 80px and 85 left it touching
+                 the frame). The right edge stays at 638 - Undo and the Activity hint line up with it -
+                 so the label moved left too, to 6px after the POTA box (489). "WWFF" is 45.5px. -->
+            <Label Content="WWFF" Canvas.Left="495" Canvas.Top="0" Height="28" Padding="0" FontSize="16"
                    VerticalContentAlignment="Center" ToolTip="World Wide Flora and Fauna, e.g. 4XFF-0016"/>
-            <TextBox x:Name="TB_WwffRef" Canvas.Left="553" Canvas.Top="0" Width="85" Height="28" FontSize="16"
+            <TextBox x:Name="TB_WwffRef" Canvas.Left="545" Canvas.Top="0" Width="93" Height="28" FontSize="16"
                      CharacterCasing="Upper" MaxLength="20" TabIndex="23" TextWrapping="NoWrap"
                      VerticalContentAlignment="Center" TextChanged="ActivityBox_TextChanged"
                      ToolTip="World Wide Flora and Fauna: the nature-reserve reference - 4XFF-0016"/>

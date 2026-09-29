@@ -3990,7 +3990,9 @@ Environment.NewLine +
             // notes is LAST, and new columns go after it: the bit a column sits on is its place in this
             // list, and an undo record written before today names the old places. Appending leaves every
             // one of them where it was; inserting would make an old undo clear the wrong column.
-            "date_off", "qth", "notes"
+            "date_off", "qth", "notes",
+            // MY_WWFF_REF, after notes as the rule above says.
+            "my_wwff_ref"
         };
 
         // The biggest QSO Id in a log, or 0 for a log with no QSOs. Taken before an import so a stopped
@@ -4240,7 +4242,8 @@ Environment.NewLine +
                     "time_off       = CASE WHEN time_off       IS NULL OR time_off       = '' THEN @toff  ELSE time_off       END, " +
                     "date_off       = CASE WHEN date_off       IS NULL OR date_off       = '' THEN @doff  ELSE date_off       END, " +
                     "qth            = CASE WHEN qth            IS NULL OR qth            = '' THEN @qth   ELSE qth            END, " +
-                    "notes          = CASE WHEN notes          IS NULL OR notes          = '' THEN @notes ELSE notes          END " +
+                    "notes          = CASE WHEN notes          IS NULL OR notes          = '' THEN @notes ELSE notes          END, " +
+                    "my_wwff_ref    = CASE WHEN my_wwff_ref    IS NULL OR my_wwff_ref    = '' THEN @mywwff ELSE my_wwff_ref   END " +
                     "WHERE Id = @id";
 
                 using (SQLiteTransaction tx = con.BeginTransaction())
@@ -4248,7 +4251,7 @@ Environment.NewLine +
                 {
                     foreach (string p in new[] { "@extra", "@state", "@iota", "@sota", "@pota", "@wwff", "@sig",
                                                  "@siginfo", "@cg", "@cnty", "@qvia", "@qslrd", "@qsent", "@cid",
-                                                 "@toff", "@doff", "@qth", "@notes", "@id" })
+                                                 "@toff", "@doff", "@qth", "@notes", "@id", "@mywwff" })
                         cmd.Parameters.Add(new SQLiteParameter(p));
 
                     foreach (QSO p in parsed)
@@ -4319,6 +4322,7 @@ Environment.NewLine +
                         cmd.Parameters[16].Value = Blank(p.Qth);
                         cmd.Parameters[17].Value = Blank(p.Notes);
                         cmd.Parameters[18].Value = target.id;
+                        cmd.Parameters[19].Value = Blank(p.MyWwffRef);
 
                         // WORKED OUT BEFORE THE WRITE, because afterwards there is no way to tell what
                         // was empty. The same test the SQL uses - empty here, something in the record -
@@ -4349,6 +4353,7 @@ Environment.NewLine +
                             if (IsEmpty(target.DateOff)        && !IsEmpty(p.DateOff))        fillMask |= 1 << 15;
                             if (IsEmpty(target.Qth)            && !IsEmpty(p.Qth))            fillMask |= 1 << 16;
                             if (IsEmpty(target.Notes)          && !IsEmpty(p.Notes))          fillMask |= 1 << 17;
+                            if (IsEmpty(target.MyWwffRef)      && !IsEmpty(p.MyWwffRef))      fillMask |= 1 << 18;
                         }
 
                         MergeNote note = null;
@@ -4372,6 +4377,7 @@ Environment.NewLine +
                             AddFill(note, "DATE_OFF", target.DateOff, p.DateOff);
                             AddFill(note, "QTH", target.Qth, p.Qth);
                             AddFill(note, "NOTES", target.Notes, p.Notes);
+                            AddFill(note, "MY_WWFF_REF", target.MyWwffRef, p.MyWwffRef);
                             // Not printed value-by-value: it is every ADIF field this program has no
                             // column of its own for, and on a Log4OM record that is hundreds of bytes.
                             // The same question, asked the same way - a report that says carried
@@ -4437,6 +4443,7 @@ Environment.NewLine +
                 || !string.IsNullOrWhiteSpace(p.QslRDate) || !string.IsNullOrWhiteSpace(p.QslSent)
                 || !string.IsNullOrWhiteSpace(p.ContestId) || !string.IsNullOrWhiteSpace(p.TimeOff)
                 || !string.IsNullOrWhiteSpace(p.DateOff) || !string.IsNullOrWhiteSpace(p.Qth)
+                || !string.IsNullOrWhiteSpace(p.MyWwffRef)
                 || !string.IsNullOrWhiteSpace(p.Notes);
         }
 
