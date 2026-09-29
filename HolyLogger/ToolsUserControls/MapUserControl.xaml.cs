@@ -201,8 +201,8 @@ namespace HolyLogger.ToolsUserControls
         // THE 4X MAP. One fixed picture of Israel, whether a callsign is typed or not, and fully
         // offline: a real-looking map built into HolyLogger (MapAssetProvider.Israel4XScriptTag -
         // land, sea, hills, lakes, towns, rivers, borders and city names), never the online
-        // street map. Typing a callsign only adds the line from home to a green dot for the station,
-        // and the distance - no pin, no compass, no zoom. The Home / DE / DX buttons, the radius list
+        // street map. Typing a callsign only adds the line from home to a purple dot for the station,
+        // the distance and the compass bearing - no pin, no zoom. The Home / DE / DX buttons, the radius list
         // and the radius circle are gone: they are about distances around the world.
         //
         // Made from the flat map pages (home/DX and cluster) rather than written as a page of its
@@ -222,9 +222,11 @@ namespace HolyLogger.ToolsUserControls
             // Cluster page: no day/night shading (its country shapes are taken off below).
             html = html.Replace("var showDayNight = true;", "var showDayNight = false;");
 
-            string head = "<style>#bottom-ctrl, #dx-center-btn, #compass-ctrl { display:none !important; } #map { background:#AAD3DF !important; }"
+            string head = "<style>#bottom-ctrl, #dx-center-btn { display:none !important; } #compass-ctrl { display:flex !important; } #map { background:#AAD3DF !important; }"
                         + " .il4x-label { white-space:nowrap; font-family:Segoe UI, Tahoma, sans-serif; font-size:16px; color:#333;"
-                        + " text-shadow:0 0 3px #fff, 0 0 3px #fff, 0 0 2px #fff; }</style>\n"
+                        + " text-shadow:0 0 3px #fff, 0 0 3px #fff, 0 0 2px #fff; }"
+                        // 14, not 16: his own exception to the size-16 rule, for the grid names only (2026-09-29).
+                        + " .il4x-grid { white-space:nowrap; font-family:Segoe UI, Tahoma, sans-serif; font-size:14px; font-weight:bold; color:#666; opacity:0.8; }</style>\n"
                         + MapAssetProvider.Israel4XScriptTag + "\n";
             html = html.Replace("</head>", head + "</head>");
             const string fourX = @"
@@ -244,6 +246,41 @@ namespace HolyLogger.ToolsUserControls
         }
         draw(IL.rivers,   { color: '#6FAFD0', weight: 1.5, opacity: 0.9 });
         draw(IL.borders,  { color: '#8E5E9C', weight: 1.5, opacity: 0.8, dashArray: '6,3' });
+        // MAIDENHEAD GRID SQUARES (KM72 and the like: 2 degrees wide, 1 high) over the whole picture,
+        // each named in its top-left corner. Grey and light, so the map stays the map.
+        var b = IL.bounds, A = 'ABCDEFGHIJKLMNOPQR';
+        for (var gx = Math.ceil(b[0][1] / 2) * 2; gx <= b[1][1]; gx += 2)
+            L.polyline([[b[0][0], gx], [b[1][0], gx]], { pane: 'il4x', interactive: false, color: '#555', weight: 1, opacity: 0.45 }).addTo(map);
+        for (var gy = Math.ceil(b[0][0]); gy <= b[1][0]; gy += 1)
+            L.polyline([[gy, b[0][1]], [gy, b[1][1]]], { pane: 'il4x', interactive: false, color: '#555', weight: 1, opacity: 0.45 }).addTo(map);
+        var squares = [];
+        for (var sx = Math.floor(b[0][1] / 2) * 2; sx < b[1][1]; sx += 2)
+            for (var sy = Math.floor(b[0][0]); sy < b[1][0]; sy += 1) {
+                var lx = sx + 180, ly = sy + 90;
+                var name = A.charAt(Math.floor(lx / 20)) + A.charAt(Math.floor(ly / 10)) + Math.floor((lx % 20) / 2) + Math.floor(ly % 10);
+                squares.push({ x: sx, y: sy, m: L.marker([sy + 1, sx], { pane: 'il4xLabels', interactive: false, keyboard: false,
+                    icon: L.divIcon({ className: 'il4x-grid', html: name, iconSize: null, iconAnchor: [-3, -2] }) }).addTo(map) });
+            }
+        // A SQUARE CUT BY THE EDGE STILL SHOWS ITS NAME: each name sits in the top-left corner of the
+        // part of its square that is in view (KM73 and KM83 have their own corners above the top edge).
+        // A strip too thin or too narrow for the name shows none.
+        window.placeGrid4X = function() {
+            var v = map.getBounds();
+            for (var i = 0; i < squares.length; i++) {
+                var q = squares[i];
+                var top = Math.min(q.y + 1, v.getNorth()), left = Math.max(q.x, v.getWest());
+                var bottom = Math.max(q.y, v.getSouth()), right = Math.min(q.x + 2, v.getEast());
+                var ok = top > bottom && right > left;
+                if (ok) {
+                    var p1 = map.latLngToContainerPoint([top, left]), p2 = map.latLngToContainerPoint([bottom, right]);
+                    ok = (p2.y - p1.y) >= 22 && (p2.x - p1.x) >= 48;
+                }
+                if (ok) q.m.setLatLng([top, left]);
+                var el = q.m.getElement ? q.m.getElement() : q.m._icon;
+                if (el) el.style.display = ok ? '' : 'none';
+            }
+        };
+        map.on('moveend zoomend resize', function() { window.placeGrid4X(); });
         var labels = [];
         for (var i = 0; i < IL.cities.length; i++) {
             var c = IL.cities[i];
@@ -256,14 +293,34 @@ namespace HolyLogger.ToolsUserControls
         // NAMES NEVER OVERLAP: the more important city keeps its name, one that would cover it is
         // hidden - and its dot with it, so no dot is left without a name.
         window.declutter4X = function() {
+            // The square names come first: a city name that would cover one is hidden.
             var kept = [];
+            for (var g = 0; g < squares.length; g++) {
+                var ge = squares[g].m.getElement ? squares[g].m.getElement() : squares[g].m._icon;
+                if (ge && ge.style.display !== 'none') kept.push(ge.getBoundingClientRect());
+            }
+            function hits(r) {
+                for (var j = 0; j < kept.length; j++) {
+                    var k = kept[j];
+                    if (!(r.right + 4 < k.left || r.left - 4 > k.right || r.bottom < k.top || r.top > k.bottom)) return true;
+                }
+                return false;
+            }
             for (var i = 0; i < labels.length; i++) {
                 var el = labels[i].el; if (!el) continue;
                 el.style.display = '';
-                var r = el.getBoundingClientRect(), hit = false;
-                for (var j = 0; j < kept.length && !hit; j++) {
-                    var k = kept[j];
-                    hit = !(r.right + 4 < k.left || r.left - 4 > k.right || r.bottom < k.top || r.top > k.bottom);
+                // Right of its dot first; if covered there, left of it, then under it, then over it
+                // (Jerusalem has KM81 on its right and KM71 on its left).
+                if (el._ml === undefined) { el._ml = el.style.marginLeft; el._mt = el.style.marginTop; }
+                el.style.marginLeft = el._ml; el.style.marginTop = el._mt;
+                var r = el.getBoundingClientRect(), w = r.width, hit = hits(r);
+                // Only the big five get the other places; the rest would crowd the map.
+                var tries = labels[i].rank <= 2 ? [[-(w + 5), 0], [-(w / 2), 14], [-(w / 2), -36]] : [];
+                for (var t = 0; hit && t < tries.length; t++) {
+                    el.style.marginLeft = tries[t][0] + 'px';
+                    el.style.marginTop = (parseFloat(el._mt) || 0) + tries[t][1] + 'px';
+                    r = el.getBoundingClientRect();
+                    hit = hits(r);
                 }
                 if (hit) el.style.display = 'none'; else kept.push(r);
                 labels[i].dot.setStyle(hit ? { opacity: 0, fillOpacity: 0 } : { opacity: 1, fillOpacity: 1 });
@@ -271,38 +328,61 @@ namespace HolyLogger.ToolsUserControls
         };
         map.on('zoomend moveend resize', function() { window.declutter4X(); });
     }
-    // THE LINE, THE DOTS AND THE DISTANCE are drawn here rather than by the page, so a new grid can
-    // move them without reloading it (updateDx, called by TryUpdateDxViaJs) - each reload of this
-    // page held the window for up to a second while he typed the grid. Home/DX page only: the
-    // cluster page has no operatorLat and draws its spots itself.
-    if (typeof gcArcPoints === 'function' && typeof operatorLat !== 'undefined') {
-        map.eachLayer(function(l) {
+    // THE LINE, THE DOTS, THE COMPASS AND THE DISTANCE are drawn here rather than by the page, so a
+    // new grid moves them in place (updateDx, called by TryUpdateDxViaJs) - reloading the page held
+    // the window for up to a second while he typed the grid. On BOTH 4X pages: the spots page too,
+    // so a station typed while the spots are showing does not swap the page either.
+    if (typeof gcArcPoints === 'function') {
+        var own = typeof operatorLat !== 'undefined';   // the home/DX page (the spots page has none)
+        if (own) map.eachLayer(function(l) {
             var p = l.options && l.options.pane;
             if (p !== 'il4x' && p !== 'il4xLabels' && (l instanceof L.Marker || l instanceof L.Polyline)) map.removeLayer(l);
         });
-        var hLat = (operatorLat !== null) ? operatorLat : homeLat, hLon = (operatorLat !== null) ? operatorLon : homeLon;
+        var hLat = (own && operatorLat !== null) ? operatorLat : homeLat, hLon = (own && operatorLat !== null) ? operatorLon : homeLon;
         var mine = [];
-        function dot(lat, lon, color) {
-            return L.marker([lat, lon], { interactive: false, keyboard: false, icon: L.divIcon({ className: '', iconAnchor: [5, 5],
-                html: '<div style=""width:10px;height:10px;background:' + color + ';border:2px solid #fff;border-radius:50%;box-shadow:0 0 3px rgba(0,0,0,0.6)""></div>' }) });
+        function dot(lat, lon, color, size) {
+            return L.marker([lat, lon], { interactive: false, keyboard: false, icon: L.divIcon({ className: '', iconAnchor: [size / 2, size / 2],
+                html: '<div style=""width:' + size + 'px;height:' + size + 'px;background:' + color + ';border:2px solid #fff;border-radius:50%;box-shadow:0 0 3px rgba(0,0,0,0.6)""></div>' }) });
         }
-        // The DX station is a green dot at the end of the line, the same size as the home dot.
+        function km4X(lat1, lon1, lat2, lon2) {
+            var r = Math.PI / 180, dLat = (lat2 - lat1) * r, dLon = (lon2 - lon1) * r;
+            var a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(lat1 * r) * Math.cos(lat2 * r) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+            return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        }
+        // The compass points from home to the station; 'AZ --' while there is none.
+        function compass4X(hasDx, az) {
+            var t = document.getElementById('compass-text'), n = document.getElementById('compass-needle');
+            if (t) t.innerHTML = hasDx ? 'AZ ' + Math.round(az) + '&deg;' : 'AZ --';
+            if (n) n.setAttribute('transform', 'rotate(' + (hasDx ? az : 0) + ' 50 50)');
+        }
+        // The DX station is a purple dot (his choice) at the end of the line, bigger than the home dot so
+        // it is noticed at once.
         function show4X(hasDx, lat, lon) {
             for (var i = 0; i < mine.length; i++) map.removeLayer(mine[i]);
             mine = [];
             if (hasDx) {
                 mine.push(L.polyline(gcArcPoints(hLat, hLon, lat, lon, 100), { color: '#1565C0', weight: 2, dashArray: '6,5', opacity: 0.8, interactive: false }).addTo(map));
-                mine.push(dot(lat, lon, '#43B843').addTo(map));
+                mine.push(dot(lat, lon, '#8E44AD', 16).addTo(map));
             }
-            mine.push(dot(hLat, hLon, '#1565C0').addTo(map));
-            document.getElementById('distance-box').innerHTML = hasDx ? formatDistanceText(haversineMeters(hLat, hLon, lat, lon)) : 'DIST --';
+            if (own) mine.push(dot(hLat, hLon, '#1565C0', 10).addTo(map));   // the spots page has its own
+            var box = document.getElementById('distance-box');
+            if (box) {
+                var km = hasDx ? km4X(hLat, hLon, lat, lon) : 0;
+                box.innerHTML = !hasDx ? 'DIST --' : (useMiles ? 'DIST ' + Math.round(km / 1.609344) + ' mi' : 'DIST ' + Math.round(km) + ' km');
+            }
         }
-        window.updateDx = function(hasDx, lat, lon) { show4X(hasDx === '1', parseFloat(lat), parseFloat(lon)); };
-        show4X(operatorLat !== null, dxLat, dxLon);
+        window.updateDx = function(hasDx, lat, lon, az) {
+            show4X(hasDx === '1', parseFloat(lat), parseFloat(lon));
+            compass4X(hasDx === '1', parseFloat(az));
+        };
+        var dxNow = own && operatorLat !== null;
+        show4X(dxNow, dxNow ? dxLat : 0, dxNow ? dxLon : 0);
+        compass4X(dxNow, dxNow ? azimuthDeg : 0);
     }
     var israel = L.latLngBounds([29.45, 34.2], [33.4, 35.95]);
     function fitIsrael() {
         map.invalidateSize(false); map.fitBounds(israel, { padding: [2, 2], animate: false });
+        if (window.placeGrid4X) window.placeGrid4X();
         if (window.declutter4X) window.declutter4X();
     }
     if (typeof radiusCircle !== 'undefined') { radiusCircle.setStyle({ opacity: 0 }); updateCircleVisibility = function() {}; }
@@ -355,6 +435,13 @@ namespace HolyLogger.ToolsUserControls
                     _clusterMapLoaded = true;
                 else if (_isPolar || _is4X)
                     _homeMapLoaded = true;
+                if (_is4X)
+                {
+                    _4xLoaded = true;
+                    // A station moved in place is not in a page loaded since (e.g. the spots page
+                    // reloaded for a new radius): put it back.
+                    if (_isClusterMode && _currentHomeLat.HasValue) TryUpdateDxViaJs();
+                }
             };
             this.SizeChanged += MapUserControl_SizeChanged;
         }
@@ -1099,7 +1186,7 @@ window.addEventListener('resize', function() {
 </script>
 </body>
 </html>";
-            if (_is4X) html = Make4X(html);
+            if (_is4X) { html = Make4X(html); Mark4XNavigating(homeLat, homeLon); }
 
             File.WriteAllText(_tempMapFile, html, System.Text.Encoding.UTF8);
             var uriBuilder = new UriBuilder(new Uri(_tempMapFile));
@@ -1988,8 +2075,42 @@ window.addEventListener('resize', function() {
             MapBrowser.Navigate(uriBuilder.Uri);
         }
 
+        // THE 4X MAP IS NEVER RELOADED FOR A NEW STATION. Whichever 4X page is showing (spots or
+        // home/DX) draws the line, dot, compass and distance itself (updateDx, see Make4X), so a
+        // station typed, changed or cleared is moved in place when the page has the same home.
+        // Measured: a reload held the window about 1 s; the in-place move takes 2-3 ms. The spots
+        // page stays the spots page - and its radius is left alone, or the next spot update would
+        // see a "changed" radius and reload it after all.
+        private bool _4xLoaded;
+        private double _4xHomeLat = double.NaN, _4xHomeLon = double.NaN;
+
+        private void Mark4XNavigating(double homeLat, double homeLon)
+        {
+            _4xLoaded = false;
+            _4xHomeLat = homeLat;
+            _4xHomeLon = homeLon;
+        }
+
         public void ShowMap(double lat, double lon, int radiusKm, double? azimuthDeg = null, double? homeLat = null, double? homeLon = null, double? spotterLat = null, double? spotterLon = null)
         {
+            double centerLat = homeLat ?? lat, centerLon = homeLon ?? lon;
+            if (_is4X && _4xLoaded && MapBrowser.Visibility == System.Windows.Visibility.Visible
+                && Math.Abs(_4xHomeLat - centerLat) < 1e-9 && Math.Abs(_4xHomeLon - centerLon) < 1e-9)
+            {
+                _currentLat = lat;
+                _currentLon = lon;
+                _currentAzimuth = azimuthDeg;
+                _currentHomeLat = homeLat;
+                _currentHomeLon = homeLon;
+                _currentSpotterLat = spotterLat;
+                _currentSpotterLon = spotterLon;
+                if (TryUpdateDxViaJs())
+                {
+                    _lastRenderedHtml = null;
+                    return;
+                }
+            }
+
             _isClusterMode = false;
             _currentLat = lat;
             _currentLon = lon;
@@ -2060,6 +2181,7 @@ window.addEventListener('resize', function() {
             // Identical map: nothing changed, skip the costly IE reload.
             if (html == _lastRenderedHtml) return;
             _lastRenderedHtml = html;
+            if (_is4X) Mark4XNavigating(centerLatNow, centerLonNow);
 
             // A full reload is happening: remember the home/center it loads with, and mark the map
             // not-yet-loaded until LoadCompleted (so DX changes during the load still reload safely).

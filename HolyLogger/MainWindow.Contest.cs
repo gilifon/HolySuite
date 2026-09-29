@@ -733,7 +733,7 @@ namespace HolyLogger
         private void ContestRxGridSettled()
         {
             string grid = (_contestRxGridBox != null ? _contestRxGridBox.Text ?? string.Empty : string.Empty).Trim();
-            bool whole = grid.Length >= 4 && MaidenheadLocator.IsValidLocator(grid);
+            bool whole = MapGridOf(grid) != null;   // KM72O counts too: the map shows KM72
             if (!whole && !_contestGridOnMap) return;   // nothing on the map to take away
             _contestGridOnMap = whole;
             // No callsign: only the 4X map draws from the grid alone (see MapIs4X).
