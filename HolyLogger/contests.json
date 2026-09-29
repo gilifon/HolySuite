@@ -2318,13 +2318,10 @@
       },
       "notes": "Israeli internal FM contest on fixed channels. Most radios on these bands have no CAT, so the operator picks the channel and the frequency is filled in from this list.",
       "channels": [
-        { "name": "S1", "mhz": 144.675 },
         { "name": "S9", "mhz": 145.225 },
         { "name": "S10", "mhz": 145.250 },
         { "name": "S11", "mhz": 145.275 },
-        { "name": "S15", "mhz": 145.375 },
         { "name": "S16", "mhz": 145.400 },
-        { "name": "S19", "mhz": 145.475 },
         { "name": "S20", "mhz": 145.500 },
         { "name": "S21", "mhz": 145.525 },
         { "name": "S22", "mhz": 145.550 },

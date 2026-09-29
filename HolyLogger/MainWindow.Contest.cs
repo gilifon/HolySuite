@@ -257,6 +257,8 @@ namespace HolyLogger
                 Margin = new Thickness(0, 1, 0, 0),
                 FontSize = 16,
                 IsTabStop = false,
+                // The whole list opens at once, no scrollbar - a channel hidden below the fold gets missed.
+                MaxDropDownHeight = double.PositiveInfinity,
                 VerticalContentAlignment = VerticalAlignment.Center,
                 BorderBrush = new SolidColorBrush(Color.FromRgb(0xAB, 0xAD, 0xB3)),
                 ToolTip = "Pick the channel - the frequency is filled in for you"
@@ -268,17 +270,37 @@ namespace HolyLogger
                 combo.Items.Add(new ComboBoxItem
                 {
                     Content = ch.Name + "  " + ch.Mhz.ToString("0.000", CultureInfo.InvariantCulture) + " MHz",
-                    Tag = ch
+                    Tag = ch,
+                    // VHF (2m) light blue, UHF (70cm) light red. Black text so it reads in the dark scheme too.
+                    Background = new SolidColorBrush(ch.Mhz < 300 ? Color.FromRgb(0xCF, 0xE5, 0xFF) : Color.FromRgb(0xFF, 0xD3, 0xD3)),
+                    Foreground = Brushes.Black
                 });
             _contestChannelBox = combo;
+            // A red "Select" sits over the box while no channel is picked, so nobody misses that it is a
+            // drop-down. Not hit-testable: a click on it goes straight through to the combo.
+            _contestChannelHint = new TextBlock
+            {
+                Text = "Press to select",
+                Foreground = Brushes.Red,
+                FontSize = 16,
+                FontWeight = FontWeights.Bold,
+                Margin = new Thickness(6, 1, 0, 0),
+                VerticalAlignment = VerticalAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Left,
+                IsHitTestVisible = false
+            };
             SyncContestChannelPick();
             combo.SelectionChanged += ContestChannel_SelectionChanged;
-            col.Children.Add(combo);
+            var comboHost = new Grid();
+            comboHost.Children.Add(combo);
+            comboHost.Children.Add(_contestChannelHint);
+            col.Children.Add(comboHost);
             ContestTxPanel.Children.Add(col);
         }
 
         private async void ContestChannel_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
+            UpdateContestChannelHint();
             if (_syncingContestChannel) return;
             var ch = (_contestChannelBox?.SelectedItem as ComboBoxItem)?.Tag as Contests.ContestChannel;
             if (ch == null) return;
@@ -296,10 +318,19 @@ namespace HolyLogger
             long hz = (long)Math.Round(mhz * 1000000.0);
             object match = _contestChannelBox.Items.OfType<ComboBoxItem>()
                 .FirstOrDefault(i => i.Tag is Contests.ContestChannel ch && Math.Abs((long)Math.Round(ch.Mhz * 1000000.0) - hz) < 100);
-            if (_contestChannelBox.SelectedItem == match) return;
+            if (_contestChannelBox.SelectedItem == match) { UpdateContestChannelHint(); return; }
             _syncingContestChannel = true;
             try { _contestChannelBox.SelectedItem = match; }
             finally { _syncingContestChannel = false; }
+            UpdateContestChannelHint();
+        }
+
+        private TextBlock _contestChannelHint;
+
+        private void UpdateContestChannelHint()
+        {
+            if (_contestChannelHint == null || _contestChannelBox == null) return;
+            _contestChannelHint.Visibility = _contestChannelBox.SelectedItem == null ? Visibility.Visible : Visibility.Collapsed;
         }
 
         // The frequency box gets the channel first, so the QSO is logged on the channel whatever the
@@ -416,6 +447,7 @@ namespace HolyLogger
             ContestRxPanel.Children.Clear();
             if (ContestTxPanel != null) ContestTxPanel.Children.Clear();
             _contestChannelBox = null;
+            _contestChannelHint = null;
 
             Contests.Contest contest = Contests.ContestService.Active;
             bool inContest = contest != null;
