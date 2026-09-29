@@ -444,6 +444,12 @@ namespace HolyLogger
 
             foreach (var b in _contestRxBoxes) b.TextChanged -= ContestRxBox_TextChanged;
             _contestRxBoxes.Clear();
+            if (_contestRxGridBox != null)
+            {
+                _contestRxGridBox.TextChanged -= ContestRxGridBox_TextChanged;
+                _contestRxGridBox.PreviewLostKeyboardFocus -= ContestRxGridBox_PreviewLostKeyboardFocus;
+            }
+            _contestRxGridBox = null;
             ContestRxPanel.Children.Clear();
             if (ContestTxPanel != null) ContestTxPanel.Children.Clear();
             _contestChannelBox = null;
@@ -510,6 +516,12 @@ namespace HolyLogger
                 box.Text = _contestRxBoxes.Count == 0 && TB_Exchange != null ? TB_Exchange.Text : string.Empty;
                 box.TextChanged += ContestRxBox_TextChanged;
                 if (IsSerialField(field)) AllowDigitsOnly(box);
+                if (string.Equals(field, "GRID", StringComparison.OrdinalIgnoreCase))
+                {
+                    _contestRxGridBox = box;
+                    box.TextChanged += ContestRxGridBox_TextChanged;
+                    box.PreviewLostKeyboardFocus += ContestRxGridBox_PreviewLostKeyboardFocus;
+                }
                 _contestRxBoxes.Add(box);
             }
 
@@ -707,6 +719,68 @@ namespace HolyLogger
                     _contestRxBoxes.Select(b => b.Text).Where(t => !string.IsNullOrWhiteSpace(t)));
         }
 
+        // THE GRID THE STATION SENDS IS WHERE IT IS. In a contest that asks for the grid (Sukkot), a
+        // station often works from somewhere other than home - so the map places it ONLY by the grid
+        // typed into this box, never by QRZ's grid or its country (see SetAzimuth). The map follows
+        // as soon as the box holds a whole grid, and drops the line the moment it does not (KM72 ->
+        // KM7 took the line away; before, it stayed on KM72 while the box said KM7).
+        private TextBox _contestRxGridBox;
+        private bool _contestGridOnMap;
+
+        private void ContestRxGridBox_TextChanged(object sender, TextChangedEventArgs e)
+            => AfterGridTypingPause(ContestRxGridSettled);
+
+        private void ContestRxGridSettled()
+        {
+            string grid = (_contestRxGridBox != null ? _contestRxGridBox.Text ?? string.Empty : string.Empty).Trim();
+            bool whole = grid.Length >= 4 && MaidenheadLocator.IsValidLocator(grid);
+            if (!whole && !_contestGridOnMap) return;   // nothing on the map to take away
+            _contestGridOnMap = whole;
+            // No callsign: only the 4X map draws from the grid alone (see MapIs4X).
+            if (string.IsNullOrWhiteSpace(TB_DXCallsign.Text) && !MapIs4X) return;
+            if (whole) SetAzimuth(); else ClearAzimuth();
+        }
+
+        // THE RECEIVED GRID IS CHECKED like My Locator: on leaving the box, and again on Add (below) -
+        // in a contest the operator often types the grid and presses F1 without leaving the box. Empty
+        // is let through here; whether the exchange may be empty is Validate's question.
+        private bool ContestRxGridIsWrong(out string grid)
+        {
+            grid = (_contestRxGridBox != null ? _contestRxGridBox.Text ?? string.Empty : string.Empty).Trim().ToUpperInvariant();
+            return grid.Length > 0 && !MaidenheadLocator.IsValidLocator(grid);
+        }
+
+        private string ContestRxGridMessage(string grid)
+            => "\"" + grid + "\" is not a grid locator.\n\nType " + MaidenheadLocator.ShortFormatHint + ".";
+
+        private void ContestRxGridBox_PreviewLostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
+        {
+            if (_fieldWarningOpen) return;
+            // ONLY WHEN HE MOVES ON TO ANOTHER BOX IN THIS WINDOW. Clicking the window's close button,
+            // a menu, the map or another program took the focus too - and the warning then pulled it
+            // back into this box every time, so HolyLogger could not be closed. Add checks it anyway.
+            var to = e.NewFocus as DependencyObject;
+            if (!(to is TextBox || to is ComboBox) || Window.GetWindow(to) != this) return;
+            if (!ContestRxGridIsWrong(out string grid)) return;
+            e.Handled = true;
+            WarnInvalidField(_contestRxGridBox, ContestRxGridMessage(grid), "Wrong Grid Locator");
+        }
+
+        // Called by Add: false (and the warning shown) when the received grid is not a grid locator.
+        // Not while HolyLogger is closing: pressing X always closes it. If he answered "save" to the
+        // unsaved-QSO question on the way out, the QSO is saved as typed rather than lost - a wrong
+        // grid can be put right later in the Log Workshop, a lost QSO cannot.
+        private bool _closeInProgress;
+
+        internal bool ContestRxGridOkBeforeSave()
+        {
+            if (_closeInProgress) return true;
+            if (!ContestRxGridIsWrong(out string grid)) return true;
+            if (!_fieldWarningOpen)
+                WarnInvalidField(_contestRxGridBox, ContestRxGridMessage(grid), "Wrong Grid Locator");
+            return false;
+        }
+
         // Empties the contest received-exchange cells beside RST-R. Called from the form Clear (F9/F1)
         // so those cells reset like every other QSO field; the RST-R cell is handled by the normal
         // RST reset. No-op outside contest mode (the list is empty).
@@ -769,7 +843,7 @@ namespace HolyLogger
                 case "MEMBER_NR": label = "Member#"; width = 64; break;
                 case "CALLSIGN": label = "Call"; width = 90; break;
                 case "FIELD_DAY_CLASS": label = "Class"; width = 56; break;
-                case "GRID": label = "Grid"; width = 72; break;   // same as My Locator
+                case "GRID": label = "Grid Locator"; width = 100; break;   // as wide as its label
                 case "DXCC": label = "DXCC"; width = 56; break;
                 case "STATE_PROVINCE_DXCC": label = "St/Pr/DX"; width = 72; break;
                 case "STATE_OR_SERIAL": label = "St/Ser"; width = 64; break;

@@ -246,6 +246,8 @@
     <EmbeddedResource Include="MapAssets\leaflet-marker-icon-2x.png" />
     <EmbeddedResource Include="MapAssets\leaflet-marker-shadow.png" />
     <EmbeddedResource Include="MapAssets\dxcc_colored.json" />
+    <EmbeddedResource Include="MapAssets\israel4x.jpg" />
+    <EmbeddedResource Include="MapAssets\israel4x.js" />
     <Compile Include="CtyDatService.cs" />
     <Compile Include="ClublogCtyService.cs" />
     <Compile Include="ClublogKey.cs" />

@@ -2085,6 +2085,8 @@ namespace HolyLogger
             // name a log id that matches no row, and the contact would be stored where nothing reads.
             if (!RequireActiveLog("log a QSO into")) return;
             if (!Validate()) return;
+            // A received contest grid that is not a grid locator is not saved (see the method).
+            if (!ContestRxGridOkBeforeSave()) return;
             // Soft callsign guard: warn when what is in the callsign box is not shaped like a callsign,
             // and let him log it anyway. Runs before the frequency question so the most basic thing
             // about the contact is settled first.
@@ -10865,6 +10867,11 @@ namespace HolyLogger
         {
             if (_isShutdownCleanupDone)
                 return;
+
+            // X WINS: while closing, the received-grid check steps aside (see ContestRxGridOkBeforeSave).
+            // Cleared again once this pass is over, in case the close was cancelled.
+            _closeInProgress = true;
+            Dispatcher.BeginInvoke(new Action(() => _closeInProgress = false), DispatcherPriority.Background);
 
             // A re-entrant Closing call (Alt+F4, or the taskbar/system-menu close, arriving while the
             // async upload from a PRIOR Closing pass is still running -- this.IsEnabled=false disables

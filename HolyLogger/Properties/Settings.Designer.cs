@@ -1347,6 +1347,18 @@ namespace HolyLogger.Properties {
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool MapUse4X {
+            get {
+                return ((bool)(this["MapUse4X"]));
+            }
+            set {
+                this["MapUse4X"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("True")]
         public bool MapUsePolar {
             get {

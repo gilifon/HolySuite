@@ -93,7 +93,20 @@ namespace HolyLogger.ToolsUserControls
             }
         }
 
-        private static string DataUri(string resource)
+        // THE 4X MAP, carried in the program so it needs no internet. israel4x.jpg is the land, sea,
+        // lakes, towns' built-up areas and the hills shading of the area around Israel, in the map's
+        // own (Web Mercator) projection; israel4x.js holds the rivers, borders and city names
+        // drawn over it, plus the picture's corners. Both are cut from Natural Earth (public domain,
+        // naturalearthdata.com) by MapAssets\israel4x_build.py - run it again to remake them.
+        private const string ISRAEL4X_JS_RESOURCE = "HolyLogger.MapAssets.israel4x.js";
+        private const string ISRAEL4X_JPG_RESOURCE = "HolyLogger.MapAssets.israel4x.jpg";
+        private static string _israel4xTag;
+
+        public static string Israel4XScriptTag => _israel4xTag ?? (_israel4xTag =
+            "<script>" + ReadResource(ISRAEL4X_JS_RESOURCE)
+            + "window.ISRAEL4X.img='" + DataUri(ISRAEL4X_JPG_RESOURCE, "image/jpeg") + "';</script>");
+
+        private static string DataUri(string resource, string mime = "image/png")
         {
             var asm = Assembly.GetExecutingAssembly();
             using (Stream s = asm.GetManifestResourceStream(resource))
@@ -102,7 +115,7 @@ namespace HolyLogger.ToolsUserControls
                 using (var mem = new MemoryStream())
                 {
                     s.CopyTo(mem);
-                    return "data:image/png;base64," + Convert.ToBase64String(mem.ToArray());
+                    return "data:" + mime + ";base64," + Convert.ToBase64String(mem.ToArray());
                 }
             }
         }
