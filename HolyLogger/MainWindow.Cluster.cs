@@ -5832,10 +5832,12 @@ namespace HolyLogger
                         openWhenPainted = (s, e) =>
                         {
                             ContentRendered -= openWhenPainted;
+                            Log.Step("painted: cluster window - starting");
                             if (Properties.Settings.Default.ClusterActive &&
                                 Properties.Settings.Default.ShowClusterWindowOption &&
                                 clusterWindow == null)
                                 GenerateNewClusterWindow();
+                            Log.Step("painted: cluster window - done");
                         };
                         ContentRendered += openWhenPainted;
                     }

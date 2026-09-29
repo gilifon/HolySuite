@@ -498,8 +498,10 @@ namespace HolyLogger
             {
                 ContentRendered -= showMap;
                 if (!Properties.Settings.Default.ShowMapWindow) return;
+                Log.Step("painted: map window - starting");
                 try { ShowMapWindow(); }
                 catch (Exception swallowed) { Log.Swallow(swallowed); }
+                Log.Step("painted: map window - shown");
             };
             ContentRendered += showMap;
         }
