@@ -22,6 +22,8 @@ namespace HolyLogger
         {
             string folder = args[0];
             string only = args.Length > 1 ? args[1] : null;
+            string hold = Environment.GetEnvironmentVariable("HOLD_BACK");
+            if (!string.IsNullOrEmpty(hold)) CwElementDecoder.HoldBackSeconds = double.Parse(hold, System.Globalization.CultureInfo.InvariantCulture);
 
             foreach (string path in Directory.GetFiles(folder, "*.wav"))
             {
