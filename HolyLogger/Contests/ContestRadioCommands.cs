@@ -75,19 +75,23 @@ namespace HolyLogger.Contests
         // The radios offered in Contest Radio Setup: the OmniRig radio files (their exact names, spaces
         // and all) of transceivers that transmit on 2m, 70cm or both. OmniRig's files do not say which
         // bands a radio has, so the list is fixed here. Every OmniRig file is a radio OmniRig controls
-        // by CAT (checked: even the TH-F6A/TH-F7E handhelds carry 19 CAT commands). Left out: receivers
-        // (IC-R8500, AR8600...), HF-only radios, and the uncertain (Elecraft K3 with a 2m module, SDR
-        // programs). Agreed with the operator 2026-09-19.
+        // by CAT. Left out: receivers (IC-R8500, AR8600...), HF-only radios, and the uncertain
+        // (Elecraft K3 with a 2m module, SDR programs). Agreed with the operator 2026-09-19.
+        //
+        // Also left out (2026-09-29, his rule: no radio on the list without commands from its maker):
+        // IC-970D and IC-275H - their Icom manuals have no command table at all, only "see the CT-17
+        // manual" - and TH-F6A / TH-F7E - Kenwood's instruction manual has no PC commands, and the only
+        // command list found is a ham's own (K9DCI), not Kenwood's.
         public static readonly IReadOnlyList<string> VhfUhfRadios = new[]
         {
-            "IC- 820", "IC- 821", "IC-821PST", "IC- 970D", "IC-275H",
+            "IC- 820", "IC- 821", "IC-821PST",
             "IC-7000", "IC-7000v2", "IC-705", "IC-705-DATA",
             "IC-706", "IC-706 MKII", "IC-706 MKIIG",
             "IC-7100", "IC-7100-DATA-FIL1", "IC-7100e4", "IC-7100e4-DATA",
             "IC-910", "IC-9100", "IC-9100v2", "IC-9700", "IC-9700-DATA", "IC-9700-SAT",
             "ID-5100A",
             "FT-100 D", "FT-817", "FT-847", "FT-857", "FT-897", "FT-991", "FT-991-DATA", "FT-991A",
-            "TS-2000", "TH-F6A", "TH-F7E",
+            "TS-2000",
         };
 
         // Where OmniRig keeps its .ini files, if that folder actually exists on this machine - so a
@@ -153,6 +157,164 @@ namespace HolyLogger.Contests
             Ic7000("IC-7000v2"),
             Ic705("IC-705"),
             Ic705("IC-705-DATA"),
+            Ic820("IC- 820"),
+            Ic821("IC- 821"),
+            Ic821("IC-821PST"),
+            Ic706("IC-706"),
+            Ic706Mk2("IC-706 MKII", "4E"),
+            Ic706Mk2("IC-706 MKIIG", "58"),
+            Ic9100("IC-9100"),
+            Ic9100("IC-9100v2"),
+            Ft817("FT-817"),
+            Ft847("FT-847"),
+            Ft100("FT-100 D"),
+        };
+
+        // IC-820H, CI-V address 42. From Icom's own IC-820H INSTRUCTION MANUAL, "Remote jack (CI-V)
+        // information" COMMAND TABLE (scanned manual, read off the page image):
+        //   07 alone = VFO mode.   06 05 = FM (the table's mode list has no narrow-FM code at all).
+        //   0F 10 = Simplex selection.
+        // The table has NO tone, tone squelch or menu command (no 16, no 1A), so No Tone, No TSQL and
+        // No Auto Repeater stay EMPTY - they cannot be reached over CAT. NOT YET CHECKED ON A RADIO.
+        private static RadioCommandSet Ic820(string name) => new RadioCommandSet
+        {
+            Radio = name,
+            Vfo = "FE FE 42 E0 07 FD",
+            FmWide = "FE FE 42 E0 06 05 FD",
+            NoAutoRepeater = "",
+            Simplex = "FE FE 42 E0 0F 10 FD",
+            NoTone = "",
+            NoTsql = "",
+        };
+
+        // IC-821H, CI-V address 4C. From Icom's own IC-821H INSTRUCTION MANUAL, COMMAND TABLE - the same
+        // commands as the IC-820H: 07 = VFO mode, 06 05 = FM (no narrow code), 0F 10 = simplex; no tone,
+        // tone squelch or menu command, so those three stay EMPTY. OmniRig's IC-821PST file is the same
+        // IC-821 (made for PstRotator), so it gets the same commands. NOT YET CHECKED ON A RADIO.
+        private static RadioCommandSet Ic821(string name) => new RadioCommandSet
+        {
+            Radio = name,
+            Vfo = "FE FE 4C E0 07 FD",
+            FmWide = "FE FE 4C E0 06 05 FD",
+            NoAutoRepeater = "",
+            Simplex = "FE FE 4C E0 0F 10 FD",
+            NoTone = "",
+            NoTsql = "",
+        };
+
+        // IC-706 (the first model), CI-V address 48. From Icom's own IC-706 INSTRUCTION MANUAL,
+        // COMMAND TABLE: 07 = VFO mode; 06 05 = FM - the table says "Add 02 to select narrow IF
+        // filters", so 06 05 without it is the normal (not narrow) filter. Its 0F command has only
+        // Split OFF/ON - NO simplex/duplex codes - and there is no tone or menu command, so Simplex,
+        // No Tone, No TSQL and No Auto Repeater stay EMPTY. NOT YET CHECKED ON A RADIO.
+        private static RadioCommandSet Ic706(string name) => new RadioCommandSet
+        {
+            Radio = name,
+            Vfo = "FE FE 48 E0 07 FD",
+            FmWide = "FE FE 48 E0 06 05 FD",
+            NoAutoRepeater = "",
+            Simplex = "",
+            NoTone = "",
+            NoTsql = "",
+        };
+
+        // IC-706MKII (CI-V 4E) and IC-706MKIIG (CI-V 58), each from its OWN Icom instruction manual.
+        //   Address: each manual's set-mode item "CI-V ADDRESS" shows the default - 4EH (MKII) and 58H
+        //     (MKIIG). The MKII manual's data-format drawing still prints 48 (the old IC-706's), and the
+        //     MKIIG's text still says 4EH; the set-mode default is what the radio really starts with.
+        //   07 alone = VFO mode (MKII "VFO mode", MKIIG "Set to VFO").
+        //   06 05 00 = FM, normal filter. Both manuals' footnote: "when normal or narrow operation is
+        //     available, add 00 for normal operation or 01 for narrow"; and both filter tables list FM
+        //     as Normal / Narrow only - so 00 is the wider of the two.
+        // MKIIG only: 0F 10 = Simplex mode; 16 42 / 16 43 = TONE / TSQL setting. The MKIIG table does
+        // NOT print the data value that means OFF for 16 42 / 16 43, so No Tone and No TSQL are left
+        // EMPTY rather than assuming 00. The MKII's 0F has only Split OFF/ON and it has no 16 command,
+        // so its Simplex is EMPTY too. Neither table has a menu (1A) command, so No Auto Repeater is
+        // EMPTY on both. NOT YET CHECKED ON A RADIO.
+        private static RadioCommandSet Ic706Mk2(string name, string civ) => new RadioCommandSet
+        {
+            Radio = name,
+            Vfo = $"FE FE {civ} E0 07 FD",
+            FmWide = $"FE FE {civ} E0 06 05 00 FD",
+            NoAutoRepeater = "",
+            Simplex = civ == "58" ? "FE FE 58 E0 0F 10 FD" : "",
+            NoTone = "",
+            NoTsql = "",
+        };
+
+        // IC-9100, CI-V address 7C. From Icom's own IC-9100 INSTRUCTION MANUAL, "18 CONTROL COMMAND":
+        //   07 = Select VFO mode (listed as a command of its own, above 07 00 VFO A).
+        //   0F 10 = Set simplex operation.
+        //   16 42 00 / 16 43 00 = Repeater tone OFF / Tone squelch OFF.
+        //   1A 05 0019 00 = Auto Repeater OFF.
+        // FM wide is left EMPTY, as on the IC-9700: the mode command takes FIL1/FIL2/FIL3, and the
+        // manual never says which one is wide for FM. NOT YET CHECKED ON A RADIO.
+        private static RadioCommandSet Ic9100(string name) => new RadioCommandSet
+        {
+            Radio = name,
+            Vfo = "FE FE 7C E0 07 FD",
+            FmWide = "",
+            NoAutoRepeater = "FE FE 7C E0 1A 05 00 19 00 FD",
+            Simplex = "FE FE 7C E0 0F 10 FD",
+            NoTone = "FE FE 7C E0 16 42 00 FD",
+            NoTsql = "FE FE 7C E0 16 43 00 FD",
+        };
+
+        // FT-817. Five raw bytes, opcode LAST, P1 first (the same order as the FT-857). From Yaesu's own
+        // FT-817 OPERATING MANUAL, "Opcode Command Chart":
+        //   07, P1 = 08 : FM (the chart lists no FM-N code)      -> "08 00 00 00 07"
+        //   09, P1 = 89 : SIMPLEX                                 -> "89 00 00 00 09"
+        //   0A, P1 = 8A : CTCSS/DCS OFF (tone and decoder both)   -> "8A 00 00 00 0A"
+        // VFO and No Auto Repeater EMPTY: the only VFO opcode is "VFO-A/B 81 Toggle", and there is no
+        // command that writes a menu item, so ARS cannot be reached. NOT YET CHECKED ON A RADIO.
+        private static RadioCommandSet Ft817(string name) => new RadioCommandSet
+        {
+            Radio = name,
+            Vfo = "",
+            FmWide = "08 00 00 00 07",
+            NoAutoRepeater = "",
+            Simplex = "89 00 00 00 09",
+            NoTone = "8A 00 00 00 0A",
+            NoTsql = "8A 00 00 00 0A",
+        };
+
+        // FT-847. Five raw bytes, D1 first, opcode (P1) last. From Yaesu's own FT-847 OPERATING MANUAL,
+        // "Opcode Command Chart"; each command's P1 picks MAIN / SAT RX / SAT TX VFO, and MAIN is used:
+        //   Operating Mode, D1 = 08 : FM (88 = FM(N)), P1 = 07 : MAIN VFO   -> "08 00 00 00 07"
+        //   Repeater Shift, D1 = 89 : Simplex, opcode 09                    -> "89 00 00 00 09"
+        //   CTCSS/DCS Mode, D1 = 8A : CTCSS/DCS OFF, P1 = 0A : MAIN VFO     -> "8A 00 00 00 0A"
+        // The FT-847 answers CAT only after "CAT ON" (00 00 00 00 00); OmniRig's FT-847 file already
+        // sends that when it starts. VFO and No Auto Repeater EMPTY: the chart has no VFO/memory command
+        // and no menu command. NOT YET CHECKED ON A RADIO.
+        private static RadioCommandSet Ft847(string name) => new RadioCommandSet
+        {
+            Radio = name,
+            Vfo = "",
+            FmWide = "08 00 00 00 07",
+            NoAutoRepeater = "",
+            Simplex = "89 00 00 00 09",
+            NoTone = "8A 00 00 00 0A",
+            NoTsql = "8A 00 00 00 0A",
+        };
+
+        // FT-100 / FT-100D. Five raw bytes, opcode last - but UNLIKE the FT-817/857/847, P1 is the FOURTH
+        // byte (the manual's own example: Split ON = 00 00 00 01 01). From Yaesu's own FT-100 OPERATING
+        // MANUAL, "Opcode Command Chart" (13 opcodes):
+        //   05, P1 = 00 : VFO Mode, VFO-A (a real select, not a toggle)  -> "00 00 00 00 05"
+        //   0C, P1 = 06 : FM (07 is W-FM)                                 -> "00 00 00 06 0C"
+        //   84, P1 = 00 : Repeater Shift, Simplex                         -> "00 00 00 00 84"
+        //   92, P1 = 00 : CTCSS/DCS OFF (tone and decoder both)           -> "00 00 00 00 92"
+        // No Auto Repeater EMPTY: ARS is menu 44/45 and the chart has no menu command.
+        // NOT YET CHECKED ON A RADIO.
+        private static RadioCommandSet Ft100(string name) => new RadioCommandSet
+        {
+            Radio = name,
+            Vfo = "00 00 00 00 05",
+            FmWide = "00 00 00 06 0C",
+            NoAutoRepeater = "",
+            Simplex = "00 00 00 00 84",
+            NoTone = "00 00 00 00 92",
+            NoTsql = "00 00 00 00 92",
         };
 
         // TS-2000. Text commands, each ending in ';', from Kenwood's own TS-2000 INSTRUCTION MANUAL,

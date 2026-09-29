@@ -160,12 +160,11 @@ namespace HolyLogger
             names.AddRange(_showingAllFiles
                                ? (IEnumerable<string>)(ContestRadioCommands.OmniRigRigFiles() ?? new HashSet<string>())
                                : RigNames);
-            // The radios that HAVE commands first, each group by name, so what is ready to use is at
-            // the top of the list.
+            // By name only, with no star: since 2026-09-29 every radio on the 2m/70cm list has its
+            // maker's commands shipped with HolyLogger, so a "has commands" mark said nothing (his call).
             var items = names.Distinct(StringComparer.OrdinalIgnoreCase)
-                             .OrderByDescending(HasCommands)
-                             .ThenBy(n => n, StringComparer.CurrentCultureIgnoreCase)
-                             .Select(n => HasCommands(n) ? Star + n : n).ToList();
+                             .OrderBy(n => n, StringComparer.CurrentCultureIgnoreCase)
+                             .ToList();
             RadioBox.ItemsSource = items;
             SelectInBox(keep);
         }
