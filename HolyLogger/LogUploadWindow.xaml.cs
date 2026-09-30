@@ -100,33 +100,18 @@ namespace HolyLogger
             CB_Events.DisplayMemberPath = "Description";
             CB_Events.SelectedValuePath = "id";
             CB_Events.ItemsSource = RadioEvents;
-            RadioEvent re = RadioEvents.FirstOrDefault(t => t.Description == Properties.Settings.Default.selectedEvent);
-            if (re != null)
-                CB_Events.SelectedItem = re;
-            else
-                CB_Events.SelectedIndex = 0;
 
             Operators = dal.GetTableData("operators");
             CB_Operator.SelectionChanged += CB_Operator_SelectionChanged;
             CB_Operator.DisplayMemberPath = "Description";
             CB_Operator.SelectedValuePath = "id";
             CB_Operator.ItemsSource = Operators;
-            GenericItem gi = Operators.FirstOrDefault(t => t.Description == Properties.Settings.Default.selectedOperator);
-            if (gi != null)
-                CB_Operator.SelectedItem = gi;
-            else
-                CB_Operator.SelectedIndex = 0;
 
             Bands = dal.GetTableData("bands");
             CB_Band.SelectionChanged += CB_Band_SelectionChanged;
             CB_Band.DisplayMemberPath = "Description";
             CB_Band.SelectedValuePath = "id";
             CB_Band.ItemsSource = Bands;
-            gi = Bands.FirstOrDefault(t => t.Description == Properties.Settings.Default.selectedBand);
-            if (gi != null)
-                CB_Band.SelectedItem = gi;
-            else
-                CB_Band.SelectedIndex = 0;
 
             Power = dal.GetTableData("power");
             // Shown with the same words as Contest Information ("LOW (Not more than 100W)"); what is
@@ -137,47 +122,37 @@ namespace HolyLogger
             CB_Power.DisplayMemberPath = "Description";
             CB_Power.SelectedValuePath = "id";
             CB_Power.ItemsSource = Power;
-            // The saved choice may be in the old words ("Low (<100W)"), so it also matches by name.
-            string savedPower = Properties.Settings.Default.selectedPower ?? string.Empty;
-            gi = Power.FirstOrDefault(t => t.Description == savedPower)
-              ?? Power.FirstOrDefault(t => !string.IsNullOrEmpty(t.Name) && savedPower.StartsWith(t.Name, StringComparison.OrdinalIgnoreCase));
-            if (gi != null)
-                CB_Power.SelectedItem = gi;
-            else
-                CB_Power.SelectedIndex = 0;
 
             Overlay = dal.GetTableData("categories");
             CB_Overlay.SelectionChanged += CB_Overlay_SelectionChanged;
             CB_Overlay.DisplayMemberPath = "Description";
             CB_Overlay.SelectedValuePath = "id";
             CB_Overlay.ItemsSource = Overlay;
-            gi = Overlay.FirstOrDefault(t => t.Description == Properties.Settings.Default.selectedOverlay);
-            if (gi != null)
-                CB_Overlay.SelectedItem = gi;
-            else
-                CB_Overlay.SelectedIndex = 0;
 
+            // EVERY BOX STARTS EMPTY and is filled only from the log being sent. They used to open on
+            // what was chosen at the last upload, so sending the main log after a Sukkot one came up
+            // as "Sukot, VHF/UHF" - another log's details on this log.
             try { PrefillFromOpenLog(); }
             catch (Exception ex) { Log.Swallow(ex); }
         }
 
         // ── STARTS FROM THE LOG THAT IS OPEN ────────────────────────────────────────────────────
         //
-        // Every box used to open on whatever was sent LAST time, so a Sukkot log came up as "Holyland
-        // Contest, SSB, High" (4Z1ZV, 8.9.14). The event now follows the open log's contest, and the
-        // boxes follow what was chosen in that log's Contest Information. Only a value IARC's list
-        // actually has is picked; anything else is left as before, and every box can still be changed.
+        // The event follows the open log's contest, and the boxes follow what was chosen in that log's
+        // Contest Information. Only a value IARC's list actually has is picked; any other box stays
+        // empty for him to choose. A log that is not a Sukkot or Holyland log (an activation, the main
+        // log) is an "IARC Event" and stores nothing else, so only the event is filled.
         private void PrefillFromOpenLog()
         {
             string eventType = dal.GetLogEventType(dal.ActiveLogId);
             string eventName = string.Equals(eventType, "SUKKOT", StringComparison.OrdinalIgnoreCase) ? "sukot"
                              : string.Equals(eventType, "HOLYLAND", StringComparison.OrdinalIgnoreCase) ? "holyland"
-                             : null;
-            if (eventName == null) return;   // not an IARC contest log: leave everything as it was
+                             : "iarc";
 
             var ev = RadioEvents.FirstOrDefault(r => string.Equals(r.Name, eventName, StringComparison.OrdinalIgnoreCase));
             if (ev == null) return;
-            CB_Events.SelectedItem = ev;     // also reloads the Mode list for this event
+            CB_Events.SelectedItem = ev;     // also loads the Mode list for this event
+            if (eventName == "iarc") return;
 
             var info = Contests.ContestHeaderStore.Load(eventType.ToUpperInvariant());
             string V(string tag) => info != null && info.TryGetValue(tag, out string v) ? (v ?? "").Trim() : "";
@@ -212,6 +187,7 @@ namespace HolyLogger
         private void CB_Events_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             selectedRadioEvent = (RadioEvent)CB_Events.SelectedItem;
+            if (selectedRadioEvent == null) return;
             int eid = selectedRadioEvent.id;
 
             init_mode_list(eid);
@@ -223,12 +199,7 @@ namespace HolyLogger
             CB_Mode.SelectionChanged += CB_Mode_SelectionChanged;
             CB_Mode.DisplayMemberPath = "Description";
             CB_Mode.SelectedValuePath = "id";
-            CB_Mode.ItemsSource = Modes;
-            GenericItem gi = Modes.FirstOrDefault(t => t.Description == Properties.Settings.Default.selectedMode);
-            if (gi != null)
-                CB_Mode.SelectedItem = gi;
-            else
-                CB_Mode.SelectedIndex = 0;
+            CB_Mode.ItemsSource = Modes;   // empty until chosen - a new event's modes are not the old one's
         }
 
         private void CB_Mode_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -254,11 +225,12 @@ namespace HolyLogger
 
         private void SendLogBtn_Click(object sender, RoutedEventArgs e)
         {
-            if (!string.IsNullOrWhiteSpace(Properties.Settings.Default.selectedEvent) &&
-                !string.IsNullOrWhiteSpace(Properties.Settings.Default.selectedMode) &&
-                !string.IsNullOrWhiteSpace(Properties.Settings.Default.selectedBand) &&
-                !string.IsNullOrWhiteSpace(Properties.Settings.Default.selectedOperator) &&
-                !string.IsNullOrWhiteSpace(Properties.Settings.Default.selectedOverlay) &&
+            if (CB_Events.SelectedItem != null &&
+                CB_Mode.SelectedItem != null &&
+                CB_Band.SelectedItem != null &&
+                CB_Operator.SelectedItem != null &&
+                CB_Power.SelectedItem != null &&
+                CB_Overlay.SelectedItem != null &&
                 !string.IsNullOrWhiteSpace(Properties.Settings.Default.PersonalInfoEmail) &&
                 !string.IsNullOrWhiteSpace(Properties.Settings.Default.PersonalInfoName) && 
                 !string.IsNullOrWhiteSpace(Properties.Settings.Default.PersonalInfoCallsign))
