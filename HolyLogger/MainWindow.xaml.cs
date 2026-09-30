@@ -9855,7 +9855,17 @@ namespace HolyLogger
                 string AddParticipant_result = await AddParticipant(bareCallsign, w.selectedOperator.Name, w.selectedMode.Name, w.selectedPower.Name, Properties.Settings.Default.PersonalInfoEmail, Properties.Settings.Default.PersonalInfoName, country);
                 string UploadLogToIARC_result = await UploadLogToIARC(new Progress<int>(percent => w.UploadProgress = percent), logToSend);
                 w.Close();
-                HolyMessageBox.Show(UploadLogToIARC_result, "Log Upload", HolyMsgType.Info, this);
+                // A Sukkot log that arrived: IARC's page listing every uploaded Sukkot log is offered
+                // as a link, so he can see his own there before closing the message.
+                if (w.selectedRadioEvent.Name.ToLower() == "sukot" && UploadLogToIARC_result == LogSentOk)
+                    HolyMessageBox.ShowWithLinks(UploadLogToIARC_result, "Log Upload", HolyMsgType.Info, this,
+                        new List<KeyValuePair<string, string>>
+                        {
+                            new KeyValuePair<string, string>("All uploaded Sukkot logs:", SukkotLogsUrl)
+                        },
+                        OpenInBrowser, linkToolTip: "Click to open this page");
+                else
+                    HolyMessageBox.Show(UploadLogToIARC_result, "Log Upload", HolyMsgType.Info, this);
             }
             
         }
@@ -9896,6 +9906,8 @@ namespace HolyLogger
             }
         }
 
+        private const string LogSentOk = "Log sent successfully, 73!";
+
         private async Task<string> UploadLogToIARC(IProgress<int> progress, ObservableCollection<QSO> QSOList)
         {
             bool allSuccessfullyDone = true;
@@ -9935,7 +9947,7 @@ namespace HolyLogger
                     file.Close();
                 }
             }
-            return allSuccessfullyDone ? "Log sent successfully, 73!" : "Done with some errors.\r\nPlease contact support.";// "Some of the QSOs had error";
+            return allSuccessfullyDone ? LogSentOk : "Done with some errors.\r\nPlease contact support.";// "Some of the QSOs had error";
         }
 
         private List<List<QSO>> SplitQSOList(ObservableCollection<QSO> QSOList)
@@ -12771,6 +12783,23 @@ namespace HolyLogger
         private void GridSquareMenuItem_Click(object sender, RoutedEventArgs e)
         {
             string url = "https://tools.iarc.org/holysquare/";
+            try
+            {
+                System.Diagnostics.Process.Start(url);
+            }
+            catch (Exception)
+            {
+                HolyMessageBox.Show("Please install 'Chrome' and try again.", "HolyLogger", HolyMsgType.Info, this);
+            }
+        }
+
+        // IARC's page listing every Sukkot log uploaded so far.
+        private const string SukkotLogsUrl = "https://tools.iarc.org/sukkot/";
+
+        private void SukkotLogsMenuItem_Click(object sender, RoutedEventArgs e) => OpenInBrowser(SukkotLogsUrl);
+
+        private void OpenInBrowser(string url)
+        {
             try
             {
                 System.Diagnostics.Process.Start(url);

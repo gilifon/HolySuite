@@ -967,6 +967,11 @@
                             <Image Source="Images/onair.png" Stretch="UniformToFill" Width="16" Height="16"/>
                         </MenuItem.Icon>
                     </MenuItem>
+                    <MenuItem x:Name="SukkotLogsMenuItem" Header="Sukkot uploaded logs" ToolTip="All logs uploaded to the Sukkot contest" Click="SukkotLogsMenuItem_Click">
+                        <MenuItem.Icon>
+                            <Image Source="Images/upload_log.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
                 </MenuItem>
                 <!-- Channels: opens the channels window directly (no submenu). The menu template
                      collapses the Icon column for top-level roles, so the tower goes in the Header. -->

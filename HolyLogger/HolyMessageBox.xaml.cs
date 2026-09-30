@@ -767,7 +767,8 @@ namespace HolyLogger
         public static void ShowWithLinks(string message, string title, HolyMsgType type, Window owner,
                                          System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<string, string>> links,
                                          Action<string> onLink, double width = 0, string footer = null,
-                                         System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<string, int>> counts = null)
+                                         System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<string, int>> counts = null,
+                                         string linkToolTip = "Click to open this file")
         {
             var dlg = new HolyMessageBox(message, title, type, owner, confirm: false, width);
 
@@ -819,7 +820,7 @@ namespace HolyLogger
                     var link = new System.Windows.Documents.Hyperlink(
                         new System.Windows.Documents.Run(path) { FontSize = 16 })
                     {
-                        ToolTip = "Click to open this file",
+                        ToolTip = linkToolTip,
                     };
                     link.Click += (s, e) =>
                     {
