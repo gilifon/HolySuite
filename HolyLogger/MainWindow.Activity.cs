@@ -290,6 +290,9 @@ namespace HolyLogger
             TB_SotaRef.Text = qso.SotaRef ?? "";
             TB_PotaRef.Text = qso.PotaRef ?? "";
             TB_WwffRef.Text = qso.WwffRef ?? "";
+            // Text alone would leave the list's old line selected, and picking that line again later
+            // would then do nothing (measured - see SetActivityRowVisible).
+            CB_ActivitySig.SelectedIndex = -1;
             if (!string.IsNullOrWhiteSpace(qso.MyWwffRef))
             {
                 myWwffRef = qso.MyWwffRef.Trim();
@@ -460,6 +463,9 @@ namespace HolyLogger
             CB_ActivitySig.DropDownOpened += ActivitySig_DropDownOpened;
             CB_ActivitySig.SelectionChanged += ActivitySig_SelectionChanged;
             TB_Exchange.TextChanged += Exchange_TextChanged;
+            // Once more when the box has its template: before that there is no inner text box to make
+            // bold, and a program remembered from last time would start in plain type.
+            CB_ActivitySig.Loaded += (s, e) => ShowActivitySigMeaning();
 
             // THE PARK LIST IS KEPT FRESH FOR EVERYBODY, not only for whoever has used WWFF (his call,
             // 2026-09-29): checked at every start and downloaded again once it is 30 days old. Half a
@@ -513,6 +519,17 @@ namespace HolyLogger
             // The word "Program" shows only while the box is empty - it is a label, not a value.
             if (TB_ActivitySigPlaceholder != null)
                 TB_ActivitySigPlaceholder.Visibility = typed.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
+
+            // AN ACTIVE PROGRAM IS BOLD (his request, 2026-09-30): WWFF, WCA, whatever is in the box.
+            // Only the box's own text - on the ComboBox itself it would turn every line of the open
+            // list bold as well.
+            try
+            {
+                var editBox = CB_ActivitySig == null ? null
+                    : CB_ActivitySig.Template?.FindName("PART_EditableTextBox", CB_ActivitySig) as TextBox;
+                if (editBox != null) editBox.FontWeight = typed.Length > 0 ? FontWeights.Bold : FontWeights.Normal;
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
 
             ApplyWwffMode();
 
@@ -578,6 +595,41 @@ namespace HolyLogger
         // Set while the old value is being put back, so that put-back is not read as a fresh choice.
         private bool explainingContest;
 
+        // CHOOSING WWFF MAKES THE STATION READY (his request, 2026-09-30): the radio goes to the WWFF
+        // frequency of the band it is on, in SSB or CW - any other mode (FM, AM, RTTY...) becomes SSB.
+        // If that band has no WWFF frequency in that mode, or is unticked in the WWFF folder, the radio
+        // goes to the NEAREST band that has one (2m and 6m -> 10m, 160m -> 80m), and he takes it from
+        // there. 30m has CW only, so SSB there moves to the nearest band with a WWFF SSB frequency.
+        // Nothing happens with no radio.
+        private void TuneToWwffFrequency()
+        {
+            try
+            {
+                if (!IsWwffActivity) return;
+                double khz = lastRealRigKhz;
+                if (khz <= 0) return;
+
+                string mode = (CB_Mode.Text ?? "").Trim().ToUpperInvariant();
+                if (mode == "LSB" || mode == "USB") mode = "SSB";
+                if (mode != "SSB" && mode != "CW") mode = "SSB";
+
+                RadioBandPreset best = null;
+                double bestDistance = double.MaxValue;
+                foreach (RadioBandPreset b in RadioPanelPresets.Load())
+                {
+                    int f = mode == "CW" ? b.WwffCwKhz : b.WwffSsbKhz;
+                    if (f <= 0 || !b.IsOffered(true)) continue;
+                    // The band the radio is on wins outright; otherwise the closest WWFF frequency.
+                    double distance = b.Contains(khz) ? -1 : Math.Abs(f - khz);
+                    if (distance < bestDistance) { bestDistance = distance; best = b; }
+                }
+                if (best == null) return;
+
+                TuneRadioToKhz(mode == "CW" ? best.WwffCwKhz : best.WwffSsbKhz, mode);
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
         private void ActivitySig_DropDownOpened(object sender, EventArgs e)
         {
             activitySigBeforeDropDown = (CB_ActivitySig.Text ?? "").Trim();
@@ -608,6 +660,15 @@ namespace HolyLogger
             if (e == null || e.AddedItems == null || e.AddedItems.Count == 0) return;
             if (!(e.AddedItems[0] is KeyValuePair<string, string>)) return;
             var picked = (KeyValuePair<string, string>)e.AddedItems[0];
+            // WWFF PICKED: the radio goes to the WWFF frequency at once (his request, 2026-09-30) -
+            // before, it stayed where it was until a band button was pressed. After the box has
+            // taken the new text, so IsWwffActivity already says yes.
+            if (string.Equals(picked.Key, WwffListEntry, StringComparison.OrdinalIgnoreCase))
+            {
+                Dispatcher.BeginInvoke(new Action(TuneToWwffFrequency), System.Windows.Threading.DispatcherPriority.Input);
+                return;
+            }
+
             if (!string.Equals(picked.Key, ContestListEntry, StringComparison.OrdinalIgnoreCase)) return;
 
             explainingContest = true;
@@ -681,8 +742,25 @@ namespace HolyLogger
             if (make) CreateNewContestLog(this);
         }
 
+        private string activityLogged;
+
         private void ActivitySig_TextChanged(object sender, TextChangedEventArgs e)
         {
+            // Into the error log, once per change: "I cannot set WWFF" (2026-09-30) could not be
+            // answered from the log, because nothing about the Activity box was ever written there.
+            try
+            {
+                string now = (CB_ActivitySig.Text ?? "").Trim();
+                if (!string.Equals(now, activityLogged, StringComparison.Ordinal))
+                {
+                    activityLogged = now;
+                    Log.Warn("Activity box: '" + now + "' | contest mode=" + Properties.Settings.Default.ContestMode
+                        + " | row visible=" + (ActivityRow != null && ActivityRow.Visibility == Visibility.Visible)
+                        + " | WWFF on=" + IsWwffActivity);
+                }
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+
             ShowActivitySigMeaning();
             RememberActivityProgram();
             try { radioPanel?.ShowWwffHint(); } catch (Exception swallowed) { Log.Swallow(swallowed); }
@@ -924,6 +1002,11 @@ namespace HolyLogger
                     SettingsFlush.RequestSave();
                 }
                 catch (Exception swallowed) { Log.Swallow(swallowed); }
+                // THE SELECTION TOO, not only the text. An editable ComboBox with text search off keeps
+                // its selected line when only the text is emptied - measured: the list still held WWFF,
+                // so picking WWFF again after the contest was "no change" and did nothing (his bug,
+                // 2026-09-30: "the program refuses").
+                CB_ActivitySig.SelectedIndex = -1;
                 CB_ActivitySig.Text = "";   // saved as the remembered program by ActivitySig_TextChanged
             }
 
