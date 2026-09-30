@@ -11661,6 +11661,11 @@ namespace HolyLogger
 
         private void GenerateNewLogUploasWindow()
         {
+            // The log that is open is the one sent, whatever kind it is - so he is told which one first.
+            if (!HolyMessageBox.ShowConfirm("Upload the log **" + SafeActiveLogName() + "** to IARC?",
+                                            "Log Upload", HolyMsgType.Info, this, fitLongestLine: true))
+                return;
+
             logupload = new LogUploadWindow();
             logupload.Left = Properties.Settings.Default.LogUploadWindowLeft < 0 ? 0 : Properties.Settings.Default.LogUploadWindowLeft;
             logupload.Top = Properties.Settings.Default.LogUploadWindowTop < 0 ? 0 : Properties.Settings.Default.LogUploadWindowTop;
