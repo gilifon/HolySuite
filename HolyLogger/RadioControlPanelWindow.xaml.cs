@@ -42,6 +42,17 @@ namespace HolyLogger
         // has an answer even though neither AM nor FM has a frequency of its own.
         private string _mode = "SSB";
 
+        // The last of SSB, CW and RTTY the radio was on - what an HF band button goes back to when the
+        // radio is on FM or AM (see BandButton_Click). SSB until the radio has said otherwise.
+        private string _lastHfMode = "SSB";
+
+        private static bool IsHfMode(string mode)
+        {
+            return string.Equals(mode, "SSB", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(mode, "CW", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(mode, "RTTY", StringComparison.OrdinalIgnoreCase);
+        }
+
         // True while the box is showing the radio's own frequency. The first character typed wipes
         // that reading and starts a fresh number - nobody edits 14246.660 into 14250 digit by digit -
         // and until Enter is pressed, or the box is left, the radio no longer writes into it.
@@ -407,6 +418,7 @@ namespace HolyLogger
             if (_modeButtons != null && _modeButtons.Any(m => string.Equals(m.Mode, mode, StringComparison.OrdinalIgnoreCase)))
             {
                 _mode = mode.ToUpperInvariant();
+                if (IsHfMode(_mode)) _lastHfMode = _mode;
             }
 
             Resources["PanelLitBrush"] = BrushForMode(_mode);
@@ -579,6 +591,14 @@ namespace HolyLogger
             // whatever mode the panel was on, rather than repeating whatever the operator was last
             // doing on a band that allows it. Every other band keeps the panel's current mode.
             string mode = string.Equals(band.Name, "30m", StringComparison.OrdinalIgnoreCase) ? "CW" : _mode;
+
+            // FM AND AM DO NOT CARRY OVER TO HF (his call, 2026-09-30). The band buttons send the radio
+            // to the SSB/CW part of the band, where FM has no business - he pressed 40m straight after a
+            // Sukkot FM session and landed on 7130 in FM. On 160m-10m the radio goes back to the last of
+            // SSB/CW/RTTY it was on (SSB if none yet), at that mode's frequency - the WWFF one during an
+            // activation. 6m and up keep FM: it is normal there, and Sukkot is worked that way.
+            bool hf = band.HighKhz <= 30000;
+            if (hf && !IsHfMode(mode)) mode = _lastHfMode;
             _main.TuneRadioToKhz(band.FrequencyFor(mode, _main.IsWwffActivity), mode);
         }
 
@@ -590,6 +610,7 @@ namespace HolyLogger
             button.IsChecked = _rigOnline && string.Equals(mode, _mode, StringComparison.OrdinalIgnoreCase);
 
             _mode = mode;
+            if (IsHfMode(mode)) _lastHfMode = mode.ToUpperInvariant();
 
             // SSB, CW and RTTY each have their own frequency for every band (the Options page), so
             // asking for CW on 20m puts the radio on the 20m CW frequency, not on CW where the SSB

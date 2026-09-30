@@ -470,6 +470,24 @@ namespace HolyLogger
             ApplyContestExchangeUI();
             ApplySukkotMap();
             UpdateDup();
+            BackToSsbAfterContest();
+        }
+
+        // BACK TO SSB. A contest log can put the radio in FM (Sukkot, ApplyContestFmOnly), and nothing
+        // took it out again: back in his main log the radio - and the Mode box - still said FM (his
+        // report, 2026-09-30). A regular log now always starts in SSB, the mode used most, at whatever
+        // frequency the radio is on: LSB below 10 MHz, USB from there up, as the rest of the program
+        // picks the sideband.
+        private void BackToSsbAfterContest()
+        {
+            SelectLoggerMode("SSB");
+            if (Properties.Settings.Default.isManualMode || !IsCatLive()) return;
+            try
+            {
+                double mhz = lastRealRigKhz / 1000.0;
+                Rig.Mode = (OmniRig.RigParamX)(mhz > 0 && mhz < 10.0 ? PM_SSB_L : PM_SSB_U);
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
         }
 
         // The contest received-exchange boxes currently shown in the Exchange row.

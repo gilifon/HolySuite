@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:primitives="clr-namespace:System.Windows.Controls.Primitives;assembly=PresentationFramework"
         Title="Radio Control Panel"
-        Width="240" SizeToContent="Height"
+        Width="248" SizeToContent="Height"
         ResizeMode="NoResize" ShowInTaskbar="False"
         Icon="Images/crown.png"
         Background="{DynamicResource WindowBg}"
@@ -181,7 +181,9 @@
             <!-- WWFF in red over "kHz" while Activity on the main window is WWFF: the band buttons
                  then go to the WWFF frequencies. The -8 right margin lets the word use the window's
                  own 8px edge; the column alone is a few pixels narrower than the word. Measured: at a
-                 1px left margin the word ends 4px inside the window. -->
+                 1px left margin the word ends 4px inside the window - on a test machine. On his, with
+                 thicker window borders, the last F was cut (screenshot 2026-09-30) at 240 and had room
+                 to spare at 252, so the panel is 248 wide. -->
             <StackPanel Grid.Column="2" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="1,0,-8,-3">
                 <TextBlock x:Name="WwffHint" Text="WWFF" FontSize="16" FontWeight="Bold"
                            LineHeight="16" LineStackingStrategy="BlockLineHeight"
