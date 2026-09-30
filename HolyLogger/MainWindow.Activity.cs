@@ -630,6 +630,33 @@ namespace HolyLogger
             catch (Exception swallowed) { Log.Swallow(swallowed); }
         }
 
+        // The band's REGULAR frequency (Options > Radio Control Panel > Regular), in the radio's mode:
+        // SSB, CW or RTTY; on 160m-10m FM and AM become SSB, as on the panel's band buttons; 30m is CW.
+        private void TuneToRegularFrequency()
+        {
+            try
+            {
+                if (IsWwffActivity) return;
+                double khz = lastRealRigKhz;
+                if (khz <= 0) return;
+
+                RadioBandPreset band = null;
+                foreach (RadioBandPreset b in RadioPanelPresets.Load())
+                    if (b.Contains(khz)) { band = b; break; }
+                if (band == null) return;
+
+                string mode = (CB_Mode.Text ?? "").Trim().ToUpperInvariant();
+                if (mode == "LSB" || mode == "USB") mode = "SSB";
+                if (string.Equals(band.Name, "30m", StringComparison.OrdinalIgnoreCase)) mode = "CW";
+                else if (mode != "SSB" && mode != "CW" && mode != "RTTY" && band.HighKhz <= 30000) mode = "SSB";
+
+                int target = band.FrequencyFor(mode);
+                if (target <= 0) return;
+                TuneRadioToKhz(target, mode);
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
         private void ActivitySig_DropDownOpened(object sender, EventArgs e)
         {
             activitySigBeforeDropDown = (CB_ActivitySig.Text ?? "").Trim();
@@ -668,6 +695,14 @@ namespace HolyLogger
                 Dispatcher.BeginInvoke(new Action(TuneToWwffFrequency), System.Windows.Threading.DispatcherPriority.Input);
                 return;
             }
+
+            // LEAVING WWFF: back to the band's regular frequency (his request, 2026-09-30). Not for the
+            // Contest line - that one puts WWFF straight back (ExplainContestLog) - and not when a
+            // contest log empties the box: that is done by code, with no line picked, and the contest
+            // sets the radio up itself.
+            if (string.Equals(activitySigBeforeDropDown, WwffListEntry, StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(picked.Key, ContestListEntry, StringComparison.OrdinalIgnoreCase))
+                Dispatcher.BeginInvoke(new Action(TuneToRegularFrequency), System.Windows.Threading.DispatcherPriority.Input);
 
             if (!string.Equals(picked.Key, ContestListEntry, StringComparison.OrdinalIgnoreCase)) return;
 
