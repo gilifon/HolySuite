@@ -158,7 +158,7 @@ namespace HolyLogger
                 || !string.Equals(c.Modes[0], "FM", StringComparison.OrdinalIgnoreCase)) return;
             SelectLoggerMode("FM");
             if (Properties.Settings.Default.isManualMode || !IsCatLive()) return;
-            try { Rig.Mode = (OmniRig.RigParamX)PM_FM; }
+            try { SetRigMode((OmniRig.RigParamX)PM_FM); }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
         }
 
