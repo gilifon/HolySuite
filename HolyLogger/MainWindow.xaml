@@ -1399,7 +1399,7 @@
                         MouseMove="FreqLed_MouseMove" MouseLeave="FreqLed_MouseLeave"
                         PreviewMouseRightButtonUp="FreqBox_PreviewMouseRightButtonUp"
                         ToolTipService.Placement="Top" ToolTipService.VerticalOffset="-30"
-                        ToolTip="Working frequency in kHz — click to edit, or roll the mouse wheel to move the radio 1 kHz">
+                        ToolTip="Working frequency — click to edit, or roll the mouse wheel to move the radio 1 kHz">
                     <Grid Margin="4,1,4,2">
                         <TextBlock x:Name="FreqLedGhost" FontFamily="./Fonts/#DSEG7 Classic" FontWeight="Bold"
                                    FontSize="18" VerticalAlignment="Center" Foreground="#1E1500"
@@ -1445,8 +1445,7 @@
                     </Grid>
                 </Border>
             </Grid>
-            <TextBlock Text="kHz" FontWeight="Bold" FontSize="13" Foreground="{DynamicResource KHzText}"
-                       VerticalAlignment="Bottom" Margin="0,0,0,-2"/>
+            <!-- No "kHz" label since 2026-10-01: the LED reads MHz.kHz.Hz (145.275.000), like a dial. -->
         </StackPanel>
         <Button x:Name="Btn_Spot" HorizontalAlignment="Left" VerticalAlignment="Top" Grid.Row="1" Margin="580,47,0,0" Width="95" Height="32" Style="{StaticResource SpotButtonStyle}" Click="SpotButton_Click" ToolTip="Spot to DX Cluster" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" Padding="0">
             <Grid Width="95">
