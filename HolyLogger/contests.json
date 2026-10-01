@@ -2302,6 +2302,8 @@
         "UHF"
       ],
       "asymmetric": false,
+      "dupe_rule": "Once per band",
+      "score": "DISTANCE_SUM",
       "no_satellite": true,
       "comment_fields": [
         "HOLYLAND_AREA"

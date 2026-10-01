@@ -646,6 +646,7 @@ namespace HolyLogger
                     AddContestChannelCell(contest.Channels);
                 AlignContestCommentCells();
                 ContestTxPanel.Visibility = Visibility.Visible;
+                LayoutContestScore(contest);   // shrinks the band and shows Score, for a scored contest
             }
             SetExchangeLabel(L_SendLabel, "Exchange", "send", true);
             if (L_SendLabel != null) L_SendLabel.Visibility = Visibility.Visible;
@@ -786,6 +787,13 @@ namespace HolyLogger
                 ContestSendBand.Visibility = contest ? Visibility.Visible : Visibility.Collapsed;
             if (ContestExchangeFrame != null)
                 ContestExchangeFrame.Visibility = contest ? Visibility.Visible : Visibility.Collapsed;
+            // Leaving the contest takes the Score frame with it; entering one shows it again only for a
+            // scored contest (LayoutContestScore, run when the send cells are built).
+            if (ContestScoreFrame != null && !contest)
+            {
+                ContestScoreFrame.Visibility = Visibility.Collapsed;
+                _contestScoreTimer?.Stop();
+            }
 
             // The activity row (IOTA / SOTA / POTA / WWFF) has nowhere to go in contest mode: the
             // contest layout slides the lower rows down and already reaches the bottom of the form.
@@ -1174,6 +1182,79 @@ namespace HolyLogger
         // follow where it actually is: contrast against the frame in contest, the theme text color
         // otherwise. The send label only ever shows in contest, always on its frame.
         // Called at startup and on every theme/scheme/color change (OnThemeChanged).
+        // ── THE SCORE FRAME ────────────────────────────────────────────────────────────────────────
+        //
+        // For a contest whose contests.json entry names a "score" kind (Sukkot: DISTANCE_SUM). The send
+        // band is shrunk to end just after its last cell, and the Score frame fills the space from there
+        // to the left edge of the Spot button, at the band's height, in a fixed light orange. A contest with no score keeps the full-width band.
+        //
+        // The total is read from the database, never added up on the screen, so a QSO deleted or edited
+        // in the Log Workshop counts too: a short timer re-reads it whenever DataAccess.ContentVersion
+        // moves. A plain Add does not move that counter, so Add refreshes it directly.
+        private const double ContestBandFullWidth = 556;   // as drawn in the XAML
+        private const double ContestScoreRight = 580;      // the left edge of the Spot button above it
+        private System.Windows.Threading.DispatcherTimer _contestScoreTimer;
+        private long _contestScoreSeenVersion = -1;
+        private long _contestScoreSeenLog = -1;
+
+        private static bool ContestHasScore(Contests.Contest c)
+            => c != null && string.Equals(c.Score, "DISTANCE_SUM", StringComparison.OrdinalIgnoreCase);
+
+        private void LayoutContestScore(Contests.Contest contest)
+        {
+            if (ContestScoreFrame == null || ContestSendBand == null) return;
+            if (!ContestHasScore(contest))
+            {
+                ContestSendBand.Width = ContestBandFullWidth;
+                ContestScoreFrame.Visibility = Visibility.Collapsed;
+                _contestScoreTimer?.Stop();
+                return;
+            }
+
+            // Where the last send cell ends: each cell's DesiredSize includes its own right margin
+            // (10 on the Channel cell), which is the gap the band keeps after it.
+            double used = 0;
+            foreach (UIElement cell in ContestTxPanel.Children)
+            {
+                cell.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+                used += cell.DesiredSize.Width;
+            }
+            double bandLeft = ContestSendBand.Margin.Left;
+            double bandRight = Math.Min(ContestScoreRight - 80, ContestTxPanel.Margin.Left + used - 4);
+            ContestSendBand.Width = bandRight - bandLeft;
+
+            double scoreLeft = bandRight + 6;
+            Thickness m = ContestScoreFrame.Margin;
+            ContestScoreFrame.Margin = new Thickness(scoreLeft, m.Top, 0, 0);
+            ContestScoreFrame.Width = ContestScoreRight - scoreLeft;
+            ContestScoreFrame.Visibility = Visibility.Visible;
+
+            _contestScoreSeenVersion = -1;   // force a fresh read
+            RefreshContestScore();
+            if (_contestScoreTimer == null)
+            {
+                _contestScoreTimer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
+                _contestScoreTimer.Tick += (s, e) => RefreshContestScore(onlyIfChanged: true);
+            }
+            _contestScoreTimer.Start();
+        }
+
+        private void RefreshContestScore(bool onlyIfChanged = false)
+        {
+            if (ContestScoreText == null || !ContestHasScore(Contests.ContestService.Active)) return;
+            long version = DataAccess.ContentVersion;
+            long logId = dal != null ? dal.ActiveLogId : 0;
+            if (onlyIfChanged && version == _contestScoreSeenVersion && logId == _contestScoreSeenLog) return;
+            _contestScoreSeenVersion = version;
+            _contestScoreSeenLog = logId;
+            try
+            {
+                long km = logId > 0 ? dal.ContestDistanceScore(logId) : 0;
+                ContestScoreText.Text = km.ToString("N0", CultureInfo.InvariantCulture) + " km";
+            }
+            catch (Exception ex) { Log.Swallow(ex); }
+        }
+
         internal void UpdateContestLabelContrast()
         {
             bool inContest = Contests.ContestService.Active != null;
