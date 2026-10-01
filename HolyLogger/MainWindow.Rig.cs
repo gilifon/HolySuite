@@ -1293,7 +1293,8 @@ namespace HolyLogger
             if (FreqLedLive == null) return false;
 
             string text = FreqLedLive.Text ?? string.Empty;
-            int dot = text.IndexOf('.');
+            // The LAST point: the display reads MHz.kHz.Hz, and the wheel divides at kHz/Hz.
+            int dot = text.LastIndexOf('.');
             if (dot < 0) return false;
 
             double dpi = VisualTreeHelper.GetDpi(FreqLedLive).PixelsPerDip;

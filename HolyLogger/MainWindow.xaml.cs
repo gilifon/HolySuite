@@ -11402,8 +11402,11 @@ namespace HolyLogger
                 return;
             }
 
+            // Shown as MHz.kHz.Hz - 145.275.000 - the way a radio's own dial reads (his call,
+            // 2026-10-01). The second point stays the kHz/Hz divide the wheel and its band go by.
             long hz = (long)Math.Round(mhz * 1000000.0);
-            string intPart = (hz / 1000).ToString(CultureInfo.InvariantCulture);  // kHz
+            string intPart = (hz / 1000000).ToString(CultureInfo.InvariantCulture) + "."
+                             + (hz / 1000 % 1000).ToString("D3", CultureInfo.InvariantCulture);  // MHz.kHz
             string fracPart = (hz % 1000).ToString("D3", CultureInfo.InvariantCulture); // Hz
             string full = intPart + "." + fracPart;
 
@@ -11424,9 +11427,9 @@ namespace HolyLogger
         private void ShowLedBlank()
         {
             if (FreqLedLive == null || FreqLedGhost == null) return;
-            FreqLedGhost.Text = "8888888.888";
+            FreqLedGhost.Text = "888.888.888";
             FreqLedLive.Inlines.Clear();
-            FreqLedLive.Inlines.Add(new System.Windows.Documents.Run("-------.---") { Foreground = LedAmberBrush });
+            FreqLedLive.Inlines.Add(new System.Windows.Documents.Run("---.---.---") { Foreground = LedAmberBrush });
         }
 
         // No CAT / rig offline — switch to a plain editable textbox with a red border.
