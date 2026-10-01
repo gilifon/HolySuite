@@ -331,6 +331,20 @@ namespace HolyLogger
             try
             {
                 byte[] rawCommand = ParseCustomCommand(command);
+                // ICOM: WAIT FOR THE RADIO'S ANSWER. CI-V on the radio's jack is ONE wire for both
+                // directions. An order sent without waiting goes out while the radio is still echoing
+                // and answering the one before, the two collide and the radio drops the order - on his
+                // IC-910 Send now's five commands, 2 ms apart, changed nothing, while 06 03 sent alone
+                // put the radio in CW (2026-10-01). Asking for the radio's 6-byte OK (plus the echo of
+                // the command, when this radio echoes) makes OmniRig wait for it before sending
+                // anything else. Kenwood and Yaesu answer no order at all, so they are left alone.
+                if (replyLength == 0 && string.IsNullOrEmpty(replyEnd)
+                    && rawCommand.Length >= 6 && rawCommand[0] == 0xFE && rawCommand[1] == 0xFE
+                    && rawCommand[rawCommand.Length - 1] == 0xFD)
+                {
+                    bool? echo = IcomEchoesCommands(NormalizeRigType(Rig.RigType));
+                    if (echo.HasValue) replyLength = (echo.Value ? rawCommand.Length : 0) + 6;
+                }
                 Rig.SendCustomCommand(rawCommand, replyLength, replyEnd ?? string.Empty);
                 return true;
             }
@@ -338,6 +352,62 @@ namespace HolyLogger
             {
                 return false;
             }
+        }
+
+        // Whether this Icom echoes each command back before its OK, read from the radio's own OmniRig
+        // file: an order there (pmSplitOff, pmFreq...) waits for the command's length + 6 when the
+        // radio echoes, and for 6 alone when it does not. That file is what already works with this
+        // radio, so it is the answer, not a guess per model. Null when the file cannot tell - then
+        // nothing changes from before.
+        private readonly Dictionary<string, bool?> _icomEchoByRig = new Dictionary<string, bool?>(StringComparer.OrdinalIgnoreCase);
+
+        private bool? IcomEchoesCommands(string rigType)
+        {
+            if (string.IsNullOrEmpty(rigType)) return null;
+            if (_icomEchoByRig.TryGetValue(rigType, out bool? known)) return known;
+
+            bool? echo = null;
+            try
+            {
+                string dir = Contests.ContestRadioCommands.OmniRigRigsFolder();
+                string path = dir == null ? null : System.IO.Path.Combine(dir, rigType + ".ini");
+                if (path != null && System.IO.File.Exists(path))
+                {
+                    string section = null, cmd = null;
+                    int? reply = null;
+                    foreach (string rawLine in System.IO.File.ReadAllLines(path).Concat(new[] { "[end]" }))
+                    {
+                        string line = rawLine.Trim();
+                        if (line.StartsWith("[", StringComparison.Ordinal))
+                        {
+                            // The section just finished: an order (pm...) with an Icom command and a reply length.
+                            if (section != null && section.StartsWith("pm", StringComparison.OrdinalIgnoreCase)
+                                && cmd != null && reply.HasValue)
+                            {
+                                int len = cmd.Length / 2;
+                                if (reply.Value == len + 6) { echo = true; break; }
+                                if (reply.Value == 6) { echo = false; break; }
+                            }
+                            section = line.Trim('[', ']');
+                            cmd = null; reply = null;
+                            continue;
+                        }
+                        if (line.StartsWith("Command=", StringComparison.OrdinalIgnoreCase))
+                        {
+                            string hex = line.Substring(8).Replace(".", "").Trim();
+                            if (hex.StartsWith("FEFE", StringComparison.OrdinalIgnoreCase) && hex.Length % 2 == 0) cmd = hex;
+                        }
+                        else if (line.StartsWith("ReplyLength=", StringComparison.OrdinalIgnoreCase)
+                                 && int.TryParse(line.Substring(12).Trim(), out int n))
+                            reply = n;
+                    }
+                }
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+            _icomEchoByRig[rigType] = echo;
+            Log.Warn("Icom echo for " + rigType + " from its OmniRig file: " + (echo.HasValue ? (echo.Value ? "yes" : "no") : "unknown"));
+            return echo;
         }
 
         private void RigLabel_MouseLeftButtonUp(object sender, System.Windows.Input.MouseButtonEventArgs e)

@@ -463,9 +463,10 @@ namespace HolyLogger.Contests
         // section (command table read column by column, each command's number vertically centered
         // over its own sub-commands - reconstructed from the PDF's text coordinates, not guessed):
         //   07 alone = Select the VFO mode (same bare command as the ID-5100 and IC-7100).
-        //   06 04 = Set FM. UNLIKE the ID-5100/IC-7100, the table's mode command (06) lists only
-        //     00=LSB, 01=USB, 03=CW, 04=FM - no narrow-FM sub-command at all, so there is nothing more
-        //     specific to send; this only guarantees the mode is FM, not a filter width.
+        //   06 05 01 = Set FM, normal (wide) filter. THE MANUAL IS WRONG HERE: its table prints 04=FM,
+        //     and 06 04 left his IC-910 out of FM (2026-10-01). The radio's FM is 05 like every other
+        //     Icom - Hamlib's IC-910 driver sends 05 with filter 01=normal / 02=narrow, and OmniRig's
+        //     own IC-910 file reads FM back from the radio as 05.
         //   0F 10 = Set simplex operation (same as the ID-5100).
         //   16 42 00 / 16 43 00 = subaudible tone OFF / tone squelch OFF - two separate commands here,
         //     unlike the ID-5100's single 16 5D.
@@ -478,7 +479,7 @@ namespace HolyLogger.Contests
         {
             Radio = name,
             Vfo = "FE FE 60 E0 07 FD",
-            FmWide = "FE FE 60 E0 06 04 FD",
+            FmWide = "FE FE 60 E0 06 05 01 FD",
             NoAutoRepeater = "",
             Simplex = "FE FE 60 E0 0F 10 FD",
             NoTone = "FE FE 60 E0 16 42 00 FD",
@@ -600,6 +601,11 @@ namespace HolyLogger.Contests
                 var d = Defaults().FirstOrDefault(x => string.Equals((x.Radio ?? "").Trim(), (saved.Radio ?? "").Trim(),
                                                                      StringComparison.OrdinalIgnoreCase));
                 if (d == null) continue;
+                // A command HolyLogger once shipped and found wrong is replaced, even though it is not
+                // empty - the operator did not type it, HolyLogger did.
+                if (string.Equals((saved.Radio ?? "").Trim(), "IC-910", StringComparison.OrdinalIgnoreCase)
+                    && string.Equals((saved.FmWide ?? "").Trim(), "FE FE 60 E0 06 04 FD", StringComparison.OrdinalIgnoreCase))
+                    saved.FmWide = d.FmWide;
                 if (string.IsNullOrWhiteSpace(saved.Vfo)) saved.Vfo = d.Vfo;
                 if (string.IsNullOrWhiteSpace(saved.FmWide)) saved.FmWide = d.FmWide;
                 if (string.IsNullOrWhiteSpace(saved.NoAutoRepeater)) saved.NoAutoRepeater = d.NoAutoRepeater;

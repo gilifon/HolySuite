@@ -13878,20 +13878,38 @@ namespace HolyLogger
 
                 try
                 {
-                    Rig.Mode = mode;
+                    SetRigMode(mode);
                     modeSent = true;
                 }
                 catch (System.Exception swallowed) { Log.Swallow(swallowed); }
 
+                bool arrived = false;
                 if (freqWritable)
                 {
                     Rig.Freq = frequencyHz;
-                    await TryGetRigReadbackAsync(frequencyHz);
+                    arrived = await TryGetRigReadbackAsync(frequencyHz);
                 }
                 else if (freqAWritable)
                 {
                     Rig.FreqA = frequencyHz;
-                    await TryGetRigReadbackAsync(frequencyHz);
+                    arrived = await TryGetRigReadbackAsync(frequencyHz);
+                }
+
+                // IC-910: Main cannot go to the band Sub is on - a 70cm frequency is refused while Sub
+                // sits on 70cm, and the frequency command never changes band by itself. 07 B0 swaps the
+                // two, then the mode and frequency go again, now to the band that was Sub's.
+                if (!arrived && (freqWritable || freqAWritable) && IsIc910OnCat())
+                {
+                    Log.Warn("IC-910 did not take " + frequencyHz + " Hz - swapping Main and Sub (07 B0) and trying once more");
+                    if (TrySendOmniRigCustomCommand(Ic910SwapMainSubCommand))
+                    {
+                        await Task.Delay(300);
+                        try { SetRigMode(mode); }
+                        catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+                        if (freqWritable) Rig.Freq = frequencyHz;
+                        else Rig.FreqA = frequencyHz;
+                        await TryGetRigReadbackAsync(frequencyHz);
+                    }
                 }
             }
             catch (System.Exception swallowed) { Log.Swallow(swallowed); }
@@ -13946,6 +13964,33 @@ namespace HolyLogger
                     Log.Warn("Spectrum width not sent to " + rigName + ": " + command);
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        // IC-910 FM. Icom's printed IC-910H manual says 06 04 is FM, and OmniRig's IC-910 file sends
+        // that - but 04 left his radio out of FM. The radio's FM is 05, as on every other Icom: Hamlib's
+        // IC-910 driver sends 05, and OmniRig's own IC-910 file reads FM back from the radio as 05.
+        // 01 = the normal (wide) filter, 02 = narrow (Hamlib's IC-910 filter coding).
+        private const string Ic910FmCommand = "FE FE 60 E0 06 05 01 FD";
+        // "Switch VFO A and VFO B" in the manual's table; on the IC-910 it swaps the Main and Sub bands.
+        private const string Ic910SwapMainSubCommand = "FE FE 60 E0 07 B0 FD";
+
+        private bool IsIc910OnCat()
+        {
+            try { return Rig != null && string.Equals(NormalizeRigType(Rig.RigType), "IC-910", StringComparison.OrdinalIgnoreCase); }
+            catch { return false; }
+        }
+
+        // Every mode HolyLogger itself sends the radio goes through here, so the IC-910's FM is the
+        // right command and not OmniRig's.
+        private void SetRigMode(OmniRig.RigParamX mode)
+        {
+            if ((int)mode == PM_FM && IsIc910OnCat())
+            {
+                if (!TrySendOmniRigCustomCommand(Ic910FmCommand))
+                    throw new InvalidOperationException("IC-910 FM command not sent");
+                return;
+            }
+            Rig.Mode = mode;
         }
 
         private async Task<bool> TryGetRigReadbackAsync(int targetHz)
