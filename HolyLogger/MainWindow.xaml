@@ -1901,6 +1901,23 @@
                    ToolTip="The exchange your station sends"><Run Text="Exchange" FontWeight="Bold"/><LineBreak/><Run Text="send"/></TextBlock>
         <StackPanel x:Name="ContestTxPanel" Orientation="Horizontal" HorizontalAlignment="Left"
                     VerticalAlignment="Top" Margin="101,82,0,0" Grid.Row="1" Panel.ZIndex="6" Visibility="Collapsed"/>
+        <!-- SCORE frame: right of the send band, same height, for a contest that names a "score" kind in
+             contests.json (Sukkot: total km). Its Left and Width are set in code (LayoutContestScore),
+             after the send band has been shrunk to fit its cells; its right edge is the Spot button's
+             left edge (580). -->
+        <Border x:Name="ContestScoreFrame" Grid.Row="1" Margin="458,82,0,0" HorizontalAlignment="Left" VerticalAlignment="Top"
+                Width="122" Height="48" Background="#FFE0B2" BorderBrush="#F0A050" BorderThickness="1" CornerRadius="8"
+                Visibility="Collapsed" Panel.ZIndex="5"
+                ToolTip="Total km of all QSOs in this log - each station once per band">
+            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                <!-- Fixed light orange (his choice), so the text is fixed black: it reads the same in
+                     every colour scheme. -->
+                <TextBlock x:Name="ContestScoreLabel" Text="Score" FontSize="16" FontWeight="Bold" LineHeight="17" LineStackingStrategy="BlockLineHeight"
+                           HorizontalAlignment="Center" Foreground="Black"/>
+                <TextBlock x:Name="ContestScoreText" Text="0 km" FontSize="16" LineHeight="20" LineStackingStrategy="BlockLineHeight"
+                           HorizontalAlignment="Center" Foreground="Black"/>
+            </StackPanel>
+        </Border>
         <Button x:Name="AddBtn" Style="{StaticResource ActionButtonStyle}" Content="Add (F1)" HorizontalAlignment="Left" Margin="567,123,0,0" VerticalAlignment="Top" Width="105" Height="32" Grid.Row="1" Click="AddBtn_Click" FontSize="16" ToolTip="Save the current QSO data" TabIndex="14" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Padding="0" />
         <Button x:Name="ClearBtn" Style="{StaticResource ActionButtonStyle}" HorizontalAlignment="Left" Margin="567,84,0,0" VerticalAlignment="Top" Width="105" Height="32" Grid.Row="1" Click="ClearBtn_Click" FontSize="16" ToolTip="Clear the current QSO data" IsTabStop="False" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Padding="0">
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">

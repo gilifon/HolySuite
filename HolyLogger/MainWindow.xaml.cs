@@ -2279,6 +2279,7 @@ namespace HolyLogger
                     // In a contest whose sent exchange is a serial number, advance it for the next QSO.
                     // NOT deferred: the next QSO's exchange must already carry the new number.
                     AdvanceContestSerial();
+                    RefreshContestScore();   // Sukkot's total km, with this QSO in it
 
                     // EVERYTHING ELSE WAITS UNTIL HE CAN TYPE (see afterTyping below).
                     afterTyping.Add(() =>
@@ -10826,6 +10827,7 @@ namespace HolyLogger
             if (fe.Margin.Left >= 670) return 0;            // right-hand map area never moves
 
             if (fe == ContestSendBand) return -9;           // "You send" band sits in the freed top strip (~y73)
+            if (fe == ContestScoreFrame) return -9;         // Score frame: beside the band, same height
             if (fe == ContestTxPanel) return -7;            // send cells (RST S + send field) centered in the band
             // Received cells: 41, not the 40 its row would give, so the 44px cell clears the frame's
             // 1px border by 1px at the top and 1px at the bottom (frame y161..209, inside 162..208).

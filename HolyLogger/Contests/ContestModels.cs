@@ -58,6 +58,11 @@ namespace HolyLogger.Contests
         // Cabrillo): what is typed there is added to the QSO's Comment, so it travels in every ADIF
         // export. Sukkot: HOLYLAND_AREA - the other station's Holyland square, when he gives it.
         [JsonProperty("comment_fields")] public List<string> CommentFields { get; set; }
+
+        // Optional: how the contest is scored, shown live in the Score frame beside the send bar. A
+        // contest without it has no Score frame. Known kinds:
+        //   "DISTANCE_SUM" - total km of all QSOs, each station once per band (Sukkot).
+        [JsonProperty("score")] public string Score { get; set; }
     }
 
     public class ContestChannel

@@ -4005,6 +4005,37 @@ Environment.NewLine +
             "my_wwff_ref"
         };
 
+        // THE KM SCORE OF A CONTEST LOG (Sukkot): the sum of every QSO's distance, each station counted
+        // once per band. A duplicate is still logged, it just adds nothing - the first contact with
+        // that station on that band is the one that counts. The callsign is compared WHOLE, stroke
+        // and all: 4Z5SL/1 and 4Z5SL/2 are two stations (his rule), so CallsignIdentity is NOT used
+        // here. A QSO with no distance (a grid was missing) adds nothing.
+        public long ContestDistanceScore(long logId)
+        {
+            lock (_dbLock)
+            {
+                if (con == null || con.State != System.Data.ConnectionState.Open) return 0;
+                long total = 0;
+                var counted = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                using (var cmd = new SQLiteCommand(
+                    "SELECT dx_callsign, band, distance FROM qso WHERE log_id = ? ORDER BY date ASC, time ASC, Id ASC", con))
+                {
+                    cmd.Parameters.Add(new SQLiteParameter(null, logId));
+                    using (var rdr = cmd.ExecuteReader())
+                        while (rdr.Read())
+                        {
+                            string key = Convert.ToString(rdr.GetValue(0)).Trim() + "|"
+                                       + Convert.ToString(rdr.GetValue(1)).Trim();
+                            if (!counted.Add(key)) continue;   // a duplicate: logged, not scored
+                            if (rdr.IsDBNull(2)) continue;
+                            long km;
+                            if (long.TryParse(Convert.ToString(rdr.GetValue(2)), out km)) total += km;
+                        }
+                }
+                return total;
+            }
+        }
+
         // The biggest QSO Id in a log, or 0 for a log with no QSOs. Taken before an import so a stopped
         // one can tell its own rows from the ones that were already there.
         public long MaxQsoId(long logId)
