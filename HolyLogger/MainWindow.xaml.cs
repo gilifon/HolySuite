@@ -2393,6 +2393,8 @@ namespace HolyLogger
                     q.Time = QsoToUpdate.Time;
                     q.PROP_MODE = QsoToUpdate.PROP_MODE;
                     q.SAT_NAME = QsoToUpdate.SAT_NAME;
+                    q.DXLocator = QsoToUpdate.DXLocator;
+                    q.Distance = QsoToUpdate.Distance;   // measured again by dal.Update
                     QSODataGrid.Items.Refresh();
                 }
 

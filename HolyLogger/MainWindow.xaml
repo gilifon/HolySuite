@@ -2527,6 +2527,17 @@
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
+                <!-- ADIF DISTANCE: km between the two stations, measured from My Locator and the DX
+                     grid when the QSO is saved (the Sukkot contest scores on it). Appended at the far
+                     right like every new column. Blank when either grid was missing. -->
+                <DataGridTemplateColumn Header="Km" IsReadOnly="True" SortMemberPath="Distance" Width="Auto">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding Distance}" HorizontalAlignment="Center" Padding="5,0,5,0"
+                                       ToolTip="Distance between the two stations, in km"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
             </DataGrid.Columns>
         </DataGrid>
 
