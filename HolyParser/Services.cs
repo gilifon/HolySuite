@@ -160,6 +160,12 @@ namespace HolyParser
                     string qth = qso.Qth.Trim();
                     adif.AppendFormat("<qth:{0}>{1}", qth.Length, qth);
                 }
+                // ADIF DISTANCE: km between the two stations, measured from the grids when saved.
+                if (qso.Distance.HasValue)
+                {
+                    string km = qso.Distance.Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                    adif.AppendFormat("<distance:{0}>{1}", km.Length, km);
+                }
                 // ADIF <freq> is MHz. Fall back to the stored text if it cannot be parsed at all, so a
                 // value we simply don't understand is passed through rather than silently dropped.
                 string freqMhz = HolyLogParser.NormalizeFreqToMhz(qso.Freq) ?? qso.Freq;

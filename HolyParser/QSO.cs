@@ -79,6 +79,20 @@ namespace HolyParser
         [JsonProperty("dx_locator")]
         public string DXLocator { get; set; }
 
+        // ADIF DISTANCE: km between the two stations, worked out from MyLocator and DXLocator each time
+        // the QSO is saved (see FillDistance). The Sukkot contest scores on it. Null when either grid is
+        // missing or not a real locator - a QSO with no distance is not one with a distance of zero.
+        [JsonProperty("distance")]
+        public int? Distance { get; set; }
+
+        // Recomputes Distance from the two grids. Left as it was when either grid is unusable, so a
+        // value that came in another way is not wiped by a save that had nothing to measure with.
+        public void FillDistance()
+        {
+            if (!MaidenheadLocator.IsValidLocator(MyLocator) || !MaidenheadLocator.IsValidLocator(DXLocator)) return;
+            Distance = (int)Math.Round(MaidenheadLocator.Distance(MyLocator, DXLocator));
+        }
+
         public string HASH { get; set; }
         public string ERROR { get; set; }
 
