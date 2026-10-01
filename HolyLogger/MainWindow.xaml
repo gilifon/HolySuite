@@ -1385,10 +1385,10 @@
                        HorizontalAlignment="Center" VerticalAlignment="Center"/>
         </Border>
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Top"
-                    Margin="192,45,0,0" Grid.Row="1">
+                    Margin="192,42,0,0" Grid.Row="1">
             <!-- Both LED and no-CAT borders share one Grid so the kHz label never shifts.
                  Width is the single fixed constraint — content never drives the layout width. -->
-            <Grid VerticalAlignment="Center" Width="160">
+            <Grid VerticalAlignment="Center" Width="186" Height="37">
                 <!-- ScrollNS, not Hand: the wheel is what this readout is FOR, and it is the cursor
                      that stands over the cluster's spot list while Live Scale runs it, so the two read
                      as the same thing. Clicking still opens it for editing - the tooltip says so. -->
@@ -1402,7 +1402,7 @@
                         ToolTip="Working frequency — click to edit, or roll the mouse wheel to move the radio 1 kHz">
                     <Grid Margin="4,1,4,2">
                         <TextBlock x:Name="FreqLedGhost" FontFamily="./Fonts/#DSEG7 Classic" FontWeight="Bold"
-                                   FontSize="18" VerticalAlignment="Center" Foreground="#1E1500"
+                                   FontSize="21" VerticalAlignment="Center" Foreground="#1E1500"
                                    TextAlignment="Right"/>
                         <!-- The band under the digits the wheel would move. It goes OVER the ghost
                              segments and under the lit ones: behind the ghost, its dark all-segment
@@ -1413,7 +1413,7 @@
                                    HorizontalAlignment="Left" Width="0" Visibility="Collapsed"
                                    IsHitTestVisible="False"/>
                         <TextBlock x:Name="FreqLedLive" FontFamily="./Fonts/#DSEG7 Classic" FontWeight="Bold"
-                                   FontSize="18" VerticalAlignment="Center" TextAlignment="Right"/>
+                                   FontSize="21" VerticalAlignment="Center" TextAlignment="Right"/>
                         <TextBox x:Name="TB_FreqLedEdit" Visibility="Collapsed" MinWidth="175"
                                  FontFamily="Consolas" FontSize="17" FontWeight="Bold"
                                  Background="#080808" Foreground="#FFB000" BorderThickness="0" Padding="0"
@@ -1433,7 +1433,7 @@
                                    HorizontalAlignment="Left" Width="0" Visibility="Collapsed"
                                    IsHitTestVisible="False"/>
                         <TextBox x:Name="TB_FreqNoCat" Padding="4,0"
-                                 FontFamily="Consolas" FontSize="22" FontWeight="Bold"
+                                 FontFamily="Consolas" FontSize="26" FontWeight="Bold"
                                  Background="Transparent" Foreground="Black" CaretBrush="Black" BorderThickness="0"
                                  TextAlignment="Right" MaxLength="11"
                                  VerticalContentAlignment="Center"

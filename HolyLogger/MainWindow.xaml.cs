@@ -11395,20 +11395,26 @@ namespace HolyLogger
 
             // Shown as MHz.kHz.Hz - 145.275.000 - the way a radio's own dial reads (his call,
             // 2026-10-01). The second point stays the kHz/Hz divide the wheel and its band go by.
+            //
+            // A half space each side of each point (LedPoint): in DSEG7 the point has NO width - it is
+            // drawn centred on the edge of the digit before it, squeezed into the gap, and could
+            // hardly be seen. The half spaces open about 4 px and put the point in the middle of it,
+            // at size 21 1296.200.000 and up no longer fit the box - accepted, rare (his call).
             long hz = (long)Math.Round(mhz * 1000000.0);
-            string intPart = (hz / 1000000).ToString(CultureInfo.InvariantCulture) + "."
+            string intPart = (hz / 1000000).ToString(CultureInfo.InvariantCulture) + LedPoint
                              + (hz / 1000 % 1000).ToString("D3", CultureInfo.InvariantCulture);  // MHz.kHz
             string fracPart = (hz % 1000).ToString("D3", CultureInfo.InvariantCulture); // Hz
-            string full = intPart + "." + fracPart;
+            string full = intPart + LedPoint + fracPart;
 
-            // Ghost layer: every digit forced to 8 (all segments lit), dots kept in place.
+            // Ghost layer: every digit forced to 8 (all segments lit), points and spaces kept in place.
             var ghost = new StringBuilder(full.Length);
-            foreach (char c in full) ghost.Append(c == '.' ? '.' : '8');
-            FreqLedGhost.Text = ghost.ToString();
+            foreach (char c in full) ghost.Append(c == '.' || c == ' ' ? c : '8');
+            FreqLedGhost.Inlines.Clear();
+            FreqLedGhost.Inlines.Add(LedSpan(ghost.ToString(), null));
 
             FreqLedLive.Inlines.Clear();
-            FreqLedLive.Inlines.Add(new System.Windows.Documents.Run(intPart + ".") { Foreground = LedAmberBrush });
-            FreqLedLive.Inlines.Add(new System.Windows.Documents.Run(fracPart) { Foreground = LedWhiteBrush });
+            FreqLedLive.Inlines.Add(LedSpan(intPart + LedPoint, LedAmberBrush));
+            FreqLedLive.Inlines.Add(LedSpan(fracPart, LedWhiteBrush));
 
             // The digits may have shifted under a mouse that never moved.
             RefreshFreqZoneMarks();
@@ -11418,9 +11424,31 @@ namespace HolyLogger
         private void ShowLedBlank()
         {
             if (FreqLedLive == null || FreqLedGhost == null) return;
-            FreqLedGhost.Text = "888.888.888";
+            FreqLedGhost.Inlines.Clear();
+            FreqLedGhost.Inlines.Add(LedSpan("888" + LedPoint + "888" + LedPoint + "888", null));
             FreqLedLive.Inlines.Clear();
-            FreqLedLive.Inlines.Add(new System.Windows.Documents.Run("---.---.---") { Foreground = LedAmberBrush });
+            FreqLedLive.Inlines.Add(LedSpan("---" + LedPoint + "---" + LedPoint + "---", LedAmberBrush));
+        }
+
+        // The point between digit groups on the LED, with a space each side. Every space on the LED is
+        // drawn at HALF the font size (LedSpan) - 2 px each at size 20 - so the point, which DSEG7 draws
+        // centred on its own position, lands in the middle of the gap. LedTextBounds measures the same way.
+        private const string LedPoint = " . ";
+
+        // LED text as a Span whose spaces are half size. Null colour leaves the TextBlock's own (the ghost).
+        private System.Windows.Documents.Span LedSpan(string text, System.Windows.Media.Brush colour)
+        {
+            var span = new System.Windows.Documents.Span();
+            if (colour != null) span.Foreground = colour;
+            var digits = new StringBuilder();
+            foreach (char c in text)
+            {
+                if (c != ' ') { digits.Append(c); continue; }
+                if (digits.Length > 0) { span.Inlines.Add(new System.Windows.Documents.Run(digits.ToString())); digits.Clear(); }
+                span.Inlines.Add(new System.Windows.Documents.Run(" ") { FontSize = FreqLedLive.FontSize / 2 });
+            }
+            if (digits.Length > 0) span.Inlines.Add(new System.Windows.Documents.Run(digits.ToString()));
+            return span;
         }
 
         // No CAT / rig offline — switch to a plain editable textbox with a red border.

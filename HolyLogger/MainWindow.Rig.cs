@@ -1292,7 +1292,9 @@ namespace HolyLogger
 
             if (FreqLedLive == null) return false;
 
-            string text = FreqLedLive.Text ?? string.Empty;
+            // Read from the runs themselves: the display is built of Inlines, and TextBlock.Text does
+            // not reliably give their text back (measured empty in a test window, 2026-10-01).
+            string text = string.Concat(LedRuns(FreqLedLive.Inlines).Select(r => r.Text));
             // The LAST point: the display reads MHz.kHz.Hz, and the wheel divides at kHz/Hz.
             int dot = text.LastIndexOf('.');
             if (dot < 0) return false;
@@ -1302,7 +1304,10 @@ namespace HolyLogger
                                         FreqLedLive.FontWeight, FreqLedLive.FontStretch);
 
             double whole = Measure(text, typeface, dpi);
-            double uptoDot = Measure(text.Substring(0, dot + 1), typeface, dpi);
+            // The space after the point goes with it, as it does in the kHz run PaintLedDigits colours.
+            int cut = dot + 1;
+            while (cut < text.Length && text[cut] == ' ') cut++;
+            double uptoDot = Measure(text.Substring(0, cut), typeface, dpi);
 
             // Right-aligned: the text ends at the right edge, so it begins that far back from it.
             start = FreqLedLive.ActualWidth - whole;
@@ -1330,11 +1335,26 @@ namespace HolyLogger
             return 1.0;
         }
 
+        // Every Run on the LED in order, through the Spans LedSpan wraps them in.
+        private static IEnumerable<System.Windows.Documents.Run> LedRuns(System.Windows.Documents.InlineCollection inlines)
+        {
+            foreach (var inline in inlines)
+            {
+                if (inline is System.Windows.Documents.Run run) yield return run;
+                else if (inline is System.Windows.Documents.Span span)
+                    foreach (var inner in LedRuns(span.Inlines)) yield return inner;
+            }
+        }
+
         private double Measure(string text, Typeface typeface, double pixelsPerDip)
         {
-            return new FormattedText(text, CultureInfo.InvariantCulture, FlowDirection.LeftToRight,
-                                     typeface, FreqLedLive.FontSize, System.Windows.Media.Brushes.Black,
-                                     pixelsPerDip).WidthIncludingTrailingWhitespace;
+            var ft = new FormattedText(text, CultureInfo.InvariantCulture, FlowDirection.LeftToRight,
+                                       typeface, FreqLedLive.FontSize, System.Windows.Media.Brushes.Black,
+                                       pixelsPerDip);
+            // Spaces are drawn at half size on the LED (MainWindow.LedSpan), so measured that way too.
+            for (int i = 0; i < text.Length; i++)
+                if (text[i] == ' ') ft.SetFontSize(FreqLedLive.FontSize / 2, i, 1);
+            return ft.WidthIncludingTrailingWhitespace;
         }
 
         // -- WHICH HALF THE WHEEL WOULD MOVE -------------------------------------
@@ -1448,7 +1468,8 @@ namespace HolyLogger
 
             try
             {
-                var runs = FreqLedLive.Inlines.OfType<System.Windows.Documents.Run>().ToList();
+                // Spans since the half-size spaces (LedSpan); the digits inside take the span's colour.
+                var runs = FreqLedLive.Inlines.OfType<System.Windows.Documents.Span>().ToList();
                 if (runs.Count == 0) return;
 
                 // The kHz run first, the Hz run second - the blank display ("-------.---") has only
