@@ -236,7 +236,9 @@ namespace HolyLogger
         // Opened from Options > General, under Select Rig.
         internal void OpenContestRadioSetup(Window owner)
         {
-            new ContestRadioSetupWindow(owner ?? this, new[] { Rig1, Rig2 }, SendContestRadioSetupNow).ShowDialog();
+            // The radio on CAT now, so the window opens on it and Send now can be pressed at once.
+            string onCat = IsCatLive() ? NormalizeRigType(Rig.RigType) : null;
+            new ContestRadioSetupWindow(owner ?? this, new[] { Rig1, Rig2 }, SendContestRadioSetupNow, onCat).ShowDialog();
         }
 
         // 5. Contest channels. Most radios on the Sukkot channels (2m / 70cm FM) have no CAT, so the
