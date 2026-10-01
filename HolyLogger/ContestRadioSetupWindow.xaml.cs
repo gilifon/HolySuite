@@ -28,7 +28,8 @@ namespace HolyLogger
         // RIG1/RIG2 come first. The box is editable, so a file renamed in OmniRig can still be typed.
         public List<string> RigNames { get; }
 
-        public ContestRadioSetupWindow(Window owner, IEnumerable<string> omniRigRigs, Func<RadioCommandSet, string> sendNow)
+        public ContestRadioSetupWindow(Window owner, IEnumerable<string> omniRigRigs, Func<RadioCommandSet, string> sendNow,
+                                       string radioOnCat = null)
         {
             var omniRigFiles = ContestRadioCommands.OmniRigRigFiles();
             NotInOmniRigBrushConverter.OmniRigFiles = omniRigFiles;
@@ -53,7 +54,13 @@ namespace HolyLogger
             // Opens on the radio he was last looking at - saved on Closing - and only falls back to the
             // first radio with commands (or the first offered at all) the very first time the window
             // is opened, before anything has been looked at yet.
-            string first = (setup.LastRadio ?? "").Trim();
+            //
+            // The radio on CAT now comes before all that, when it is in the list: it is the one Send now
+            // can reach, so a suspected CAT problem can be tried at once without hunting for it.
+            string onCat = (radioOnCat ?? "").Trim();
+            bool onCatListed = onCat.Length > 0 && (RadioBox.ItemsSource as IEnumerable<string> ?? Enumerable.Empty<string>())
+                                   .Contains(onCat, StringComparer.OrdinalIgnoreCase);
+            string first = onCatListed ? onCat : (setup.LastRadio ?? "").Trim();
             if (first.Length == 0)
                 first = _sets.Select(s => (s.Radio ?? "").Trim()).FirstOrDefault(n => n.Length > 0)
                         ?? RigNames.FirstOrDefault() ?? string.Empty;
