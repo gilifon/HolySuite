@@ -109,6 +109,12 @@ namespace HolyLogger
         private const uint SWP_NOACTIVATE = 0x0010;
         private const uint SWP_FRAMECHANGED = 0x0020;
 
+        // The Radio Control Panel is owned by the main window but asks for its own taskbar button
+        // (ShowInTaskbar="True"), and it does get one: a throwaway owned window set the same way showed
+        // its own taskbar button when minimised (tested 2026-10-01). So it keeps its minimise button.
+        private static bool MayMinimise(Window w)
+            => w.ShowInTaskbar && (w.Owner == null || w is RadioControlPanelWindow);
+
         private static void RemoveMinimiseFromTaskbarlessWindows()
         {
             EventManager.RegisterClassHandler(typeof(Window), FrameworkElement.LoadedEvent,
@@ -126,7 +132,7 @@ namespace HolyLogger
                         // which never set ShowInTaskbar at all, still disappeared when it was minimised:
                         // "i simply did not see and icon of the workshop after minizing it". The main
                         // window owns nothing and is in the taskbar, so it keeps its button.
-                        if (w.ShowInTaskbar && w.Owner == null) return;
+                        if (MayMinimise(w)) return;
 
                         // A WINDOW THAT DRAWS ITS OWN TITLE BAR needs its own button hidden - there is
                         // no system caption to take anything away from. The Workshop and the Channels
@@ -151,8 +157,7 @@ namespace HolyLogger
                         // desktop", a keyboard shortcut - comes straight back rather than disappearing.
                         w.StateChanged += (s2, e2) =>
                         {
-                            if (w.WindowState == WindowState.Minimized
-                                && !(w.ShowInTaskbar && w.Owner == null))
+                            if (w.WindowState == WindowState.Minimized && !MayMinimise(w))
                                 w.WindowState = WindowState.Normal;
                         };
                     }

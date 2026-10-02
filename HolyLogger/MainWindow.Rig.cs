@@ -1136,6 +1136,7 @@ namespace HolyLogger
         private void RadioControlPanelMenuItem_Click(object sender, RoutedEventArgs e)
         {
             Properties.Settings.Default.ShowRadioControlPanel = true;
+            Properties.Settings.Default.RadioPanelMinimized = false;
             try { Properties.Settings.Default.Save(); } catch (Exception swallowed) { Log.Swallow(swallowed); }
             ApplyRadioControlPanelVisibility();
         }
@@ -1152,10 +1153,32 @@ namespace HolyLogger
                     try { radioPanel.Owner = this; } catch (Exception swallowed) { Log.Swallow(swallowed); }
                     radioPanel.Closed += RadioPanel_Closed;
                     radioPanel.Show();
+                    // Minimized when he last left it so (RadioControlPanelWindow.OnStateChanged). The
+                    // View menu clears this first: asking for the panel means wanting to see it.
+                    // NOT BEFORE IT HAS BEEN DRAWN ONCE: minimized straight after Show it had never
+                    // painted, and the taskbar's hover preview of it was an empty window.
+                    if (Properties.Settings.Default.RadioPanelMinimized)
+                    {
+                        var drawnPanel = radioPanel;
+                        EventHandler minimizeWhenDrawn = null;
+                        minimizeWhenDrawn = (s, e) =>
+                        {
+                            drawnPanel.ContentRendered -= minimizeWhenDrawn;
+                            if (radioPanel == drawnPanel) drawnPanel.WindowState = WindowState.Minimized;
+                        };
+                        drawnPanel.ContentRendered += minimizeWhenDrawn;
+                    }
                 }
                 else
                 {
-                    try { radioPanel.Activate(); } catch (Exception swallowed) { Log.Swallow(swallowed); }
+                    // Minimized (it has a minimize button and its own taskbar button since 2026-10-01):
+                    // Activate alone leaves it down there, so the menu item brings it back first.
+                    try
+                    {
+                        if (radioPanel.WindowState == WindowState.Minimized) radioPanel.WindowState = WindowState.Normal;
+                        radioPanel.Activate();
+                    }
+                    catch (Exception swallowed) { Log.Swallow(swallowed); }
                 }
 
                 UpdateRadioPanel();

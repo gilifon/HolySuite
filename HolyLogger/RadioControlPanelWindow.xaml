@@ -4,7 +4,7 @@
         xmlns:primitives="clr-namespace:System.Windows.Controls.Primitives;assembly=PresentationFramework"
         Title="Radio Control Panel"
         Width="248" SizeToContent="Height"
-        ResizeMode="NoResize" ShowInTaskbar="False"
+        ResizeMode="CanMinimize" ShowInTaskbar="True"
         Icon="Images/crown.png"
         Background="{DynamicResource WindowBg}"
         Foreground="{DynamicResource TextBrush}">

@@ -3642,6 +3642,30 @@ namespace HolyLogger.Properties {
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool RadioPanelMinimized {
+            get {
+                return ((bool)(this["RadioPanelMinimized"]));
+            }
+            set {
+                this["RadioPanelMinimized"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool ClusterWindowMinimized {
+            get {
+                return ((bool)(this["ClusterWindowMinimized"]));
+            }
+            set {
+                this["ClusterWindowMinimized"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
         public bool EsmEnabled {
             get {
                 return ((bool)(this["EsmEnabled"]));

@@ -225,6 +225,19 @@ namespace HolyLogger
             SettingsFlush.RequestSave();
         }
 
+        // REMEMBERS BEING MINIMIZED, so a panel he put down on the taskbar starts there next time
+        // instead of having to be minimized again after every start. Only Minimized and Normal are
+        // written: the panel cannot be maximized.
+        protected override void OnStateChanged(EventArgs e)
+        {
+            base.OnStateChanged(e);
+            if (WindowState == WindowState.Maximized) return;
+            bool minimized = WindowState == WindowState.Minimized;
+            if (Properties.Settings.Default.RadioPanelMinimized == minimized) return;
+            Properties.Settings.Default.RadioPanelMinimized = minimized;
+            SettingsFlush.RequestSave();
+        }
+
         /// <summary>Rebuild the buttons after the frequencies were edited in Options.</summary>
         public void ReloadPresets()
         {
