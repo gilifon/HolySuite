@@ -145,7 +145,7 @@ namespace HolyLogger
         FrameworkElement clusterCenterLine = null;    // overlay that hosts the reference line (fills the table area)
         Grid clusterCenterLineBand = null;            // the movable strip (line + readout) positioned at the rows-area center
         TextBlock clusterCenterLineFreqText = null;   // live VFO frequency shown on the line
-        System.Windows.Controls.Primitives.DataGridRowsPresenter clusterLiveScaleRowsHost = null;  // rows panel; carries the off-screen spacer margins
+        System.Windows.Controls.Primitives.DataGridRowsPresenter clusterLiveScaleRowsHost = null;  // rows panel; Live Scale shifts it past the ends (see ClusterScaleOffset)
         int clusterLiveScaleAlignRetries = 0;         // guards the layout-not-ready retry loop of the scroll engine
 
         // Dragging the scale by hand (see ClusterDragTo): armed on the button press, live once the
@@ -916,6 +916,7 @@ namespace HolyLogger
             clusterCenterLineBand = null;
             clusterCenterLineFreqText = null;
             clusterLiveScaleRowsHost = null;
+            _clusterScalePad = 0; _clusterScaleShift.Y = 0;
             clusterLastMinutesFilterPanel = null;
             clusterBandSelectorPanel = null;
             clusterModeSelectorPanel = null;
@@ -2482,10 +2483,44 @@ namespace HolyLogger
             }
             else
             {
-                if (clusterLiveScaleRowsHost != null) clusterLiveScaleRowsHost.Margin = new Thickness(0);
-                var sv = clusterSpotsScrollViewer ?? FindVisualChild<ScrollViewer>(clusterSpotsDataGrid);
-                if (sv != null) sv.CanContentScroll = true;   // back to normal virtualized scrolling
+                _clusterScaleShift.Y = 0;
+                System.Windows.Controls.VirtualizingPanel.SetScrollUnit(clusterSpotsDataGrid, System.Windows.Controls.ScrollUnit.Item);
             }
+        }
+
+        // WHERE THE SCALE IS SCROLLED TO, AS IF A VIEWPORT-HIGH SPACE SAT ABOVE AND BELOW THE ROWS.
+        // Live Scale needs that space so the first and last spot can reach the line and the list can
+        // slide away past them. It used to be real: a margin on the rows panel, with the grid scrolling
+        // by pixels as plain content - but that switches off the grid's row virtualization, so EVERY
+        // spot of the band was built and laid out again on every spot refresh and every scroll. With
+        // Live Scale open the CW decoder's waterfall arrived 30-60 ms late on most frames (2026-10-02,
+        // measured in its frame log: smooth all afternoon, jumpy from the moment Live Scale opened).
+        // Now the grid scrolls by pixels WITH virtualization (only the visible rows exist), and the
+        // part of the offset beyond the real scroll range is a shift of the rows panel instead.
+        double _clusterScalePad = 0;
+        readonly TranslateTransform _clusterScaleShift = new TranslateTransform();
+
+        private double ClusterScaleOffset(ScrollViewer sv)
+        {
+            return _clusterScalePad + sv.VerticalOffset - _clusterScaleShift.Y;
+        }
+
+        private void SetClusterScaleOffset(ScrollViewer sv, double offset)
+        {
+            double inRows = offset - _clusterScalePad;
+            double real = Math.Max(0, Math.Min(inRows, sv.ScrollableHeight));
+            sv.ScrollToVerticalOffset(real);
+            double shift = -(inRows - real);
+            if (Math.Abs(_clusterScaleShift.Y - shift) > 0.01) _clusterScaleShift.Y = shift;
+        }
+
+        // A row that exists - with virtualization only the visible rows do, so row 0 may not.
+        private double ClusterRealizedRowHeight()
+        {
+            if (clusterLiveScaleRowsHost == null) return 0;
+            foreach (UIElement child in clusterLiveScaleRowsHost.Children)
+                if (child is DataGridRow row && row.ActualHeight > 0) return row.ActualHeight;
+            return 0;
         }
 
         private void ClusterLiveScale_BlockWheel(object sender, System.Windows.Input.MouseWheelEventArgs e)
@@ -2569,15 +2604,14 @@ namespace HolyLogger
             if (clusterSpotsDataGrid == null) return false;
 
             sv = clusterSpotsScrollViewer ?? FindVisualChild<ScrollViewer>(clusterSpotsDataGrid);
-            if (sv == null || sv.ViewportHeight <= 0 || sv.CanContentScroll) return false;
+            if (sv == null || sv.ViewportHeight <= 0 || !clusterLiveScaleOn || _clusterScalePad <= 0) return false;
 
             if (clusterLiveScaleRowsHost == null)
                 clusterLiveScaleRowsHost = FindVisualChild<System.Windows.Controls.Primitives.DataGridRowsPresenter>(clusterSpotsDataGrid);
             if (clusterLiveScaleRowsHost == null) return false;
-            pad = clusterLiveScaleRowsHost.Margin.Top;
+            pad = _clusterScalePad;
 
-            if (clusterSpotsDataGrid.ItemContainerGenerator.ContainerFromIndex(0) is DataGridRow r0 && r0.ActualHeight > 0)
-                rowH = r0.ActualHeight;
+            rowH = ClusterRealizedRowHeight();
             if (rowH <= 0) return false;
 
             lineY = sv.ViewportHeight / 2.0;
@@ -2620,12 +2654,12 @@ namespace HolyLogger
             double offset = _clusterDragFromOffset - dy;          // pull down -> earlier rows (higher kHz)
             if (offset < lowest) offset = lowest;
             if (offset > highest) offset = highest;
-            sv.ScrollToVerticalOffset(offset);
+            SetClusterScaleOffset(sv, offset);
 
             int index = (int)Math.Round((offset + lineY - pad) / rowH - 0.5);
             if (index < 0) index = 0; else if (index > n - 1) index = n - 1;
 
-            if (letGo) sv.ScrollToVerticalOffset(ClusterOffsetForRow(index, pad, rowH, lineY));
+            if (letGo) SetClusterScaleOffset(sv, ClusterOffsetForRow(index, pad, rowH, lineY));
 
             if (index == _clusterDragLastIndex) return;
             _clusterDragLastIndex = index;
@@ -2674,10 +2708,11 @@ namespace HolyLogger
             var sv = clusterSpotsScrollViewer;
             if (sv == null) return;
 
-            // Pixel-precise scrolling so the line can sit BETWEEN rows; needs a re-layout, so re-run after.
-            if (sv.CanContentScroll)
+            // Pixel-precise scrolling so the line can sit BETWEEN rows - still virtualized (see
+            // ClusterScaleOffset); needs a re-layout, so re-run after.
+            if (System.Windows.Controls.VirtualizingPanel.GetScrollUnit(clusterSpotsDataGrid) != System.Windows.Controls.ScrollUnit.Pixel)
             {
-                sv.CanContentScroll = false;
+                System.Windows.Controls.VirtualizingPanel.SetScrollUnit(clusterSpotsDataGrid, System.Windows.Controls.ScrollUnit.Pixel);
                 Dispatcher.BeginInvoke(new Action(ScrollClusterLiveScale), System.Windows.Threading.DispatcherPriority.Loaded);
                 return;
             }
@@ -2688,15 +2723,11 @@ namespace HolyLogger
             if (clusterLiveScaleRowsHost == null)
                 clusterLiveScaleRowsHost = FindVisualChild<System.Windows.Controls.Primitives.DataGridRowsPresenter>(clusterSpotsDataGrid);
             if (clusterLiveScaleRowsHost == null) return;
+            if (clusterLiveScaleRowsHost.RenderTransform != _clusterScaleShift)
+                clusterLiveScaleRowsHost.RenderTransform = _clusterScaleShift;
 
             double pad = vh;   // full viewport above and below -> any frequency can reach the line
-            var m = clusterLiveScaleRowsHost.Margin;
-            if (Math.Abs(m.Top - pad) > 1 || Math.Abs(m.Bottom - pad) > 1)
-            {
-                clusterLiveScaleRowsHost.Margin = new Thickness(0, pad, 0, pad);
-                Dispatcher.BeginInvoke(new Action(ScrollClusterLiveScale), System.Windows.Threading.DispatcherPriority.Loaded);
-                return;
-            }
+            _clusterScalePad = pad;
 
             int n = clusterSpotsDataGrid.Items.Count;
             double vfo = 0;
@@ -2708,9 +2739,7 @@ namespace HolyLogger
             if (IsClusterOutOfBand() && TryClusterNearestBandEdge(vfo, out double edgeMhz, out _))
                 vfo = edgeMhz;
 
-            double rowH = 0;
-            if (clusterSpotsDataGrid.ItemContainerGenerator.ContainerFromIndex(0) is DataGridRow r0 && r0.ActualHeight > 0)
-                rowH = r0.ActualHeight;
+            double rowH = ClusterRealizedRowHeight();
             if (rowH <= 0)
             {
                 // Rows exist but aren't laid out yet (e.g. Live Scale restored at window open, spots
@@ -2784,9 +2813,9 @@ namespace HolyLogger
             }
 
             double target = pad + rowsY * rowH - lineY;
-            double maxOffset = Math.Max(0, sv.ExtentHeight - vh);
+            double maxOffset = Math.Max(0, sv.ExtentHeight + 2 * pad - vh);   // the rows plus both spaces
             if (target < 0) target = 0; else if (target > maxOffset) target = maxOffset;
-            sv.ScrollToVerticalOffset(target);
+            SetClusterScaleOffset(sv, target);
         }
 
         // The gear that opens the Cluster Settings window. Big enough to find: the glyph at 20 on a
@@ -3469,7 +3498,7 @@ namespace HolyLogger
                     _clusterDragArmed = true;
                     _clusterDragging = false;
                     _clusterDragFrom = e.GetPosition(dataGrid);
-                    _clusterDragFromOffset = sv.VerticalOffset;
+                    _clusterDragFromOffset = ClusterScaleOffset(sv);
                     _clusterDragLastDy = 0;
                     _clusterDragLastIndex = -1;
                 }
