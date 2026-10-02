@@ -183,10 +183,31 @@ namespace HolyLogger
             return null;
         }
 
+        // WHERE THE LINE STARTS. Normally My Locator. While a QSO from the log is being edited, the grid
+        // saved on THAT QSO - where he was when he logged it, which in Sukkot is often not home - so the
+        // line and the km on the map are the ones the QSO was scored with. A QSO with no grid of its own
+        // falls back to My Locator.
+        private string MapHomeGrid()
+        {
+            if (state == State.Edit && QsoToUpdate != null && MaidenheadLocator.IsValidLocator(QsoToUpdate.MyLocator))
+                return QsoToUpdate.MyLocator.Trim();
+            return TB_MyLocator.Text;
+        }
+
+        // A double-click on a log row loads the QSO for editing: show its line on the map, as typing it
+        // did. Any grid-typing redraw the load itself queued is dropped - this one is the same line.
+        private void ShowEditedQsoOnMap()
+        {
+            if (_gridTypingTimer != null) _gridTypingTimer.Stop();
+            _gridTypingAction = null;
+            SetAzimuth();
+        }
+
         private void SetAzimuth()
         {
             bool hasCall = !string.IsNullOrWhiteSpace(TB_DXCallsign.Text);
-            if (!string.IsNullOrWhiteSpace(TB_MyLocator.Text) && (hasCall || (MapIs4X && HasTypedDxGrid())))
+            string homeGrid = MapHomeGrid();
+            if (!string.IsNullOrWhiteSpace(homeGrid) && (hasCall || (MapIs4X && HasTypedDxGrid())))
             {
                 try
                 {
@@ -218,7 +239,9 @@ namespace HolyLogger
                         locator = contestGrid;
                     }
 
-                    if (string.IsNullOrWhiteSpace(locator) && !string.IsNullOrWhiteSpace(QRZGrid))
+                    // Not while editing: QRZGrid is whatever station was looked up LAST (the edit load
+                    // does no lookup), so it would draw the line to somebody else. The country below.
+                    if (string.IsNullOrWhiteSpace(locator) && !string.IsNullOrWhiteSpace(QRZGrid) && state != State.Edit)
                         locator = QRZGrid;
 
                     if (string.IsNullOrWhiteSpace(locator))
@@ -234,9 +257,9 @@ namespace HolyLogger
                         return;
                     }
 
-                    Azimuth = MaidenheadLocator.Azimuth(TB_MyLocator.Text, locator);
+                    Azimuth = MaidenheadLocator.Azimuth(homeGrid, locator);
                     var ll = MaidenheadLocator.LocatorToLatLng(locator);
-                    var homell = MaidenheadLocator.LocatorToLatLng(TB_MyLocator.Text);
+                    var homell = MaidenheadLocator.LocatorToLatLng(homeGrid);
                     // Auto-fit: compute distance between home and DX, add 10% padding.
                     double distKm = MaidenheadLocator.Distance(homell, ll);
                     int autoFitRadius = Math.Max(500, (int)(distKm * 1.10));

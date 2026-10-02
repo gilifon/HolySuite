@@ -10241,7 +10241,9 @@ namespace HolyLogger
             {
                 _suppressCallsignLookupForEdit = false;
             }
-            
+
+            // The line between the two stations on the map, as it was drawn while the QSO was typed.
+            ShowEditedQsoOnMap();
         }
         
         private void UpdateState(State newState)
