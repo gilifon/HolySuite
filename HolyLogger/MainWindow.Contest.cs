@@ -850,6 +850,18 @@ namespace HolyLogger
             return grid.Length > 0 && !MaidenheadLocator.IsValidLocator(grid);
         }
 
+        // THE DX GRID A CONTEST QSO IS SAVED WITH. In a contest whose received exchange is a grid
+        // (Sukkot), that grid is where the station really is - and the DX Locator box holds QRZ's grid,
+        // its HOME, which for 4X/KC1USQ was Boston and scored 8,804 km. So the received grid replaces
+        // it, and the distance (QSO.FillDistance) is measured to it. Anything else: the box as typed.
+        private string DxLocatorForLog()
+        {
+            string typed = TB_DXLocator.Text;
+            if (_contestRxGridBox == null) return typed;
+            string grid = (_contestRxGridBox.Text ?? string.Empty).Trim().ToUpperInvariant();
+            return MaidenheadLocator.IsValidLocator(grid) ? grid : typed;
+        }
+
         private string ContestRxGridMessage(string grid)
             => "\"" + grid + "\" is not a grid locator.\n\nType " + MaidenheadLocator.ShortFormatHint + ".";
 

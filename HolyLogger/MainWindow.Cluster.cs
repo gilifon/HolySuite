@@ -6439,6 +6439,12 @@ namespace HolyLogger
             if (Properties.Settings.Default.MapAreaDisplayMode == 4)
                 return;
 
+            // IN A CONTEST WHOSE EXCHANGE IS A GRID (Sukkot) the DX station is placed ONLY by the Grid
+            // Locator in the received exchange (his rule) - never by where the cluster server or the
+            // country says it is. SetAzimuth draws it once that grid is typed.
+            if (_contestRxGridBox != null)
+                return;
+
             if (string.IsNullOrWhiteSpace(TB_MyLocator.Text))
                 return;
 

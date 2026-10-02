@@ -2223,7 +2223,7 @@ namespace HolyLogger
                 qso.Operator = TB_Operator.Text;
                 qso.STX = ContestSendExchangeForLog();
                 qso.MyLocator = TB_MyLocator.Text;
-                qso.DXLocator = TB_DXLocator.Text;
+                qso.DXLocator = DxLocatorForLog();   // Sukkot: the received Grid Locator
                 ActivityToQso(qso);                 // IOTA / SOTA / POTA / WWFF and the Other pair
                 qso.RST_RCVD = TB_RSTRcvd.Text;
                 qso.RST_SENT = TB_RSTSent.Text;
@@ -2360,7 +2360,7 @@ namespace HolyLogger
                 // the QSO was logged with (its sent contest exchange, its locator at the time) with
                 // whatever the station happens to be set to today. Both are edited per QSO in the Log
                 // Workshop editor instead.
-                QsoToUpdate.DXLocator = TB_DXLocator.Text;
+                QsoToUpdate.DXLocator = DxLocatorForLog();   // Sukkot: the received Grid Locator
                 ActivityToQso(QsoToUpdate);         // IOTA / SOTA / POTA / WWFF and the Other pair
                 QsoToUpdate.RST_RCVD = TB_RSTRcvd.Text;
                 QsoToUpdate.RST_SENT = TB_RSTSent.Text;
