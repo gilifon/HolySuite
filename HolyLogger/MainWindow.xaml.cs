@@ -10314,6 +10314,9 @@ namespace HolyLogger
             // their yellow like every other field.
             if (_contestRstRcvdBox != null) _contestRstRcvdBox.Background = backgroundColor;
             foreach (var b in _contestRxBoxes) b.Background = backgroundColor;
+            // Sukkot's Holyland Square box sits in the same row but is kept out of _contestRxBoxes (it
+            // is not the exchange), so it was missed here and stayed yellow after the edit ended.
+            foreach (var b in _contestCommentBoxes) b.Background = backgroundColor;
         }
         
         private bool Validate()
