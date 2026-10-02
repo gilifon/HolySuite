@@ -293,8 +293,8 @@ namespace HolyLogger
         readonly int _windowSamples;
         readonly double[] _toneFrequencies;
         readonly double[] _coefficients;
-        readonly double[] _binAverage;      // slow average per frequency: which note is really there
-        readonly double[] _binPower;        // this reading's strength per frequency
+        double[] _binAverage;               // slow average per frequency: which note is really there
+        double[] _binPower;                 // this reading's strength per frequency (a past one while re-reading)
         readonly double[] _binSorted;       // scratch for finding the middle of the band
         readonly double[] _window;          // the last _windowSamples of audio, oldest first
         readonly double[] _taper;           // smooths the ends of the window
@@ -394,6 +394,10 @@ namespace HolyLogger
             _binPower = new double[_toneFrequencies.Length];
             _binSorted = new double[_toneFrequencies.Length];
             _bestBin = _toneFrequencies.Length / 2;
+            _leftBinAt = new long[_toneFrequencies.Length];
+            for (int i = 0; i < _leftBinAt.Length; i++) _leftBinAt[i] = long.MinValue / 2;
+            _pastPower = new double[PastReadings][];
+            for (int i = 0; i < PastReadings; i++) _pastPower[i] = new double[_toneFrequencies.Length];
         }
 
         /// <summary>Forget the speed, the note and the half-finished letter. Used by Clear.</summary>
@@ -402,7 +406,8 @@ namespace HolyLogger
             Array.Clear(_binAverage, 0, _binAverage.Length);
             Array.Clear(_window, 0, _window.Length);
             Array.Clear(_levelHistory, 0, _levelHistory.Length);
-            _windowFill = 0; _levelIndex = 0;
+            _windowFill = 0; _levelIndex = 0; _pastCount = 0;
+            for (int i = 0; i < _leftBinAt.Length; i++) _leftBinAt[i] = long.MinValue / 2;
             _noiseFloor = 0; _peak = 0; _levelsSeeded = false;
             _keyDown = false; _lastMarkWasDah = false; _heldMarkMs = 0; _heldDipMs = 0; _fadedMs = 0; _stateMs = 0;
             _ditMs = 60.0;
@@ -441,6 +446,7 @@ namespace HolyLogger
 
         void AnalyseWindow()
         {
+            _frameCount++;
             // The window may have decided the turn changed while we were between readings. Acting on
             // it here, before anything is started, is what makes it safe - see ForgetTheOperator.
             if (_forgetAsked) { _forgetAsked = false; ForgetNow(); }
@@ -460,16 +466,120 @@ namespace HolyLogger
                 if (_binAverage[b] > best) { best = _binAverage[b]; bestIndex = b; }
             }
 
+            Array.Copy(_binPower, _pastPower[(int)(_frameCount % PastReadings)], _binPower.Length);
+            if (_pastCount < PastReadings) _pastCount++;
+
             // Step 2: change note only when another is clearly stronger. Without the margin the
             // choice would flutter between neighbouring bins on every fade.
+            bool moved = false;
             if (bestIndex != _bestBin && best > _binAverage[_bestBin] * 1.3)
+            {
+                moved = Math.Abs(bestIndex - _bestBin) >= NewStationBins;
+                _leftBinAt[_bestBin] = _frameCount;
                 _bestBin = bestIndex;
+            }
 
             ToneHz = InterpolatedNote(_bestBin);
 
             var reading = Reading;
             if (reading != null) reading(_bestBin, _binPower);
 
+            if (moved && ReReadOnNewNote) ReReadAtNewNote();
+            ReadTheNote();
+        }
+
+        // A NEW NOTE IS READ FROM WHERE IT BEGAN, NOT FROM WHERE WE NOTICED IT (2026-10-02).
+        //
+        // In a QSO or a pile-up each station has its own note, and the note followed is the one
+        // loudest over the last half second - so when one stops and the next begins, the decoder
+        // stays on the old note for about 0.3 s. Found on his recording of UA6HRB working DL2HW
+        // (watch2/diff_20261002_152207): UA6HRB began at 628 Hz while the decoder still sat on
+        // DL2HW's 444 Hz, and moved over just as the U ended - so every over came out A6HRB,
+        // E6HRB or T6HRB, though the waterfall shows the U and the A clean, 25 dB over the noise.
+        //
+        // So the strength at every note is kept for the last second, and on moving to a note far
+        // enough from the old one to be another station, the last second is read again at the new
+        // note before going on. The question "is a station there?" is asked with the averages as
+        // they stand NOW - the averages of a second ago are exactly what had not yet noticed him.
+        internal static bool ReReadOnNewNote = true;
+        internal static Action<string> TraceReading;
+        const int PastReadings = 200;          // 1 s of readings
+        const int NewStationBins = 2;          // 50 Hz: nearer is the same station drifting
+        internal static double ReReadSeconds = 0.8;
+        const int QuietBeforeReadings = 60;   // 0.3 s
+        internal static double ReReadContrast = 1000; // 30 dB in power: 10 and 100 let noise through (generated 112 and 229 of 256)
+        double[][] _pastPower;
+        int _pastCount;
+
+        void ReReadAtNewNote()
+        {
+            int back = Math.Min(_pastCount - 1, (int)(ReReadSeconds * 1000 / FrameMilliseconds));
+            // Never back over what was already read at this note: coming back to a station after a
+            // moment on another (two stations sending at once) re-read his last letters a second time
+            // - "CQ DE JD 4Z5SL" on the generated QRM case.
+            back = (int)Math.Min(back, _frameCount - _leftBinAt[_bestBin]);
+            if (back <= 0) return;
+
+            // Is he really there, and where did he begin? Judged on his own note alone: a keyed note
+            // switches between its own quiet and many times that, which neither noise nor a station
+            // beside it does. (Measured against the notes beside it instead, as the live test does, a
+            // crowded pile-up let nobody stand out - the neighbours were stations too.) The stretch
+            // read again starts a little before his first loud reading.
+            var column = new double[back];
+            for (int k = 0; k < back; k++) column[k] = _pastPower[(int)((_frameCount - back + k) % PastReadings)][_bestBin];
+            var sorted = (double[])column.Clone();
+            Array.Sort(sorted);
+            double quiet = Math.Max(sorted[(int)(back * 0.2)], 1e-12), loud = sorted[(int)(back * 0.95)];
+            if (TraceReading != null) TraceReading(string.Format("{0:F3}s REREAD bin {1} back {2} loud/quiet {3:F1}", (_frameCount * FrameMilliseconds) / 1000.0, _bestBin, back, loud / quiet));
+            if (loud < quiet * ReReadContrast) return;
+            int first = 0;
+            while (first < back && column[first] < quiet * ReReadContrast) first++;
+            // ONLY A STATION THAT HAS JUST BEGUN. He must have been silent for a while before his first
+            // loud reading - the start of his over. Two stations sending at once are both loud all
+            // along; hopping between them and reading back turned the 4 of 4Z5SL into a J on the
+            // generated QRM case (the letter was half read before the hop).
+            if (first < QuietBeforeReadings) return;
+            back -= Math.Max(0, first - 10);          // 50 ms before his first loud reading
+
+            // The old station's key state is his; the new one starts with the key up.
+            _keyDown = false;
+            _lastMarkWasDah = false;
+            _heldMarkMs = 0;
+            _heldDipMs = 0;
+            _stateMs = 0;
+
+            double[] now = _binPower;
+            long frameNow = _frameCount;
+            double fadedMs = _fadedMs;
+            _rereading = true;
+            try
+            {
+                for (long f = frameNow - back; f < frameNow; f++)
+                {
+                    _binPower = _pastPower[(int)(f % PastReadings)];
+                    _frameCount = f;
+                    ReadTheNote();
+                }
+            }
+            finally
+            {
+                _binPower = now;
+                _frameCount = frameNow;
+                _fadedMs = fadedMs;
+                _rereading = false;
+            }
+            // ...and he goes on being heard while the slow averages catch up with him, up to a second.
+            _trustNewStationUntil = frameNow + PastReadings;
+        }
+
+        long _trustNewStationUntil;
+        long[] _leftBinAt;                     // the reading at which each note was last left
+
+        bool _rereading;                       // the stretch being read again is known to hold a station
+
+        // Steps 3 and 4: the followed note's loudness this reading, and what the key is doing.
+        void ReadTheNote()
+        {
             // Step 3: that note's LOUDNESS is the key, up or down.
             //
             // Loudness, not energy. Energy is loudness squared, and squaring stretches the random
@@ -563,7 +673,7 @@ namespace HolyLogger
             // and over, and every time it went absent the letter being spelled out was thrown away -
             // so a station next to another one lost letters it had actually decoded correctly.
             double standsOutBy = _binAverage[_bestBin] / NoiseBesideTheNote();
-            bool standsOut = (SignalPresent
+            bool standsOut = _rereading || _frameCount < _trustNewStationUntil || (SignalPresent
                                 ? standsOutBy > SignalOverNoise * 0.5
                                 : standsOutBy > SignalOverNoise)
                             && span > 1e-5;
@@ -579,6 +689,7 @@ namespace HolyLogger
             }
 
             SignalPresent = standsOut;
+            if (TraceReading != null) TraceReading(string.Format("{0:F3}s bin {1} standsOutBy {2:F2} present {3} fading {4}", (_frameCount * FrameMilliseconds) / 1000.0, _bestBin, standsOutBy, SignalPresent, fading));
 
             // WHILE IT IS FADED, NOTHING IS READ - the decoder only waits. Reading on through the fade
             // was tried first: it did recover words, and it printed more wrong ones than it recovered,
@@ -677,6 +788,7 @@ namespace HolyLogger
                 startLine = _noiseFloor + span * DahShadowOnFraction;
 
             bool nowDown = _keyDown ? smoothed > offThreshold : smoothed > startLine;
+            if (TraceReading != null) TraceReading(string.Format("{0:F3}s bin {1} lvl {2:F4} on {3:F4} off {4:F4} floor {5:F4} peak {6:F4} down {7}", (_frameCount * FrameMilliseconds) / 1000.0, _bestBin, smoothed, startLine, offThreshold, _noiseFloor, _peak, nowDown));
 
             // HOW DEEPLY THE NOTE ACTUALLY SWITCHES OFF. Kept only to judge what we are hearing -
             // never to set the threshold above, which was tried and made fast sending far worse.
@@ -850,6 +962,7 @@ namespace HolyLogger
 
         void EndOfMark(double lengthMs)
         {
+            if (TraceReading != null) TraceReading(string.Format("{0:F3}s mark {1:F0} ms (dit {2:F0})", (_frameCount * FrameMilliseconds) / 1000.0, lengthMs, _ditMs));
             // Too short to be anything a person sent - a click, a crash of static, or the edge of
             // somebody else's signal. Thrown away WITHOUT being remembered: letting it into the
             // speed estimate is what ruined the first version on the air.
@@ -889,6 +1002,8 @@ namespace HolyLogger
             // first letter off a station whose speed is not known yet gets read with a dividing line
             // that has already learned something - which is the difference between C and F when
             // somebody starts sending at 40 WPM.
+            if (_letterMarks.Count == 0) _letterStartFrame = _frameCount - (long)(lengthMs / FrameMilliseconds) - TimingLagFrames;
+            _letterEndFrame = _frameCount - TimingLagFrames;
             _letterMarks.Add(lengthMs);
 
             // The speed comes from the short cluster - the dits - averaged. Until both kinds have
@@ -1036,6 +1151,7 @@ namespace HolyLogger
         // follows an operator who leaves wider gaps than the book says, which many good ones do.
         void RememberGap(double lengthMs)
         {
+            if (TraceReading != null) TraceReading(string.Format("{0:F3}s gap {1:F0} ms", (_frameCount * FrameMilliseconds) / 1000.0, lengthMs));
             if (lengthMs < 5 || lengthMs > 3000) return;
 
             _gaps[_gapNext] = lengthMs;
@@ -1194,6 +1310,7 @@ namespace HolyLogger
             _letterMarks.Clear();
 
             string pattern = _symbols.ToString();
+            if (TraceReading != null) TraceReading(string.Format("{0:F3}s emit {1}", (_frameCount * FrameMilliseconds) / 1000.0, pattern));
 
             // A run of dits and dahs that spells nothing is DROPPED, not shown. It was printed as
             // <..-.> at first, on the reasoning that an operator could often read it himself. On the
@@ -1220,8 +1337,22 @@ namespace HolyLogger
             // letter recovered is usually still wrong somewhere else, and a pattern with no clear
             // pause in it was never two letters that could be told apart.
             string letter;
-            if (FromMorseTable.TryGetValue(pattern, out letter)) Output(letter);
+            if (FromMorseTable.TryGetValue(pattern, out letter))
+            {
+                var timed = LetterTimed;
+                if (timed != null) timed(letter, _letterStartFrame * _hopSamples, _letterEndFrame * _hopSamples);
+                Output(letter);
+            }
         }
+
+        // EVERY LETTER WITH WHERE ITS MARKS WERE, for the waterfall in the decode window - so this
+        // decoder's letters sit under their own dits and dahs, straight above the new decoder's (his
+        // request: the two readings one over the other). Raised the moment the letter is spelled out,
+        // before any holding back - a held letter is still this decoder's reading of those marks. In
+        // samples from the first one given; TimingLagFrames takes off the smoothing's delay.
+        public event Action<string, long, long> LetterTimed;
+        const int TimingLagFrames = 4;
+        long _frameCount, _letterStartFrame, _letterEndFrame;
 
         // EVERY LETTER GOES THROUGH HERE, and until the sending has been recognised as Morse it is
         // held back rather than shown - or thrown away.
