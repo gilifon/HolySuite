@@ -496,6 +496,8 @@ namespace HolyLogger
 
                 if (existingWindow != null)
                 {
+                    // Minimized: Activate alone leaves it on the taskbar, so bring it back first.
+                    if (existingWindow.WindowState == WindowState.Minimized) existingWindow.WindowState = WindowState.Normal;
                     existingWindow.Activate();
                     return;
                 }
@@ -503,6 +505,8 @@ namespace HolyLogger
 
             // Update the Visible setting when user opens cluster from View menu
             Properties.Settings.Default.ShowClusterWindowOption = true;
+            // Asking for the cluster from the menu means wanting to see it, not a minimized one.
+            Properties.Settings.Default.ClusterWindowMinimized = false;
             try { Properties.Settings.Default.Save(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
 
             // Refresh the settings dialog if it's open
@@ -695,6 +699,17 @@ namespace HolyLogger
             clusterWindow.Show();
             ApplyAlwaysOnTop();   // Options > User Interface > Always on top
 
+            // Minimized when he last left it so. Done after the window has laid out (and Live Scale
+            // re-engaged, queued below at Loaded), so its measurements are real when he brings it back.
+            if (Properties.Settings.Default.ClusterWindowMinimized)
+            {
+                var minimizeWin = clusterWindow;
+                _ = Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    if (clusterWindow == minimizeWin) minimizeWin.WindowState = WindowState.Minimized;
+                }), System.Windows.Threading.DispatcherPriority.Background);
+            }
+
             // The cluster is up, so the CW keyer may open now if the radio is in CW. It is held back
             // until this point so that a radio already in CW at startup does not put the keyer on the
             // desktop ahead of the log and the cluster. Does nothing after the first call, so opening
@@ -827,6 +842,15 @@ namespace HolyLogger
         // Keeps the Cluster window's maximize/restore glyph in sync, same reasoning as MainWindow_StateChanged.
         private void ClusterWindow_StateChanged(object sender, EventArgs e)
         {
+            // REMEMBERS BEING MINIMIZED, so a cluster he put on the taskbar starts there next time
+            // (GenerateNewClusterWindow). Maximized and Normal both count as "not minimized".
+            bool minimizedNow = clusterWindow.WindowState == WindowState.Minimized;
+            if (Properties.Settings.Default.ClusterWindowMinimized != minimizedNow)
+            {
+                Properties.Settings.Default.ClusterWindowMinimized = minimizedNow;
+                SettingsFlush.RequestSave();
+            }
+
             if (clusterMaxRestoreBtn == null) return;
             bool maximized = clusterWindow.WindowState == WindowState.Maximized;
             clusterMaxRestoreBtn.Content = maximized ? "\uE923" : "\uE922";

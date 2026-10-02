@@ -929,6 +929,12 @@
     <Setting Name="RadioPanelWindowTop" Type="System.Double" Scope="User">
       <Value Profile="(Default)">-1</Value>
     </Setting>
+    <Setting Name="RadioPanelMinimized" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">False</Value>
+    </Setting>
+    <Setting Name="ClusterWindowMinimized" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">False</Value>
+    </Setting>
     <Setting Name="SwapCwSideband" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">False</Value>
     </Setting>
