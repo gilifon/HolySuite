@@ -3,6 +3,7 @@ using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
 using System.Windows.Threading;
 
@@ -127,7 +128,7 @@ namespace HolyLogger
         {
             Title = "CW Decoder";
             Width = 660;
-            Height = 300;
+            Height = 300 + WaterfallRowHeight;
 
             // WIDE ENOUGH FOR THE BAR, SHORT ENOUGH FOR ONE LINE. The floor on the height is the bar
             // plus a single row of text: an operator who wants a one-line ticker along the bottom of
@@ -139,7 +140,9 @@ namespace HolyLogger
 
             // The bar, plus the framed paper with one row of text in it. Anything taller than this
             // would refuse an operator who wants a one-line ticker along the edge of his screen.
-            MinHeight = 88;
+            // The waterfall strip (see BuildWaterfall) is added on top of that floor, so the text row is
+            // never squeezed out by it.
+            MinHeight = 88 + WaterfallRowHeight;
 
             ResizeMode = ResizeMode.CanResize;
             ShowInTaskbar = false;
@@ -174,9 +177,28 @@ namespace HolyLogger
             };
             _screenTimer.Tick += ScreenTimer_Tick;
 
-            RestoreWindowBounds();
+            // PUT BACK WHERE HE LEFT IT - by the same helper as every other HolyLogger window
+            // (2026-10-03). Its own restore set the corner at SourceInitialized and a top on his second
+            // monitor (-217) did not hold: the window came up at top 26 and then saved that, so it never
+            // found its way back; and a window left open when HolyLogger closed was never saved at all.
+            // WindowBounds sets the corner before the window is shown, saves at closing AND at program
+            // exit (SaveAllOpen), and keeps a restored window reachable. The place this window kept in
+            // its own four settings is taken over once, the first time.
+            try
+            {
+                var old = Properties.Settings.Default;
+                if (!WindowBounds.HasSaved("CwDecode") && old.CwDecodeWindowWidth >= MinWidth && old.CwDecodeWindowHeight >= MinHeight
+                    && !double.IsNaN(old.CwDecodeWindowLeft) && !double.IsNaN(old.CwDecodeWindowTop))
+                    WindowBounds.SaveRect("CwDecode", new Rect(old.CwDecodeWindowLeft, old.CwDecodeWindowTop, old.CwDecodeWindowWidth, old.CwDecodeWindowHeight));
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+            WindowBounds.Attach(this, "CwDecode");
 
             Loaded += (s, e) => StartListening();
+
+            // The waterfall moves with every screen refresh - see WaterfallFrame.
+            Loaded += (s, e) => CompositionTarget.Rendering += WaterfallFrame;
+            Closed += (s, e) => CompositionTarget.Rendering -= WaterfallFrame;
             Closing += OnClosing;
         }
 
@@ -215,17 +237,24 @@ namespace HolyLogger
             var boxes = new Grid();
             boxes.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             boxes.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+            boxes.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });   // the waterfall
             boxes.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             _networkRow = new RowDefinition { Height = new GridLength(1, GridUnitType.Star) };
             boxes.RowDefinitions.Add(_networkRow);
 
+            // THE WATERFALL BETWEEN THE TWO BOXES (his placing): under the top box always, so with one
+            // reader it sits under its text, and in Both it divides Plain from New.
+            var waterfall = BuildWaterfall();
+
             Grid.SetRow(_plainLabel, 0);
             Grid.SetRow(frame, 1);
-            Grid.SetRow(_networkLabel, 2);
-            Grid.SetRow(_networkFrame, 3);
+            Grid.SetRow(waterfall, 2);
+            Grid.SetRow(_networkLabel, 3);
+            Grid.SetRow(_networkFrame, 4);
 
             boxes.Children.Add(_plainLabel);
             boxes.Children.Add(frame);
+            boxes.Children.Add(waterfall);
             boxes.Children.Add(_networkLabel);
             boxes.Children.Add(_networkFrame);
 
@@ -588,91 +617,6 @@ namespace HolyLogger
             canvas.Children.Add(dit);
         }
 
-        // ---- where the window was left last time ----
-        //
-        // Same rule as the Cluster Alerts window: the saved spot is checked against the WHOLE desktop
-        // - every monitor - before it is used. Checking only the main screen is how a window on the
-        // second monitor gets restored somewhere the operator cannot reach it, and if the saved spot
-        // is not on any screen any more the window simply opens centred instead.
-
-        // PUT BACK WHERE HE LEFT IT - AND THE MOMENT MATTERS.
-        //
-        // The size and the choice of Manual are settled in the constructor, because WPF reads
-        // WindowStartupLocation when the window is shown and it must already say Manual by then.
-        //
-        // THE POSITION IS SET LATER, when the window's handle exists. Setting Left and Top in the
-        // constructor looked right and did not hold: at that point there is no window yet, the owner
-        // has not even been attached, and what WPF does with those numbers on the way to the screen
-        // is its own business. SourceInitialized is the first moment there is a real window to move,
-        // and early enough that nothing is ever seen in the wrong place.
-        void RestoreWindowBounds()
-        {
-            try
-            {
-                var s = Properties.Settings.Default;
-                if (s.CwDecodeWindowWidth >= MinWidth) Width = s.CwDecodeWindowWidth;
-                if (s.CwDecodeWindowHeight >= MinHeight) Height = s.CwDecodeWindowHeight;
-
-                if (!IsPositionOnScreen(s.CwDecodeWindowLeft, s.CwDecodeWindowTop))
-                {
-                    WindowStartupLocation = WindowStartupLocation.CenterOwner;
-                    return;
-                }
-
-                WindowStartupLocation = WindowStartupLocation.Manual;
-
-                SourceInitialized += (sender, e) =>
-                {
-                    try
-                    {
-                        Left = s.CwDecodeWindowLeft;
-                        Top = s.CwDecodeWindowTop;
-                        if (s.CwDecodeWindowWidth >= MinWidth) Width = s.CwDecodeWindowWidth;
-                        if (s.CwDecodeWindowHeight >= MinHeight) Height = s.CwDecodeWindowHeight;
-                    }
-                    catch (Exception swallowed) { Log.Swallow(swallowed); }
-                };
-            }
-            catch (Exception swallowed) { Log.Swallow(swallowed); }
-        }
-
-        void SaveWindowBounds()
-        {
-            try
-            {
-                var b = WindowState == WindowState.Normal
-                    ? new Rect(Left, Top, Width, Height)
-                    : RestoreBounds;
-
-                var s = Properties.Settings.Default;
-                if (!double.IsNaN(b.Left) && !double.IsInfinity(b.Left) &&
-                    !double.IsNaN(b.Top) && !double.IsInfinity(b.Top))
-                {
-                    s.CwDecodeWindowLeft = b.Left;
-                    s.CwDecodeWindowTop = b.Top;
-                }
-                if (b.Width > 0) s.CwDecodeWindowWidth = b.Width;
-                if (b.Height > 0) s.CwDecodeWindowHeight = b.Height;
-                s.Save();
-            }
-            catch (Exception swallowed) { Log.Swallow(swallowed); }
-        }
-
-        static bool IsPositionOnScreen(double left, double top)
-        {
-            if (double.IsNaN(left) || double.IsNaN(top) ||
-                double.IsInfinity(left) || double.IsInfinity(top))
-                return false;
-
-            double vsLeft = SystemParameters.VirtualScreenLeft;
-            double vsTop = SystemParameters.VirtualScreenTop;
-            double vsRight = vsLeft + SystemParameters.VirtualScreenWidth;
-            double vsBottom = vsTop + SystemParameters.VirtualScreenHeight;
-
-            return left >= vsLeft - 10 && top >= vsTop - 10 &&
-                   left <= vsRight - 100 && top <= vsBottom - 60;
-        }
-
         // ---- listening ----
 
         // Which device to listen to is set in Options (General > CW Decode) and simply read here.
@@ -713,6 +657,7 @@ namespace HolyLogger
 
             var decoder = new CwDecoder(_recorder.ActualSampleRate);
             decoder.Text += OnPlainText;
+            decoder.LetterTimed += OnPlainLetterTimed;
             _decoder = decoder;
 
             if (SharedNet.Loaded)
@@ -725,6 +670,8 @@ namespace HolyLogger
 
             var element = new CwElementDecoder(_recorder.ActualSampleRate);
             element.Text += OnElementText;
+            lock (_wfGate) _wfBase = _wfWritten;       // its sample count starts here
+            element.LetterTimed += OnElementLetterTimed;
             _element = element;
 
             _shownLevel = 0;
@@ -739,7 +686,7 @@ namespace HolyLogger
 
             var decoder = _decoder;
             _decoder = null;
-            if (decoder != null) decoder.Text -= OnPlainText;
+            if (decoder != null) { decoder.Text -= OnPlainText; decoder.LetterTimed -= OnPlainLetterTimed; }
 
             var neural = _neural;
             _neural = null;
@@ -747,7 +694,7 @@ namespace HolyLogger
 
             var element = _element;
             _element = null;
-            if (element != null) { element.Text -= OnElementText; element.Dispose(); }
+            if (element != null) { element.Text -= OnElementText; element.LetterTimed -= OnElementLetterTimed; element.Dispose(); }
 
             FlushPendingText();
 
@@ -778,6 +725,424 @@ namespace HolyLogger
             _text.Append("\r\n" + message + "\r\n");
         }
 
+        // ---- the waterfall ----
+        //
+        // WHAT THE DECODERS HEAR, FOR THE EYE (his request). A strip across the window: time runs from
+        // right to left - the newest sound at the right edge, the last six seconds across - and the
+        // note up the strip, 300 Hz at the bottom to 1000 Hz at the top, so every dit and dah is a
+        // short bright dash at its note and the station's letters can be read off it by eye. A dotted
+        // green line marks the note the plain decoder is listening to.
+        //
+        // IT CANNOT SLOW THE DECODERS: the capture thread only copies the samples into a ring, and
+        // the drawing - one small FFT per 10 ms of sound - runs on the screen timer.
+        const int LetterRowHeight = 22;                // one line of letters under the strip
+        const int WaterfallRowHeight = 64 + 2 * LetterRowHeight;   // the strip, its two letter lines, margins
+        const int WfColumns = 600, WfRows = 56;        // six seconds at one column per 10 ms
+        const double WfLowHz = 300, WfHighHz = 1000;
+        readonly short[] _wfRing = new short[1 << 15];
+        long _wfWritten, _wfRead;
+        readonly object _wfGate = new object();
+        WriteableBitmap _wfBitmap;
+        int[] _wfPixels;
+        double[] _wfRowFloor;
+        static readonly int[] WfPalette = MakeWaterfallPalette();
+
+        UIElement BuildWaterfall()
+        {
+            _wfBitmap = new WriteableBitmap(WfColumns, WfRows, 96, 96, PixelFormats.Bgr32, null);
+            _wfPixels = new int[WfColumns * WfRows];
+            for (int i = 0; i < _wfPixels.Length; i++) _wfPixels[i] = WfPalette[0];
+            _wfBitmap.WritePixels(new Int32Rect(0, 0, WfColumns, WfRows), _wfPixels, WfColumns * 4, 0);
+
+            var image = new Image { Source = _wfBitmap, Stretch = Stretch.Fill, Height = WfRows };
+            RenderOptions.SetBitmapScalingMode(image, BitmapScalingMode.LowQuality);
+            _wfImage = image;
+
+            // THE LETTERS UNDER THEIR OWN DITS AND DAHS (his idea): Plain's line, then New's, moving left
+            // with the strip, so a missed or wrong letter can be seen against the marks it came from.
+            _wfLetterCanvas = new Canvas
+            {
+                Height = 2 * LetterRowHeight,
+                Background = new SolidColorBrush(Color.FromRgb(0, 0, 0)),
+                ClipToBounds = true
+            };
+            var stack = new StackPanel();
+            stack.Children.Add(image);
+            stack.Children.Add(_wfLetterCanvas);
+
+            int inner = WfRows + 2 * LetterRowHeight + 2;
+            return new Border
+            {
+                Child = stack,
+                Height = inner,
+                Margin = new Thickness(0, (WaterfallRowHeight - inner) / 2, 0, (WaterfallRowHeight - inner) / 2),
+                BorderThickness = new Thickness(1),
+                BorderBrush = GroupEdgeBrush,
+                ClipToBounds = true,          // the picture slides left between columns - see WaterfallFrame
+                ToolTip = "What the decoders hear: time runs right to left, the note up (300 to 1000 Hz). The dotted green line is the note being read.\nUnder it, the letters each reader made of it: Plain in white, New in yellow."
+            };
+        }
+
+        Image _wfImage;
+        double _wfShift;                                // how far the picture has slid past the last column, in pixels
+        Canvas _wfLetterCanvas;
+        long _wfBase;                                   // waterfall sample count when the readers were made
+
+        sealed class WfLetter { public string Text; public long Sample; public int Row; public TextBlock Block; }
+        readonly System.Collections.Generic.List<WfLetter> _wfLetters = new System.Collections.Generic.List<WfLetter>();
+        readonly System.Collections.Generic.List<WfLetter> _wfLetterQueue = new System.Collections.Generic.List<WfLetter>();
+
+        // Each reader says where each letter began and ended: it is written under the middle of its marks,
+        // so the two lines sit one over the other and a difference is seen at once.
+        void OnPlainLetterTimed(string letter, long start, long end)
+        {
+            lock (_wfLetterQueue) _wfLetterQueue.Add(new WfLetter { Text = letter, Sample = _wfBase + (start + end) / 2, Row = 0 });
+        }
+
+        void OnElementLetterTimed(string letter, long start, long end)
+        {
+            lock (_wfLetterQueue) _wfLetterQueue.Add(new WfLetter { Text = letter, Sample = _wfBase + (start + end) / 2, Row = 1 });
+        }
+
+        void MoveWaterfallLetters(int rate)
+        {
+            if (_wfLetterCanvas == null || _wfImage == null) return;
+            lock (_wfLetterQueue)
+            {
+                foreach (WfLetter l in _wfLetterQueue)
+                {
+                    l.Block = new TextBlock
+                    {
+                        Text = l.Text,
+                        FontSize = 16,
+                        FontWeight = FontWeights.Bold,
+                        FontFamily = new FontFamily("Consolas"),
+                        Foreground = l.Row == 0 ? Brushes.White : new SolidColorBrush(Color.FromRgb(255, 210, 0))
+                    };
+                    Canvas.SetTop(l.Block, l.Row * LetterRowHeight + 1);
+                    _wfLetterCanvas.Children.Add(l.Block);
+                    _wfLetters.Add(l);
+                }
+                _wfLetterQueue.Clear();
+            }
+
+            int hop = rate / 100, window = rate * 40 / 1000;
+            double width = _wfImage.ActualWidth;
+            long rightCentre = _wfRead - hop + window / 2;     // the sound under the newest column
+            for (int i = _wfLetters.Count - 1; i >= 0; i--)
+            {
+                WfLetter l = _wfLetters[i];
+                double column = WfColumns - 1 - (rightCentre - l.Sample) / (double)hop;
+                double x = column * width / WfColumns - 5 - _wfShift;
+                if (x < -20)
+                {
+                    _wfLetterCanvas.Children.Remove(l.Block);
+                    _wfLetters.RemoveAt(i);
+                    continue;
+                }
+                l.Block.Visibility = x > width ? Visibility.Hidden : Visibility.Visible;   // not drawn yet
+                Canvas.SetLeft(l.Block, x);
+            }
+        }
+
+        void FeedWaterfall(short[] samples, int count)
+        {
+            lock (_wfGate)
+                for (int i = 0; i < count; i++) _wfRing[(int)(_wfWritten++ & (_wfRing.Length - 1))] = samples[i];
+        }
+
+        // SMOOTH, NOT IN JUMPS. The sound arrives in blocks of a tenth of a second, and drawn as it came
+        // the strip jumped ten columns at a time - "aggressive steps", he said. So the strip is moved
+        // at the pace of the clock, one column per 10 ms, on every screen refresh, running WfBehindMs
+        // behind the sound so the next column is always there. If the sound card's clock and this one
+        // drift apart, the strip catches up (or waits) a little at a time rather than jumping.
+        const double WfBehindMs = 200;
+        readonly System.Diagnostics.Stopwatch _wfClock = new System.Diagnostics.Stopwatch();
+        long _wfShown;                                  // columns drawn
+        long _wfOffset;                                 // columns the clock is moved by, to follow the sound card
+
+        // TEMPORARY - TO FIND THE JUMPS HE SEES. Outside HolyLogger the strip moved within a pixel of
+        // where it should on 1,168 frames of 1,169, so what jumps in HolyLogger must be its frames: this
+        // writes every frame that came late, or took long, to %TEMP%\HolyLogger_cw_flow.tsv. Remove
+        // once the cause is found.
+        readonly System.Diagnostics.Stopwatch _flowClock = System.Diagnostics.Stopwatch.StartNew();
+        readonly StringBuilder _flowLog = new StringBuilder();
+        double _flowLast, _flowSaved;
+        int _flowFrames, _flowLate;
+
+        // TEMPORARY, WITH THE FLOW LOG: every piece of work on the window's thread that takes over 40 ms
+        // is written to the same file ("slow" lines), named by the method that ran - for a timer, the
+        // Tick handlers - so the jumps that remain with Live Scale off can be put to their cause.
+        bool _probeOn;
+        readonly System.Collections.Generic.Dictionary<DispatcherOperation, long> _probeStart = new System.Collections.Generic.Dictionary<DispatcherOperation, long>();
+
+        void StartProbe()
+        {
+            _probeOn = true;
+            var hooks = Dispatcher.Hooks;
+            hooks.OperationStarted += (s, e) => _probeStart[e.Operation] = System.Diagnostics.Stopwatch.GetTimestamp();
+            hooks.OperationAborted += (s, e) => _probeStart.Remove(e.Operation);
+            hooks.OperationCompleted += (s, e) =>
+            {
+                long t0;
+                if (!_probeStart.TryGetValue(e.Operation, out t0)) return;
+                _probeStart.Remove(e.Operation);
+                double ms = (System.Diagnostics.Stopwatch.GetTimestamp() - t0) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+                if (ms > 40)
+                    _flowLog.AppendFormat(System.Globalization.CultureInfo.InvariantCulture, "slow\t{0:F0}\t{1:F1}\t{2}\n",
+                        _flowClock.Elapsed.TotalMilliseconds, ms, DescribeOperation(e.Operation));
+            };
+        }
+
+        // Everything in every open window that has an animation running on it right now, by window,
+        // type and name - an animation that never stops makes the one drawing engine all HolyLogger's
+        // windows share redraw on every frame.
+        static string AnimatingNow()
+        {
+            var found = new System.Collections.Generic.List<string>();
+            try
+            {
+                foreach (Window w in Application.Current.Windows)
+                {
+                    if (!w.IsVisible) continue;
+                    var stack = new System.Collections.Generic.Stack<DependencyObject>();
+                    stack.Push(w);
+                    while (stack.Count > 0 && found.Count < 12)
+                    {
+                        DependencyObject d = stack.Pop();
+                        var ui = d as UIElement;
+                        if (ui != null)
+                        {
+                            var rt = ui.RenderTransform as System.Windows.Media.Animation.Animatable;
+                            bool animated = ui.HasAnimatedProperties || (rt != null && rt.HasAnimatedProperties)
+                                || (ui.Effect != null && ui.Effect.HasAnimatedProperties);
+                            if (animated)
+                            {
+                                var fe = ui as FrameworkElement;
+                                found.Add(w.GetType().Name + "/" + ui.GetType().Name + (fe != null && !string.IsNullOrEmpty(fe.Name) ? ":" + fe.Name : "")
+                                          + (ui.IsVisible ? "" : "(hidden)"));
+                            }
+                        }
+                        if (d is Visual || d is System.Windows.Media.Media3D.Visual3D)
+                            for (int i = VisualTreeHelper.GetChildrenCount(d) - 1; i >= 0; i--) stack.Push(VisualTreeHelper.GetChild(d, i));
+                    }
+                }
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+            return found.Count == 0 ? "nothing" : string.Join(", ", found);
+        }
+
+        static string DescribeOperation(DispatcherOperation op)
+        {
+            try
+            {
+                var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+                var d = typeof(DispatcherOperation).GetField("_method", flags)?.GetValue(op) as Delegate;
+                if (d == null) return op.Priority.ToString();
+                string s = (d.Method.DeclaringType != null ? d.Method.DeclaringType.Name : "?") + "." + d.Method.Name;
+                if (d.Target is DispatcherTimer timer)
+                {
+                    var tick = typeof(DispatcherTimer).GetField("Tick", flags)?.GetValue(timer) as Delegate;
+                    if (tick != null)
+                        foreach (Delegate h in tick.GetInvocationList())
+                            s += " tick:" + (h.Method.DeclaringType != null ? h.Method.DeclaringType.Name : "?") + "." + h.Method.Name;
+                }
+                return s + " (" + op.Priority + ")";
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); return op.Priority.ToString(); }
+        }
+
+        void WaterfallFrame(object sender, EventArgs e)
+        {
+            if (!_probeOn) StartProbe();
+            double flowStart = _flowClock.Elapsed.TotalMilliseconds;
+            long flowShown = _wfShown, flowOffset = _wfOffset;
+            WaterfallFrameInner();
+            double flowEnd = _flowClock.Elapsed.TotalMilliseconds;
+            try
+            {
+                var re = e as RenderingEventArgs;
+                double gap = _flowLast > 0 ? flowStart - _flowLast : 0;
+                _flowLast = flowStart;
+                _flowFrames++;
+                if (gap > 25 || flowEnd - flowStart > 8 || _wfOffset != flowOffset)
+                {
+                    _flowLate++;
+                    _flowLog.AppendFormat(System.Globalization.CultureInfo.InvariantCulture,
+                        "{0:F0}\t{1:F1}\t{2:F1}\t{3}\t{4}\t{5:F0}\n", flowStart, gap, flowEnd - flowStart,
+                        _wfShown - flowShown, _wfOffset, re != null ? re.RenderingTime.TotalMilliseconds : 0);
+                }
+                if (flowStart - _flowSaved > 10000)
+                {
+                    _flowSaved = flowStart;
+                    _flowLog.AppendFormat("# {0:F0} ms: {1} frames, {2} late or long\n", flowStart, _flowFrames, _flowLate);
+                    _flowLog.AppendFormat("# tier {0}, windows {1}, animating: {2}\n", RenderCapability.Tier >> 16,
+                        Application.Current.Windows.Count, AnimatingNow());
+                    System.IO.File.AppendAllText(System.IO.Path.Combine(System.IO.Path.GetTempPath(), "HolyLogger_cw_flow.tsv"), _flowLog.ToString());
+                    _flowLog.Clear();
+                    _flowFrames = 0; _flowLate = 0;
+                }
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        void WaterfallFrameInner()
+        {
+            try
+            {
+                int rate = _recorder.ActualSampleRate;
+                if (rate <= 0) return;
+                long written; lock (_wfGate) written = _wfWritten;
+                if (written == 0) return;
+                if (!_wfClock.IsRunning) { _wfClock.Start(); _wfShown = 0; _wfOffset = 0; }
+
+                int hop = rate / 100, window = rate * 40 / 1000;
+                long ready = _wfShown + Math.Max(0, (written - _wfRead - window) / hop);
+                long due = (long)((_wfClock.Elapsed.TotalMilliseconds - WfBehindMs) / 10) + _wfOffset;
+                if (ready - due > 30) _wfOffset++;                        // sound ahead: one column extra now and then
+                else if (due - ready > 30) _wfOffset -= due - ready - 10;  // sound late: wait for it without a jump later
+                due = (long)((_wfClock.Elapsed.TotalMilliseconds - WfBehindMs) / 10) + _wfOffset;
+
+                long take = Math.Min(due, ready) - _wfShown;
+                if (take > 0) _wfShown += DrawWaterfall((int)Math.Min(take, 6));
+
+                // BETWEEN COLUMNS, A SLIDE. Whole columns at the screen's 60 a second came one, two, one,
+                // two - small jumps he could see ("not smooth enough"). The picture is also moved left
+                // by the part of a column that is due by now, so it glides; the next column then lands
+                // exactly where the slide has got to.
+                double exact = (_wfClock.Elapsed.TotalMilliseconds - WfBehindMs) / 10 + _wfOffset;
+                double part = Math.Max(0, Math.Min(1, exact - _wfShown));
+                _wfShift = _wfImage != null ? part * _wfImage.ActualWidth / WfColumns : 0;
+                if (_wfImage != null)
+                {
+                    if (!(_wfImage.RenderTransform is TranslateTransform)) _wfImage.RenderTransform = new TranslateTransform();
+                    ((TranslateTransform)_wfImage.RenderTransform).X = -_wfShift;
+                }
+                MoveWaterfallLetters(rate);
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        int DrawWaterfall(int columns)
+        {
+            int rate = _recorder.ActualSampleRate;
+            if (_wfBitmap == null || rate <= 0) return 0;
+            int window = rate * 40 / 1000, hop = rate / 100;
+            int nfft = 1; while (nfft < window * 3 / 2) nfft <<= 1;
+
+            double note = 0;
+            var heard = _decoder;
+            if (heard != null && heard.SignalPresent) note = heard.ToneHz;
+
+            var re = new double[nfft]; var im = new double[nfft];
+            var column = new int[WfRows];
+            int drawn = 0;
+            while (true)
+            {
+                lock (_wfGate)
+                {
+                    // Fallen far behind (the window was hidden, the machine busy): skip to the present.
+                    if (_wfWritten - _wfRead > _wfRing.Length / 2) _wfRead = _wfWritten - window - hop * 20;
+                    if (_wfWritten - _wfRead < window) break;
+                    for (int i = 0; i < nfft; i++)
+                    {
+                        // Blackman-Harris, not Hann: a strong station leaked into every row of the strip
+                        // through a Hann window's sidelobes, 31 dB down; these are 92 dB down.
+                        double a = 2 * Math.PI * i / (window - 1);
+                        double shape = 0.35875 - 0.48829 * Math.Cos(a) + 0.14128 * Math.Cos(2 * a) - 0.01168 * Math.Cos(3 * a);
+                        re[i] = i < window ? _wfRing[(int)((_wfRead + i) & (_wfRing.Length - 1))] * shape : 0;
+                        im[i] = 0;
+                    }
+                    _wfRead += hop;
+                }
+
+                WaterfallFft(re, im);
+                double binHz = (double)rate / nfft;
+                var db = new double[WfRows];
+                for (int y = 0; y < WfRows; y++)
+                {
+                    double f = WfHighHz - (WfHighHz - WfLowHz) * y / (WfRows - 1);
+                    double b = f / binHz; int b0 = (int)b; double w = b - b0;
+                    double m0 = Math.Sqrt(re[b0] * re[b0] + im[b0] * im[b0]);
+                    double m1 = Math.Sqrt(re[b0 + 1] * re[b0 + 1] + im[b0 + 1] * im[b0 + 1]);
+                    db[y] = 20 * Math.Log10(m0 + (m1 - m0) * w + 1);
+                }
+
+                // EACH NOTE ITS OWN QUIET LEVEL. One level for the whole strip made the noise inside the
+                // radio's CW filter bright yellow and the station hardly brighter (his screenshot): the
+                // dark stretch outside the filter pulled the level down. Each row's level drops at once
+                // to anything quieter and creeps up slowly, so it settles on that note's noise, and only
+                // a station stands out above it.
+                if (_wfRowFloor == null) _wfRowFloor = (double[])db.Clone();
+                for (int y = 0; y < WfRows; y++)
+                    _wfRowFloor[y] += (db[y] < _wfRowFloor[y] ? 0.05 : 0.002) * (db[y] - _wfRowFloor[y]);
+
+                int noteRow = note > 0 ? (int)Math.Round((WfHighHz - note) / (WfHighHz - WfLowHz) * (WfRows - 1)) : -1;
+                bool dot = (_wfRead / hop) % 3 == 0;
+                for (int y = 0; y < WfRows; y++)
+                {
+                    double v = (db[y] - _wfRowFloor[y] - 6) / 30;   // tried on his YT3T recording, strong and weak
+                    int shade = (int)(Math.Max(0, Math.Min(1, v)) * 255);
+                    column[y] = y == noteRow && dot ? 0x40E040 : WfPalette[shade];
+                }
+
+                // Everything one column to the left, the new column at the right edge.
+                for (int y = 0; y < WfRows; y++)
+                {
+                    Array.Copy(_wfPixels, y * WfColumns + 1, _wfPixels, y * WfColumns, WfColumns - 1);
+                    _wfPixels[y * WfColumns + WfColumns - 1] = column[y];
+                }
+                if (++drawn >= columns) break;
+            }
+            if (drawn > 0) _wfBitmap.WritePixels(new Int32Rect(0, 0, WfColumns, WfRows), _wfPixels, WfColumns * 4, 0);
+            return drawn;
+        }
+
+        // Black for silence, dark blue for noise, bright yellow for a station, white for the loudest -
+        // the noise kept dim so the dits and dahs are what the eye finds.
+        static int[] MakeWaterfallPalette()
+        {
+            var stops = new[] { new[] { 0, 0, 0 }, new[] { 10, 30, 110 }, new[] { 255, 200, 0 }, new[] { 255, 255, 255 } };
+            var p = new int[256];
+            for (int i = 0; i < 256; i++)
+            {
+                double t = i / 255.0 * (stops.Length - 1);
+                int k = Math.Min(stops.Length - 2, (int)t); double w = t - k;
+                int r = (int)(stops[k][0] + (stops[k + 1][0] - stops[k][0]) * w);
+                int g = (int)(stops[k][1] + (stops[k + 1][1] - stops[k][1]) * w);
+                int b = (int)(stops[k][2] + (stops[k + 1][2] - stops[k][2]) * w);
+                p[i] = (r << 16) | (g << 8) | b;
+            }
+            return p;
+        }
+
+        static void WaterfallFft(double[] re, double[] im)
+        {
+            int n = re.Length;
+            for (int i = 1, j = 0; i < n; i++)
+            {
+                int bit = n >> 1;
+                for (; (j & bit) != 0; bit >>= 1) j ^= bit;
+                j ^= bit;
+                if (i < j) { double t = re[i]; re[i] = re[j]; re[j] = t; t = im[i]; im[i] = im[j]; im[j] = t; }
+            }
+            for (int len = 2; len <= n; len <<= 1)
+            {
+                double ang = -2 * Math.PI / len, wr = Math.Cos(ang), wi = Math.Sin(ang);
+                for (int i = 0; i < n; i += len)
+                {
+                    double cr = 1, ci = 0;
+                    for (int k = 0; k < len / 2; k++)
+                    {
+                        int a = i + k, b = i + k + len / 2;
+                        double tr = re[b] * cr - im[b] * ci, ti = re[b] * ci + im[b] * cr;
+                        re[b] = re[a] - tr; im[b] = im[a] - ti; re[a] += tr; im[a] += ti;
+                        double nr = cr * wr - ci * wi; ci = cr * wi + ci * wr; cr = nr;
+                    }
+                }
+            }
+        }
+
         // On the capture thread. Hand the block straight to the decoder - it is a few thousand
         // multiplications, far less than the 100 ms of audio it represents.
         void OnSamples(short[] samples, int count)
@@ -787,6 +1152,9 @@ namespace HolyLogger
 
             try { decoder.Process(samples, count); }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+            // A copy for the waterfall, drawn on the screen timer - nothing is worked out here.
+            FeedWaterfall(samples, count);
 
             // Only copied here; the reading itself runs on the new decoder's own thread.
             var element = _element;
@@ -837,6 +1205,7 @@ namespace HolyLogger
 
         void ScreenTimer_Tick(object sender, EventArgs e)
         {
+
             FlushPendingText();
             UpdateLamp();
             UpdateSpeed();
@@ -921,7 +1290,6 @@ namespace HolyLogger
 
         void OnClosing(object sender, System.ComponentModel.CancelEventArgs e)
         {
-            SaveWindowBounds();
             _recorder.Failed -= OnRecorderFailed;
             _recorder.Samples -= OnSamples;
             InputDeviceChanged -= OnInputDeviceChanged;
