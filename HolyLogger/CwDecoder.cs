@@ -507,7 +507,11 @@ namespace HolyLogger
         const int NewStationBins = 2;          // 50 Hz: nearer is the same station drifting
         internal static double ReReadSeconds = 0.8;
         const int QuietBeforeReadings = 60;   // 0.3 s
-        internal static double ReReadContrast = 1000; // 30 dB in power: 10 and 100 let noise through (generated 112 and 229 of 256)
+        // 20 dB in power. Before QuietBeforeReadings existed, 10 and 100 let noise through (generated 112 and
+        // 229 of 256); with it, 100 holds every bench (W1AW invented 327 -> 325) and reads 6 more callsigns
+        // and 8 more CQ on the watcher clips than 1000. 30 read "CQ TEST" where 100 still read "FQ TEST",
+        // but cost one of his recordings (32 -> 31) and 17 invented words on W1AW.
+        internal static double ReReadContrast = 100;
         double[][] _pastPower;
         int _pastCount;
 
@@ -573,6 +577,7 @@ namespace HolyLogger
         }
 
         long _trustNewStationUntil;
+
         double _traceMarkMax;                  // the loudest reading of the mark in progress, over the peak
         double _lastMarkTop;                   // the same for the mark just ended
 

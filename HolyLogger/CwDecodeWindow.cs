@@ -92,6 +92,7 @@ namespace HolyLogger
         // The network also needs the plain decoder running: the note and the speed it measures are
         // what the network's front end is set up from.
         static readonly CwNeuralNet SharedNet = new CwNeuralNet();
+        const bool RunNetwork = false;
         static bool _netTried;
         CwNeuralDecoder _neural;
 
@@ -162,7 +163,7 @@ namespace HolyLogger
                 UseAeroCaptionButtons = false
             });
 
-            LoadNetworkOnce();
+            if (RunNetwork) LoadNetworkOnce();
             BuildContent();
             PaintWhich();
             ApplyShowLayout();
@@ -235,20 +236,20 @@ namespace HolyLogger
             // A grid rather than a stack: in Both the two boxes share the room equally however the
             // window is dragged, which is what makes them comparable at a glance.
             var boxes = new Grid();
+            boxes.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });   // the waterfall
             boxes.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             boxes.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-            boxes.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });   // the waterfall
             boxes.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             _networkRow = new RowDefinition { Height = new GridLength(1, GridUnitType.Star) };
             boxes.RowDefinitions.Add(_networkRow);
 
-            // THE WATERFALL BETWEEN THE TWO BOXES (his placing): under the top box always, so with one
-            // reader it sits under its text, and in Both it divides Plain from New.
+            // THE WATERFALL ON TOP, THE TEXT UNDER IT (his placing, 2026-10-03; it sat between the two
+            // boxes before): the sound first, then what was read from it.
             var waterfall = BuildWaterfall();
 
-            Grid.SetRow(_plainLabel, 0);
-            Grid.SetRow(frame, 1);
-            Grid.SetRow(waterfall, 2);
+            Grid.SetRow(waterfall, 0);
+            Grid.SetRow(_plainLabel, 1);
+            Grid.SetRow(frame, 2);
             Grid.SetRow(_networkLabel, 3);
             Grid.SetRow(_networkFrame, 4);
 
@@ -391,11 +392,11 @@ namespace HolyLogger
             // WHICH READER IS ON SHOW. Two keys in the keyer's own frame, so the pair reads as one
             // question with two answers rather than as two separate switches.
             _plainBtn = BarButton("Plain", "The arithmetic decoder - no network, and the one that has been on the air longest.");
-            _networkBtn = BarButton("Net", "The neural network. Better on some signals, worse on others.");
+            _networkBtn = RunNetwork ? BarButton("Net", "The neural network. Better on some signals, worse on others.") : null;
             _newBtn = BarButton("New", "The new decoder, on test. Better on weak signals, still worse on some strong fast ones.");
             _bothBtn = BarButton("Both", "Plain and New at once, one under the other, reading the same signal - the only fair way to see which suits your station.");
             _plainBtn.Click += (s, e) => ShowWhich(Reader.Plain);
-            _networkBtn.Click += (s, e) => ShowWhich(Reader.Network);
+            if (_networkBtn != null) _networkBtn.Click += (s, e) => ShowWhich(Reader.Network);
             _newBtn.Click += (s, e) => ShowWhich(Reader.New);
             _bothBtn.Click += (s, e) => ShowWhich(Reader.Both);
 
@@ -405,7 +406,7 @@ namespace HolyLogger
                 VerticalAlignment = VerticalAlignment.Center
             };
             whichPanel.Children.Add(_plainBtn);
-            whichPanel.Children.Add(_networkBtn);
+            if (_networkBtn != null) whichPanel.Children.Add(_networkBtn);
             whichPanel.Children.Add(_newBtn);
             whichPanel.Children.Add(_bothBtn);
 
@@ -460,7 +461,7 @@ namespace HolyLogger
 
         void ShowWhich(Reader which)
         {
-            if (which == Reader.Network && !SharedNet.Loaded) return;
+            if (which == Reader.Network && (!RunNetwork || !SharedNet.Loaded)) return;
 
             try
             {
@@ -507,6 +508,7 @@ namespace HolyLogger
             _plainLabel.Visibility = both ? Visibility.Visible : Visibility.Collapsed;
 
             _networkRow.Height = both ? new GridLength(1, GridUnitType.Star) : new GridLength(0);
+            SizeLetterLines(both);
         }
 
         static void PaintChoice(Button button, bool chosen)
@@ -523,7 +525,7 @@ namespace HolyLogger
                 try
                 {
                     var which = (Reader)Properties.Settings.Default.CwDecodeShow;
-                    if (which == Reader.Network && !SharedNet.Loaded) return Reader.Plain;
+                    if (which == Reader.Network && (!RunNetwork || !SharedNet.Loaded)) return Reader.Plain;
                     if (which < Reader.Plain || which > Reader.New) return Reader.Plain;
                     return which;
                 }
@@ -660,7 +662,10 @@ namespace HolyLogger
             decoder.LetterTimed += OnPlainLetterTimed;
             _decoder = decoder;
 
-            if (SharedNet.Loaded)
+            // NET IS NO LONGER RUN (2026-10-03, his decision). Verified correct, but trained only on clean
+            // generated CW it read real signals no better than Plain, and it cost the computer all the
+            // time it ran in the background. The code stays; RunNetwork brings it back.
+            if (RunNetwork && SharedNet.Loaded)
             {
                 var neural = new CwNeuralDecoder(_recorder.ActualSampleRate, SharedNet);
                 neural.Reset();
@@ -771,7 +776,7 @@ namespace HolyLogger
             stack.Children.Add(_wfLetterCanvas);
 
             int inner = WfRows + 2 * LetterRowHeight + 2;
-            return new Border
+            _wfBorder = new Border
             {
                 Child = stack,
                 Height = inner,
@@ -781,6 +786,19 @@ namespace HolyLogger
                 ClipToBounds = true,          // the picture slides left between columns - see WaterfallFrame
                 ToolTip = "What the decoders hear: time runs right to left, the note up (300 to 1000 Hz). The dotted green line is the note being read.\nUnder it, the letters each reader made of it: Plain in white, New in yellow."
             };
+            return _wfBorder;
+        }
+
+        Border _wfBorder;
+
+        // ONE LINE OF LETTERS UNLESS BOTH ARE ON SHOW (2026-10-03, his request): with one reader the
+        // second line was always empty and only took room from the text above.
+        void SizeLetterLines(bool both)
+        {
+            if (_wfLetterCanvas == null || _wfBorder == null) return;
+            int lines = both ? 2 : 1;
+            _wfLetterCanvas.Height = lines * LetterRowHeight;
+            _wfBorder.Height = WfRows + lines * LetterRowHeight + 2;
         }
 
         Image _wfImage;
@@ -826,6 +844,11 @@ namespace HolyLogger
                 _wfLetterQueue.Clear();
             }
 
+            // ONLY THE READER ON SHOW (2026-10-03, his choice): Plain's letters with Plain, New's with New,
+            // both lines only in Both - and a single line always sits on the top row.
+            Reader showing = Showing;
+            bool both = showing == Reader.Both;
+
             int hop = rate / 100, window = rate * 40 / 1000;
             double width = _wfImage.ActualWidth;
             long rightCentre = _wfRead - hop + window / 2;     // the sound under the newest column
@@ -840,7 +863,9 @@ namespace HolyLogger
                     _wfLetters.RemoveAt(i);
                     continue;
                 }
-                l.Block.Visibility = x > width ? Visibility.Hidden : Visibility.Visible;   // not drawn yet
+                bool mine = both || (l.Row == 0 ? showing != Reader.New : showing == Reader.New);
+                l.Block.Visibility = x > width || !mine ? Visibility.Hidden : Visibility.Visible;   // not drawn yet, or not on show
+                Canvas.SetTop(l.Block, (both ? l.Row : 0) * LetterRowHeight + 1);
                 Canvas.SetLeft(l.Block, x);
             }
         }
