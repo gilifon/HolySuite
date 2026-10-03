@@ -20,6 +20,7 @@ namespace HolyLogger
     {
         static void Main(string[] args)
         {
+            BenchSwitches.Apply();
             string folder = args[0];
             string only = args.Length > 1 ? args[1] : null;
             string hold = Environment.GetEnvironmentVariable("HOLD_BACK");
@@ -36,6 +37,39 @@ namespace HolyLogger
             if (!string.IsNullOrEmpty(al)) CwElementDecoder.AdaptiveLeak = al == "1";
             string wg = Environment.GetEnvironmentVariable("WORDGAP_NO_PAUSES");
             if (!string.IsNullOrEmpty(wg)) CwElementDecoder.WordGapWithoutPauses = wg == "1";
+            string lg = Environment.GetEnvironmentVariable("LETTER_GATE");
+            if (!string.IsNullOrEmpty(lg)) CwElementDecoder.LetterGate = double.Parse(lg, System.Globalization.CultureInfo.InvariantCulture);
+            string ig = Environment.GetEnvironmentVariable("INWORD_GATE");
+            if (!string.IsNullOrEmpty(ig)) CwElementDecoder.InWordGate = double.Parse(ig, System.Globalization.CultureInfo.InvariantCulture);
+            string sg = Environment.GetEnvironmentVariable("SHORT_GATE");
+            if (!string.IsNullOrEmpty(sg)) CwElementDecoder.ShortLetterGate = double.Parse(sg, System.Globalization.CultureInfo.InvariantCulture);
+            string letterLog = Environment.GetEnvironmentVariable("LETTER_LOG");
+            string sdb = Environment.GetEnvironmentVariable("STRONG_DB");
+            if (!string.IsNullOrEmpty(sdb)) CwElementDecoder.StrongDb = double.Parse(sdb, System.Globalization.CultureInfo.InvariantCulture);
+            string lt = Environment.GetEnvironmentVariable("LEARN_TIMING");
+            if (!string.IsNullOrEmpty(lt)) CwElementDecoder.LearnOperatorTiming = lt == "1";
+            string slo = Environment.GetEnvironmentVariable("SPEED_LETTERS_ONLY");
+            if (!string.IsNullOrEmpty(slo)) CwElementDecoder.SpeedFromLettersOnly = slo == "1";
+            string rr = Environment.GetEnvironmentVariable("REREAD");
+            if (!string.IsNullOrEmpty(rr)) CwElementDecoder.ReReadOnSpeedChange = rr == "1";
+            string cbs = Environment.GetEnvironmentVariable("CONFIRM_SPEED");
+            if (!string.IsNullOrEmpty(cbs)) CwElementDecoder.ConfirmBigSpeedChange = cbs == "1";
+            string prt = Environment.GetEnvironmentVariable("PART_RUNS");
+            if (!string.IsNullOrEmpty(prt)) CwElementDecoder.PartRunsTogether = prt == "1";
+            string sfo = Environment.GetEnvironmentVariable("SHORT_FIRST_ONLY");
+            if (!string.IsNullOrEmpty(sfo)) CwElementDecoder.ShortGateFirstOnly = sfo == "1";
+            string nh = Environment.GetEnvironmentVariable("NEIGHBOUR_HZ");
+            if (!string.IsNullOrEmpty(nh)) CwElementDecoder.NeighbourHz = double.Parse(nh, System.Globalization.CultureInfo.InvariantCulture);
+            string ms = Environment.GetEnvironmentVariable("MIN_STEADY");
+            if (!string.IsNullOrEmpty(ms)) CwElementDecoder.MinSteadiness = double.Parse(ms, System.Globalization.CultureInfo.InvariantCulture);
+            string mb = Environment.GetEnvironmentVariable("MIN_BESIDE");
+            if (!string.IsNullOrEmpty(mb)) CwElementDecoder.MinBeside = double.Parse(mb, System.Globalization.CultureInfo.InvariantCulture);
+            string mg = Environment.GetEnvironmentVariable("MAX_GAPFILL");
+            if (!string.IsNullOrEmpty(mg)) CwElementDecoder.MaxGapFill = double.Parse(mg, System.Globalization.CultureInfo.InvariantCulture);
+            string cf = Environment.GetEnvironmentVariable("CARRIER_FILL");
+            if (!string.IsNullOrEmpty(cf)) CwElementDecoder.CarrierGapFill = double.Parse(cf, System.Globalization.CultureInfo.InvariantCulture);
+            string lm = Environment.GetEnvironmentVariable("LEAK_MARGIN");
+            if (!string.IsNullOrEmpty(lm)) CwElementDecoder.LeakMargin = int.Parse(lm);
             string sl = Environment.GetEnvironmentVariable("STRONG_LETTER");
             if (!string.IsNullOrEmpty(sl)) CwElementDecoder.StrongLetter = double.Parse(sl, System.Globalization.CultureInfo.InvariantCulture);
 
@@ -49,6 +83,16 @@ namespace HolyLogger
                 var decoder = new CwElementDecoder(rate, false); var clock = System.Diagnostics.Stopwatch.StartNew();
                 var got = new StringBuilder();
                 decoder.Text += s => got.Append(s);
+                if (!string.IsNullOrEmpty(letterLog))
+                {
+                    var dd = decoder; string nm = name;
+                    decoder.Judged = (pat, end, ev, shown) =>
+                    {
+                        if (!shown) return;
+                        File.AppendAllText(letterLog, string.Format(System.Globalization.CultureInfo.InvariantCulture,
+                            "{0}\t{1}\t{2:F3}\t{3}\t{4}\t{5}\t{6:F3}\t{7:F2}\t{8:F3}\n", nm, pat, ev, dd.LastJudgedInWord ? 1 : 0, dd.LastJudgedPlainHeard ? 1 : 0, end, dd.LastSteadiness, dd.LastBeside, dd.LastGapFill));
+                    };
+                }
 
                 int block = rate / 10;
                 var buf = new short[block];

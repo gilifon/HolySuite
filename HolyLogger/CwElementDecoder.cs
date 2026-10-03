@@ -43,8 +43,11 @@ namespace HolyLogger
         const int PieceFrames = 4;             // 20 ms pieces; shorter only for fast sending (below)
         const double LengthSpread = 0.30;      // how loosely a length may fit, in log units
         const int LongestGapUnits = 60;
-        const double LetterGate = 0.6;         // a letter is shown only if its marks stood out this much
-        const double InWordGate = 0.1;         // ...or this much, after a shown letter in the same word
+        internal static double LetterGate = 0.6;   // a letter is shown only if its marks stood out this much
+        internal static double InWordGate = 0.1;   // ...or this much, after a shown letter in the same word
+        internal static double ShortLetterGate = 1.0; // ...and at least this much for a letter of one or two elements:
+                                                      // on his air sessions 900 invented words fell to 793 for 659 read to 629
+                                                      // (0.8: 831 / 640; 1.5: 777 / 598); W1AW read unchanged, invented 169 to 160
         internal static double Leak = 0.01;    // a strong station leaves 1% of itself in its own gaps - at least
         internal static bool AdaptiveLeak = true;
         double _leak = Leak;
@@ -79,6 +82,8 @@ namespace HolyLogger
         double _note;
         long _sample;                          // samples mixed so far
         double _accRe, _accIm; int _accN;      // the 5 ms reading being summed
+        double _loRe, _loIm, _hiRe, _hiIm;     // the same 5 ms at NeighbourHz below and above the note
+        readonly double[] _beside = new double[Ring];   // their power, per reading
 
         readonly Complex[] _z = new Complex[Ring];
         readonly double[] _tonePower = new double[Ring], _noise = new double[Ring];
@@ -112,9 +117,25 @@ namespace HolyLogger
 
         public event Action<string> Text;
 
+        // Every shown letter with where its first mark began and its last mark ended, counted in samples
+        // from the first sample this decoder was given - so the decode window can write it under its own
+        // dits and dahs on the waterfall. Raised on this decoder's own thread.
+        public event Action<string, long, long> LetterTimed;
+
         // For the research bench only: every letter judged - its dits and dahs, where its last mark
         // ends (reading), its evidence, and whether it was shown.
         internal Action<string, long, double, bool> Judged;
+        internal bool LastJudgedInWord, LastJudgedPlainHeard;
+        internal string TimingNow
+        {
+            get
+            {
+                return string.Format(System.Globalization.CultureInfo.InvariantCulture,
+                    "dit {0:F1} fr, dah {1:F2} egap {2:F2} lgap {3:F2} wgap {4:F2}, leak {5}, tone/noise {6:F1} dB, ev to {7} search {8}..{9} shown {10}",
+                    _unit, _kinds[1], _kinds[2], _kinds[3], _kinds[4], _leak,
+                    _levelNoiseBase > 0 ? 10 * Math.Log10(_levelTone / _levelNoiseBase) : 0, _evidenceTo, _searchFrom, _searchTo, _shownTo);
+            }
+        }
 
         public double ToneHz { get; private set; }
         public double Wpm { get; private set; }
@@ -185,8 +206,12 @@ namespace HolyLogger
 
                 if (_note > 0)
                 {
-                    double ph = -2 * Math.PI * _note * (_sample % (_rate * 1000L)) / _rate;
+                    long n = _sample % (_rate * 1000L);
+                    double ph = -2 * Math.PI * _note * n / _rate;
                     _accRe += v * Math.Cos(ph); _accIm += v * Math.Sin(ph);
+                    double pl = -2 * Math.PI * (_note - NeighbourHz) * n / _rate, phh = -2 * Math.PI * (_note + NeighbourHz) * n / _rate;
+                    _loRe += v * Math.Cos(pl); _loIm += v * Math.Sin(pl);
+                    _hiRe += v * Math.Cos(phh); _hiIm += v * Math.Sin(phh);
                 }
                 _sample++;
                 if (++_accN < _hopSamples) continue;
@@ -197,8 +222,13 @@ namespace HolyLogger
                 _plainHearsNow = GateMode == 2 ? _plain.SignalPresent && _plain.ProvedMorse : _plain.SignalPresent;
                 FollowPlainSpeed();
                 FollowPlainNote();
-                if (_note > 0) AddReading(new Complex(_accRe, _accIm));
+                if (_note > 0)
+                {
+                    AddReading(new Complex(_accRe, _accIm));
+                    _beside[(int)((_frames - 1) & (Ring - 1))] = 0.5 * (_loRe * _loRe + _loIm * _loIm + _hiRe * _hiRe + _hiIm * _hiIm);
+                }
                 _accRe = _accIm = 0; _accN = 0;
+                _loRe = _loIm = _hiRe = _hiIm = 0;
 
                 // Once a second: is the station we follow still the strongest? Not while the plain
                 // decoder hears a station - its note is followed then (FollowPlainNote), and this 10 s
@@ -211,9 +241,11 @@ namespace HolyLogger
         {
             _frames = 0; _evidenceTo = -1; _searchFrom = -1; _searchTo = -1;
             _plain.Reset();
+            _plainQuietSince = LongAgo; _plainOverStart = LongAgo; _plainWasHearing = false;
             _shownTo = 0; _spaceOwed = false; _lastShown = long.MinValue;
             _recentTone.Clear();
             _unit = 12; _kinds = new double[] { 1, 3, 1, 3, 7 }; _piece = PieceFrames; SetLengths();
+            _rawUnit = 0; _pendingUnit = 0;
             SignalPresent = false;
         }
 
@@ -248,10 +280,38 @@ namespace HolyLogger
         // plain decoder, which re-learns the dit with every element, read it right. So when the plain
         // decoder starts hearing a station after a pause, its speed is taken until this decoder has
         // measured its own (SpeedFromPlain 1), or always (2, for the bench).
-        internal static int SpeedFromPlain = 1;
-        long _plainQuietSince;                 // reading from which the plain decoder has heard nothing
-        long _plainOverStart = long.MinValue;  // reading where it began hearing after a pause
+        // 0 SINCE 2026-09-30: this decoder's own speed. The start-of-over borrowing only helped while an
+        // overflow (LongAgo, above) made it permanent; measured honestly, its own speed read his air
+        // sessions best (643 / 776 against 629 / 796) and W1AW no worse.
+        internal static int SpeedFromPlain = 0;
+        // FAR IN THE PAST, NOT long.MinValue. "Now minus MinValue" overflows to a large negative number,
+        // which read as "an over began a moment ago" for ever: wherever the plain decoder heard a station
+        // from the first second, this decoder copied its speed permanently and never ran its own speed,
+        // timing and leak measurements (found on radio.wav, where DELTA came out as DELK with the
+        // textbook timing still in place). And the first station ever heard counts as the start of an over.
+        const long LongAgo = -1000000000000L;
+        long _plainQuietSince = LongAgo;       // reading from which the plain decoder has heard nothing
+        long _plainOverStart = LongAgo;        // reading where it began hearing after a pause
         bool _plainWasHearing;
+
+        // SpeedFromPlain 3: THE PLAIN DECODER'S SPEED WHENEVER IT IS SURE OF THE STATION, this decoder's
+        // own otherwise. Measured with an overflow fixed that had, by accident, given every recording
+        // where the plain decoder heard a station from the first second the plain speed for good:
+        // always the plain speed read W1AW best (1150 words / 158 invented against 1116 / 205 with this
+        // decoder's own) and his IC-7610 recordings best (20 against 18), but his weak air sessions
+        // worst (625 / 827 against 643 / 776) - where the plain decoder barely hears, its speed is a guess.
+        //
+        // SpeedFromPlain 3 - the plain speed only while the plain decoder has proved Morse - was worse
+        // than either (W1AW 1102 / 218). What decides it is the signal's STRENGTH: the recordings the
+        // plain speed wins are 14-32 dB over the noise, the ones it loses 0-7 dB. So 4: the plain speed
+        // while this station stands more than StrongDb over the noise, this decoder's own below.
+        internal static double StrongDb = 10;
+        bool PlainIsConfident()
+        {
+            if (SpeedFromPlain == 4)
+                return _plain.SignalPresent && _levelNoiseBase > 0 && 10 * Math.Log10(_levelTone / _levelNoiseBase) > StrongDb;
+            return _plain.SignalPresent && _plain.ProvedMorse;
+        }
 
         void FollowPlainSpeed()
         {
@@ -263,8 +323,10 @@ namespace HolyLogger
             _plainWasHearing = hears;
 
             bool early = _frames - _plainOverStart < 4 * SpeedEvery / 2;
-            if (!hears || (SpeedFromPlain == 1 && !early) || _frames % 20 != 0) return;
-            double wpm = _plain.Wpm;
+            bool confident = PlainIsConfident();
+            if (!hears || (SpeedFromPlain == 1 && !early) || (SpeedFromPlain >= 3 && !confident && !early)
+                || _frames % 20 != 0) return;
+            double wpm = ForceWpm > 0 ? ForceWpm : _plain.Wpm;
             if (wpm < 5 || wpm > 60) return;
             double unit = 1200.0 / wpm / (Hop * 1000.0);
             if (Math.Abs(unit - _unit) < 0.05 * _unit) return;
@@ -296,7 +358,16 @@ namespace HolyLogger
             for (int k = 0; k < span; k++) x[k] = _sound[(int)((_soundCount - span + k) % _sound.Length)];
             _note = FindNote(x, Math.Round(heard));
             ToneHz = _note;
+            if (FreshLevelsOnNewNote) { _levelsFrom = _frames; _recentTone.Clear(); }
         }
+
+        // A NEW NOTE IS A NEW STATION: ITS LEVELS ARE ITS OWN. The levels came from the last 10 s, and
+        // the loud station was held for 20 s, so after a loud station stopped and a weaker one answered
+        // on another note, the weaker one was measured against the loud one - its marks looked like
+        // gaps. From a change of note only the readings since are used (at least half a second's), and
+        // they are re-measured every quarter second until there are two seconds of them.
+        internal static bool FreshLevelsOnNewNote = true;
+        long _levelsFrom = -1;
 
         bool PlainHeard(long from, long to)
         {
@@ -314,7 +385,9 @@ namespace HolyLogger
             _z[(int)(f & (Ring - 1))] = z;
             _plainHeard[(int)(f & (Ring - 1))] = _plainHearsNow;
 
-            if (_frames % LevelsEvery == 0 && _frames >= 2 * LevelsEvery) UpdateLevels();
+            bool freshNote = _levelsFrom >= 0 && _frames - _levelsFrom < 2 * LevelsEvery * 2;
+            if (freshNote ? (_frames - _levelsFrom >= 100 && _frames % 50 == 0)
+                          : (_frames % LevelsEvery == 0 && _frames >= 2 * LevelsEvery)) UpdateLevels();
             if (_evidenceTo < 0) return;
 
             // The piece for reading i reaches c - 1 - c/2 readings ahead of it, so reading i is judged
@@ -342,8 +415,9 @@ namespace HolyLogger
             // his: "VVV DE 4Z5SL" at the start of each part of session 3 (20, then 25, then 30 WPM)
             // came out as TVMEZ5SL and YY DE XZ5SL. For its first 4 s an over is re-measured every
             // half second, from itself alone.
-            bool newOver = _evidenceTo - _overStart < 4 * SpeedEvery / 2;
-            bool plainRules = SpeedFromPlain == 2 || (SpeedFromPlain == 1 && _frames - _plainOverStart < 4 * SpeedEvery / 2);
+            bool newOver = _evidenceTo - _overStart < 4 * SpeedEvery / 2
+                           || (SpeedFromEdges && _levelNoiseBase > 0 && 10 * Math.Log10(_levelTone / _levelNoiseBase) > StrongDb);
+            bool plainRules = SpeedFromPlain == 2 || (SpeedFromPlain != 0 && _frames - _plainOverStart < 4 * SpeedEvery / 2);
             if (!plainRules && _frames % (newOver ? SpeedEvery / 4 : SpeedEvery) == 0) UpdateSpeed();
         }
 
@@ -354,6 +428,7 @@ namespace HolyLogger
         void UpdateLevels()
         {
             int n = (int)Math.Min(LevelsOver, _frames);
+            if (_levelsFrom >= 0) n = (int)Math.Min(n, Math.Max(100, _frames - _levelsFrom));
             var z = LastReadings(n);
             var p = new double[n];
             for (int k = 0; k < n; k++) p[k] = z[k].Norm;
@@ -401,17 +476,44 @@ namespace HolyLogger
                 z[k] = _z[at]; amp[k] = Math.Sqrt(_tonePower[at]); noise[k] = _noise[at];
             }
             double unit = FindSpeed(z, amp, noise, 0, n);
+            bool strongNow = _levelNoiseBase > 0 && 10 * Math.Log10(_levelTone / _levelNoiseBase) > StrongDb;
+            if (SpeedFromEdges && strongNow)
+            {
+                double byEdges = UnitFromRisingEdges(z, amp, n);
+                if (SpeedDebug != null) SpeedDebug(string.Format("    edges {0:F2} (search {1:F2})", byEdges, unit));
+                // EdgesOnlyWhenSlower: the edges overrule the search only where the search has run away
+                // to a slower speed - the failure they were made for - and not otherwise.
+                if (byEdges > 0 && (!EdgesOnlyWhenSlower || unit > EdgesSlowerRatio * byEdges)) unit = byEdges;
+            }
+
+            // A BIG CHANGE OF SPEED MUST BE FOUND TWICE. On YT7FT's CQ (his recording missedcq_173716)
+            // the speed flipped between 19.9 WPM, right, and 48 - the fastest allowed - from one search to
+            // the next: short clicks in the twenty seconds searched passed for dits. The CQ began while
+            // it said 48, and its dahs were cut into pieces. A speed more than a third away from the one
+            // in use is taken only when the next search finds it again.
+            if (ConfirmBigSpeedChange && !(SpeedFromEdges && strongNow) && _rawUnit > 0 && Math.Abs(Math.Log(unit / _rawUnit)) > Math.Log(1.35))
+            {
+                if (_pendingUnit > 0 && Math.Abs(Math.Log(unit / _pendingUnit)) < Math.Log(1.15)) _pendingUnit = 0;
+                else { _pendingUnit = unit; unit = _rawUnit; }
+            }
+            else _pendingUnit = 0;
+            _rawUnit = unit;
             double[] book = { 1, 3, 1, 3, 7 };
             double[] F = Evidence(z, amp, noise, PieceFrames, 0, n);
-            double dit;
+            double dit = 1;
             List<Segment> read = Decode(F, n, unit, book, LengthSpread);
-            _kinds = LearnTiming(read, unit, book, out dit);
-            _unit = unit * dit;
+            _kinds = LearnOperatorTiming ? LearnTiming(read, unit, book, out dit) : (double[])book.Clone();
+            if (!LearnOperatorTiming) dit = 1;
+            // While the plain decoder is sure of the station its speed rules (see PlainIsConfident);
+            // this reading still teaches the operator's timing and the leak.
+            double unitBefore = _unit;
+            if (!(SpeedFromPlain >= 3 && PlainIsConfident())) _unit = unit * dit;
             if (AdaptiveLeak)
             {
                 var noiseBase = new double[n];
                 for (int k = 0; k < n; k++) noiseBase[k] = _noiseBase[(int)((to - n + k) & (Ring - 1))];
                 _leak = ChooseLeak(z, amp, noiseBase, n);
+                if (strongNow && StrongLeak > 0 && !StrongLeakIsAChoice) _leak = StrongLeak;
             }
 
             // Pieces of 4, shorter only below a 45 ms dit (measured: shorter pieces help fast sending
@@ -419,6 +521,27 @@ namespace HolyLogger
             _piece = unit < 9 ? Math.Max(2, Math.Min(4, (int)Math.Round(unit / 3))) : PieceFrames;
             SetLengths();
             Wpm = 1200.0 / (_unit * Hop * 1000.0);
+
+            if (ReReadOnSpeedChange && unitBefore > 0 && Math.Abs(Math.Log(_unit / unitBefore)) > Math.Log(1.15))
+                ReReadSinceLastLetter();
+        }
+
+        // A NEW SPEED RE-READS WHAT IS NOT YET SHOWN. The search goes forward one reading at a time, and
+        // what it worked out while the speed was wrong stayed worked out: on YT7FT's CQ the stretch read
+        // at 48 WPM lost the C's first dit (it came out M N), and the C's and Q's after it ran together
+        // although the speed was right again by then. So when the speed moves by more than 15%, the
+        // search is run again, at the new speed, over everything since the last letter shown.
+        internal static bool ReReadOnSpeedChange = true;
+
+        void ReReadSinceLastLetter()
+        {
+            long to = _evidenceTo;
+            long from = Math.Max(_shownTo, to - (Ring - 2048));
+            if (from >= to) return;
+            long overStart = _overStart;
+            StartSearchAt(from);
+            _overStart = overStart;
+            for (long t = from + 1; t <= to; t++) SearchStep(t);
         }
 
         // HOW MUCH OF THE STATION IS LEFT IN ITS OWN GAPS - chosen by reading, not assumed. A fixed 1%
@@ -430,12 +553,16 @@ namespace HolyLogger
         // and dahs that spell nothing. So the last stretch is read at each share, and the one whose
         // letters are most often real Morse letters wins - Morse's own alphabet, no words.
         static readonly double[] LeakChoices = { 0.01, 0.03, 0.1 };
+        // 3: W1AW 1143 words read (1152 with a fixed 1%, 1116 with no margin), and his own IC-7610's
+        // R6ODZ DE LZ5BB still read; at 8 W1AW was whole again and R6ODZ was lost.
+        internal static int LeakMargin = 3;
 
         double ChooseLeak(Complex[] z, double[] amp, double[] noiseBase, int n)
         {
             double best = _leak; int bestScore = int.MinValue;
             var noise = new double[n];
-            foreach (double leak in LeakChoices)
+            double[] choices = StrongLeakIsAChoice && StrongLeak > 0 ? new[] { 0.01, 0.03, 0.1, StrongLeak } : LeakChoices;
+            foreach (double leak in choices)
             {
                 for (int k = 0; k < n; k++) noise[k] = Math.Max(noiseBase[k], leak * amp[k] * amp[k]);
                 double[] F = Evidence(z, amp, noise, _piece, 0, n);
@@ -448,7 +575,10 @@ namespace HolyLogger
                     score += CwDecoder.FromMorseTable.ContainsKey(pattern.ToString()) ? 1 : -2;
                     pattern.Clear();
                 }
-                if (score > bestScore) { bestScore = score; best = leak; }
+                // A HIGHER SHARE HAS TO WIN CLEARLY. Chosen on a bare majority it cost W1AW 36 words
+                // (1152 read with a fixed 1%, 1116 chosen) - a letter or two more on a strong station's
+                // twenty seconds is noise, not letters running together.
+                if (bestScore == int.MinValue || score > bestScore + LeakMargin) { bestScore = score; best = leak; }
             }
             return best;
         }
@@ -553,12 +683,19 @@ namespace HolyLogger
                 tt = s; kk = pk;
             }
             segs.Reverse();
+            if (PathDebug != null && t % 200 == 0)
+            {
+                var sb = new StringBuilder();
+                foreach (Segment sg in segs) sb.Append("._-:/"[sg.Kind]).Append(sg.End - sg.Start).Append(' ');
+                PathDebug(string.Format("  path at {0} (shown {1}, from {2}, best kind {3}): {4}", t, _shownTo, _searchFrom, kk, sb));
+            }
 
             double letterEnds = Math.Sqrt(_kinds[2] * _kinds[3]) * _unit * 1.25;
             double wordEnds = Math.Sqrt(_kinds[3] * _kinds[4]) * _unit;
             var said = new StringBuilder();
             var pattern = new StringBuilder();
             double evidence = 0; long lastMarkEnd = -1, a0OfLetter = -1;
+            var marks = new List<long[]>(); var gaps = new List<long[]>();
 
             for (int n = 0; n < segs.Count; n++)
             {
@@ -568,7 +705,8 @@ namespace HolyLogger
                 if (sg.Kind <= 1)
                 {
                     if (a < _shownTo) continue;            // part of a letter already judged
-                    if (pattern.Length == 0) a0OfLetter = a;
+                    if (pattern.Length == 0) { a0OfLetter = a; marks.Clear(); gaps.Clear(); }
+                    marks.Add(new[] { a, b });
                     pattern.Append(sg.Kind == 0 ? '.' : '-');
                     evidence += (_F[(int)(b & (Ring - 1))] - _F[(int)(a & (Ring - 1))]) / (b - a);
                     lastMarkEnd = b;
@@ -580,6 +718,7 @@ namespace HolyLogger
                 bool letterDone = last ? (atTheEnd || length >= letterEnds) : sg.Kind >= 3;
                 if (!atTheEnd && lastMarkEnd > t - (long)(HoldBackSeconds / Hop)) letterDone = false;
                 bool wordDone = last ? (atTheEnd || length >= wordEnds) : sg.Kind == 4;
+                if (pattern.Length > 0) gaps.Add(new[] { a, Math.Min(b, a + (long)(2 * _unit)) });
 
                 if (letterDone && pattern.Length > 0)
                 {
@@ -589,14 +728,54 @@ namespace HolyLogger
                     // out for 25 ms and scored 0.14, far under the gate on its own. Once this word has
                     // a letter on screen, the same letter needs only InWordGate.
                     double gate = _spaceOwed ? InWordGate : LetterGate;
-                    bool shown = evidence / pattern.Length >= gate
-                                 && (evidence / pattern.Length >= StrongLetter || PlainHeard(a0OfLetter - GateWiden, t + 1))
-                                 && CwDecoder.FromMorseTable.TryGetValue(pattern.ToString(), out letter);
+                    // A LONE E OR T, OR A LETTER OF TWO ELEMENTS, NEEDS MORE. Measured over his four air
+                    // sessions, letter by letter against the sent text: 38% of the junk letters were a
+                    // single dit or dah, against 11% of the real ones, and the real letters' evidence
+                    // was three times the junk's (medians 2.8 and 0.8).
+                    if (pattern.Length <= 2 && (!_spaceOwed || !ShortGateFirstOnly)) gate = Math.Max(gate, ShortLetterGate);
+                    double steady, beside, filled;
+                    MeasureLetter(marks, gaps, out steady, out beside, out filled);
+                    LastSteadiness = steady; LastBeside = beside; LastGapFill = filled;
+                    // ON A STRONG STATION ONLY THE CARRIER TEST. The three checks together cut the junk on
+                    // his weak air sessions (776 invented words to 695) and wrecked the strong ones: W1AW
+                    // fell from 1152 words read to 971, and the whole of IK1QHB's strong over vanished -
+                    // a strong station's own tail sits in its gaps (his IC-7610 especially) and reads as
+                    // "not quiet". Above StrongDb only a gap nearly as loud as the tone - a carrier - stops it.
+                    // By the station's strength. By each letter's own loudness was tried (the station's is
+                    // held for 20 s) and measured worse: air sessions 617 / 715 against 615 / 695 - the
+                    // letters that passed after DD4U on his clicks recording were a real weak station at
+                    // 428 Hz, not noise.
+                    bool strong = _levelNoiseBase > 0 && 10 * Math.Log10(_levelTone / _levelNoiseBase) > StrongDb;
+                    bool waterfallOk = strong
+                        ? filled <= CarrierGapFill
+                        : steady >= MinSteadiness && beside >= MinBeside && filled <= MaxGapFill;
+                    bool passes = waterfallOk
+                                  && evidence / pattern.Length >= gate
+                                  && (evidence / pattern.Length >= StrongLetter || PlainHeard(a0OfLetter - GateWiden, t + 1));
+
+                    // LETTERS THAT RAN TOGETHER ARE PARTED AT THEIR LONGEST GAPS. On his recording of
+                    // YT7FT's CQ the C and the Q came out as one run, -.-..--.- , which spells nothing and
+                    // was thrown away whole - while the plain decoder read CQ CQ CQ. Where two letters run
+                    // together the gap between them is still the longest gap in the run, so a run that
+                    // spells nothing is cut there, and again, until every piece is a letter. Morse's own
+                    // timing only: nothing is guessed about which letters are likely.
+                    List<int[]> pieces = passes ? PartIntoLetters(pattern.ToString(), marks) : null;
+                    bool shown = pieces != null;
+                    LastJudgedInWord = _spaceOwed;
+                    LastJudgedPlainHeard = PlainHeard(a0OfLetter - GateWiden, t + 1);
                     var judged = Judged;
                     if (judged != null) judged(pattern.ToString(), lastMarkEnd, evidence / pattern.Length, shown);
-                    if (shown && CwDecoder.FromMorseTable.TryGetValue(pattern.ToString(), out letter))
+                    if (shown)
                     {
-                        said.Append(letter);
+                        var timed = LetterTimed;
+                        foreach (int[] piece in pieces)
+                        {
+                            CwDecoder.FromMorseTable.TryGetValue(pattern.ToString(piece[0], piece[1] - piece[0]), out letter);
+                            said.Append(letter);
+                            if (timed != null)
+                                timed(letter, FirstReadingSample + marks[piece[0]][0] * _hopSamples,
+                                      FirstReadingSample + marks[piece[1] - 1][1] * _hopSamples);
+                        }
                         _spaceOwed = true;
                         if (_lastShown < lastMarkEnd - (long)(OverGapSeconds / Hop)) _overStart = a0OfLetter;
                         _lastShown = lastMarkEnd;
@@ -622,6 +801,102 @@ namespace HolyLogger
             var text = Text;
             if (text != null) text(said.ToString());
         }
+
+        // WHAT THE EYE SEES ON A WATERFALL, asked of every letter before it is shown (his idea):
+        //   STEADINESS - a real dit or dah is one steady tone, its phase moving smoothly from start to
+        //     end, so its readings add up WITH their phase almost as well as their powers add: close to
+        //     1. A burst of noise is as loud but its phase jumps, and adds up to little: near 1/length.
+        //     The letter's weakest element counts.
+        //   BESIDE - a real element is narrow: loud at its note and quiet NeighbourHz either side. A
+        //     static crash is loud everywhere at once. Power at the note over power beside it.
+        //   GAP FILL - the gaps between its elements, and after it, must be quiet. A carrier chopped
+        //     into dahs by the search (TTTTTTTTT) has as much tone in its "gaps" as in its marks.
+        internal static double NeighbourHz = 150;
+        // Chosen from his four air sessions, every shown letter marked real or junk against the sent text
+        // (tools/LetterJunk2.py): together these keep 95% of the real letters and 71% of the junk. In
+        // whole words, weak stations only: invented 776 -> 695 for read 643 -> 615; W1AW 1152 / 158 ->
+        // 1152 / 149. The carrier test (0.7) never fired on the benches - it is for the TTTTTTTTT he saw live.
+        internal static double MinSteadiness = 0.4, MinBeside = 2.5, MaxGapFill = 0.4, CarrierGapFill = 0.7;
+        internal static bool SteadyAllowsOffset = true;
+        internal double LastSteadiness, LastBeside, LastGapFill;
+
+        // The run of marks [0, n) as letters: itself if it spells one, else cut at its longest inner gap
+        // and each side parted the same way. Null if some piece can never be a letter. Each piece is
+        // {first mark, one past its last mark}.
+        static List<int[]> PartIntoLetters(string pattern, List<long[]> marks)
+        {
+            var pieces = new List<int[]>();
+            return Part(pattern, marks, 0, pattern.Length, pieces) ? pieces : null;
+        }
+
+        static bool Part(string pattern, List<long[]> marks, int from, int to, List<int[]> pieces)
+        {
+            if (CwDecoder.FromMorseTable.ContainsKey(pattern.Substring(from, to - from)))
+            {
+                pieces.Add(new[] { from, to });
+                return true;
+            }
+            if (to - from < 2 || !PartRunsTogether) return false;
+            int cut = -1; long widest = -1;
+            for (int i = from; i < to - 1; i++)
+            {
+                long gap = marks[i + 1][0] - marks[i][1];
+                if (gap > widest) { widest = gap; cut = i + 1; }
+            }
+            return Part(pattern, marks, from, cut, pieces) && Part(pattern, marks, cut, to, pieces);
+        }
+
+        // OFF - MEASURED AND LOST. On YT7FT's CQ the gaps inside the joined run were all much the same
+        // length (his radio's tail shortens them), so the cuts fell in the wrong places (CQ became CGME),
+        // and on the benches it added junk: air sessions 625 / 687 fell to 621 / 715, W1AW 1143 / 159 to
+        // 1141 / 167. The cause to attack is the start-of-over speed (48 WPM against a real 19) and the
+        // letter gaps the tail eats, not the run afterwards.
+        internal static bool PartRunsTogether = false;
+
+        void MeasureLetter(List<long[]> marks, List<long[]> gaps, out double steady, out double beside, out double filled)
+        {
+            // MEASURED OVER WHOLE ELEMENTS, phase kept, the ratio separated real letters from junk no
+            // better (at 40: 96% of real kept, 84% of junk) and cost 54 real words on his air sessions.
+            // Kept per 5 ms reading, as it was chosen.
+            //
+            // OFF-NOTE TONES ARE STEADY TOO. A station 10 Hz from the note we listen on turns its phase a
+            // little every reading, and over a 165 ms dah that summed to nothing: steadiness 0.03, every
+            // letter of the answering station dropped while its marks stood 18 dB clear. So the letter's
+            // own turn per reading is measured first (the phase step from each reading to the next, over
+            // all its marks) and taken out before the readings are added.
+            double stepRe = 0, stepIm = 0;
+            if (SteadyAllowsOffset)
+                foreach (long[] m in marks)
+                    for (long k = m[0] + 1; k < m[1]; k++)
+                    {
+                        Complex a = _z[(int)(k & (Ring - 1))], b = _z[(int)((k - 1) & (Ring - 1))];
+                        stepRe += a.Re * b.Re + a.Im * b.Im; stepIm += a.Im * b.Re - a.Re * b.Im;
+                    }
+            double turn = SteadyAllowsOffset ? Math.Atan2(stepIm, stepRe) : 0;
+            steady = 1; double markPower = 0, besidePower = 0; long markFrames = 0;
+            foreach (long[] m in marks)
+            {
+                double re = 0, im = 0, power = 0;
+                for (long k = m[0]; k < m[1]; k++)
+                {
+                    Complex z = _z[(int)(k & (Ring - 1))];
+                    double c = Math.Cos(-turn * (k - m[0])), sn = Math.Sin(-turn * (k - m[0]));
+                    re += z.Re * c - z.Im * sn; im += z.Re * sn + z.Im * c; power += z.Norm;
+                    besidePower += _beside[(int)(k & (Ring - 1))];
+                }
+                long len = m[1] - m[0];
+                if (len > 0 && power > 0) steady = Math.Min(steady, (re * re + im * im) / (len * power));
+                markPower += power; markFrames += len;
+            }
+            beside = besidePower > 0 ? markPower / besidePower : 1e9;
+            double gapPower = 0; long gapFrames = 0;
+            foreach (long[] g in gaps)
+                for (long k = g[0]; k < g[1]; k++) { gapPower += _z[(int)(k & (Ring - 1))].Norm; gapFrames++; }
+            filled = markFrames > 0 && markPower > 0 && gapFrames > 0 ? (gapPower / gapFrames) / (markPower / markFrames) : 0;
+            LastLoudness = markFrames > 0 ? markPower / markFrames : 0;
+        }
+
+        internal double LastLoudness;          // the letter's own power per reading, for "is it strong?"
 
         // ---- the note ----
 
@@ -916,7 +1191,20 @@ namespace HolyLogger
             {
                 List<Segment> segs = Decode(F, n, g, book, it == 0 ? 0.5 : 0.35);
                 var L = new List<double>();
-                foreach (Segment s in segs) if (s.Kind <= 1) L.Add(Math.Log(s.End - s.Start));
+                // ONLY MARKS WITH A NEIGHBOUR IN THE SAME LETTER. Short clicks, each standing alone
+                // between silences, passed for dits: on YT7FT's CQ the speed flipped between 19 WPM and
+                // the fastest allowed, 48, from one search to the next. A real dit or dah nearly always
+                // has another mark beside it across a gap inside a letter; a click does not.
+                var all = new List<double>();
+                for (int i = 0; i < segs.Count; i++)
+                {
+                    Segment s = segs[i];
+                    if (s.Kind > 1) continue;
+                    all.Add(Math.Log(s.End - s.Start));
+                    bool neighbour = (i > 0 && segs[i - 1].Kind == 2) || (i + 1 < segs.Count && segs[i + 1].Kind == 2);
+                    if (neighbour || !SpeedFromLettersOnly) L.Add(Math.Log(s.End - s.Start));
+                }
+                if (L.Count < 6) L = all;
                 if (L.Count == 0) L.Add(Math.Log(g));
                 double[] arr = L.ToArray();
                 double lo = Percentile(arr, 20), hi = Percentile(arr, 80);
@@ -927,12 +1215,141 @@ namespace HolyLogger
                     if (na == 0 || nb == 0) break;
                     lo = sa / na; hi = sb / nb;
                 }
-                g = Math.Min(Math.Max(Math.Exp(lo), 5.0), 35.0);
+                if (SpeedDebug != null) SpeedDebug(string.Format("    it{0}: marks {1} (all {2}) lo {3:F1} hi {4:F1} fr; segs {5}", it, arr.Length, all.Count, Math.Exp(lo), Math.Exp(hi), DebugSegs(segs)));
+                double byPeriod = SpeedByPeriod ? UnitFromPeriods(segs) : 0;
+                if (SpeedDebug != null) SpeedDebug(string.Format("        by period {0:F1}", byPeriod));
+                g = Math.Min(Math.Max(byPeriod > 0 ? byPeriod : Math.Exp(lo), 5.0), 35.0);
             }
             return g;
         }
 
+        internal static Action<string> SpeedDebug;
+        internal static Action<string> PathDebug;
+        internal static bool SpeedByPeriod = false;
+        internal static bool WideTiming = false;
+        internal static bool SpeedFromEdges = false;
+        internal static double StrongLeak = 0;
+        internal static bool StrongLeakIsAChoice = true;      // offered to ChooseLeak, not forced
+        internal static bool EdgesOnlyWhenSlower = true;
+        internal static double EdgesSlowerRatio = 1.35;
+
+        // THE SPEED OF A STRONG STATION FROM WHERE ITS MARKS BEGIN. A strong station rings on after every
+        // mark (the receiver's filter and AGC - 50 ms on his IC-7610), so its marks read long and its
+        // gaps short, and a speed taken from mark lengths came out far too slow (35 WPM read as 7-20).
+        // A mark BEGINS sharply, though, and from one beginning to the next is always an even number of
+        // dits: 2 after a dit inside a letter, 4 after a dah or a dit at a letter's end, 6, 8, 10.
+        // So the dit is half the shortest common start-to-start time, refined against all of them.
+        // Strong stations only: on a weak one, noise makes false beginnings.
+        double UnitFromRisingEdges(Complex[] z, double[] amp, int n)
+        {
+            var starts = new List<int>();
+            bool on = false;
+            for (int k = 0; k < n; k++)
+            {
+                double tone = amp[k] * amp[k];
+                if (tone <= 0) continue;
+                double p = z[k].Norm / tone;
+                if (!on && p > 0.4) { on = true; starts.Add(k); }
+                else if (on && p < 0.12) on = false;
+            }
+            double all = UnitFromStarts(starts, 0);
+            if (all <= 0 || !EdgesSinceLastPause) return all;
+            // ONLY SINCE THE LAST PAUSE, when that is enough: in a QSO the twenty seconds searched hold
+            // both stations, and the answer was a mixture of the two speeds - wrong for both.
+            int from = 0;
+            for (int i = starts.Count - 1; i > 0; i--)
+                if (starts[i] - starts[i - 1] > 14 * all) { from = i; break; }
+            if (from == 0) return all;
+            double recent = UnitFromStarts(starts, from);
+            return recent > 0 ? recent : all;
+        }
+
+        internal static bool EdgesSinceLastPause = true;
+
+        static double UnitFromStarts(List<int> starts, int from)
+        {
+            var iv = new List<double>();
+            for (int i = from + 1; i < starts.Count; i++)
+            {
+                int d = starts[i] - starts[i - 1];
+                if (d >= 8 && d <= 140) iv.Add(d);         // 2 dits at 60 WPM up to 10 dits at 9 WPM... roughly
+            }
+            if (iv.Count < 8) return 0;
+            double[] arr = iv.ToArray();
+            Array.Sort(arr);
+            // the shortest cluster that holds at least 15% of the intervals: two dits
+            double two = 0;
+            for (int i = 0; i < arr.Length; i++)
+            {
+                int c = 0;
+                foreach (double v in arr) if (v >= arr[i] * 0.85 && v <= arr[i] * 1.25) c++;
+                if (c >= Math.Max(4, arr.Length * 0.15)) { two = arr[i]; break; }
+            }
+            if (two <= 0) return 0;
+            double u = 0;
+            for (int pass = 0; pass < 3; pass++)
+            {
+                double sum = 0; int cnt = 0;
+                foreach (double v in arr)
+                {
+                    double m = Math.Round(v / (pass == 0 ? two : 2 * u));
+                    if (m < 1 || m > 5) continue;
+                    double unitHere = v / (2 * m);
+                    double baseU = pass == 0 ? two / 2 : u;
+                    if (Math.Abs(unitHere / baseU - 1) > 0.2) continue;
+                    sum += unitHere; cnt++;
+                }
+                if (cnt < 6) return 0;
+                u = sum / cnt;
+            }
+            return Math.Min(Math.Max(u, 4.0), 35.0);
+        }
+        internal static double ForceWpm;      // bench only: the true speed, with SpeedFromPlain 2
+
+        // THE SPEED FROM A MARK AND THE GAP AFTER IT TOGETHER. On a strong station every mark is read a
+        // few readings long (the 20 ms pieces and the receiver's tail) and every gap as much short, so
+        // the shortest marks said "slower" than the truth; read at that slower speed letters ran
+        // together, which said slower still - 35 WPM fell to 7 in three steps. A mark plus the gap
+        // inside the letter after it does not care where the edge between them was read: two dits for
+        // a dit, four for a dah.
+        static double UnitFromPeriods(List<Segment> segs)
+        {
+            var p = new List<double>();
+            for (int i = 0; i + 1 < segs.Count; i++)
+                if (segs[i].Kind <= 1 && segs[i + 1].Kind == 2)
+                    p.Add(Math.Log(segs[i + 1].End - segs[i].Start));
+            if (p.Count < 6) return 0;
+            double[] arr = p.ToArray();
+            double lo = Percentile(arr, 20), hi = Percentile(arr, 80);
+            int na = 0, nb = 0;
+            for (int i = 0; i < 15; i++)
+            {
+                double mid = (lo + hi) / 2, sa = 0, sb = 0; na = 0; nb = 0;
+                foreach (double v in arr) { if (v < mid) { sa += v; na++; } else { sb += v; nb++; } }
+                if (na == 0 || nb == 0) break;
+                lo = sa / na; hi = sb / nb;
+            }
+            // Two clusters a factor of about two apart: dit periods and dah periods. One cluster only
+            // (all dits or all dahs) is ambiguous - left to the marks.
+            double ratio = Math.Exp(hi - lo);
+            if (na == 0 || nb == 0 || ratio < 1.5 || ratio > 2.7) return 0;
+            return (na * Math.Exp(lo) / 2 + nb * Math.Exp(hi) / 4) / (na + nb);
+        }
+        static string DebugSegs(List<Segment> segs)
+        {
+            var sb = new StringBuilder();
+            foreach (Segment s in segs) { if (sb.Length > 400) break; sb.Append("._-:/"[s.Kind]).Append(s.End - s.Start).Append(' '); }
+            return sb.ToString();
+        }
+
         internal static bool WordGapWithoutPauses = true;
+        internal static bool ConfirmBigSpeedChange = true;
+        internal static bool SpeedFromLettersOnly = true;
+        double _rawUnit, _pendingUnit;        // the speed search's last accepted answer, and one waiting to be confirmed
+        // The short-letter gate for the FIRST letter of a word only: inside a word it dropped real letters
+        // (BONNE came out BONN on radio.wav). Air sessions 615 / 695 -> 625 / 687, nothing lost elsewhere.
+        internal static bool ShortGateFirstOnly = true;
+        internal static bool LearnOperatorTiming = true;
 
         static double[] LearnTiming(List<Segment> segs, double unit, double[] book, out double dit)
         {
@@ -949,7 +1366,8 @@ namespace HolyLogger
                 lens[s.Kind].Add(units);
             }
             dit = lens[0].Count > 10 ? Median(lens[0]) : 1.0;
-            double[] lo = { 1, 2.4, 0.6, 2.2, 5.0 }, hi = { 1, 4.5, 1.6, 5.0, 12.0 };
+            double[] lo = WideTiming ? new double[] { 1, 1.6, 0.15, 1.0, 3.0 } : new double[] { 1, 2.4, 0.6, 2.2, 5.0 };
+            double[] hi = { 1, 4.5, 1.6, 5.0, 12.0 };
             var learned = (double[])book.Clone();
             for (int k = 1; k < 5; k++)
                 if (lens[k].Count > 10) learned[k] = Math.Min(Math.Max(Median(lens[k]) / dit, lo[k]), hi[k]);
