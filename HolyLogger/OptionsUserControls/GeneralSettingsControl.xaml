@@ -126,6 +126,53 @@
             </StackPanel>
         </GroupBox>
 
+        <!-- CW DECODE. The picker lives here rather than in the decode window itself: it is set once,
+             when the station is wired up, and after that it is only in the way of the decoded text.
+             The window now opens by itself whenever the radio goes to CW, so it has to know which
+             device to listen to before it opens - which means the answer has to live in Options. -->
+        <GroupBox Header="Input Device" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,12,0,0" Width="580" FontSize="16">
+            <StackPanel Margin="4,4,4,4">
+                <StackPanel Orientation="Horizontal" Margin="0,2,0,2">
+                    <!-- Only as wide as the words. It was 150, borrowed from the audio-alerts row in
+                         the box below, which leaves a hand's width of nothing between the label and
+                         the list - and the two are in different frames, so nothing was gained by
+                         lining them up. -->
+                    <TextBlock Text="Listen to:" VerticalAlignment="Center" FontSize="16" Margin="0,0,8,0"/>
+                    <ComboBox x:Name="CB_CwDecodeDevice" Width="175" VerticalAlignment="Center" FontSize="16"
+                              SelectionChanged="CB_CwDecodeDevice_SelectionChanged">
+                        <ComboBox.ToolTip>
+                            <ToolTip>
+                                <TextBlock MaxWidth="330" TextWrapping="Wrap" FontSize="16"
+                                           Text="The recording device the radio's audio arrives on - usually the radio's own USB codec.&#x0a;&#x0a;'System default' uses whatever Windows is set to record from."/>
+                            </ToolTip>
+                        </ComboBox.ToolTip>
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding}" MaxWidth="300" ToolTip="{Binding}">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="TextWrapping" Value="Wrap"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=ComboBoxItem}}" Value="{x:Null}">
+                                                    <Setter Property="TextWrapping" Value="NoWrap"/>
+                                                    <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+                    <Button x:Name="BTN_RefreshCwDecodeDevices" Content="Refresh" Margin="10,0,0,0"
+                            VerticalAlignment="Center" Padding="8,2" FontSize="16" Cursor="Hand"
+                            ToolTip="Look for devices again - use it after switching the radio on"
+                            Click="BTN_RefreshCwDecodeDevices_Click"/>
+                </StackPanel>
+                <TextBlock TextWrapping="Wrap" Margin="0,6,0,0" FontSize="16" Foreground="Gray"
+                           Text="The device in your computer that listens to the audio coming from the radio."/>
+            </StackPanel>
+        </GroupBox>
 
         </StackPanel>
 

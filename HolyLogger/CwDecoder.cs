@@ -1,0 +1,1541 @@
+using System;
+using System.Collections.Generic;
+using System.Text;
+
+namespace HolyLogger
+{
+    // READS CW OUT OF THE AUDIO, with arithmetic only - no model, no library, nothing shipped
+    // alongside. This is the decoder every program of this kind has had since the 1980s, and on a
+    // clean signal it is very good. On a crowded band, or a signal that fades, it is not - which is
+    // what the neural network is for later. Both need this same front end, so it is written first.
+    //
+    // ONE SIGNAL, THE ONE HE IS TUNED TO. The window follows the note in the receiver's passband
+    // rather than reading the whole band at once the way a skimmer does. That matches how the
+    // operator works a station: he tunes somebody in and wants to know what that somebody is
+    // sending. Reading several at once is a different program and can come later if he wants it.
+    //
+    // How it works, in five steps:
+    //   1. Every 5 ms, measure how loud each of a row of frequencies across the passband is over the
+    //      last 20 ms (a Goertzel filter each - a one-frequency Fourier transform, a few lines long).
+    //   2. The frequency that has been loudest over the last second or so IS the note being sent.
+    //      Nobody has to type in the pitch, and it follows him when he tunes.
+    //   3. Is it a station at all? Only if it stands well above the SAME note's neighbours a hundred
+    //      Hz away, and only if the key really takes the tone away rather than rippling it.
+    //   4. That one frequency's loudness over time is the key going up and down. A threshold that
+    //      moves with the noise turns it into on and off.
+    //   5. Lengths of the on and off stretches become dits, dahs, letter gaps and word gaps. The
+    //      speed is learned from what arrives, so nothing has to be set for a fast or slow operator.
+    public class CwDecoder
+    {
+        // ----- the shape of the analysis -----
+
+        // A reading every 5 ms. A dit at 40 WPM is 30 ms, so even the fastest operator gets six
+        // readings to a dit and the measurement is never what limits the accuracy.
+        const double FrameMilliseconds = 5.0;
+
+        // BUT EACH READING LOOKS AT 20 ms OF SOUND, the last four hops, overlapping. The width of
+        // the filter is set by how much sound it looks at and nothing else: 5 ms of audio can only
+        // be measured to about 200 Hz, which lets in a great deal of band noise and most of the
+        // station next door, while 20 ms narrows that to about 50 Hz. Overlapping is what allows
+        // both - a narrow filter AND timing measured to 5 ms - where a plain run of 20 ms blocks
+        // would have to give one up for the other.
+        //
+        // 20 ms was measured, not chosen: 15 scored 185 of 224, 20 scored 190, 25 scored 187 and
+        // 35 scored 182. Longer is a quieter filter but it smears a fast operator's dits, and this
+        // is where the two meet.
+        const int HopsPerWindow = 4;
+
+        // The band of notes we look in. Nobody listens to CW below 300 Hz or above 1200; a wider
+        // search would only offer more chances to lock onto the wrong thing.
+        const double LowestTone = 300.0;
+        const double HighestTone = 1200.0;
+        const double ToneStep = 25.0;
+
+        // Speeds we are willing to believe. Outside this the timing has gone wrong, not the operator.
+        const double SlowestDitMs = 200.0;   // 6 WPM
+        const double FastestDitMs = 24.0;    // 50 WPM
+
+        // A mark shorter than this is a click or a burst of noise, never a dit - and it must never be
+        // allowed into the speed estimate. THIS IS THE FAULT THAT SPOILED THE FIRST VERSION ON THE
+        // AIR: noise crossing the threshold for two readings counted as a very short dit, dragged the
+        // learned speed down to the fastest it would believe, and from there every real gap looked
+        // like the end of a letter - so the window filled with lone Es. A mark also has to be a
+        // reasonable fraction of the dit length already being heard, which is the second guard.
+        // Kept gentle on purpose. An earlier attempt threw away anything under 25 ms, or under half
+        // the dit length already learned, and that turned out to be a trap of its own: at 40 WPM a
+        // dit IS 30 ms, so the dits were thrown away, only the dahs survived, the learned speed
+        // followed them upwards, and the rule then rejected everything real. Keeping noise out is
+        // the job of the signal test above, which can tell noise from a station properly.
+        const double ShortestRealMarkMs = 15.0;
+        const double ShortestFractionOfDit = 0.25;
+
+        // How far above the rest of the band a note has to stand before it is believed to be a
+        // station. Measured in strength, so 6 is a little under 8 dB - low enough for a signal only
+        // just readable by ear, high enough that noise never reaches it.
+        const double SignalOverNoise = 6.0;
+
+        // How many dits and dahs must be heard before anything is written on screen at all. Nothing
+        // is lost while waiting - the text is held and comes out together the moment the gate opens -
+        // but the operator sees a blank window while he can hear the station perfectly well, and he
+        // said so twice.
+        //
+        // EIGHT WAS COSTING SECONDS AND BUYING NOTHING. Swept over all three benches and over the
+        // wait itself, measured from the moment the signal is first heard to the first letter on
+        // screen, across his fourteen recordings:
+        //
+        //     marks   generated   his recordings   W1AW read   invented   average wait   worst
+        //       8      247/256        32/34          1006        328         4.0s        17.3s
+        //       6      247            32             1006        328         3.0s        11.1s
+        //       5      247            32             1006        328         2.6s        11.1s
+        //       4      247            32             1006        328         2.4s        11.1s   <- kept
+        //
+        // Not one of the three quality numbers moves. What guards the empty band was checked
+        // separately and separately, because that is what this constant was for: beacons.wav, three
+        // minutes of band noise and three beacons neither decoder can read, still prints NOTHING at
+        // four; session1.wav, eight minutes of a band that emptied, prints seventeen letters instead
+        // of fifteen. Two letters in eight minutes is what the other second and a half cost.
+        const int MarksNeededBeforeBelieving = 4;
+
+        // The most held-back text kept while waiting to be sure. Eight marks is two or three
+        // characters; this is generous, and it stops a long carrier quietly filling memory.
+        const int MostHeldBack = 40;
+
+        // The running score that decides whether this is Morse at all - see Score below.
+        const int MorseScoreCeiling = 12;
+
+        // HOW LONG THE OPERATOR STARES AT AN EMPTY WINDOW. This was eight, and eight is what he
+        // complained about: he could hear the station perfectly well and the text arrived several
+        // seconds later. It was not imagined and it was worse than it looked - measured across the
+        // recordings, the wait from the first mark to the first letter averaged 6.5 seconds and
+        // reached 20 on a weak one. Twenty seconds of sending is more than the forty characters
+        // held back while waiting, so on the worst of them text was not merely late, it was gone.
+        //
+        // Four costs nothing. Swept over all three measures - the 256 generated cases, the
+        // real-signal word score, and the wait itself - and the quality does not move at all
+        // between eight and one:
+        //
+        //     score to open   generated   real   wait avg   worst
+        //          8            247/256    26      6.5s     20.2s
+        //          6            247        26      4.6s      9.6s
+        //          4            247        26      3.2s      6.9s
+        //          1            247        26      2.2s      4.2s
+        //
+        // Not lower than four, even though the numbers say it costs nothing there either. Below
+        // four it would be EASIER to open the gate than to keep it open, which is the hysteresis
+        // backwards: the gate would open on one good mark and shut on the next bad one, flickering
+        // in a way none of these benches is shaped to catch. Four is the lowest honest value.
+        //
+        // What still guards the empty frequency is unchanged and was checked separately: nothing
+        // at all is printed over three minutes of band noise on beacons.wav, at eight, four or one.
+        const int MorseScoreToOpen = 4;
+        const int MorseScoreToKeep = 3;
+
+        // How much louder the note must be with the key down than with it up before the keying is
+        // believed. Twice is modest for a real signal - a key takes the tone away entirely - and far
+        // beyond anything a steady carrier with noise on it can reach.
+        const double KeyingDepth = 2.0;
+
+        // How many recent dits and dahs are kept to decide which is which. Two dozen is three or
+        // four characters - enough to be sure both kinds are in there, short enough to follow an
+        // operator who changes speed, or a new station taking over the frequency.
+        const int MarkMemory = 24;
+
+        // How many recent gaps are kept to find the line between the two kinds. More than marks,
+        // because both kinds have to be in there and the gaps between characters are the rarer.
+        const int GapMemory = 32;
+
+        // How many 5 ms readings the loudness is averaged over - see the note where it is used.
+        //
+        // SIX WAS TOO MANY FOR A FAST OPERATOR, and it took a real station to show it. A dit at
+        // 35 WPM is 34 ms, so an average over 30 ms spans almost the whole of it: a lone dit gets
+        // flattened, and a weak one drops under the threshold and disappears entirely. The dahs,
+        // three times longer, sail through. That is why L (.-..) kept arriving as D (-..) - always
+        // the SHORT element lost, always on a FAST station.
+        //
+        // Found because the operator noticed the same callsign coming out as LY2PX and DY2PX and
+        // asked which was right. Adding fast weak stations to the bench then measured it: fifteen
+        // ms scored 217 of 256, twenty 231, twenty-five 241, thirty 235.
+        const int ReadingsAveraged = 5;
+
+        // THE DIT AFTER A DAH IS THE ONE THAT GOES MISSING, and it is the only place a lower line is
+        // allowed to help.
+        //
+        // MEASURED, not reasoned. Twenty thousand words of W1AW's bulletin were lined up against the
+        // text ARRL publishes, and every word that came out wrong by exactly one element was traced
+        // to the element that went astray (MissedWhere.py). Fifty elements were lost. Forty-five of
+        // them were DITS. Thirty-two of those forty-five sat immediately after a DAH, although only
+        // a quarter of all dits do - and not one dit was lost after another dit. All thirty-eight
+        // elements judged the wrong length were DAHS heard as something shorter.
+        //
+        // One cause fits all of that: after a long key-down the sound comes back weaker - the
+        // receiver's own gain control ducking, which every Kiwi in the test and his own radio do. So
+        // the dit that follows a dah arrives under the line to START a mark, vanishes, and the
+        // silence left behind (dah, gap, gap) is read as a gap between letters. That is exactly how
+        // WIND came out WINTE and C (-.-.) came out T N.
+        //
+        // WHY THIS IS NOT THE LOWER LINE THAT WAS ALREADY THROWN OUT. That one lowered the line for
+        // every element inside a letter, and lost: an element that starts too easily also fails to
+        // END where it should, so elements bridge into one. This lowers it ONLY in the shadow of a
+        // dah - a couple of dits of silence - and nowhere else, so an element that is already under
+        // way is untouched and the letter gap is untouched.
+        // SWEPT ON ALL THREE BENCHES. The gain is small and it is free, which is the most that can
+        // be had here; anything bolder starts paying for it on the other two benches:
+        //
+        //     shadow line   generated   his recordings   W1AW read   invented
+        //       0.55 (off)   247/256        32/34           1001        335
+        //       0.50         247            32              1006        328   <- kept
+        //       0.45         243            32              1008        324
+        //       0.40         239            30              1010        318
+        //
+        // AND ONLY AFTER A DAH. Letting the lower line follow ANY mark reads six more words of the
+        // bulletin, and costs a case on the generated bench and a word on his own recordings - the
+        // measurement said the dah is where the loss is, and the bench agrees.
+        //
+        // The length of the shadow is not critical: 1.5 dits reads 1003, 2.5 reads 1006, and 4 or 8
+        // add two fewer invented words and nothing else. 2.5 is kept because it cannot reach past
+        // the gap between letters into the next one.
+        // HOW LONG A STATION ALREADY PROVED TO BE MORSE MAY FADE BELOW THE SIGNAL LINE BEFORE IT IS
+        // GIVEN UP, in milliseconds.
+        //
+        // Giving up costs far more than the moment it lasts. It throws away the text held back, the
+        // letter half spelled out and the proof that this is Morse at all, so after every dip the
+        // decoder has to earn its trust again from nothing - four more dits and dahs before a letter
+        // is printed. On his own transmission heard in Austria the signal test called the frequency
+        // empty for about a tenth of the time he was sending, and whole stretches of text were
+        // never printed. A fade on HF lasts a fraction of a second to a second or two; a station that
+        // has really stopped does not come back, and the grace runs out.
+        //
+        // READING ON THROUGH THE FADE LOST; WAITING THROUGH IT WON. Both swept on all four benches:
+        //
+        //     through a fade        grace    generated  his recordings  W1AW read  invented  4Z5SL read  invented
+        //     (no grace)              -       248/256       32/34         1009       327         86        237
+        //     read on                0.5s     248           32            1009       327         89        244
+        //     read on                1s       248           31            1009       327         90        255
+        //     wait, read nothing     1s       248           32            1009       327         88        234
+        //     wait, read nothing     2s       248           32            1009       327         88        233   <- kept
+        //
+        // Reading on recovers the most words and invents more than it recovers, because what sits
+        // under the line in a fade is mostly noise. Waiting loses on no bench. Beyond two seconds it
+        // changes nothing more, and a longer grace would hand a new station the old one's trust.
+        const double FadeGraceMs = 2000.0;
+        const bool PauseDuringFade = true;
+
+        // A SILENCE THIS SHORT, in dits, INSIDE A MARK IS A DIP, NOT THE END OF IT.
+        //
+        // Measured on his own transmission heard in Europe (recordingsz5sl): one mark in eleven was
+        // a fragment under three quarters of a dit, against one in fifty on W1AW, and silences under
+        // half a dit were ten times as common. A signal that has come over a fading path drops for a
+        // few milliseconds in the middle of a dah, the key threshold sees two marks, and a dah comes
+        // out as two dits - HB9CVQ was printed EEEEBONCVQ. So a mark is held for this long after the
+        // tone goes: if it comes straight back, the mark carries on as one.
+        //
+        // JOINING EVERY SHORT DIP WAS A TRAP, and a tempting one. It read far more of his own
+        // transmission, and it wrecked everything else, because a dit, its gap and the next dit
+        // measured in noise can look exactly like a dah with a dip in it:
+        //
+        //     joined whenever the dip is short     generated   his recordings   4Z5SL read  invented
+        //       off                                  247/256       32/34           85        246
+        //       0.25 dit                             240           32              86        239
+        //       0.5 dit                              200           29              98        218
+        //
+        // So two pieces are joined only if one of them is a FRAGMENT - see FragmentDits - which a
+        // torn element leaves and two real dits do not. Swept with that rule, and this is the first
+        // change here that loses on none of the four benches:
+        //
+        //     dip    fragment   generated   his recordings   W1AW read  invented   4Z5SL read  invented
+        //     off       -        247/256       32/34           1006       328          85        246
+        //     0.25     0.75      247           32              1007       327          86        241
+        //     0.3      0.5       248           32              1008       328          85        239
+        //     0.3      0.75      248           32              1009       327          86        237   <- kept
+        //     0.3      1.0       240           31              1009       326          86        233
+        //     0.35     0.75      239           32              1010       325          87        229
+        //     0.5      0.75      227           29              1012       322          88        230
+        //
+        // The bigger gain on his signal is still there to be had, at 0.5 dit and joining everything -
+        // but only by a test that can tell a torn dah from two dits by something other than length.
+        const double DipDits = 0.3;
+
+        // A piece of a mark shorter than this, in dits, is a fragment - no operator sends one.
+        const double FragmentDits = 0.75;
+
+        // MEASURED AND THROWN OUT: TELLING A FADE FROM A GAP BY HOW DEEP IT FALLS.
+        //
+        // The idea was sound on paper. When the key goes up the tone is gone and the loudness drops
+        // to the band noise; when a path fades for an instant the tone is only weaker. So a short
+        // silence whose quietest reading stayed well above the noise floor should be a fade, and its
+        // two pieces could be joined even when neither is a fragment - reaching for the bigger gain
+        // on his transmission that joining every dip showed (86 -> 98 words).
+        //
+        // The depths were measured first, on every short silence: his transmission over the fading
+        // path, W1AW, and his own IC-7610 recordings all show the SAME spread, deep and shallow alike,
+        // with no separate hump for fades. Swept anyway, with the fragment rule kept for the shortest
+        // silences and depth deciding the longer ones:
+        //
+        //     held   shallow at   generated   his recordings   W1AW read  invented   4Z5SL read  invented
+        //     0.3        -         248/256        32/34           1009       327          88        233
+        //     0.4       0.15       247            31              1014       318          93        226
+        //     0.5       0.15       246            31              1017       315          94        228
+        //     0.5       0.2        247            31              1016       316          93        231
+        //
+        // Every form of it cost a word on his own recordings, and the word says why: SP9ADG came out
+        // NP9ADG - two real dits of the S joined into a dah. On a fast, weak signal through a narrow
+        // filter the gap between two dits never falls to the floor either; the 20 ms filter and the
+        // 25 ms average smear it shut. The generated cases it broke were the same kind, 28 WPM and
+        // weak through a 300 Hz filter. Depth cannot separate a fade from a real gap that is too short
+        // to be heard all the way down, and those are exactly the gaps in question. A callsign lost
+        // is worse than a few words gained.
+
+        const double DahShadowDits = 2.5;        // how long after a dah the lower line applies
+        const double DahShadowOnFraction = 0.50; // the lower line, as a fraction of the loud-quiet span
+
+        readonly int _sampleRate;
+        readonly int _hopSamples;
+        readonly int _windowSamples;
+        readonly double[] _toneFrequencies;
+        readonly double[] _coefficients;
+        double[] _binAverage;               // slow average per frequency: which note is really there
+        double[] _binPower;                 // this reading's strength per frequency (a past one while re-reading)
+        readonly double[] _binSorted;       // scratch for finding the middle of the band
+        readonly double[] _window;          // the last _windowSamples of audio, oldest first
+        readonly double[] _taper;           // smooths the ends of the window
+        readonly double[] _levelHistory = new double[ReadingsAveraged];
+        int _windowFill;
+        int _levelIndex;
+
+        int _bestBin;
+        volatile bool _forgetAsked;         // the window has seen the turn change - see ForgetTheOperator
+        double _noiseFloor;
+        double _peak;
+        bool _levelsSeeded;
+
+        bool _keyDown;
+        bool _lastMarkWasDah;               // the dit right after a dah is the one that goes missing
+        double _heldMarkMs;                 // a mark whose end may yet turn out to be a dip - see DipDits
+        double _heldDipMs;                  // the short silence after it, while the next mark decides
+        double _fadedMs;                    // how long a proved station has been under the signal line - see FadeGraceMs
+        double _stateMs;                    // how long the current on/off stretch has lasted
+        double _ditMs = 60.0;               // 20 WPM until the sending says otherwise
+        readonly double[] _marks = new double[MarkMemory];
+        readonly double[] _sorted = new double[MarkMemory];
+        readonly double[] _gaps = new double[GapMemory];
+        readonly double[] _gapSorted = new double[GapMemory];
+        int _gapCount, _gapNext;
+        int _markCount, _markNext;
+        readonly StringBuilder _symbols = new StringBuilder();
+        readonly List<double> _letterMarks = new List<double>(12);
+        double _boundaryMs = 104.0;         // the dit/dah dividing line, until sending sets it
+        bool _looksLikeMorse;               // is what we are hearing built of dits and dahs at all?
+        string _heldLone;                   // a lone E or T waiting to see whether a word follows it
+        bool _atWordStart = true;
+        int _morseScore;
+        double _onLevel, _offLevel;         // how loud the note is with the key down, and up
+        readonly StringBuilder _held = new StringBuilder();
+        bool _letterPending;
+        bool _wordPending;
+
+        /// <summary>The note being decoded, in Hz. 0 before anything has been heard.</summary>
+        public double ToneHz { get; private set; }
+
+        /// <summary>Sending speed as measured from the air, in words a minute.</summary>
+        public double Wpm { get { return 1200.0 / _ditMs; } }
+
+        /// <summary>True while the decoder can see a signal above the noise.</summary>
+        public bool SignalPresent { get; private set; }
+
+        // Whether what is heard has been PROVED to be dits and dahs (the Morse score is up) - the
+        // new decoder (CwElementDecoder) shows its letters only where this decoder hears a station.
+        internal bool ProvedMorse { get { return _looksLikeMorse; } }
+
+        /// <summary>
+        /// Decoded characters as they are finished, one or a few at a time. Raised on whichever
+        /// thread feeds Process - the capture thread - so a screen handler must marshal.
+        /// </summary>
+        public event Action<string> Text;
+
+        /// <summary>
+        /// Every 5 ms reading, handed on as it is measured: which frequency is the note, and the
+        /// strength at every frequency the decoder looks at. For a second reader that wants to hear
+        /// what this one hears - the CTC network - and nothing else.
+        ///
+        /// THE ARRAY IS THE DECODER'S OWN and is overwritten by the next reading, so take what is
+        /// needed from it and do not keep it. Raised on the capture thread, like Text.
+        ///
+        /// WHY THE NETWORK READS THIS rather than a front end of its own: the network it replaces had
+        /// a front end that stretched time by the measured speed, so whenever the speed estimate was
+        /// wrong - and it is always wrong for the first seconds of a new station - the network was
+        /// shown CW at the wrong speed and misread it. These readings come at a fixed 5 ms whatever
+        /// anybody is sending, so the network learns speed itself instead of being told it.
+        /// </summary>
+        public event Action<int, double[]> Reading;
+
+        public CwDecoder(int sampleRate)
+        {
+            _sampleRate = sampleRate < 4000 ? 8000 : sampleRate;
+            _hopSamples = (int)Math.Round(_sampleRate * FrameMilliseconds / 1000.0);
+            _windowSamples = _hopSamples * HopsPerWindow;
+            _window = new double[_windowSamples];
+
+            // A raised cosine over the window. Without it the sharp ends of each window spray energy
+            // across the whole search, and a strong station a few hundred Hz away shows up in the bin
+            // we are listening to. This is most of what "narrower" buys.
+            _taper = new double[_windowSamples];
+            for (int i = 0; i < _windowSamples; i++)
+                _taper[i] = 0.5 - 0.5 * Math.Cos(2.0 * Math.PI * i / (_windowSamples - 1));
+
+            var freqs = new List<double>();
+            for (double f = LowestTone; f <= HighestTone; f += ToneStep) freqs.Add(f);
+            _toneFrequencies = freqs.ToArray();
+
+            _coefficients = new double[_toneFrequencies.Length];
+            for (int i = 0; i < _toneFrequencies.Length; i++)
+                _coefficients[i] = 2.0 * Math.Cos(2.0 * Math.PI * _toneFrequencies[i] / _sampleRate);
+
+            _binAverage = new double[_toneFrequencies.Length];
+            _binPower = new double[_toneFrequencies.Length];
+            _binSorted = new double[_toneFrequencies.Length];
+            _bestBin = _toneFrequencies.Length / 2;
+            _leftBinAt = new long[_toneFrequencies.Length];
+            for (int i = 0; i < _leftBinAt.Length; i++) _leftBinAt[i] = long.MinValue / 2;
+            _pastPower = new double[PastReadings][];
+            for (int i = 0; i < PastReadings; i++) _pastPower[i] = new double[_toneFrequencies.Length];
+        }
+
+        /// <summary>Forget the speed, the note and the half-finished letter. Used by Clear.</summary>
+        public void Reset()
+        {
+            Array.Clear(_binAverage, 0, _binAverage.Length);
+            Array.Clear(_window, 0, _window.Length);
+            Array.Clear(_levelHistory, 0, _levelHistory.Length);
+            _windowFill = 0; _levelIndex = 0; _pastCount = 0;
+            for (int i = 0; i < _leftBinAt.Length; i++) _leftBinAt[i] = long.MinValue / 2;
+            _noiseFloor = 0; _peak = 0; _levelsSeeded = false;
+            _keyDown = false; _lastMarkWasDah = false; _heldMarkMs = 0; _heldDipMs = 0; _fadedMs = 0; _stateMs = 0;
+            _ditMs = 60.0;
+            _markCount = 0; _markNext = 0;
+            Array.Clear(_marks, 0, _marks.Length);
+            _gapCount = 0; _gapNext = 0;
+            Array.Clear(_gaps, 0, _gaps.Length);
+            _symbols.Clear();
+            _letterMarks.Clear();
+            _boundaryMs = 104.0;
+            _looksLikeMorse = false;
+            _morseScore = 0;
+            _heldLone = null; _atWordStart = true;
+            _onLevel = 0; _offLevel = 0;
+            _held.Clear();
+            _letterPending = false; _wordPending = false;
+            SignalPresent = false;
+            ToneHz = 0;
+        }
+
+        /// <summary>Feeds one block of samples from the recorder. Call it with every block.</summary>
+        public void Process(short[] samples, int count)
+        {
+            for (int i = 0; i < count; i++)
+            {
+                _window[_windowFill++] = samples[i] / 32768.0;
+                if (_windowFill < _windowSamples) continue;
+
+                AnalyseWindow();
+
+                // Slide on by one hop and keep the tail, so the next reading overlaps this one.
+                Array.Copy(_window, _hopSamples, _window, 0, _windowSamples - _hopSamples);
+                _windowFill = _windowSamples - _hopSamples;
+            }
+        }
+
+        void AnalyseWindow()
+        {
+            _frameCount++;
+            // The window may have decided the turn changed while we were between readings. Acting on
+            // it here, before anything is started, is what makes it safe - see ForgetTheOperator.
+            if (_forgetAsked) { _forgetAsked = false; ForgetNow(); }
+
+            // Step 1: how strong each candidate note is in the last 20 ms.
+            double best = 0;
+            int bestIndex = _bestBin;
+
+            for (int b = 0; b < _toneFrequencies.Length; b++)
+            {
+                _binPower[b] = Goertzel(_coefficients[b]);
+
+                // A slow average per note. The tone is only present half the time - it is CW - so a
+                // single reading proves nothing, but over a second the sent note stands out clearly.
+                _binAverage[b] = _binAverage[b] * 0.99 + _binPower[b] * 0.01;
+
+                if (_binAverage[b] > best) { best = _binAverage[b]; bestIndex = b; }
+            }
+
+            Array.Copy(_binPower, _pastPower[(int)(_frameCount % PastReadings)], _binPower.Length);
+            if (_pastCount < PastReadings) _pastCount++;
+
+            // Step 2: change note only when another is clearly stronger. Without the margin the
+            // choice would flutter between neighbouring bins on every fade.
+            bool moved = false;
+            if (bestIndex != _bestBin && best > _binAverage[_bestBin] * 1.3)
+            {
+                moved = Math.Abs(bestIndex - _bestBin) >= NewStationBins;
+                _leftBinAt[_bestBin] = _frameCount;
+                _bestBin = bestIndex;
+            }
+
+            ToneHz = InterpolatedNote(_bestBin);
+
+            var reading = Reading;
+            if (reading != null) reading(_bestBin, _binPower);
+
+            if (moved && ReReadOnNewNote) ReReadAtNewNote();
+            ReadTheNote();
+        }
+
+        // A NEW NOTE IS READ FROM WHERE IT BEGAN, NOT FROM WHERE WE NOTICED IT (2026-10-02).
+        //
+        // In a QSO or a pile-up each station has its own note, and the note followed is the one
+        // loudest over the last half second - so when one stops and the next begins, the decoder
+        // stays on the old note for about 0.3 s. Found on his recording of UA6HRB working DL2HW
+        // (watch2/diff_20261002_152207): UA6HRB began at 628 Hz while the decoder still sat on
+        // DL2HW's 444 Hz, and moved over just as the U ended - so every over came out A6HRB,
+        // E6HRB or T6HRB, though the waterfall shows the U and the A clean, 25 dB over the noise.
+        //
+        // So the strength at every note is kept for the last second, and on moving to a note far
+        // enough from the old one to be another station, the last second is read again at the new
+        // note before going on. The question "is a station there?" is asked with the averages as
+        // they stand NOW - the averages of a second ago are exactly what had not yet noticed him.
+        internal static bool ReReadOnNewNote = true;
+        internal static Action<string> TraceReading;
+        const int PastReadings = 200;          // 1 s of readings
+        const int NewStationBins = 2;          // 50 Hz: nearer is the same station drifting
+        internal static double ReReadSeconds = 0.8;
+        const int QuietBeforeReadings = 60;   // 0.3 s
+        // 20 dB in power. Before QuietBeforeReadings existed, 10 and 100 let noise through (generated 112 and
+        // 229 of 256); with it, 100 holds every bench (W1AW invented 327 -> 325) and reads 6 more callsigns
+        // and 8 more CQ on the watcher clips than 1000. 30 read "CQ TEST" where 100 still read "FQ TEST",
+        // but cost one of his recordings (32 -> 31) and 17 invented words on W1AW.
+        internal static double ReReadContrast = 100;
+        double[][] _pastPower;
+        int _pastCount;
+
+        void ReReadAtNewNote()
+        {
+            int back = Math.Min(_pastCount - 1, (int)(ReReadSeconds * 1000 / FrameMilliseconds));
+            // Never back over what was already read at this note: coming back to a station after a
+            // moment on another (two stations sending at once) re-read his last letters a second time
+            // - "CQ DE JD 4Z5SL" on the generated QRM case.
+            back = (int)Math.Min(back, _frameCount - _leftBinAt[_bestBin]);
+            if (back <= 0) return;
+
+            // Is he really there, and where did he begin? Judged on his own note alone: a keyed note
+            // switches between its own quiet and many times that, which neither noise nor a station
+            // beside it does. (Measured against the notes beside it instead, as the live test does, a
+            // crowded pile-up let nobody stand out - the neighbours were stations too.) The stretch
+            // read again starts a little before his first loud reading.
+            var column = new double[back];
+            for (int k = 0; k < back; k++) column[k] = _pastPower[(int)((_frameCount - back + k) % PastReadings)][_bestBin];
+            var sorted = (double[])column.Clone();
+            Array.Sort(sorted);
+            double quiet = Math.Max(sorted[(int)(back * 0.2)], 1e-12), loud = sorted[(int)(back * 0.95)];
+            if (TraceReading != null) TraceReading(string.Format("{0:F3}s REREAD bin {1} back {2} loud/quiet {3:F1}", (_frameCount * FrameMilliseconds) / 1000.0, _bestBin, back, loud / quiet));
+            if (loud < quiet * ReReadContrast) return;
+            int first = 0;
+            while (first < back && column[first] < quiet * ReReadContrast) first++;
+            // ONLY A STATION THAT HAS JUST BEGUN. He must have been silent for a while before his first
+            // loud reading - the start of his over. Two stations sending at once are both loud all
+            // along; hopping between them and reading back turned the 4 of 4Z5SL into a J on the
+            // generated QRM case (the letter was half read before the hop).
+            if (first < QuietBeforeReadings) return;
+            back -= Math.Max(0, first - 10);          // 50 ms before his first loud reading
+
+            // The old station's key state is his; the new one starts with the key up.
+            _keyDown = false;
+            _lastMarkWasDah = false;
+            _heldMarkMs = 0;
+            _heldDipMs = 0;
+            _stateMs = 0;
+
+            double[] now = _binPower;
+            long frameNow = _frameCount;
+            double fadedMs = _fadedMs;
+            _rereading = true;
+            try
+            {
+                for (long f = frameNow - back; f < frameNow; f++)
+                {
+                    _binPower = _pastPower[(int)(f % PastReadings)];
+                    _frameCount = f;
+                    ReadTheNote();
+                }
+            }
+            finally
+            {
+                _binPower = now;
+                _frameCount = frameNow;
+                _fadedMs = fadedMs;
+                _rereading = false;
+            }
+            // ...and he goes on being heard while the slow averages catch up with him, up to a second.
+            _trustNewStationUntil = frameNow + PastReadings;
+        }
+
+        long _trustNewStationUntil;
+
+        double _traceMarkMax;                  // the loudest reading of the mark in progress, over the peak
+        double _lastMarkTop;                   // the same for the mark just ended
+
+        // A WEAK LONE DIT IS NOT A LETTER (2026-10-02). On his watcher clips the stray Es inside words
+        // ("WE6HRB", "EEEESW") came from dits that peaked at 0.84 of the station's loudness (median),
+        // where the dits of real letters peaked at 0.98 and above in 9 of 10. A letter that is one dit
+        // and no louder than WeakDitTop of the station is dropped. 0 = off.
+        //
+        // MEASURED AND THROWN OUT - it only ever lost. Swept on all benches:
+        //
+        //     WeakDitTop   generated   his recordings   W1AW read  invented   4Z5SL read  invented
+        //       off          248/256       32/34           1009       327         531        704
+        //       0.7          248           32              1008       327         528        707
+        //       0.8          248           32              1007       328         527        704
+        //       0.9          248           30              1006       328         526        703
+        //       1.0          248           29              1001       333         524        704
+        //
+        // Not one invented word less anywhere: on the benches the stray letters are not weak dits,
+        // and real Es fading under the station's peak were dropped. Left at 0.
+        internal static double WeakDitTop = 0;
+        long[] _leftBinAt;                     // the reading at which each note was last left
+
+        bool _rereading;                       // the stretch being read again is known to hold a station
+
+        // Steps 3 and 4: the followed note's loudness this reading, and what the key is doing.
+        void ReadTheNote()
+        {
+            // Step 3: that note's LOUDNESS is the key, up or down.
+            //
+            // Loudness, not energy. Energy is loudness squared, and squaring stretches the random
+            // ups and downs of band noise into something that looks a lot like a signal - which is
+            // how noise came to be decoded as letters. Taking the square root puts noise back into a
+            // narrow band around its own average, where a threshold can be set above it honestly.
+            double level = Math.Sqrt(_binPower[_bestBin]);
+
+            // AVERAGED OVER THE LAST SIX READINGS - 30 ms of sound.
+            //
+            // Averaging is how noise is beaten: a single reading of noise can be twice its
+            // neighbours, six in a row cannot. It costs sharpness at the ends of a mark, which is
+            // why it cannot simply be made longer and longer.
+            //
+            // SIX WAS MEASURED, and the obvious clever idea lost. Tying the length of the average to
+            // the speed being heard - a quarter of a dit, so a slow operator gets a longer average
+            // than a fast one - sounds right and scored 190 of 224. A plain fixed six scored 210,
+            // and seven the same. Eight and ten fell away again. The reason a fixed length wins is
+            // that the speed is not known when it is needed: early on, and on exactly the weak
+            // signals this is meant to help, the learned speed is still wrong, so tying the average
+            // to it makes the average wrong in the same direction.
+            _levelHistory[_levelIndex] = level;
+            _levelIndex = (_levelIndex + 1) % _levelHistory.Length;
+
+            int readings = ReadingsAveraged;
+
+            double sum = 0;
+            for (int i = 1; i <= readings; i++)
+            {
+                int at = _levelIndex - i;
+                if (at < 0) at += _levelHistory.Length;
+                sum += _levelHistory[at];
+            }
+            double smoothed = sum / readings;
+
+            if (!_levelsSeeded) { _noiseFloor = smoothed; _peak = smoothed; _levelsSeeded = true; }
+
+            // The floor drops quickly to anything quieter and creeps up slowly, so it settles on the
+            // band noise; the peak does the opposite and settles on the sent tone. Between them they
+            // give a threshold that follows a fading signal instead of losing it.
+            // Both settle within a couple of seconds, which is roughly how fast a signal fades up and
+            // down on HF - so the threshold rides the fade instead of losing the weak half of it.
+            _noiseFloor += (smoothed < _noiseFloor) ? (smoothed - _noiseFloor) * 0.05 : (smoothed - _noiseFloor) * 0.005;
+            _peak += (smoothed > _peak) ? (smoothed - _peak) * 0.05 : (smoothed - _peak) * 0.005;
+
+            // MEASURED AND THROWN OUT, TWICE NOW, AND THIS IS THE SECOND AND BETTER ATTEMPT.
+            //
+            // The complaint is real and the diagnosis is not in doubt: these two chase the extremes
+            // and both lag, the peak coming down at half a percent a reading, so a station that
+            // fades keeps a threshold set by how loud he WAS. That is what left the fourth dit of
+            // LY2PX at 0.324 under a line standing at 0.386, and it is why a callsign is mangled
+            // while CQ stays readable - one lost element ruins a callsign and CQ can spare one.
+            //
+            // WHAT WAS BUILT. CW sits in two places and almost nowhere in between, so a window of
+            // recent readings sorted into order should show a low cluster (band noise, key up) and
+            // a high one (the tone, key down), and a percentile in from each end names them. Unlike
+            // the attempt before it - which learned the two levels separately and died at 40 WPM
+            // because a 30 ms mark is too little to learn from - this learns from every reading
+            // whatever the key is doing, so a fast operator gives it as much to work with as a slow
+            // one. The reasoning was sound and it is still sound.
+            //
+            // IT LOST BADLY, at every setting swept - three window lengths against four percentiles:
+            //
+            //     window   1/4    1/10   1/20   1/50      (real-signal score, 29 is the standing one)
+            //       2s      11     14     16     16
+            //       4s      13     12     12     12
+            //       8s      12      9      8     10
+            //
+            // WHY, and this is the part worth keeping. A percentile follows the CONTENT as well as
+            // the signal: a run of dahs, a long word gap, a pause between overs all move it, and it
+            // moves the threshold under a station who has not changed at all. The slow floor-and-
+            // peak pair is deaf to that by construction, and its deafness turns out to be worth far
+            // more than its lag costs. Being slow is the feature.
+            //
+            // So the lag stays a known weakness. A third attempt must not replace this pair - it has
+            // now beaten two replacements - and must find some other way to catch the element that
+            // falls just under the line. DO NOT rebuild the level tracker again.
+            double span = _peak - _noiseFloor;
+
+            // IS THERE A SIGNAL AT ALL? Asking whether this one note is loud compared with its own
+            // quiet moments is not enough - band noise has loud and quiet moments too, and answering
+            // that question wrongly is exactly what filled the window with lone Es on the air.
+            //
+            // The honest question is whether this note stands out from THE NOTES EITHER SIDE OF IT.
+            // Noise is much the same at one frequency as at the next, so a hiss is no louder here
+            // than it is a hundred Hz away; only a real signal is. Comparing across frequencies costs
+            // nothing - the strength at every note has already been measured - and it cannot be
+            // fooled by a burst of static, because static is loud everywhere at once.
+            // Harder to gain than to keep, like the key threshold and for the same reason. A signal
+            // that is only just strong enough would otherwise be declared present and absent over
+            // and over, and every time it went absent the letter being spelled out was thrown away -
+            // so a station next to another one lost letters it had actually decoded correctly.
+            double standsOutBy = _binAverage[_bestBin] / NoiseBesideTheNote();
+            bool standsOut = _rereading || _frameCount < _trustNewStationUntil || (SignalPresent
+                                ? standsOutBy > SignalOverNoise * 0.5
+                                : standsOutBy > SignalOverNoise)
+                            && span > 1e-5;
+
+            // A STATION ALREADY PROVED TO BE MORSE IS NOT GIVEN UP AT THE FIRST FADE - see FadeGraceMs.
+            bool fading = false;
+            if (standsOut) _fadedMs = 0;
+            else if (SignalPresent && _looksLikeMorse && _fadedMs < FadeGraceMs)
+            {
+                _fadedMs += FrameMilliseconds;
+                standsOut = true;
+                fading = true;
+            }
+
+            SignalPresent = standsOut;
+            if (TraceReading != null) TraceReading(string.Format("{0:F3}s bin {1} standsOutBy {2:F2} present {3} fading {4}", (_frameCount * FrameMilliseconds) / 1000.0, _bestBin, standsOutBy, SignalPresent, fading));
+
+            // WHILE IT IS FADED, NOTHING IS READ - the decoder only waits. Reading on through the fade
+            // was tried first: it did recover words, and it printed more wrong ones than it recovered,
+            // because what is under the line in a fade is mostly noise. Waiting keeps everything the
+            // fade used to destroy - the trust, the held text, the letter in hand - and reads nothing
+            // that is not there.
+            if (fading && PauseDuringFade) return;
+            if (!SignalPresent)
+            {
+                FinishAnythingPending();
+                _keyDown = false;
+                _lastMarkWasDah = false;
+                _heldMarkMs = 0;
+                _heldDipMs = 0;
+                _stateMs = 0;
+                return;
+            }
+
+            // MEASURED AND THROWN OUT: SPOTTING A NEW STATION BY A JUMP IN STRENGTH.
+            //
+            // The reasoning was good. Off the air, one station handing over to another went from
+            // standing out six times above the noise beside it to three hundred and forty-four,
+            // while the note moved all of eighteen Hz - so loudness looked like a far better tell
+            // than pitch, and it would have fired at the first mark instead of waiting for the
+            // letters to come out wrong.
+            //
+            // It fired ZERO times, on all six recordings, in both forms it was tried: against the
+            // reading 5 ms earlier, and against a five-second trailing average. The reason is above
+            // this line - _binAverage is already smoothed over half a second, so even a station
+            // arriving out of nowhere climbs there smoothly and never multiplies by eight against
+            // any reference. Lowering the eight far enough to fire would have fired on ordinary
+            // fading as well, which throws away a speed that was worth keeping.
+            //
+            // The score falling to nothing catches the same handover a second or two later, and
+            // does it honestly. Not worth a test that costs work and never triggers.
+
+            // Two thresholds, not one: a signal hovering on a single threshold would chatter on and
+            // off many times inside one dit. They sit well apart for the same reason.
+            //
+            // A tracker that learned the key-down and key-up loudness separately was tried here, on
+            // the reasoning that it would follow a fade faster than this long-term range can. It was
+            // measurably worse - 86 of 104 against 94 - and it destroyed fast sending completely,
+            // because at 40 WPM a mark is 30 ms and there is not enough of it to learn from. Deep
+            // fading is left as a known weakness rather than paid for with everything else.
+            // SWEPT AGAIN ON 18 SEPTEMBER 2026, both lines together, now that a second transmission of
+            // his (recordingsz5sl2, a clear frequency, all three parts) had joined the benches.
+            // Every move helps somewhere and costs somewhere, so both lines stay where they are:
+            //
+            //     start  keep    generated   his recordings   W1AW read  invented   4Z5SL read  invented
+            //     0.45   0.35     238/256       33/34           1026       303         356        470
+            //     0.48   0.35     246           32              1020       310         367        475
+            //     0.50   0.35     246           32              1017       319         366        487
+            //     0.55   0.35     248           32              1009       327         370        508   <- kept
+            //     0.60   0.35     248           30               998       338         371        543
+            //     0.55   0.25     244           28              1031       303         382        481
+            //     0.55   0.30     246           31              1020       311         372        497
+            //     0.55   0.40     248           31               991       348         352        538
+            //     0.48   0.30     243           31              1032       296         368        471
+            //
+            // A lower start line reads more of W1AW and one more word of his own recordings, and
+            // invents fewer words everywhere - but it costs ten generated cases and fourteen words of
+            // his transmission. Nothing here wins on all five, which is the standing rule.
+            double onThreshold = _noiseFloor + span * 0.55;
+            double offThreshold = _noiseFloor + span * 0.35;
+
+            // MEASURED AND THROWN OUT: A LOWER LINE FOR AN ELEMENT INSIDE A LETTER.
+            //
+            // WHY IT LOOKED RIGHT, and the diagnosis behind it is sound and worth keeping. Traced
+            // on the air, on the L of LY2PX at 19.1 seconds into ly2px.wav: the fourth dit WAS
+            // there and reached 0.324, while the line to start a mark stood at 0.386 because the
+            // same station had been at 0.53 a fifth of a second earlier. It fell a sixth short, so
+            // ".-.." came out as ".-." and the callsign read RY2PX. And 0.324 is well above the
+            // 0.286 needed to KEEP a mark going - the decoder would happily have carried that
+            // element, it simply refused to begin it. The reasoning followed: in mid-letter we
+            // already know a man is sending, so the high line is guarding against nothing.
+            //
+            // IT WORKED, AND IT STILL LOST. At the full drop to the lower line it found LY2PX twice
+            // and BONNE, the two words this decoder had never got - and broke MERCI, POUR CE, 73 GL
+            // and LB2WD, which it had. Swept, both benches, and the line is straight:
+            //
+            //     mid-letter line   generated   real signals
+            //     span * 0.35         232/256       21/25
+            //     span * 0.40         232           22
+            //     span * 0.45         241           22
+            //     span * 0.50         246           22
+            //     span * 0.55         247           23      <- no change at all
+            //
+            // There is no level at which it pays. An element that starts too easily also fails to
+            // END where it should, so two elements bridge into one, and that costs more characters
+            // than the fading dit wins. DO NOT RETRY without a way to catch the weak element that
+            // does not also weaken the gap - the gap and the mark are the same threshold here.
+            // IN THE SHADOW OF A DAH the line to start a mark is lowered - see DahShadowDits above
+            // for the measurement that says this is where the lost dits are, and only here.
+            double startLine = onThreshold;
+            if (!_keyDown && _lastMarkWasDah && _stateMs <= _ditMs * DahShadowDits)
+                startLine = _noiseFloor + span * DahShadowOnFraction;
+
+            bool nowDown = _keyDown ? smoothed > offThreshold : smoothed > startLine;
+            if (TraceReading != null) TraceReading(string.Format("{0:F3}s bin {1} lvl {2:F4} on {3:F4} off {4:F4} floor {5:F4} peak {6:F4} down {7}", (_frameCount * FrameMilliseconds) / 1000.0, _bestBin, smoothed, startLine, offThreshold, _noiseFloor, _peak, nowDown));
+
+            // HOW DEEPLY THE NOTE ACTUALLY SWITCHES OFF. Kept only to judge what we are hearing -
+            // never to set the threshold above, which was tried and made fast sending far worse.
+            //
+            // A real key takes the tone away completely: while it is up, all that is left is the
+            // noise floor, so the note is several times louder down than up. A steady carrier, or a
+            // birdie, is always there; the threshold still finds edges in the noise riding on it,
+            // but the loud parts are barely louder than the quiet ones. That ratio is the difference
+            // between a station and a whistle, and no amount of studying the LENGTHS can see it.
+            if (nowDown) _traceMarkMax = Math.Max(_traceMarkMax, smoothed / Math.Max(_peak, 1e-12));
+            if (nowDown) _onLevel = _onLevel > 0 ? _onLevel * 0.9 + smoothed * 0.1 : smoothed;
+            else _offLevel = _offLevel > 0 ? _offLevel * 0.9 + smoothed * 0.1 : smoothed;
+
+            if (nowDown == _keyDown)
+            {
+                _stateMs += FrameMilliseconds;
+                if (!_keyDown)
+                {
+                    // The silence has now lasted too long to be a dip: the held mark really ended.
+                    if (_heldMarkMs > 0 && _stateMs > _ditMs * DipDits) ReleaseHeldMark();
+                    CheckGaps();
+                }
+                return;
+            }
+
+            // Step 4: the state changed, so the stretch that just ended has a length worth reading.
+            double lasted = _stateMs;
+            _keyDown = nowDown;
+            _stateMs = FrameMilliseconds;
+
+            if (!nowDown)
+            {
+                if (_heldDipMs > 0)
+                {
+                    // A MARK, A SHORT DIP, AND NOW A SECOND MARK - one element broken by fading, or
+                    // two real ones close together? Only a FRAGMENT gives it away: a dah torn in the
+                    // middle leaves at least one piece far shorter than any dit, while a dit, its
+                    // gap and the next dit leave two pieces of full size. Joining without asking this
+                    // welded real dit pairs together and cost the generated bench 47 cases.
+                    double first = _heldMarkMs, dip = _heldDipMs, second = lasted;
+                    _heldDipMs = 0;
+                    double fragment = _ditMs * FragmentDits;
+
+                    if (first < fragment || second < fragment)
+                        _heldMarkMs = first + dip + second;
+                    else
+                    {
+                        _heldMarkMs = 0;
+                        EndOfMark(first);
+                        RememberGap(dip);
+                        _heldMarkMs = second;
+                    }
+                }
+                else _heldMarkMs = lasted;
+
+                // NOT ENDED YET - it may be a dip. See DipDits.
+                if (DipDits <= 0) ReleaseHeldMark();
+            }
+            else if (_heldMarkMs > 0 && lasted <= _ditMs * DipDits)
+            {
+                // The tone came straight back. Whether that silence was a dip or a real gap is
+                // decided when this next mark ends and its length is known - see above.
+                _heldDipMs = lasted;
+            }
+            else
+            {
+                ReleaseHeldMark();
+                RememberGap(lasted);
+            }
+        }
+
+        // THE NOTE TO A FEW Hz, not to the nearest 25.
+        //
+        // The filters are 25 Hz apart, so taking the strongest one as the answer rounds the note to
+        // the nearest 25 - and that was too coarse for the job the note has to do. Two stations in a
+        // QSO sit a few tens of Hz apart, being netted to each other by ear, and telling one from
+        // the other by pitch needs better than a 25 Hz ruler.
+        //
+        // A tone between two filters lights both of them, and how much of each says where it really
+        // is. Three strengths - the strongest and its two neighbours - lie on a curve, and the top of
+        // that curve is the note. Taking their logarithms first is what makes it a fair curve to fit:
+        // a tapered filter's response falls away in a shape that is close to a parabola in decibels
+        // and nothing like one in raw strength. The answer is good to a few Hz, and it costs three
+        // logarithms.
+        double InterpolatedNote(int bin)
+        {
+            double centre = _toneFrequencies[bin];
+            if (bin <= 0 || bin >= _binAverage.Length - 1) return centre;
+
+            double left = _binAverage[bin - 1];
+            double mid = _binAverage[bin];
+            double right = _binAverage[bin + 1];
+            if (left <= 0 || mid <= 0 || right <= 0) return centre;
+
+            double l = Math.Log(left), m = Math.Log(mid), r = Math.Log(right);
+
+            double curvature = l - 2 * m + r;
+            if (Math.Abs(curvature) < 1e-12) return centre;
+
+            double offset = 0.5 * (l - r) / curvature;
+
+            // Never further than half a step: beyond that the strongest filter would have been a
+            // different one, and a wild answer here would be worse than the rounding it replaced.
+            if (offset > 0.5) offset = 0.5;
+            if (offset < -0.5) offset = -0.5;
+
+            return centre + offset * ToneStep;
+        }
+
+        // How loud it is JUST BESIDE the note we are listening to - a hundred or two Hz either side,
+        // which is near enough to be the same noise and far enough not to be the note itself.
+        //
+        // THIS MUST BE MEASURED CLOSE BY, and getting that wrong is what put lone Es on the screen a
+        // second time. The first attempt compared the note against the middle of the whole search,
+        // 300 to 1200 Hz. But a receiver has a CW filter: inside it there is a hump of noise, and
+        // outside it there is next to nothing. So the whole search is not one band of noise at all,
+        // and any note inside the filter towered over a "middle" that was really the silence outside
+        // it. Every hiss in the passband passed the test.
+        //
+        // Beside the note, inside the same filter, noise is noise: a hiss is as loud there as it is
+        // here, and only a real signal is louder here than beside itself.
+        double NoiseBesideTheNote()
+        {
+            const int Guard = 3;      // 75 Hz - close enough that the note itself still spills in
+            const int Reach = 8;      // 200 Hz - as far as we go before it may be another filter
+
+            double left = SideMedian(_bestBin, -1, Guard, Reach);
+            double right = SideMedian(_bestBin, +1, Guard, Reach);
+
+            // The louder side. A note sitting at the edge of the receiver's filter has the filter's
+            // skirt on one side of it, which is quiet for reasons that have nothing to do with
+            // whether anybody is sending.
+            double beside = Math.Max(left, right);
+            return beside < 1e-12 ? 1e-12 : beside;
+        }
+
+        double SideMedian(int centre, int direction, int guard, int reach)
+        {
+            int n = 0;
+            for (int step = guard; step <= reach; step++)
+            {
+                int b = centre + direction * step;
+                if (b < 0 || b >= _binAverage.Length) continue;
+                _binSorted[n++] = _binAverage[b];
+            }
+            if (n == 0) return 0;
+            Array.Sort(_binSorted, 0, n);
+            return _binSorted[n / 2];
+        }
+
+        // A one-frequency Fourier transform over the window, tapered at both ends.
+        double Goertzel(double coefficient)
+        {
+            double s1 = 0, s2 = 0;
+            for (int i = 0; i < _windowSamples; i++)
+            {
+                double s0 = _window[i] * _taper[i] + coefficient * s1 - s2;
+                s2 = s1;
+                s1 = s0;
+            }
+            double power = s1 * s1 + s2 * s2 - coefficient * s1 * s2;
+            return power < 0 ? 0 : power / _windowSamples;
+        }
+
+        void ReleaseHeldMark()
+        {
+            if (_heldMarkMs <= 0) return;
+            double mark = _heldMarkMs;
+            _heldMarkMs = 0;
+            EndOfMark(mark);
+        }
+
+        void EndOfMark(double lengthMs)
+        {
+            if (TraceReading != null) TraceReading(string.Format("{0:F3}s mark {1:F0} ms (dit {2:F0}) top {3:F2}", (_frameCount * FrameMilliseconds) / 1000.0, lengthMs, _ditMs, _traceMarkMax));
+            _lastMarkTop = _traceMarkMax;
+            _traceMarkMax = 0;
+            // Too short to be anything a person sent - a click, a crash of static, or the edge of
+            // somebody else's signal. Thrown away WITHOUT being remembered: letting it into the
+            // speed estimate is what ruined the first version on the air.
+            if (lengthMs < ShortestRealMarkMs) return;
+            if (lengthMs < _ditMs * ShortestFractionOfDit) return;
+
+            _marks[_markNext] = lengthMs;
+            _markNext = (_markNext + 1) % MarkMemory;
+            if (_markCount < MarkMemory) _markCount++;
+
+            // DITS AND DAHS ARE TOLD APART BY LOOKING AT THE LAST TWO DOZEN OF THEM, not by
+            // measuring each one against a running guess. A single guess that starts too slow can
+            // never recover: every dah falls just under its own threshold, gets counted as a dit,
+            // and drags the guess back up again. Two dozen marks nearly always contain both kinds,
+            // and then the two lengths stand a clear 3:1 apart and the line between them is obvious.
+            //
+            // NOT the shortest and longest of the two dozen, though: one mangled mark at either end
+            // would set the whole scale. A fifth of the way in from each end gives the same answer
+            // on clean sending and ignores the freaks on bad sending.
+            Array.Copy(_marks, _sorted, _markCount);
+            Array.Sort(_sorted, 0, _markCount);
+            double shortest = _sorted[_markCount / 5];
+            double longest = _sorted[_markCount - 1 - _markCount / 5];
+
+            // The dividing line is the GEOMETRIC middle, not the plain average. These are lengths in
+            // a ratio to each other, so the fair midpoint between 40 and 120 is 69, not 80 - and
+            // that difference is exactly what decides a borderline character.
+            bool canTellThemApart = longest >= shortest * 2.2;
+            double boundary = canTellThemApart ? Math.Sqrt(shortest * longest) : _ditMs * 1.732;
+            _boundaryMs = boundary;
+
+            bool isDah = lengthMs > boundary;
+            _lastMarkWasDah = isDah;
+
+            // THE LENGTHS ARE KEPT, NOT THE DOTS AND DASHES, and the letter is only spelled out when
+            // the gap after it says it is finished. By then a mark or two more has been heard, so the
+            // first letter off a station whose speed is not known yet gets read with a dividing line
+            // that has already learned something - which is the difference between C and F when
+            // somebody starts sending at 40 WPM.
+            if (_letterMarks.Count == 0) _letterStartFrame = _frameCount - (long)(lengthMs / FrameMilliseconds) - TimingLagFrames;
+            _letterEndFrame = _frameCount - TimingLagFrames;
+            _letterMarks.Add(lengthMs);
+
+            // The speed comes from the short cluster - the dits - averaged. Until both kinds have
+            // been seen, fall back on what this one mark implies about the speed.
+            double impliedDit;
+            if (canTellThemApart)
+            {
+                double sum = 0; int n = 0;
+                for (int i = 0; i < _markCount; i++)
+                    if (_marks[i] <= boundary) { sum += _marks[i]; n++; }
+                impliedDit = n > 0 ? sum / n : shortest;
+            }
+            else impliedDit = isDah ? lengthMs / 3.0 : lengthMs;
+
+            // THE MARKS AND THE GAPS ARE WRONG BY THE SAME AMOUNT IN OPPOSITE DIRECTIONS, so the
+            // two together give a dit that neither gives alone.
+            //
+            // A mark is measured between the moments its loudness crosses the threshold, which is
+            // some way up the rising edge and some way down the falling one - so every mark measures
+            // SHORT by roughly twice that. The gap either side of it is bounded by the same two
+            // crossings, so every gap measures LONG by the same amount. Marks short by 2d, gaps long
+            // by 2d, and the average of the two has no d in it at all.
+            //
+            // It shows in the data. On a recording that decoded well the gaps inside characters sat
+            // at 0.85 of the learned dit; on one that decoded badly they sat at 1.0 to 1.5 and
+            // crowded the line that ends a character - the dit estimate running short, exactly as
+            // this predicts, and exactly what splits a character in two.
+            // MEASURED AND REJECTED. Averaging the mark-derived dit with the gap-derived one was
+            // tried and changed NOTHING - the gap histogram in units of the learned dit came out
+            // identical to the last gap, because the two estimates already agree. So the threshold
+            // does not pull marks and gaps apart the way the reasoning above says it should, and
+            // there is no bias here to cancel.
+            _ditMs = _ditMs * 0.5 + impliedDit * 0.5;
+            if (_ditMs < FastestDitMs) _ditMs = FastestDitMs;
+            if (_ditMs > SlowestDitMs) _ditMs = SlowestDitMs;
+
+            JudgeWhetherThisIsMorse(boundary);
+
+            _letterPending = true;
+            _wordPending = true;
+        }
+
+        // DOES WHAT WE ARE HEARING ACTUALLY LOOK LIKE MORSE? Nothing else asked this, and it is the
+        // question that finally silences an empty frequency.
+        //
+        // Being loud enough is not the same as being a station. A steady carrier, a birdie, a noisy
+        // receiver, a burst of atmospherics - any of them can stand above the noise beside them, and
+        // the moment they do, the on-and-off threshold starts finding edges in them and letters come
+        // out. But their edges fall where they like.
+        //
+        // Morse cannot. It is built out of exactly two lengths, one three times the other, and every
+        // mark is close to one of them. So we measure that directly: the two lengths must be there,
+        // one must be about three times the other, and most marks must sit close to whichever they
+        // belong to. Noise cannot keep that up, and a station cannot help it.
+        void JudgeWhetherThisIsMorse(double boundary)
+        {
+            if (_markCount < MarksNeededBeforeBelieving) { Score(false); return; }
+
+            double shortSum = 0, longSum = 0;
+            int shortCount = 0, longCount = 0;
+            for (int i = 0; i < _markCount; i++)
+            {
+                if (_marks[i] <= boundary) { shortSum += _marks[i]; shortCount++; }
+                else { longSum += _marks[i]; longCount++; }
+            }
+
+            // Only one length heard so far - a run of dits, or a run of dahs. Nothing to judge yet.
+            if (shortCount == 0 || longCount == 0) { Score(false); return; }
+
+            double shortMean = shortSum / shortCount;
+            double longMean = longSum / longCount;
+            double ratio = longMean / shortMean;
+
+            // A dah is three dits. Real operators are loose, so anything from twice to four and a
+            // half times is allowed - but noise lands outside this far more often than inside it.
+            if (ratio < 2.0 || ratio > 4.5) { Score(false); return; }
+
+            int nearItsOwnLength = 0;
+            for (int i = 0; i < _markCount; i++)
+            {
+                double belongsTo = _marks[i] <= boundary ? shortMean : longMean;
+                if (Math.Abs(_marks[i] - belongsTo) <= belongsTo * 0.4) nearItsOwnLength++;
+            }
+
+            bool lengthsLookRight = nearItsOwnLength >= _markCount * 0.7;
+
+            // ...and the key must really be lifting the tone away, not just rippling it.
+            bool keyingIsReal = _offLevel > 0 && _onLevel > _offLevel * KeyingDepth;
+
+            Score(lengthsLookRight && keyingIsReal);
+        }
+
+        // ONCE IS NOT ENOUGH. A carrier with noise on top of it, chopped into marks by the
+        // threshold, will now and then throw up a run of lengths that happens to look like Morse -
+        // and a single instant of agreement was enough to open the gate and let a burst of rubbish
+        // out. So agreement has to be sustained: each mark that fits scores one, each mark that does
+        // not costs two, and the gate opens only well up the scale. Real sending climbs it in a
+        // couple of characters and stays there; noise and carriers rattle around the bottom.
+        void Score(bool fitsMorse)
+        {
+            int was = _morseScore;
+
+            _morseScore += fitsMorse ? 1 : -2;
+            if (_morseScore < 0) _morseScore = 0;
+            if (_morseScore > MorseScoreCeiling) _morseScore = MorseScoreCeiling;
+
+            // THE SPEED BELONGS TO THE STATION, AND THE STATION HAS JUST CHANGED.
+            //
+            // When one operator stops and another starts, the two dozen remembered marks are still
+            // the old man's. He may have been sending at 40 words a minute and the new one at 14,
+            // and until his marks are flushed out one by one every dit of the new station measures
+            // longer than the old dit/dah line and is read as a dah. Measured off the air: at 38
+            // seconds into a recording a 14 WPM station began while the decoder still held a 32 ms
+            // dit and a 63 ms line, and four seconds of him came out as "GT TOATTT TTTT 4T". By the
+            // time the memory had crawled up to an 86 ms dit he was being read perfectly.
+            //
+            // Falling to nothing is the decoder saying, in its own words, that what it is hearing is
+            // not built of dits and dahs at all - which is exactly when the remembered lengths are
+            // worth nothing. So they go, and the new station is measured from his own sending.
+            // Only on the way down: sitting at nothing must not keep wiping the memory, or it could
+            // never gather the eight marks it needs to believe in anybody.
+            if (was > 0 && _morseScore == 0) ForgetNow();
+
+            bool wasOpen = _looksLikeMorse;
+
+            // Harder to open than to keep open, so a fade or one bad character does not shut the
+            // decoder up in the middle of a callsign.
+            _looksLikeMorse = wasOpen ? _morseScore >= MorseScoreToKeep : _morseScore >= MorseScoreToOpen;
+
+            if (_looksLikeMorse && !wasOpen) ReleaseHeldText();
+        }
+
+        // THE LINE BETWEEN A GAP INSIDE A CHARACTER AND A GAP BETWEEN CHARACTERS, taken from the
+        // gaps the operator is actually leaving rather than from two dits of a learned dit length.
+        //
+        // WHY IT WAS WRONG BEFORE. The old line was 2 x the learned dit. Measured off the air, the
+        // gaps themselves fall in two clean clusters with an empty valley between them - 91 gaps
+        // between half a dit and one and a quarter, then nothing at all until two - so the gaps are
+        // not ambiguous and never were. What wobbles is the DIT ESTIMATE. Let that estimate run
+        // briefly short and an ordinary one-dit gap measures as more than two of them, and a
+        // character is cut in half: OM3CW came out as MTM3CW, the O's own inside gap read as a gap
+        // between letters, splitting --- into -- and -.
+        //
+        // Measuring the gaps directly takes the dit estimate out of the question altogether. It also
+        // follows an operator who leaves wider gaps than the book says, which many good ones do.
+        void RememberGap(double lengthMs)
+        {
+            if (TraceReading != null) TraceReading(string.Format("{0:F3}s gap {1:F0} ms", (_frameCount * FrameMilliseconds) / 1000.0, lengthMs));
+            if (lengthMs < 5 || lengthMs > 3000) return;
+
+            _gaps[_gapNext] = lengthMs;
+            _gapNext = (_gapNext + 1) % GapMemory;
+            if (_gapCount < GapMemory) _gapCount++;
+        }
+
+        // THE MARKS AND THE GAPS ARE NOT WRONG IN OPPOSITE DIRECTIONS - measured, not assumed.
+        //
+        // The reasoning said they must be: a mark is measured between the moments its loudness
+        // crosses the threshold, some way up the rising edge and some way down the falling one, so
+        // marks should read short and the gaps either side of them long by the same amount - and
+        // averaging the two would cancel it. It was built, and the gap histogram in units of the
+        // learned dit came out IDENTICAL to the last gap. The two estimates already agree. Left
+        // written down so the idea is not had twice.
+        double LetterGapMs()
+        {
+            // MEASURED AND REJECTED - TWICE. Two dits of the learned dit length is what this returns,
+            // and it is what it returned before, because two attempts to do better both made the
+            // decoder measurably worse on real recordings.
+            //
+            // The idea was sound enough: the letter line is 2 x a dit estimate that wobbles, so take
+            // it from the gaps themselves instead. The gaps do fall in two clean clusters with an
+            // empty valley between them - 91 gaps under one and a quarter dits, then nothing until
+            // two - so there is a right answer in there. Finding it reliably is the part that failed.
+            //
+            // Taking a high percentile as the long end put the line too HIGH: that end of the list is
+            // word gaps and the pauses between transmissions, not gaps between characters, and whole
+            // phrases ran together - "F RST 599 5NN BK" came out "FRST5995NNBK". Taking a low
+            // percentile as the short end and multiplying up put it too LOW: that percentile sits
+            // under the top of the cluster, and characters split - PLAISIR into "PL AI SIR", DELTA
+            // into "D EL TA", 80W into "8 0 W".
+            //
+            // Both scored worse than this one line. The gap memory is left in place because it costs
+            // nothing and it is what any third attempt would need; the note above it says what has
+            // already been tried, so nobody spends another evening on the same two ideas.
+            return _ditMs * 2.0;
+        }
+
+        // Called on every frame of silence: as soon as the gap is long enough to BE a letter gap the
+        // letter is written out. Waiting for the next mark would put the whole decode one letter
+        // behind the operator, which is exactly when it stops being useful.
+        void CheckGaps()
+        {
+            if (_letterPending && _stateMs >= LetterGapMs())
+            {
+                EmitLetter();
+                _letterPending = false;
+            }
+
+            // Five dits, not seven. Seven is what a machine sends between words; a person's word gap
+            // wanders either side of it, and the only thing that must not happen is mistaking one for
+            // the three-dit gap between letters. Halfway between three and seven is the safe place.
+            // AND THE WORD GAP FOLLOWS THE LETTER GAP BY ARITHMETIC, not by a guess.
+            //
+            // The three gaps stand at 1, 3 and 7 dits. Divide each pair at its geometric middle and
+            // the two dividing lines are sqrt(3) and sqrt(21) - so the second is sqrt(7) times the
+            // first, whatever the operator's speed or spacing. Guessing 2.2 here instead put the
+            // word line below where the gaps between characters actually fell, and PLAISIR came out
+            // as "P L AI S IR": every letter right, a space thrown in between most of them.
+            if (_wordPending && !_letterPending && _stateMs >= _ditMs * 5.0)
+            {
+                Output(" ");
+                _wordPending = false;
+            }
+        }
+
+        // The signal has gone - the station stopped, or it faded into the noise. Whatever marks were
+        // half way through a letter are THROWN AWAY, not written out.
+        //
+        // Writing them out was the last place a lone E could still escape onto the screen: a single
+        // blip of noise makes one short mark, the signal test then decides there is no station after
+        // all, and the half letter that blip started got printed as an E. A letter cut short by the
+        // signal disappearing was never trustworthy anyway. When a station simply stops sending, the
+        // ordinary gap has already written its last letter out long before this runs.
+        /// <summary>
+        /// Throw away the speed learned from the operator who was sending, and measure the next one
+        /// from his own sending instead.
+        ///
+        /// The remembered marks are the only thing dropped. The note, the levels and the letter
+        /// being spelled out are left alone: the frequency has not moved and the letter in hand may
+        /// well be the new man's first.
+        ///
+        /// Called from three places, each of which knows the turn has changed for its own reason -
+        /// the score falling to nothing, the signal jumping in strength, and the window telling us
+        /// it has just broken the line on a K, a BK or a prosign.
+        ///
+        /// ASKED FOR HERE, DONE ON THE SOUND THREAD. The window calls this from the screen thread,
+        /// and emptying the marks from under the sound thread stopped the decoder dead: it was in
+        /// the middle of AddMark, had already copied the marks out to sort them, and asked for the
+        /// one a fifth of the way in from the end of nothing - which is item minus one. The sound
+        /// thread died on it and no letter ever appeared again. So the answer is left as a note and
+        /// picked up at the top of the next reading, where nothing is half done.
+        /// </summary>
+        public void ForgetTheOperator()
+        {
+            _forgetAsked = true;
+        }
+
+        void ForgetNow()
+        {
+            _markCount = 0;
+            _markNext = 0;
+        }
+
+        void FinishAnythingPending()
+        {
+            DropHeldLone();
+            _letterMarks.Clear();
+            _symbols.Clear();
+            _letterPending = false;
+            _wordPending = false;
+            _looksLikeMorse = false;
+            _morseScore = 0;
+            _heldLone = null; _atWordStart = true;
+            _onLevel = 0; _offLevel = 0;
+            _held.Clear();
+        }
+
+        void EmitLetter()
+        {
+            if (_letterMarks.Count == 0) return;
+
+            // MEASURED AND THROWN OUT: FITTING THE WHOLE CHARACTER'S TIMING AT ONCE.
+            //
+            // One line judges every mark on its own and cannot know that the marks of one letter
+            // came from one operator inside a fifth of a second. An operator running long, or
+            // fading, moves ALL his elements together, so a reading where the dit is a tenth longer
+            // ought sometimes to explain a whole letter better than the standing line does. This is
+            // what ggmorse does - it weighs timing candidates against a cost - and it is the obvious
+            // next idea after the level tracker.
+            //
+            // Built: try dit lengths from 0.65 to 1.55 of the learned one, score each by how far
+            // every mark lands from the nearer of one dit and three, as a FRACTION so a dah is not
+            // punished three times over for the same proportional error, and read the letter against
+            // the winner. Pulled gently back towards the learned dit so a one-element letter cannot
+            // invent a scale (at any scale a single mark is exactly one dit, and E would become T).
+            //
+            // NOT A SINGLE POINT MOVED. 247 of 256 generated and 29 of 31 real, identical, at every
+            // strength of that pull from 0.5 down to nothing at all.
+            //
+            // WHY, and this is the finding worth having. Counted directly: across the ten recordings
+            // the fit reads only 34 elements differently out of 824 letters - four per cent - and
+            // those changes are a wash, some better and some worse. The classification is scale
+            // free: stretch the dit and the dit/dah line stretches with it, so a well separated
+            // letter reads the same however the scale is chosen, and one that is not well separated
+            // is not separated at any scale either.
+            //
+            // WHAT IT PROVES ABOUT EVERYTHING ELSE. The errors left in this decoder are NOT misjudged
+            // dits and dahs. They are elements that were never detected, and elements that ran into
+            // each other. No amount of re-scoring what was detected can recover what was not, and
+            // that is where any further work has to go.
+            _symbols.Clear();
+            for (int i = 0; i < _letterMarks.Count; i++)
+                _symbols.Append(_letterMarks[i] > _boundaryMs ? '-' : '.');
+            string pattern = _symbols.ToString();
+            if (RespellByOwnTiming && !FromMorseTable.ContainsKey(pattern))
+            {
+                string own = SpellByOwnTiming(_letterMarks);
+                if (own != null) pattern = own;
+            }
+            _letterMarks.Clear();
+
+            if (pattern == "." && WeakDitTop > 0 && _lastMarkTop < WeakDitTop) return;
+            if (TraceReading != null) TraceReading(string.Format("{0:F3}s emit {1}", (_frameCount * FrameMilliseconds) / 1000.0, pattern));
+
+            // A run of dits and dahs that spells nothing is DROPPED, not shown. It was printed as
+            // <..-.> at first, on the reasoning that an operator could often read it himself. On the
+            // air that was wrong: what it really means is that the signal broke up, so the brackets
+            // arrive exactly when the text is already hard to follow and make it harder still. The
+            // operator asked for silence instead, and silence is also the honest answer - we did not
+            // hear a letter.
+            //
+            // MEASURED AND THROWN OUT: SPLITTING IT INTO TWO LETTERS AT ITS LONGEST GAP.
+            //
+            // Counted first: 7.3% of the letters on his transmission over the fading path spell
+            // nothing, 6.2% on his own recordings, 0.6% on W1AW - and many look like two letters with
+            // the gap between them read short (".....-", "-.-..-"). The gap between two letters is the
+            // longest in the pattern and it was measured, so the pattern was split there, when that gap
+            // stood out from every other by a factor and both halves spelled a letter:
+            //
+            //     split when longest gap is   generated   his recordings   W1AW read  invented   4Z5SL read  invented
+            //       off                        248/256       32/34           1009       327          88        233
+            //       any amount longer          248           32              1007       334          88        239
+            //       1.2 times                  248           32              1009       328          88        234
+            //       1.3, 1.5 or 2 times        248           32              1009       327          88        233
+            //
+            // Clear splits changed no word on any bench; looser ones only invented. A word with one
+            // letter recovered is usually still wrong somewhere else, and a pattern with no clear
+            // pause in it was never two letters that could be told apart.
+            string letter;
+            if (FromMorseTable.TryGetValue(pattern, out letter))
+            {
+                var timed = LetterTimed;
+                if (timed != null) timed(letter, _letterStartFrame * _hopSamples, _letterEndFrame * _hopSamples);
+                Output(letter);
+            }
+        }
+
+        // EVERY LETTER WITH WHERE ITS MARKS WERE, for the waterfall in the decode window - so this
+        // decoder's letters sit under their own dits and dahs, straight above the new decoder's (his
+        // request: the two readings one over the other). Raised the moment the letter is spelled out,
+        // before any holding back - a held letter is still this decoder's reading of those marks. In
+        // samples from the first one given; TimingLagFrames takes off the smoothing's delay.
+        public event Action<string, long, long> LetterTimed;
+        const int TimingLagFrames = 4;
+        long _frameCount, _letterStartFrame, _letterEndFrame;
+
+        // EVERY LETTER GOES THROUGH HERE, and until the sending has been recognised as Morse it is
+        // held back rather than shown - or thrown away.
+        //
+        // Holding rather than throwing away matters: the proof that this is Morse takes eight marks,
+        // two or three characters, and those characters are the beginning of a callsign. Dropping
+        // them would mean the decoder was always right and always started with "Q DE" instead of
+        // "CQ DE". Held, they arrive a moment late and whole. If the signal turns out to be noise
+        // after all, they are never shown at all.
+        // A SINGLE E OR T STANDING ALONE AS A WORD IS NOISE, and dropping it is the biggest single
+        // gain left in this decoder.
+        //
+        // One dit, or one dah, with a word gap either side of it. Nobody sends that: no word in a
+        // QSO is one letter long, and E and T are the two characters a single blip of noise decodes
+        // to. Six of the fifteen bench failures were the whole message read PERFECTLY and then a
+        // stray E after it - "CQ DE 4Z5SL K E" - the station having stopped and the noise carrying
+        // on. A decoder that weighs whole characters would never catch these, because E is a
+        // perfectly good character; what gives it away is standing alone.
+        //
+        // So it is held rather than printed, and it is only printed if a letter follows it inside
+        // the same word. Nothing else is delayed - a lone E is the only thing that waits.
+        // A LETTER THAT SPELLS NOTHING IS READ AGAIN BY ITS OWN TIMING (2026-10-03).
+        //
+        // SX2LGT called CQ every ten seconds and Plain printed "Q SX2LGT" nearly every time. In the
+        // pause between calls the noise had taught it a dit of 24 ms - 50 WPM, the fastest it allows -
+        // so the C at 32 WPM, marks 110 50 120 40 ms, read as ---. against that line, spelled nothing,
+        // and was dropped; by the Q the speed had come right again. The letter carries its own answer:
+        // its dahs are its long marks and its dits its short ones, two groups with a clear jump
+        // between them. So a letter that spells nothing is split at the biggest jump between its sorted
+        // mark lengths - if that jump is a real one (DahDitRatio) - and kept if THAT spells a letter.
+        // Only letters that were going to be thrown away are touched.
+        internal static bool RespellByOwnTiming = true;
+        const double DahDitRatio = 1.8;
+
+        static string SpellByOwnTiming(List<double> marks)
+        {
+            if (marks.Count < 2) return null;
+            var sorted = new List<double>(marks);
+            sorted.Sort();
+            double bestRatio = 0, line = 0;
+            for (int i = 0; i + 1 < sorted.Count; i++)
+            {
+                double ratio = sorted[i + 1] / Math.Max(sorted[i], 1);
+                if (ratio > bestRatio) { bestRatio = ratio; line = Math.Sqrt(sorted[i] * sorted[i + 1]); }
+            }
+            if (bestRatio < DahDitRatio) return null;
+            var sb = new StringBuilder();
+            foreach (double m in marks) sb.Append(m > line ? '-' : '.');
+            string pattern = sb.ToString();
+            return FromMorseTable.ContainsKey(pattern) ? pattern : null;
+        }
+
+        static bool IsLoneNoiseLetter(string text)
+        {
+            return text == "E" || text == "T";
+        }
+
+        void ReleaseHeldLone()
+        {
+            if (_heldLone == null) return;
+            string lone = _heldLone;
+            _heldLone = null;
+            Output(lone);
+        }
+
+        void DropHeldLone()
+        {
+            _heldLone = null;
+        }
+
+        void Output(string text)
+        {
+            // A letter following the held one, with no word gap between: it was part of a word after
+            // all, so both go out.
+            if (_heldLone != null && text != " ")
+            {
+                string lone = _heldLone;
+                _heldLone = null;
+                Output(lone);
+            }
+            else if (_heldLone != null && text == " ")
+            {
+                // A word gap after it: it WAS a word on its own. Dropped, and the space with it -
+                // two spaces round nothing would leave a hole where the noise was.
+                _heldLone = null;
+                return;
+            }
+
+            if (_atWordStart && IsLoneNoiseLetter(text))
+            {
+                _heldLone = text;
+                _atWordStart = false;
+                return;
+            }
+
+            _atWordStart = text == " ";
+
+            OutputNow(text);
+        }
+
+        void OutputNow(string text)
+        {
+            if (_looksLikeMorse) { Raise(text); return; }
+
+            _held.Append(text);
+            if (_held.Length > MostHeldBack) _held.Remove(0, _held.Length - MostHeldBack);
+        }
+
+        void ReleaseHeldText()
+        {
+            if (_held.Length == 0) return;
+            string text = _held.ToString();
+            _held.Clear();
+            Raise(text);
+        }
+
+        void Raise(string text)
+        {
+            var handler = Text;
+            if (handler == null) return;
+            try { handler(text); }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        // Pattern to character. The letters, figures and the punctuation that actually turns up in a
+        // QSO, plus the prosigns sent as one run of dits and dahs.
+        // Shared with the neural reader, which spells its characters out of the same table.
+        internal static readonly Dictionary<string, string> FromMorseTable = new Dictionary<string, string>
+        {
+            {".-","A"},   {"-...","B"}, {"-.-.","C"}, {"-..","D"},  {".","E"},    {"..-.","F"},
+            {"--.","G"},  {"....","H"}, {"..","I"},   {".---","J"}, {"-.-","K"},  {".-..","L"},
+            {"--","M"},   {"-.","N"},   {"---","O"},  {".--.","P"}, {"--.-","Q"}, {".-.","R"},
+            {"...","S"},  {"-","T"},    {"..-","U"},  {"...-","V"}, {".--","W"},  {"-..-","X"},
+            {"-.--","Y"}, {"--..","Z"},
+            {"-----","0"},{".----","1"},{"..---","2"},{"...--","3"},{"....-","4"},
+            {".....","5"},{"-....","6"},{"--...","7"},{"---..","8"},{"----.","9"},
+            {".-.-.-","."},  {"--..--",","}, {"..--..","?"},  {"-..-.","/"},
+            {".--.-.","@"},  {"-...-","="},  {"-....-","-"},
+            {"-.--.-",")"},  {".----.","'"}, {"---...",":"},  {"-.-.-.",";"},
+            {"..--.-","_"},  {"...-..-","$"},{"-.-.--","!"},  {".-..-.","\""},
+            // Prosigns, written the way an operator writes them down. KN and the opening bracket are
+            // the same run of dits and dahs; on the air it is always KN, so that is what it says.
+            //
+            // ONLY THE ONES REALLY SENT. AA, HH and SN were here too and were taken out: they are
+            // almost never sent on purpose, and what they nearly always are is two ordinary letters
+            // that ran into each other and were read as one. Leaving them in meant every merged pair
+            // came out as a prosign, which reads as though something meaningful was heard when
+            // nothing was. Unknown runs print nothing at all, and these now do the same.
+            {".-...","<AS>"}, {".-.-.","<AR>"}, {"...-.-","<SK>"}, {"-.--.","<KN>"},
+        };
+    }
+}

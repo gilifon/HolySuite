@@ -142,6 +142,7 @@ namespace HolyLogger.OptionsUserControls
             // THE PORT LIST FOLLOWS THE USB PLUGS by itself while this page is open - see ListenForPorts.
             Loaded += (sender, args) => ListenForPorts(true);
             Unloaded += (sender, args) => ListenForPorts(false);
+            InitCwDecodeDevicePicker();
 
             HasChanged = false;
         }
@@ -410,6 +411,53 @@ namespace HolyLogger.OptionsUserControls
                 (!string.IsNullOrWhiteSpace(savedDev) && devices.Contains(savedDev, StringComparer.OrdinalIgnoreCase))
                     ? devices.First(d => string.Equals(d, savedDev, StringComparison.OrdinalIgnoreCase))
                     : SystemDefaultDevice;
+        }
+
+        // ── the RECORDING device the CW decoder listens to ────────────────
+        //
+        // Deliberately beside the output-device picker rather than in the decode window: it is set
+        // once when the station is wired up, and the decode window has to know the answer BEFORE it
+        // opens, because it opens by itself whenever the radio goes to CW.
+        bool _loadingCwDecodeDevice;
+
+        void InitCwDecodeDevicePicker()
+        {
+            _loadingCwDecodeDevice = true;
+            try
+            {
+                var devices = new List<string> { SystemDefaultDevice };
+                try { devices.AddRange(WaveInRecorder.GetInputDeviceNames()); }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+                string saved = Properties.Settings.Default.CwDecodeInputDevice;
+                CB_CwDecodeDevice.ItemsSource = devices;
+                CB_CwDecodeDevice.SelectedItem =
+                    (!string.IsNullOrWhiteSpace(saved) && devices.Contains(saved, StringComparer.OrdinalIgnoreCase))
+                        ? devices.First(d => string.Equals(d, saved, StringComparison.OrdinalIgnoreCase))
+                        : SystemDefaultDevice;
+            }
+            finally { _loadingCwDecodeDevice = false; }
+        }
+
+        private void BTN_RefreshCwDecodeDevices_Click(object sender, RoutedEventArgs e)
+        {
+            InitCwDecodeDevicePicker();
+        }
+
+        private void CB_CwDecodeDevice_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_loadingCwDecodeDevice) return;
+
+            try
+            {
+                Properties.Settings.Default.CwDecodeInputDevice = DeviceSettingFrom(CB_CwDecodeDevice);
+                Properties.Settings.Default.Save();
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+            // A decode window already open and listening moves to the new device at once, rather
+            // than going on listening to the old one until it is closed and opened again.
+            CwDecodeWindow.RaiseInputDeviceChanged();
         }
 
         // The saved device string for a picker: empty for "System default", else the device name.

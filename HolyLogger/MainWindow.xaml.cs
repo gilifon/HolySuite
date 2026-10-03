@@ -4865,8 +4865,17 @@ namespace HolyLogger
 
                 // And the one line comes back to the bar - see CanTypeCwOnTheBar.
                 if (cwLiteKeyer != null) cwLiteKeyer.KeyerWindowOpen = false;
+
+                // The decode window came up with the keyer, so it goes down with it.
+                CloseCwDecodeIfItOpenedItself();
             };
             cwKeyboard.Show();
+
+            // Sending and reading belong together: the window that reads the other station opens
+            // with the one that answers him. Tied to the KEYER rather than to the radio being in CW,
+            // because a rig sitting in CW all evening is not the same as an operator working CW -
+            // this way the sound card is only taken while he is actually at it.
+            OpenCwDecodeWithKeyer();
             UpdateActionKeyLabels();
             RefreshEsmHint();   // its first four buttons show the ESM hint from the moment it opens
         }
