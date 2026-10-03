@@ -922,6 +922,22 @@ namespace HolyLogger
         // Everything in every open window that has an animation running on it right now, by window,
         // type and name - an animation that never stops makes the one drawing engine all HolyLogger's
         // windows share redraw on every frame.
+        // Every window of the program by type, shown or not, its size, and "SEE-THROUGH" for a layered
+        // window (AllowsTransparency) - those are drawn by the processor, not the graphics card, and
+        // redrawing one is far dearer than an ordinary window.
+        static string OpenWindowsNow()
+        {
+            var parts = new System.Collections.Generic.List<string>();
+            try
+            {
+                foreach (Window w in Application.Current.Windows)
+                    parts.Add(string.Format(System.Globalization.CultureInfo.InvariantCulture, "{0}{1} {2:F0}x{3:F0}{4}",
+                        w.GetType().Name, w.IsVisible ? "" : "(hidden)", w.ActualWidth, w.ActualHeight, w.AllowsTransparency ? " SEE-THROUGH" : ""));
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+            return string.Join(", ", parts);
+        }
+
         static string AnimatingNow()
         {
             var found = new System.Collections.Generic.List<string>();
@@ -977,8 +993,20 @@ namespace HolyLogger
             catch (Exception swallowed) { Log.Swallow(swallowed); return op.Priority.ToString(); }
         }
 
+        // ONLY ON A MACHINE THAT ASKS FOR IT: the frame log and the probe run only when the file
+        // %TEMP%\HolyLogger_cw_flow.on exists (his, for finding the jumps), so a released program never
+        // writes a growing log for anybody else.
+        static readonly bool FlowLogOn = FlowLogWanted();
+
+        static bool FlowLogWanted()
+        {
+            try { return System.IO.File.Exists(System.IO.Path.Combine(System.IO.Path.GetTempPath(), "HolyLogger_cw_flow.on")); }
+            catch (Exception swallowed) { Log.Swallow(swallowed); return false; }
+        }
+
         void WaterfallFrame(object sender, EventArgs e)
         {
+            if (!FlowLogOn) { WaterfallFrameInner(); return; }
             if (!_probeOn) StartProbe();
             double flowStart = _flowClock.Elapsed.TotalMilliseconds;
             long flowShown = _wfShown, flowOffset = _wfOffset;
@@ -1003,6 +1031,7 @@ namespace HolyLogger
                     _flowLog.AppendFormat("# {0:F0} ms: {1} frames, {2} late or long\n", flowStart, _flowFrames, _flowLate);
                     _flowLog.AppendFormat("# tier {0}, windows {1}, animating: {2}\n", RenderCapability.Tier >> 16,
                         Application.Current.Windows.Count, AnimatingNow());
+                    _flowLog.AppendFormat("# open: {0}\n", OpenWindowsNow());
                     System.IO.File.AppendAllText(System.IO.Path.Combine(System.IO.Path.GetTempPath(), "HolyLogger_cw_flow.tsv"), _flowLog.ToString());
                     _flowLog.Clear();
                     _flowFrames = 0; _flowLate = 0;
