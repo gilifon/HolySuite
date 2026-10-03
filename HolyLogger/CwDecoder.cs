@@ -573,6 +573,26 @@ namespace HolyLogger
         }
 
         long _trustNewStationUntil;
+        double _traceMarkMax;                  // the loudest reading of the mark in progress, over the peak
+        double _lastMarkTop;                   // the same for the mark just ended
+
+        // A WEAK LONE DIT IS NOT A LETTER (2026-10-02). On his watcher clips the stray Es inside words
+        // ("WE6HRB", "EEEESW") came from dits that peaked at 0.84 of the station's loudness (median),
+        // where the dits of real letters peaked at 0.98 and above in 9 of 10. A letter that is one dit
+        // and no louder than WeakDitTop of the station is dropped. 0 = off.
+        //
+        // MEASURED AND THROWN OUT - it only ever lost. Swept on all benches:
+        //
+        //     WeakDitTop   generated   his recordings   W1AW read  invented   4Z5SL read  invented
+        //       off          248/256       32/34           1009       327         531        704
+        //       0.7          248           32              1008       327         528        707
+        //       0.8          248           32              1007       328         527        704
+        //       0.9          248           30              1006       328         526        703
+        //       1.0          248           29              1001       333         524        704
+        //
+        // Not one invented word less anywhere: on the benches the stray letters are not weak dits,
+        // and real Es fading under the station's peak were dropped. Left at 0.
+        internal static double WeakDitTop = 0;
         long[] _leftBinAt;                     // the reading at which each note was last left
 
         bool _rereading;                       // the stretch being read again is known to hold a station
@@ -798,6 +818,7 @@ namespace HolyLogger
             // birdie, is always there; the threshold still finds edges in the noise riding on it,
             // but the loud parts are barely louder than the quiet ones. That ratio is the difference
             // between a station and a whistle, and no amount of studying the LENGTHS can see it.
+            if (nowDown) _traceMarkMax = Math.Max(_traceMarkMax, smoothed / Math.Max(_peak, 1e-12));
             if (nowDown) _onLevel = _onLevel > 0 ? _onLevel * 0.9 + smoothed * 0.1 : smoothed;
             else _offLevel = _offLevel > 0 ? _offLevel * 0.9 + smoothed * 0.1 : smoothed;
 
@@ -962,7 +983,9 @@ namespace HolyLogger
 
         void EndOfMark(double lengthMs)
         {
-            if (TraceReading != null) TraceReading(string.Format("{0:F3}s mark {1:F0} ms (dit {2:F0})", (_frameCount * FrameMilliseconds) / 1000.0, lengthMs, _ditMs));
+            if (TraceReading != null) TraceReading(string.Format("{0:F3}s mark {1:F0} ms (dit {2:F0}) top {3:F2}", (_frameCount * FrameMilliseconds) / 1000.0, lengthMs, _ditMs, _traceMarkMax));
+            _lastMarkTop = _traceMarkMax;
+            _traceMarkMax = 0;
             // Too short to be anything a person sent - a click, a crash of static, or the edge of
             // somebody else's signal. Thrown away WITHOUT being remembered: letting it into the
             // speed estimate is what ruined the first version on the air.
@@ -1307,9 +1330,15 @@ namespace HolyLogger
             _symbols.Clear();
             for (int i = 0; i < _letterMarks.Count; i++)
                 _symbols.Append(_letterMarks[i] > _boundaryMs ? '-' : '.');
+            string pattern = _symbols.ToString();
+            if (RespellByOwnTiming && !FromMorseTable.ContainsKey(pattern))
+            {
+                string own = SpellByOwnTiming(_letterMarks);
+                if (own != null) pattern = own;
+            }
             _letterMarks.Clear();
 
-            string pattern = _symbols.ToString();
+            if (pattern == "." && WeakDitTop > 0 && _lastMarkTop < WeakDitTop) return;
             if (TraceReading != null) TraceReading(string.Format("{0:F3}s emit {1}", (_frameCount * FrameMilliseconds) / 1000.0, pattern));
 
             // A run of dits and dahs that spells nothing is DROPPED, not shown. It was printed as
@@ -1374,6 +1403,37 @@ namespace HolyLogger
         //
         // So it is held rather than printed, and it is only printed if a letter follows it inside
         // the same word. Nothing else is delayed - a lone E is the only thing that waits.
+        // A LETTER THAT SPELLS NOTHING IS READ AGAIN BY ITS OWN TIMING (2026-10-03).
+        //
+        // SX2LGT called CQ every ten seconds and Plain printed "Q SX2LGT" nearly every time. In the
+        // pause between calls the noise had taught it a dit of 24 ms - 50 WPM, the fastest it allows -
+        // so the C at 32 WPM, marks 110 50 120 40 ms, read as ---. against that line, spelled nothing,
+        // and was dropped; by the Q the speed had come right again. The letter carries its own answer:
+        // its dahs are its long marks and its dits its short ones, two groups with a clear jump
+        // between them. So a letter that spells nothing is split at the biggest jump between its sorted
+        // mark lengths - if that jump is a real one (DahDitRatio) - and kept if THAT spells a letter.
+        // Only letters that were going to be thrown away are touched.
+        internal static bool RespellByOwnTiming = true;
+        const double DahDitRatio = 1.8;
+
+        static string SpellByOwnTiming(List<double> marks)
+        {
+            if (marks.Count < 2) return null;
+            var sorted = new List<double>(marks);
+            sorted.Sort();
+            double bestRatio = 0, line = 0;
+            for (int i = 0; i + 1 < sorted.Count; i++)
+            {
+                double ratio = sorted[i + 1] / Math.Max(sorted[i], 1);
+                if (ratio > bestRatio) { bestRatio = ratio; line = Math.Sqrt(sorted[i] * sorted[i + 1]); }
+            }
+            if (bestRatio < DahDitRatio) return null;
+            var sb = new StringBuilder();
+            foreach (double m in marks) sb.Append(m > line ? '-' : '.');
+            string pattern = sb.ToString();
+            return FromMorseTable.ContainsKey(pattern) ? pattern : null;
+        }
+
         static bool IsLoneNoiseLetter(string text)
         {
             return text == "E" || text == "T";

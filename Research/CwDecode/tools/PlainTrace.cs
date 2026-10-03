@@ -13,6 +13,7 @@ namespace HolyLogger
             int rate = BitConverter.ToInt32(bytes, 24);
             double from = double.Parse(a[1], System.Globalization.CultureInfo.InvariantCulture), to = double.Parse(a[2], System.Globalization.CultureInfo.InvariantCulture);
             if (Environment.GetEnvironmentVariable("PT_NOREREAD") == "1") CwDecoder.ReReadOnNewNote = false;
+            if (Environment.GetEnvironmentVariable("PT_NORESPELL") == "1") CwDecoder.RespellByOwnTiming = false;
             var all = new System.Text.StringBuilder();
             var d = new CwDecoder(rate);
             d.Text += s => all.Append(s);
