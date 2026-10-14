@@ -1180,6 +1180,10 @@
     <Content Include="Data\callsigns_merged_big.txt">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <!-- The World Castles Award list (71,380 castles) behind the COTA suggestions: WcaDirectory. -->
+    <Content Include="Data\wca_castles.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
     <!-- Recorded voice for the spoken cluster alerts. A wildcard, because the folder is normally
          empty: recordings can be dropped in later without anyone editing this file again. -->
     <Content Include="Voice\*.wav">

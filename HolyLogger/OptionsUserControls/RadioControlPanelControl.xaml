@@ -57,6 +57,7 @@
             <!-- Each folder its own colour, as in Statistics: Regular the Worked green, WWFF the eQSL purple. -->
             <ListBoxItem Content="Regular" IsSelected="True" Background="{DynamicResource RowOnFreqBg}"/>
             <ListBoxItem Content="WWFF" Background="#E6CCFF"/>
+            <ListBoxItem Content="COTA" Background="#FFE0B2"/>
         </ListBox>
 
         <Border x:Name="FolderFrame" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1" Padding="8,10,8,10"
@@ -72,6 +73,8 @@
                                Text="Each band button on the panel holds three frequencies. Pressing the button moves the radio to the SSB one when the panel is on SSB, the CW one when it is on CW, and the RTTY one when it is on RTTY. Frequencies are in kHz. Uncheck Select for a band your radio does not cover - its button on the panel goes grey and stops responding."/>
                     <TextBlock x:Name="WwffIntro" FontSize="16" TextWrapping="Wrap" Visibility="Hidden"
                                Text="Used while Activity on the main window is WWFF. An empty box means the band has no WWFF frequency, and the Regular one is used. RTTY always uses the Regular one. Frequencies are in kHz. Uncheck Select for a band you do not want in WWFF - its button on the panel goes grey while Activity is WWFF."/>
+                    <TextBlock x:Name="CotaIntro" FontSize="16" TextWrapping="Wrap" Visibility="Hidden"
+                               Text="Used while Activity on the main window is COTA (Castles on the Air). An empty box means the band has no COTA frequency, and the Regular one is used. RTTY always uses the Regular one. Frequencies are in kHz. Uncheck Select for a band you do not want in COTA - its button on the panel goes grey while Activity is COTA."/>
                 </Grid>
                 <TextBlock Text="You may edit any frequency" FontSize="16" FontWeight="Bold" Foreground="Blue" Margin="0,0,0,10"/>
                 <Grid>
@@ -79,6 +82,7 @@
                          missing from the panel, or the other way round. -->
                     <Grid x:Name="BandGrid"/>
                     <Grid x:Name="WwffGrid" Visibility="Hidden"/>
+                    <Grid x:Name="CotaGrid" Visibility="Hidden"/>
                 </Grid>
 
                 <!-- Shown only after a typed frequency fell outside its band and was put back. -->

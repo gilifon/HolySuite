@@ -493,7 +493,10 @@ namespace HolyLogger
         /// </summary>
         public void ShowWwffHint()
         {
-            WwffHint.Visibility = _main != null && _main.IsWwffActivity ? Visibility.Visible : Visibility.Collapsed;
+            string set = _main?.ActivityFrequencySet;
+            WwffHint.Text = set ?? "WWFF";
+            WwffHint.ToolTip = (set ?? "WWFF") + " activation: the band buttons go to the " + (set ?? "WWFF") + " frequencies";
+            WwffHint.Visibility = set != null ? Visibility.Visible : Visibility.Collapsed;
             // Activity just changed, maybe: the WWFF folder has its own Select, so the band buttons
             // that work may be different now - without waiting for the radio's next report.
             ApplyBandsOffered();
@@ -502,11 +505,11 @@ namespace HolyLogger
         private void ApplyBandsOffered()
         {
             if (_bandButtons == null) return;
-            bool wwff = _main != null && _main.IsWwffActivity;
+            string set = _main?.ActivityFrequencySet;
             foreach (var button in _bandButtons)
             {
                 var band = button.Tag as RadioBandPreset;
-                button.IsEnabled = _rigOnline && (band == null || band.IsOffered(wwff));
+                button.IsEnabled = _rigOnline && (band == null || band.IsOffered(set));
             }
         }
 
@@ -612,7 +615,7 @@ namespace HolyLogger
             // activation. 6m and up keep FM: it is normal there, and Sukkot is worked that way.
             bool hf = band.HighKhz <= 30000;
             if (hf && !IsHfMode(mode)) mode = _lastHfMode;
-            _main.TuneRadioToKhz(band.FrequencyFor(mode, _main.IsWwffActivity), mode);
+            _main.TuneRadioToKhz(band.FrequencyFor(mode, _main.ActivityFrequencySet), mode);
         }
 
         private void ModeButton_Click(object sender, RoutedEventArgs e)
@@ -634,7 +637,7 @@ namespace HolyLogger
             bool hasOwnFrequency = string.Equals(mode, "SSB", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(mode, "CW", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(mode, "RTTY", StringComparison.OrdinalIgnoreCase);
-            double khz = hasOwnFrequency && _currentBand != null ? _currentBand.FrequencyFor(mode, _main.IsWwffActivity) : _rigKhz;
+            double khz = hasOwnFrequency && _currentBand != null ? _currentBand.FrequencyFor(mode, _main.ActivityFrequencySet) : _rigKhz;
             if (khz <= 0) return;
 
             _main.TuneRadioToKhz(khz, mode);

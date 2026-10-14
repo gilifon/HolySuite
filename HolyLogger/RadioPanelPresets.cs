@@ -44,9 +44,32 @@ namespace HolyLogger
         // the band's button works. True by default, so nothing changes until he unticks one.
         public bool WwffEnabled { get; set; } = true;
 
-        // Whether the band's button is offered: the WWFF folder's Select during a WWFF activation,
-        // the Regular folder's otherwise.
-        public bool IsOffered(bool wwff) => wwff ? WwffEnabled : Enabled;
+        // THE COTA FREQUENCIES (the COTA folder), built the same way as the WWFF ones above: 0 means
+        // this band has none and the Regular one is used; CotaEnabled is the COTA folder's own Select.
+        public int CotaSsbKhz { get; set; }
+        public int CotaCwKhz { get; set; }
+        public bool CotaEnabled { get; set; } = true;
+
+        // Whether the band's button is offered: the open activity's own Select (WWFF or COTA) during
+        // that activity, the Regular folder's otherwise. "set" is RadioPanelPresets.Wwff / .Cota, or
+        // null for no frequency-changing activity.
+        public bool IsOffered(string set)
+        {
+            if (set == RadioPanelPresets.Wwff) return WwffEnabled;
+            if (set == RadioPanelPresets.Cota) return CotaEnabled;
+            return Enabled;
+        }
+
+        // The activity's spot for this mode, 0 when the band has none (or the mode is not SSB/CW).
+        public int ActivityKhz(string set, string mode)
+        {
+            bool cw = string.Equals(mode, "CW", StringComparison.OrdinalIgnoreCase);
+            bool ssb = string.Equals(mode, "SSB", StringComparison.OrdinalIgnoreCase);
+            if (!cw && !ssb) return 0;
+            if (set == RadioPanelPresets.Wwff) return cw ? WwffCwKhz : WwffSsbKhz;
+            if (set == RadioPanelPresets.Cota) return cw ? CotaCwKhz : CotaSsbKhz;
+            return 0;
+        }
 
         public int FrequencyFor(string mode)
         {
@@ -58,20 +81,11 @@ namespace HolyLogger
         // While the operator is in a WWFF activation (Activity = WWFF on the main window) SSB and CW
         // go to the WWFF spot, where this band has one. RTTY, AM and FM have no WWFF frequency and
         // keep their ordinary one.
-        public int FrequencyFor(string mode, bool wwff)
+        // COTA works the same way (set = RadioPanelPresets.Cota).
+        public int FrequencyFor(string mode, string set)
         {
-            if (wwff)
-            {
-                if (string.Equals(mode, "CW", StringComparison.OrdinalIgnoreCase))
-                {
-                    if (WwffCwKhz > 0) return WwffCwKhz;
-                }
-                else if (string.Equals(mode, "SSB", StringComparison.OrdinalIgnoreCase))
-                {
-                    if (WwffSsbKhz > 0) return WwffSsbKhz;
-                }
-            }
-            return FrequencyFor(mode);
+            int spot = ActivityKhz(set, mode);
+            return spot > 0 ? spot : FrequencyFor(mode);
         }
     }
 
@@ -85,6 +99,10 @@ namespace HolyLogger
     /// </summary>
     public static class RadioPanelPresets
     {
+        // The two activities that have a folder of their own frequencies.
+        public const string Wwff = "WWFF";
+        public const string Cota = "COTA";
+
         // Region 1 calling / commonly used frequencies. 10 MHz and 18 MHz have no SSB by band plan;
         // their "SSB" slot holds the same CW-part frequency so a press there still does something
         // sensible, and the operator can put whatever he wants in it.
@@ -173,6 +191,25 @@ namespace HolyLogger
             { "28",  new[] { 28444, 28044 } },
         };
 
+        // THE COTA FREQUENCIES = the World Castles Award's own "Recommended frequencies for WCA
+        // activity" (rz1cwc.qrz.ru/eng/wca/home.htm, rule 8, read 2026-10-14), chosen by him over the
+        // COTA-PA page's (which were 20 kHz higher on most bands): CW 3.511, 7.011, 10.121, 14.011,
+        // 18.081, 21.011, 24.891, 28.011; SSB 3.711, 7.111, 14.211, 18.151, 21.211, 24.951, 28.511
+        // MHz. No SSB on 30m, and every other band has none (0).
+        // Declared before Edges for the same reason as WwffFactory.
+        private static readonly Dictionary<string, int[]> CotaFactory = new Dictionary<string, int[]>
+        {
+            //          label       ssb     cw
+            { "3.5", new[] {  3711,  3511 } },
+            { "7",   new[] {  7111,  7011 } },
+            { "10",  new[] {     0, 10121 } },
+            { "14",  new[] { 14211, 14011 } },
+            { "18",  new[] { 18151, 18081 } },
+            { "21",  new[] { 21211, 21011 } },
+            { "24",  new[] { 24951, 24891 } },
+            { "28",  new[] { 28511, 28011 } },
+        };
+
         // The band EDGES never change and are not the operator's to edit - only the two frequencies
         // inside each band are - so they are worked out once and answered from here, rather than
         // re-reading and re-parsing the settings string for every notch of the mouse wheel.
@@ -202,11 +239,21 @@ namespace HolyLogger
                     CwKhz = (int)row[5],
                     RttyKhz = (int)row[6],
                 };
+                // A band the activity's official page does not name is NOT selected in its folder by
+                // default (his request, 2026-10-14): 160m, 60m, 8m and everything above for both.
+                band.WwffEnabled = WwffFactory.ContainsKey(band.Label);
+                band.CotaEnabled = CotaFactory.ContainsKey(band.Label);
                 int[] wwff;
                 if (WwffFactory.TryGetValue(band.Label, out wwff))
                 {
                     band.WwffSsbKhz = wwff[0];
                     band.WwffCwKhz = wwff[1];
+                }
+                int[] cota;
+                if (CotaFactory.TryGetValue(band.Label, out cota))
+                {
+                    band.CotaSsbKhz = cota[0];
+                    band.CotaCwKhz = cota[1];
                 }
                 return band;
             }).ToList();
@@ -253,7 +300,54 @@ namespace HolyLogger
             catch (Exception swallowed) { Log.Swallow(swallowed); }
 
             LoadWwff(bands);
+            LoadCota(bands);
             return bands;
+        }
+
+        // The COTA folder: the same "label=ssb/cw/select" text as the WWFF one, in its own setting.
+        private static void LoadCota(List<RadioBandPreset> bands)
+        {
+            string saved = Properties.Settings.Default.RadioPanelCotaBands;
+            if (string.IsNullOrWhiteSpace(saved)) return;
+
+            try
+            {
+                foreach (string entry in saved.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries))
+                {
+                    string[] halves = entry.Split('=');
+                    if (halves.Length != 2) continue;
+
+                    var band = bands.FirstOrDefault(b => string.Equals(b.Label, halves[0].Trim(), StringComparison.OrdinalIgnoreCase));
+                    if (band == null) continue;
+
+                    string[] parts = halves[1].Split('/');
+                    if (parts.Length < 2) continue;
+
+                    if (int.TryParse(parts[0].Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out int ssb) && ssb >= 0)
+                        band.CotaSsbKhz = ssb;
+                    if (int.TryParse(parts[1].Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out int cw) && cw >= 0)
+                        band.CotaCwKhz = cw;
+                    if (parts.Length >= 3)
+                        band.CotaEnabled = parts[2].Trim() != "0";
+                }
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        public static void SaveCota(IEnumerable<RadioBandPreset> bands)
+        {
+            var text = new StringBuilder();
+            foreach (var band in bands)
+            {
+                if (text.Length > 0) text.Append(';');
+                text.Append(band.Label).Append('=')
+                    .Append(band.CotaSsbKhz.ToString(CultureInfo.InvariantCulture)).Append('/')
+                    .Append(band.CotaCwKhz.ToString(CultureInfo.InvariantCulture)).Append('/')
+                    .Append(band.CotaEnabled ? "1" : "0");
+            }
+
+            Properties.Settings.Default.RadioPanelCotaBands = text.ToString();
+            Properties.Settings.Default.Save();
         }
 
         // The WWFF folder, kept in a setting of its own as "label=ssb/cw/select" (select 1 or 0; a
