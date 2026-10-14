@@ -91,7 +91,7 @@ namespace HolyLogger
                 get { return _locator; }
                 set
                 {
-                    _locator = value;
+                    _locator = value == null ? null : value.ToUpperInvariant();
                     if (PropertyChanged != null)
                     {
                         PropertyChanged(this, new PropertyChangedEventArgs("Locator"));
@@ -102,20 +102,20 @@ namespace HolyLogger
             public event PropertyChangedEventHandler PropertyChanged;
         }
 
+        // A minimised window reports -32000, and a window on a monitor left of or above the main one has
+        // a NEGATIVE position that is perfectly good - so only the minimised case is skipped.
         private void SignboardWindow1_LocationChanged(object sender, EventArgs e)
         {
-            if (this.Left >= 0)
+            if (this.WindowState != WindowState.Normal) return;
             Properties.Settings.Default.SignBoardWindowLeft = this.Left;
-            if (this.Top >= 0)
-                Properties.Settings.Default.SignBoardWindowTop = this.Top;
+            Properties.Settings.Default.SignBoardWindowTop = this.Top;
         }
 
         private void SignboardWindow1_SizeChanged(object sender, SizeChangedEventArgs e)
         {
-            if (this.Width >= 0)
-                Properties.Settings.Default.SignBoardWindowWidth = this.Width;
-            if (this.Height >= 0)
-                Properties.Settings.Default.SignBoardWindowHeight = this.Height;
+            if (this.WindowState != WindowState.Normal) return;
+            Properties.Settings.Default.SignBoardWindowWidth = this.Width;
+            Properties.Settings.Default.SignBoardWindowHeight = this.Height;
         }
     }
 }
