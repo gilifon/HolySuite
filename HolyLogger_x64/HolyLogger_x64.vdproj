@@ -105,6 +105,12 @@
         }
         "Entry"
         {
+        "MsmKey" = "8:_5E1D7A93B4C2480F9A6B0C3D8E2F7154"
+        "OwnerKey" = "8:_UNDEFINED"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
         "MsmKey" = "8:_203D6C9C7D837F25A8DE69409DE8DCB7"
         "OwnerKey" = "8:_CE1121BE086943A5B988CFD903285274"
         "MsmSig" = "8:_UNDEFINED"
@@ -1534,6 +1540,26 @@
             {
             "SourcePath" = "8:..\\HolyLogger\\Data\\logDB.db"
             "TargetName" = "8:logDB.db"
+            "Tag" = "8:"
+            "Folder" = "8:_A3201F3469A34EB19E5A76041089256B"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:FALSE"
+            "IsolateTo" = "8:"
+            }
+            "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_5E1D7A93B4C2480F9A6B0C3D8E2F7154"
+            {
+            "SourcePath" = "8:..\\HolyLogger\\Data\\wca_castles.txt"
+            "TargetName" = "8:wca_castles.txt"
             "Tag" = "8:"
             "Folder" = "8:_A3201F3469A34EB19E5A76041089256B"
             "Condition" = "8:"
