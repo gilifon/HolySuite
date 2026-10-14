@@ -24,7 +24,7 @@ namespace HolyLogger
         public SignboardData signboardData { get; set; }
         private StickyWindow _stickyWindow;
 
-        public SignboardWindow(string call, string square)
+        public SignboardWindow(string call, string square, string locator)
         {
             InitializeComponent();
             this.Loaded += SignboardWindow_Loaded;
@@ -32,7 +32,8 @@ namespace HolyLogger
             signboardData = new SignboardData()
             {
                 Callsign = call,
-                Square = square
+                Square = square,
+                Locator = locator
             };
             LayoutGrid.DataContext = signboardData;
         }
@@ -80,6 +81,20 @@ namespace HolyLogger
                     if (PropertyChanged != null)
                     {
                         PropertyChanged(this, new PropertyChangedEventArgs("Square"));
+                    }
+                }
+            }
+
+            private string _locator;
+            public string Locator
+            {
+                get { return _locator; }
+                set
+                {
+                    _locator = value;
+                    if (PropertyChanged != null)
+                    {
+                        PropertyChanged(this, new PropertyChangedEventArgs("Locator"));
                     }
                 }
             }
