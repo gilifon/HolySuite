@@ -3850,8 +3850,8 @@ namespace HolyLogger
                 TextBox runBox = keys.Showing == CwKeyboardWindow.Bank.Run ? tb : CwMacroBox(keys.RunText);
                 TextBox spBox  = keys.Showing == CwKeyboardWindow.Bank.Sp  ? tb : CwMacroBox(keys.SpText);
 
-                CwEditRow(rows, 0, "Button ID", "General macro", genFace, genBox);
-                CwEditRow(rows, 2, "Button ID (contest)", "Run macro", contestFace, runBox);
+                CwEditRow(rows, 0, "Button ID (Gen)", "General macro", genFace, genBox);
+                CwEditRow(rows, 2, "Button ID (Run / S&P)", "Run macro", contestFace, runBox);
                 CwEditRow(rows, 4, null, "S&P macro", null, spBox);
 
                 // Hard against the box it belongs to. Left where the name boxes start it stood a
@@ -4095,6 +4095,11 @@ namespace HolyLogger
                 keys.GenText = (keyBoxes[0].Text ?? string.Empty).Trim();
                 keys.RunText = (keyBoxes[1].Text ?? string.Empty).Trim();
                 keys.SpText = (keyBoxes[2].Text ?? string.Empty).Trim();
+
+                // The General Button ID box was only ever copied into `name`, never into the row that
+                // SaveKeyRow writes, so clearing it changed nothing.
+                if (keys.GenName != null && nameBox != null)
+                    keys.GenName.Label = (nameBox.Text ?? string.Empty).Trim();
 
                 if (keys.ContestName != null && contestBox != null)
                     keys.ContestName.Label = (contestBox.Text ?? string.Empty).Trim();
