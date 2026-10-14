@@ -1539,7 +1539,15 @@ namespace HolyLogger
                 catch (Exception swallowed) { Log.Swallow(swallowed); }
             }
 
-            ReopenTheWindowsThatWereLeftOpen();
+            // Matrix, Sign Board and Timer wait for the main window to be drawn, like the radio panel
+            // below: opened from Loaded, the Sign Board was the first thing on the screen.
+            EventHandler showLeftOpenWindows = null;
+            showLeftOpenWindows = (sender2, args2) =>
+            {
+                ContentRendered -= showLeftOpenWindows;
+                ReopenTheWindowsThatWereLeftOpen();
+            };
+            ContentRendered += showLeftOpenWindows;
 
             // The Radio Control Panel comes back if it was left switched on - but NOT before the log
             // itself is on the screen. Opened from Loaded it stood alone on the desktop for the length
@@ -11250,7 +11258,8 @@ namespace HolyLogger
             {
                 try { NewDXCCTimer.Tick -= NewDXCCTimer_Tick; NewDXCCTimer.Stop(); NewDXCCTimer.Dispose(); NewDXCCTimer = null; } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
             }
-            Properties.Settings.Default.SignBoardWindowIsOpen = Application.Current.Windows.Cast<Window>().SingleOrDefault(w => w == signboard) != null;
+            // SignBoardWindowIsOpen is kept up to date as the window opens and closes (see GenerateNewSignboardWindow): by
+            // the time this runs the owned window may already be gone, which read as "closed" every time.
             Properties.Settings.Default.MatrixWindowIsOpen = Application.Current.Windows.Cast<Window>().SingleOrDefault(w => w == matrix) != null;
             Properties.Settings.Default.TimerWindowIsOpen = Application.Current.Windows.Cast<Window>().SingleOrDefault(w => w == timerscreen) != null;
             // Where every column sits AND how wide it is - the widths can only be read now, since dragging
@@ -12755,7 +12764,19 @@ namespace HolyLogger
             if (w >= 120) signboard.Width = w;
             if (h >= 120) signboard.Height = h;
 
+            // Remember open/closed. Closed by the USER clears it; closed because the program is closing
+            // does not, so the window comes back on the next start.
+            var thisSignboard = signboard;
+            thisSignboard.Closed += (s2, e2) =>
+            {
+                if (_isShutdownCleanupDone || _closeInProgress) return;
+                Properties.Settings.Default.SignBoardWindowIsOpen = false;
+                try { Properties.Settings.Default.Save(); } catch (Exception swallowed) { Log.Swallow(swallowed); }
+            };
+
             signboard.Show();
+            Properties.Settings.Default.SignBoardWindowIsOpen = true;
+            try { Properties.Settings.Default.Save(); } catch (Exception swallowed) { Log.Swallow(swallowed); }
         }
 
         private void GenerateNewTimerWindow()

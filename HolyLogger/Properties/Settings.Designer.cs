@@ -254,7 +254,7 @@ namespace HolyLogger.Properties {
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("280")]
+        [global::System.Configuration.DefaultSettingValueAttribute("355")]
         public double SignBoardWindowWidth {
             get {
                 return ((double)(this["SignBoardWindowWidth"]));
@@ -266,7 +266,7 @@ namespace HolyLogger.Properties {
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("330")]
+        [global::System.Configuration.DefaultSettingValueAttribute("251")]
         public double SignBoardWindowHeight {
             get {
                 return ((double)(this["SignBoardWindowHeight"]));

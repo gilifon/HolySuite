@@ -60,10 +60,10 @@
       <Value Profile="(Default)">660</Value>
     </Setting>
     <Setting Name="SignBoardWindowWidth" Type="System.Double" Scope="User">
-      <Value Profile="(Default)">280</Value>
+      <Value Profile="(Default)">355</Value>
     </Setting>
     <Setting Name="SignBoardWindowHeight" Type="System.Double" Scope="User">
-      <Value Profile="(Default)">330</Value>
+      <Value Profile="(Default)">251</Value>
     </Setting>
     <Setting Name="MatrixWindowIsOpen" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">False</Value>
