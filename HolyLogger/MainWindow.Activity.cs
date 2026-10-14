@@ -247,6 +247,22 @@ namespace HolyLogger
                 }
             }
 
+            // THE SAME FOR MY CASTLE in a COTA activation.
+            if (IsCotaActivity && string.IsNullOrWhiteSpace(TB_ActivitySigInfo.Text))
+            {
+                bool logAnyway = HolyMessageBox.ShowConfirm(
+                    "Your castle is not typed in My Castle."
+                    + Environment.NewLine + Environment.NewLine
+                    + "Type it there, e.g. DL-00001, so this QSO counts for your activation.",
+                    "My Castle is empty", HolyMsgType.Warning, this, 0,
+                    "Log anyway", "Type my castle");
+                if (!logAnyway)
+                {
+                    TB_ActivitySigInfo.Focus();
+                    return false;
+                }
+            }
+
             List<string> bad = ActivityComplaints();
             if (bad.Count == 0) return true;
             string message = (bad.Count == 1 ? "This reference is not in the standard form:" : "These references are not in the standard form:")
@@ -301,6 +317,11 @@ namespace HolyLogger
             }
             else
             {
+                // A castle QSO opened for editing: the box must show its castle, not be put back to
+                // the remembered one by the COTA layout.
+                if (string.Equals((qso.Sig ?? "").Trim(), CotaListEntry, StringComparison.OrdinalIgnoreCase)
+                    && !string.IsNullOrWhiteSpace(qso.SigInfo))
+                    myCastleRef = qso.SigInfo.Trim();
                 CB_ActivitySig.Text = qso.Sig ?? "";
                 TB_ActivitySigInfo.Text = qso.SigInfo ?? "";
             }
@@ -313,36 +334,52 @@ namespace HolyLogger
         // holds for any other program - switching to castles must not log my park as a castle - and it
         // survives Clear and a restart, because it stays the same for the whole activation.
         private string myWwffRef = (Properties.Settings.Default.LastMyWwffRef ?? "").Trim();
-        private bool wwffModeShown;
+        // ── MY CASTLE: the same, for Activity = COTA ("My Castle", LastMyCastleRef). It is saved the way
+        // the box always was for a program that is not WWFF - SIG = COTA, SIG_INFO = the number.
+        private string myCastleRef = (Properties.Settings.Default.LastMyCastleRef ?? "").Trim();
+        private static readonly Regex CastlePattern = new Regex(@"^[A-Z0-9]{1,4}-\d{5}$", RegexOptions.Compiled);
+        public static bool IsValidCastle(string s) { return CastlePattern.IsMatch((s ?? "").Trim()); }
+
+        // Which of the two "my reference" layouts the row is showing: "WWFF", "COTA" or null.
+        private string myModeShown;
 
         private void ApplyWwffMode()
         {
             if (TB_ActivitySigInfo == null || TB_MyWwffLabel == null) return;
             bool wwff = IsWwffActivity;
-            if (wwff == wwffModeShown) return;
-            wwffModeShown = wwff;
+            string mode = wwff ? RadioPanelPresets.Wwff : IsCotaActivity ? RadioPanelPresets.Cota : null;
+            if (mode == myModeShown) { ApplyMyWwffColour(); return; }   // COTA's castle colour follows the activity too
+            myModeShown = mode;
             if (L_WwffRef != null) L_WwffRef.FontWeight = wwff ? FontWeights.Bold : FontWeights.Normal;
             if (wwff) WwffDirectory.EnsureLoaded(this, RefreshWwffColours);
+            if (mode == RadioPanelPresets.Cota) WcaDirectory.EnsureLoaded(this, ApplyMyWwffColour);
 
-            if (wwff)
+            if (mode != null)
             {
+                bool cota = mode == RadioPanelPresets.Cota;
                 // Label, box and hint all 8px further right than the plain row, asked for by eye so
-                // "My Fauna" does not crowd the list's chevron.
+                // "My Fauna" does not crowd the list's chevron. "Castle" is a little wider than
+                // "Fauna", so its box and hint start 5px further right.
+                TB_MyWwffLabel.Inlines.Clear();
+                TB_MyWwffLabel.Inlines.Add(new System.Windows.Documents.Bold(new System.Windows.Documents.Run("My")));
+                TB_MyWwffLabel.Inlines.Add(new System.Windows.Documents.LineBreak());
+                TB_MyWwffLabel.Inlines.Add(new System.Windows.Documents.Run(cota ? "Castle" : "Fauna"));
+                TB_MyWwffLabel.ToolTip = cota ? "Your own castle, e.g. DL-00001" : "Your own WWFF park, e.g. 4XFF-0016";
                 TB_MyWwffLabel.Visibility = Visibility.Visible;
                 System.Windows.Controls.Canvas.SetLeft(TB_MyWwffLabel, 185);
-                System.Windows.Controls.Canvas.SetLeft(TB_ActivitySigInfo, 233);
-                System.Windows.Controls.Canvas.SetLeft(TB_ActivitySigHint, 343);
+                System.Windows.Controls.Canvas.SetLeft(TB_ActivitySigInfo, cota ? 238 : 233);
+                System.Windows.Controls.Canvas.SetLeft(TB_ActivitySigHint, cota ? 348 : 343);
                 TB_ActivitySigInfo.Width = 102;
                 TB_ActivitySigInfo.MaxLength = 20;
-                TB_ActivitySigInfo.ToolTip = "Your own WWFF park, e.g. 4XFF-0016";
-                TB_ActivitySigInfo.Text = myWwffRef;
+                TB_ActivitySigInfo.ToolTip = cota ? "Your own castle, e.g. DL-00001" : "Your own WWFF park, e.g. 4XFF-0016";
+                TB_ActivitySigInfo.Text = cota ? myCastleRef : myWwffRef;
 
-                // No park yet: the cursor goes straight to where it is typed. After the list has
+                // None yet: the cursor goes straight to where it is typed. After the list has
                 // closed, or the list takes the focus back.
-                if (myWwffRef.Length == 0)
+                if ((cota ? myCastleRef : myWwffRef).Length == 0)
                     Dispatcher.BeginInvoke(new Action(delegate
                     {
-                        try { if (IsWwffActivity) TB_ActivitySigInfo.Focus(); }
+                        try { if (myModeShown != null) TB_ActivitySigInfo.Focus(); }
                         catch (Exception swallowed) { Log.Swallow(swallowed); }
                     }), System.Windows.Threading.DispatcherPriority.Input);
             }
@@ -361,7 +398,7 @@ namespace HolyLogger
 
         private void ActivitySigInfo_TextChanged(object sender, TextChangedEventArgs e)
         {
-            if (IsWwffActivity && wwffModeShown)
+            if (IsWwffActivity && myModeShown == RadioPanelPresets.Wwff)
             {
                 myWwffRef = (TB_ActivitySigInfo.Text ?? "").Trim();
                 try
@@ -369,6 +406,19 @@ namespace HolyLogger
                     if (!string.Equals(Properties.Settings.Default.LastMyWwffRef, myWwffRef, StringComparison.Ordinal))
                     {
                         Properties.Settings.Default.LastMyWwffRef = myWwffRef;
+                        SettingsFlush.RequestSave();
+                    }
+                }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
+            }
+            else if (IsCotaActivity && myModeShown == RadioPanelPresets.Cota)
+            {
+                myCastleRef = (TB_ActivitySigInfo.Text ?? "").Trim();
+                try
+                {
+                    if (!string.Equals(Properties.Settings.Default.LastMyCastleRef, myCastleRef, StringComparison.Ordinal))
+                    {
+                        Properties.Settings.Default.LastMyCastleRef = myCastleRef;
                         SettingsFlush.RequestSave();
                     }
                 }
@@ -398,6 +448,30 @@ namespace HolyLogger
                           + (guess != null ? Environment.NewLine + "It is probably " + guess : "");
             }
             if (bad) { TB_ActivitySigInfo.Background = MyWwffMissingBrush; return; }
+            if (IsCotaActivity)
+            {
+                // MY castle, like My Fauna: the strong red while it is empty or not a castle number,
+                // its name on hover, orange when it is not on the WCA list (a typo, or a castle added
+                // since this release's list).
+                WcaDirectory.EnsureLoaded(this, ApplyMyWwffColour);
+                if (text.Length == 0 || !IsValidCastle(text))
+                {
+                    TB_ActivitySigInfo.ToolTip = text.Length == 0
+                        ? "Type your own castle here, e.g. DL-00001"
+                        : "Write it as: country prefix, a dash, five digits - DL-00001";
+                    TB_ActivitySigInfo.Background = MyWwffMissingBrush;
+                    return;
+                }
+                WwffDirectory.Park castle = WcaDirectory.Find(text);
+                TB_ActivitySigInfo.ToolTip = castle != null ? "Your castle: " + castle.Ref + " - " + castle.Name
+                    : "Your own castle, e.g. DL-00001";
+                if (text.Length > 0 && castle == null && WcaDirectory.IsKnown(text) == false)
+                {
+                    TB_ActivitySigInfo.ToolTip = text + " is not on the World Castles Award list. Check the number.";
+                    TB_ActivitySigInfo.Background = UnknownParkBrush;
+                    return;
+                }
+            }
             if (IsWwffActivity)
             {
                 WwffDirectory.Park park = WwffDirectory.Find(text);
@@ -425,7 +499,7 @@ namespace HolyLogger
             TB_PotaRef.Clear();
             TB_WwffRef.Clear();
             // My Fauna is MY park for the whole activation, so it stays, like the program itself.
-            if (!IsWwffActivity) TB_ActivitySigInfo.Clear();
+            if (!IsWwffActivity && !IsCotaActivity) TB_ActivitySigInfo.Clear();
             ShowActivitySigMeaning();
         }
 
@@ -587,6 +661,28 @@ namespace HolyLogger
             }
         }
 
+        private const string CotaListEntry = "COTA";
+
+        /// <summary>True while Activity is COTA (Castles on the Air) - the panel then uses the COTA frequencies.</summary>
+        internal bool IsCotaActivity
+        {
+            get
+            {
+                if (Properties.Settings.Default.ContestMode) return false;
+                string now = CB_ActivitySig == null ? "" : (CB_ActivitySig.Text ?? "").Trim();
+                return string.Equals(now, CotaListEntry, StringComparison.OrdinalIgnoreCase);
+            }
+        }
+
+        /// <summary>
+        /// The activity whose own frequencies the Radio Control Panel uses right now
+        /// (RadioPanelPresets.Wwff or .Cota), or null for the Regular ones.
+        /// </summary>
+        internal string ActivityFrequencySet
+        {
+            get { return IsWwffActivity ? RadioPanelPresets.Wwff : IsCotaActivity ? RadioPanelPresets.Cota : null; }
+        }
+
         // What the box held before the list was opened, so choosing Contest can put it back. Taken when
         // the list opens rather than from the selection's RemovedItems: the box is editable, and a typed
         // value has no item to be removed.
@@ -601,11 +697,13 @@ namespace HolyLogger
         // goes to the NEAREST band that has one (2m and 6m -> 10m, 160m -> 80m), and he takes it from
         // there. 30m has CW only, so SSB there moves to the nearest band with a WWFF SSB frequency.
         // Nothing happens with no radio.
+        // Done the same way for COTA, with the COTA folder's frequencies (ActivityFrequencySet).
         private void TuneToWwffFrequency()
         {
             try
             {
-                if (!IsWwffActivity) return;
+                string set = ActivityFrequencySet;
+                if (set == null) return;
                 double khz = lastRealRigKhz;
                 if (khz <= 0) return;
 
@@ -617,15 +715,15 @@ namespace HolyLogger
                 double bestDistance = double.MaxValue;
                 foreach (RadioBandPreset b in RadioPanelPresets.Load())
                 {
-                    int f = mode == "CW" ? b.WwffCwKhz : b.WwffSsbKhz;
-                    if (f <= 0 || !b.IsOffered(true)) continue;
+                    int f = b.ActivityKhz(set, mode);
+                    if (f <= 0 || !b.IsOffered(set)) continue;
                     // The band the radio is on wins outright; otherwise the closest WWFF frequency.
                     double distance = b.Contains(khz) ? -1 : Math.Abs(f - khz);
                     if (distance < bestDistance) { bestDistance = distance; best = b; }
                 }
                 if (best == null) return;
 
-                TuneRadioToKhz(mode == "CW" ? best.WwffCwKhz : best.WwffSsbKhz, mode);
+                TuneRadioToKhz(best.ActivityKhz(set, mode), mode);
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
         }
@@ -636,7 +734,7 @@ namespace HolyLogger
         {
             try
             {
-                if (IsWwffActivity) return;
+                if (ActivityFrequencySet != null) return;
                 double khz = lastRealRigKhz;
                 if (khz <= 0) return;
 
@@ -690,7 +788,8 @@ namespace HolyLogger
             // WWFF PICKED: the radio goes to the WWFF frequency at once (his request, 2026-09-30) -
             // before, it stayed where it was until a band button was pressed. After the box has
             // taken the new text, so IsWwffActivity already says yes.
-            if (string.Equals(picked.Key, WwffListEntry, StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(picked.Key, WwffListEntry, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(picked.Key, CotaListEntry, StringComparison.OrdinalIgnoreCase))
             {
                 Dispatcher.BeginInvoke(new Action(TuneToWwffFrequency), System.Windows.Threading.DispatcherPriority.Input);
                 return;
@@ -700,7 +799,8 @@ namespace HolyLogger
             // Contest line - that one puts WWFF straight back (ExplainContestLog) - and not when a
             // contest log empties the box: that is done by code, with no line picked, and the contest
             // sets the radio up itself.
-            if (string.Equals(activitySigBeforeDropDown, WwffListEntry, StringComparison.OrdinalIgnoreCase)
+            if ((string.Equals(activitySigBeforeDropDown, WwffListEntry, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(activitySigBeforeDropDown, CotaListEntry, StringComparison.OrdinalIgnoreCase))
                 && !string.Equals(picked.Key, ContestListEntry, StringComparison.OrdinalIgnoreCase))
                 Dispatcher.BeginInvoke(new Action(TuneToRegularFrequency), System.Windows.Threading.DispatcherPriority.Input);
 
@@ -856,8 +956,16 @@ namespace HolyLogger
         private bool ParkSuggestApplies(TextBox box)
         {
             if (box == TB_WwffRef) return true;
+            if (CastleBox(box)) return true;
             // My Fauna and Exchange are parks only while the activity is WWFF.
             return WwffExchangeOn && (box == TB_ActivitySigInfo || box == TB_Exchange);
+        }
+
+        // The box beside the Activity list is a castle number while Activity is COTA.
+        private bool CastleBox(TextBox box)
+        {
+            return box == TB_ActivitySigInfo && IsCotaActivity && ActivityRow != null
+                && ActivityRow.Visibility == Visibility.Visible;
         }
 
         private void UpdateParkSuggestions(TextBox box)
@@ -865,16 +973,20 @@ namespace HolyLogger
             if (fillingPark || box == null) return;
             if (!box.IsKeyboardFocusWithin || !ParkSuggestApplies(box)) { if (parkTarget == box) CloseParkSuggestions(); return; }
 
-            if (!WwffDirectory.Loaded)
+            bool castles = CastleBox(box);
+            if (castles ? !WcaDirectory.Loaded : !WwffDirectory.Loaded)
             {
                 // First use: fetch the list, and answer this same typing once it is here.
-                WwffDirectory.EnsureLoaded(this, delegate { RefreshWwffColours(); UpdateParkSuggestions(box); });
+                if (castles) WcaDirectory.EnsureLoaded(this, delegate { ApplyMyWwffColour(); UpdateParkSuggestions(box); });
+                else WwffDirectory.EnsureLoaded(this, delegate { RefreshWwffColours(); UpdateParkSuggestions(box); });
                 return;
             }
-            WwffDirectory.EnsureLoaded(this, RefreshWwffColours);   // a no-op unless the list is old
+            if (!castles) WwffDirectory.EnsureLoaded(this, RefreshWwffColours);   // a no-op unless the list is old
 
             string typed = (box.Text ?? "").Trim();
-            List<WwffDirectory.Park> matches = WwffDirectory.Suggest(typed, MaxParkSuggestions);
+            List<WwffDirectory.Park> matches = castles
+                ? WcaDirectory.Suggest(typed, MaxParkSuggestions)
+                : WwffDirectory.Suggest(typed, MaxParkSuggestions);
             // Nothing to offer, or the box already holds exactly the one park: no list.
             if (matches.Count == 0 || (matches.Count == 1 && string.Equals(matches[0].Ref, typed, StringComparison.OrdinalIgnoreCase)))
             {
@@ -889,8 +1001,9 @@ namespace HolyLogger
             // Very light blue while what is typed is not yet a whole park, white once it is. Light
             // blue, not the box's pale red (tried, and he did not like it) - and lighter than the
             // #7FBFFF highlight, so the row Up/Down is on still stands out.
-            parkFrame.Background = IsValidWwff(typed) && WwffDirectory.IsKnown(typed) != false
-                ? Brushes.White : ParkListTypingBrush;
+            bool whole = castles ? WcaDirectory.IsKnown(typed) == true
+                                 : IsValidWwff(typed) && WwffDirectory.IsKnown(typed) != false;
+            parkFrame.Background = whole ? Brushes.White : ParkListTypingBrush;
             parkList.SelectedIndex = 0;
             parkList.ScrollIntoView(parkList.SelectedItem);
             parkPopup.IsOpen = true;
@@ -1304,6 +1417,126 @@ namespace HolyLogger
                     if (result.Count >= max) break;
                     if (p.Name.IndexOf(t, StringComparison.OrdinalIgnoreCase) >= 0 && !result.Contains(p))
                         result.Add(p);
+                }
+            }
+            return result;
+        }
+    }
+
+    // ── THE WCA CASTLE LIST (Activity = COTA) ───────────────────────────────────────────────────────
+    //
+    // The World Castles Award's own list (www.wcagroup.org/FORMS/WCALIST.xls, read 2026-10-14: 71,380
+    // castles, one sheet per country, columns WCA number / national number / prefix / name /
+    // location). An .xls cannot be read without a library, so it was boiled down once, at release
+    // time, to Data\wca_castles.txt beside the program: "DL-00001<tab>name<tab>location". Updating it
+    // means a new file in a new release. Suggestions reuse WwffDirectory.Park, so the same popup
+    // serves both lists (Name = "castle, location").
+    internal static class WcaDirectory
+    {
+        private static List<WwffDirectory.Park> _castles;     // sorted by Ref, ordinal
+        private static Dictionary<string, WwffDirectory.Park> _byRef;
+        private static int _busy;
+        private static readonly List<Action> _waiting = new List<Action>();
+
+        public static bool Loaded { get { return _castles != null; } }
+
+        private static string FilePath
+        {
+            get { return System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Data", "wca_castles.txt"); }
+        }
+
+        /// <summary>Reads the file off the UI thread; onReady runs on the window's thread once it is in.
+        /// Safe to call as often as you like. A missing file simply leaves the list empty.</summary>
+        public static void EnsureLoaded(Window owner, Action onReady)
+        {
+            if (Loaded) return;
+            if (onReady != null) lock (_waiting) _waiting.Add(onReady);
+            if (System.Threading.Interlocked.Exchange(ref _busy, 1) == 1) return;
+
+            System.Threading.Tasks.Task.Run(delegate
+            {
+                try
+                {
+                    var list = new List<WwffDirectory.Park>(72000);
+                    if (System.IO.File.Exists(FilePath))
+                        foreach (string line in System.IO.File.ReadLines(FilePath, System.Text.Encoding.UTF8))
+                        {
+                            string[] f = line.Split('\t');
+                            if (f.Length < 2) continue;
+                            string where = f.Length > 2 ? f[2] : "";
+                            list.Add(new WwffDirectory.Park
+                            {
+                                Ref = f[0],
+                                Name = where.Length > 0 ? f[1] + ", " + where : f[1],
+                                Locator = ""
+                            });
+                        }
+                    list.Sort((a, b) => string.CompareOrdinal(a.Ref, b.Ref));
+                    var byRef = new Dictionary<string, WwffDirectory.Park>(StringComparer.OrdinalIgnoreCase);
+                    foreach (var c in list) byRef[c.Ref] = c;
+                    _byRef = byRef;
+                    _castles = list;
+                }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
+                finally { System.Threading.Interlocked.Exchange(ref _busy, 0); }
+
+                Action[] calls;
+                lock (_waiting) { calls = _waiting.ToArray(); _waiting.Clear(); }
+                if (owner != null && calls.Length > 0)
+                    owner.Dispatcher.BeginInvoke(new Action(delegate
+                    {
+                        foreach (Action a in calls)
+                            try { a(); } catch (Exception swallowed) { Log.Swallow(swallowed); }
+                    }));
+            });
+        }
+
+        /// <summary>The castle, or null when it is not on the list (or the list is not loaded).</summary>
+        public static WwffDirectory.Park Find(string reference)
+        {
+            var byRef = _byRef;
+            WwffDirectory.Park c;
+            return byRef != null && byRef.TryGetValue((reference ?? "").Trim(), out c) ? c : null;
+        }
+
+        /// <summary>True/false once loaded and non-empty; null when nothing can be said.</summary>
+        public static bool? IsKnown(string reference)
+        {
+            var byRef = _byRef;
+            if (byRef == null || byRef.Count == 0) return null;
+            return byRef.ContainsKey((reference ?? "").Trim());
+        }
+
+        /// <summary>Castles whose number starts with what was typed; with three or more characters
+        /// holding a letter, castles whose NAME or place holds it as well.</summary>
+        public static List<WwffDirectory.Park> Suggest(string typed, int max)
+        {
+            var result = new List<WwffDirectory.Park>();
+            var castles = _castles;
+            string t = (typed ?? "").Trim().ToUpperInvariant();
+            if (castles == null || t.Length == 0) return result;
+
+            int lo = 0, hi = castles.Count;
+            while (lo < hi)
+            {
+                int mid = (lo + hi) / 2;
+                if (string.CompareOrdinal(castles[mid].Ref, t) < 0) lo = mid + 1; else hi = mid;
+            }
+            for (int i = lo; i < castles.Count && result.Count < max; i++)
+            {
+                if (!castles[i].Ref.StartsWith(t, StringComparison.Ordinal)) break;
+                result.Add(castles[i]);
+            }
+
+            bool hasLetters = false;
+            foreach (char ch in t) if (char.IsLetter(ch)) { hasLetters = true; break; }
+            if (result.Count < max && t.Length >= 3 && hasLetters)
+            {
+                foreach (var c in castles)
+                {
+                    if (result.Count >= max) break;
+                    if (c.Name.IndexOf(t, StringComparison.OrdinalIgnoreCase) >= 0 && !result.Contains(c))
+                        result.Add(c);
                 }
             }
             return result;

@@ -23,32 +23,59 @@ namespace HolyLogger.OptionsUserControls
         /// <summary>True once anything here was edited, so the open panel can be rebuilt.</summary>
         public bool HasChanged { get; private set; }
 
-        private readonly List<TextBox> _wwffSsbBoxes = new List<TextBox>();
-        private readonly List<TextBox> _wwffCwBoxes = new List<TextBox>();
-        // The WWFF folder's own Select boxes (RadioBandPreset.WwffEnabled): they belong to the WWFF
-        // activation, not to the Regular folder - his call, 2026-09-29.
-        private readonly List<CheckBox> _wwffEnabledBoxes = new List<CheckBox>();
+        // One activity folder's boxes (WWFF or COTA). The Select boxes (RadioBandPreset.WwffEnabled /
+        // CotaEnabled) belong to the activity, not to the Regular folder - his call, 2026-09-29.
+        private sealed class ActivityFolder
+        {
+            public string Set;
+            public Grid Grid;
+            public readonly List<TextBox> Ssb = new List<TextBox>();
+            public readonly List<TextBox> Cw = new List<TextBox>();
+            public readonly List<CheckBox> Enabled = new List<CheckBox>();
+        }
+
+        private ActivityFolder _wwff;
+        private ActivityFolder _cota;
+
+        private static int SsbOf(RadioBandPreset b, string set) { return set == RadioPanelPresets.Cota ? b.CotaSsbKhz : b.WwffSsbKhz; }
+        private static int CwOf(RadioBandPreset b, string set) { return set == RadioPanelPresets.Cota ? b.CotaCwKhz : b.WwffCwKhz; }
+        private static bool EnabledOf(RadioBandPreset b, string set) { return set == RadioPanelPresets.Cota ? b.CotaEnabled : b.WwffEnabled; }
+        private static void SetSsb(RadioBandPreset b, string set, int v) { if (set == RadioPanelPresets.Cota) b.CotaSsbKhz = v; else b.WwffSsbKhz = v; }
+        private static void SetCw(RadioBandPreset b, string set, int v) { if (set == RadioPanelPresets.Cota) b.CotaCwKhz = v; else b.WwffCwKhz = v; }
+        private static void SetEnabled(RadioBandPreset b, string set, bool v) { if (set == RadioPanelPresets.Cota) b.CotaEnabled = v; else b.WwffEnabled = v; }
+        private static void SaveSet(IEnumerable<RadioBandPreset> bands, string set)
+        {
+            if (set == RadioPanelPresets.Cota) RadioPanelPresets.SaveCota(bands); else RadioPanelPresets.SaveWwff(bands);
+        }
 
         public RadioControlPanelControl()
         {
             InitializeComponent();
+            _wwff = new ActivityFolder { Set = RadioPanelPresets.Wwff, Grid = WwffGrid };
+            _cota = new ActivityFolder { Set = RadioPanelPresets.Cota, Grid = CotaGrid };
             var bands = RadioPanelPresets.Load();
             BuildRows(bands);
-            BuildWwffRows(bands);
+            BuildActivityRows(_wwff, bands);
+            BuildActivityRows(_cota, bands);
         }
 
         private bool WwffFolderOpen => LB_Folder != null && LB_Folder.SelectedIndex == 1;
+        private bool CotaFolderOpen => LB_Folder != null && LB_Folder.SelectedIndex == 2;
+        private ActivityFolder OpenActivityFolder => WwffFolderOpen ? _wwff : CotaFolderOpen ? _cota : null;
 
         private void LB_Folder_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (RegularIntro == null || WwffIntro == null || BandGrid == null || WwffGrid == null) return;
+            if (RegularIntro == null || WwffIntro == null || CotaIntro == null || BandGrid == null || WwffGrid == null || CotaGrid == null) return;
             // Hidden, not Collapsed: the folder not shown keeps its space, so the table does not move.
-            var regular = WwffFolderOpen ? Visibility.Hidden : Visibility.Visible;
+            var regular = OpenActivityFolder != null ? Visibility.Hidden : Visibility.Visible;
             var wwff = WwffFolderOpen ? Visibility.Visible : Visibility.Hidden;
+            var cota = CotaFolderOpen ? Visibility.Visible : Visibility.Hidden;
             RegularIntro.Visibility = regular;
             BandGrid.Visibility = regular;
             WwffIntro.Visibility = wwff;
             WwffGrid.Visibility = wwff;
+            CotaIntro.Visibility = cota;
+            CotaGrid.Visibility = cota;
             // The frame wears the open folder's colour (the tab's own Background), as in Statistics.
             if (FolderFrame != null && LB_Folder.SelectedItem is ListBoxItem open)
                 FolderFrame.Background = open.Background;
@@ -63,40 +90,43 @@ namespace HolyLogger.OptionsUserControls
         // the folder changes; the RTTY column is simply left empty here.
         private const int WwffCols = Cols;
 
-        private void BuildWwffRows(List<RadioBandPreset> bands)
+        // Built for both activity folders (WWFF and COTA) - the same table, each on its own settings.
+        private void BuildActivityRows(ActivityFolder folder, List<RadioBandPreset> bands)
         {
+            var grid = folder.Grid;
+            string set = folder.Set;
             var standards = new Dictionary<string, RadioBandPreset>();
             foreach (var d in RadioPanelPresets.Defaults()) standards[d.Label] = d;
-            _wwffSsbBoxes.Clear();
-            _wwffCwBoxes.Clear();
-            _wwffEnabledBoxes.Clear();
+            folder.Ssb.Clear();
+            folder.Cw.Clear();
+            folder.Enabled.Clear();
 
-            WwffGrid.Children.Clear();
-            WwffGrid.RowDefinitions.Clear();
-            WwffGrid.ColumnDefinitions.Clear();
+            grid.Children.Clear();
+            grid.RowDefinitions.Clear();
+            grid.ColumnDefinitions.Clear();
 
             for (int g = 0; g < 2; g++)
             {
                 // Same widths as BuildRows: Select, Band, SSB, CW, RTTY (empty here), gap.
-                WwffGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(55) });
-                WwffGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(140) });
-                WwffGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(80) });
-                WwffGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(80) });
-                WwffGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(92) });
-                if (g == 0) WwffGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(30) });
+                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(55) });
+                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(140) });
+                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(80) });
+                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(80) });
+                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(92) });
+                if (g == 0) grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(30) });
             }
 
             int perGroup = (bands.Count + 1) / 2;
             for (int r = 0; r <= perGroup; r++)
-                WwffGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
             for (int group = 0; group < 2; group++)
             {
                 int colBase = group * WwffCols;
-                AddHeader(WwffGrid, "Select", colBase + 0);
-                AddHeader(WwffGrid, "Band", colBase + 1);
-                AddHeader(WwffGrid, "SSB (kHz)", colBase + 2);
-                AddHeader(WwffGrid, "CW (kHz)", colBase + 3);
+                AddHeader(grid, "Select", colBase + 0);
+                AddHeader(grid, "Band", colBase + 1);
+                AddHeader(grid, "SSB (kHz)", colBase + 2);
+                AddHeader(grid, "CW (kHz)", colBase + 3);
             }
 
             for (int i = 0; i < bands.Count; i++)
@@ -108,17 +138,17 @@ namespace HolyLogger.OptionsUserControls
 
                 var enabled = new CheckBox
                 {
-                    IsChecked = band.WwffEnabled,
+                    IsChecked = EnabledOf(band, set),
                     VerticalAlignment = VerticalAlignment.Center,
                     Margin = new Thickness(0, 4, 8, 4),
-                    ToolTip = "Offer this band's button on the Radio Control Panel while Activity is WWFF"
+                    ToolTip = "Offer this band's button on the Radio Control Panel while Activity is " + set
                 };
                 enabled.Checked += EnabledBox_Changed;
                 enabled.Unchecked += EnabledBox_Changed;
                 Grid.SetRow(enabled, row);
                 Grid.SetColumn(enabled, colBase + 0);
-                WwffGrid.Children.Add(enabled);
-                _wwffEnabledBoxes.Add(enabled);
+                grid.Children.Add(enabled);
+                folder.Enabled.Add(enabled);
 
                 var label = new TextBlock
                 {
@@ -129,7 +159,7 @@ namespace HolyLogger.OptionsUserControls
                 };
                 Grid.SetRow(label, row);
                 Grid.SetColumn(label, colBase + 1);
-                WwffGrid.Children.Add(label);
+                grid.Children.Add(label);
 
                 RadioBandPreset standard;
                 standards.TryGetValue(band.Label, out standard);
@@ -147,15 +177,15 @@ namespace HolyLogger.OptionsUserControls
                     dash.SetResourceReference(TextBlock.ForegroundProperty, "MutedTextBrush");
                     Grid.SetRow(dash, row);
                     Grid.SetColumn(dash, colBase + 2);
-                    WwffGrid.Children.Add(dash);
+                    grid.Children.Add(dash);
                 }
                 else
                 {
-                    ssb = MakeWwffBox(band.WwffSsbKhz, standard == null ? 0 : standard.WwffSsbKhz, row, colBase + 2);
+                    ssb = MakeWwffBox(grid, SsbOf(band, set), standard == null ? 0 : SsbOf(standard, set), row, colBase + 2);
                 }
-                var cw = MakeWwffBox(band.WwffCwKhz, standard == null ? 0 : standard.WwffCwKhz, row, colBase + 3);
-                _wwffSsbBoxes.Add(ssb);
-                _wwffCwBoxes.Add(cw);
+                var cw = MakeWwffBox(grid, CwOf(band, set), standard == null ? 0 : CwOf(standard, set), row, colBase + 3);
+                folder.Ssb.Add(ssb);
+                folder.Cw.Add(cw);
             }
         }
 
@@ -185,7 +215,7 @@ namespace HolyLogger.OptionsUserControls
             else box.Background = ChangedBrush;
         }
 
-        private TextBox MakeWwffBox(int khz, int standardKhz, int row, int column)
+        private TextBox MakeWwffBox(Grid grid, int khz, int standardKhz, int row, int column)
         {
             var box = new TextBox
             {
@@ -203,7 +233,7 @@ namespace HolyLogger.OptionsUserControls
             box.LostFocus += Box_LostFocus;
             Grid.SetRow(box, row);
             Grid.SetColumn(box, column);
-            WwffGrid.Children.Add(box);
+            grid.Children.Add(box);
             return box;
         }
 
@@ -451,24 +481,28 @@ namespace HolyLogger.OptionsUserControls
                 changed |= ReadBox(_rttyBoxes[i], _bands[i], value => _bands[i].RttyKhz = value, _bands[i].RttyKhz, ref rejected);
             }
 
-            bool wwffChanged = false;
-            for (int i = 0; i < _bands.Count && i < _wwffCwBoxes.Count; i++)
+            foreach (var folder in new[] { _wwff, _cota })
             {
-                var band = _bands[i];
-                bool wantWwff = i < _wwffEnabledBoxes.Count && _wwffEnabledBoxes[i].IsChecked == true;
-                if (i < _wwffEnabledBoxes.Count && wantWwff != band.WwffEnabled)
+                string set = folder.Set;
+                bool folderChanged = false;
+                for (int i = 0; i < _bands.Count && i < folder.Cw.Count; i++)
                 {
-                    band.WwffEnabled = wantWwff;
-                    wwffChanged = true;
+                    var band = _bands[i];
+                    bool want = i < folder.Enabled.Count && folder.Enabled[i].IsChecked == true;
+                    if (i < folder.Enabled.Count && want != EnabledOf(band, set))
+                    {
+                        SetEnabled(band, set, want);
+                        folderChanged = true;
+                    }
+                    if (folder.Ssb[i] != null)
+                        folderChanged |= ReadWwffBox(folder.Ssb[i], band, value => SetSsb(band, set, value), SsbOf(band, set), ref rejected);
+                    folderChanged |= ReadWwffBox(folder.Cw[i], band, value => SetCw(band, set, value), CwOf(band, set), ref rejected);
                 }
-                if (_wwffSsbBoxes[i] != null)
-                    wwffChanged |= ReadWwffBox(_wwffSsbBoxes[i], band, value => band.WwffSsbKhz = value, band.WwffSsbKhz, ref rejected);
-                wwffChanged |= ReadWwffBox(_wwffCwBoxes[i], band, value => band.WwffCwKhz = value, band.WwffCwKhz, ref rejected);
-            }
-            if (wwffChanged)
-            {
-                RadioPanelPresets.SaveWwff(_bands);
-                HasChanged = true;
+                if (folderChanged)
+                {
+                    SaveSet(_bands, set);
+                    HasChanged = true;
+                }
             }
 
             // The message stays until the next save that rejects nothing, so it is still there to
@@ -531,17 +565,18 @@ namespace HolyLogger.OptionsUserControls
         private void Btn_RestoreDefaults_Click(object sender, RoutedEventArgs e)
         {
             var defaults = RadioPanelPresets.Defaults();
-            if (WwffFolderOpen)
+            var open = OpenActivityFolder;
+            if (open != null)
             {
                 foreach (var band in _bands)
                 {
                     var d = defaults.First(x => x.Label == band.Label);
-                    band.WwffSsbKhz = d.WwffSsbKhz;
-                    band.WwffCwKhz = d.WwffCwKhz;
-                    band.WwffEnabled = d.WwffEnabled;   // the WWFF folder's own Select, back on
+                    SetSsb(band, open.Set, SsbOf(d, open.Set));
+                    SetCw(band, open.Set, CwOf(d, open.Set));
+                    SetEnabled(band, open.Set, EnabledOf(d, open.Set));   // the folder's own Select, back on
                 }
-                RadioPanelPresets.SaveWwff(_bands);
-                BuildWwffRows(_bands);
+                SaveSet(_bands, open.Set);
+                BuildActivityRows(open, _bands);
             }
             else
             {
@@ -550,7 +585,10 @@ namespace HolyLogger.OptionsUserControls
                     var band = _bands.First(x => x.Label == d.Label);
                     d.WwffSsbKhz = band.WwffSsbKhz;
                     d.WwffCwKhz = band.WwffCwKhz;
-                    d.WwffEnabled = band.WwffEnabled;   // Regular's restore leaves WWFF's Select alone
+                    d.WwffEnabled = band.WwffEnabled;   // Regular's restore leaves the activities' Select alone
+                    d.CotaSsbKhz = band.CotaSsbKhz;
+                    d.CotaCwKhz = band.CotaCwKhz;
+                    d.CotaEnabled = band.CotaEnabled;
                 }
                 RadioPanelPresets.Save(defaults);
                 BuildRows(defaults);

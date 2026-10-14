@@ -3666,6 +3666,30 @@ namespace HolyLogger.Properties {
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string LastMyCastleRef {
+            get {
+                return ((string)(this["LastMyCastleRef"]));
+            }
+            set {
+                this["LastMyCastleRef"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string RadioPanelCotaBands {
+            get {
+                return ((string)(this["RadioPanelCotaBands"]));
+            }
+            set {
+                this["RadioPanelCotaBands"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
         public string LastMyWwffRef {
             get {
                 return ((string)(this["LastMyWwffRef"]));
