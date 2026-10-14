@@ -1442,7 +1442,14 @@ namespace HolyLogger
 
         private static string FilePath
         {
-            get { return System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Data", "wca_castles.txt"); }
+            // Data\ beside the program (the 32-bit installer); the x64 installer has no Data folder
+            // and puts it next to the program itself.
+            get
+            {
+                string dir = AppDomain.CurrentDomain.BaseDirectory;
+                string inData = System.IO.Path.Combine(dir, "Data", "wca_castles.txt");
+                return System.IO.File.Exists(inData) ? inData : System.IO.Path.Combine(dir, "wca_castles.txt");
+            }
         }
 
         /// <summary>Reads the file off the UI thread; onReady runs on the window's thread once it is in.
