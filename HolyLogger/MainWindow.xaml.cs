@@ -8878,6 +8878,18 @@ namespace HolyLogger
             return string.Equals(GetNormalizedRigMode(), "SSB", StringComparison.OrdinalIgnoreCase);
         }
 
+        // The band/mode matrix has three columns - SSB, CW, DIGI. RTTY is a digital mode, so it lights
+        // DIGI; parsing "RTTY" as the enum failed and left the default (SSB). Other names that are not
+        // in the enum (FM, AM) still fall to the default exactly as before.
+        private static HolyLogger.Mode MatrixModeOf(string mode)
+        {
+            if (string.Equals((mode ?? "").Trim(), "RTTY", StringComparison.OrdinalIgnoreCase))
+                return HolyLogger.Mode.DIGI;
+            HolyLogger.Mode parsed;
+            Enum.TryParse(mode, out parsed);
+            return parsed;
+        }
+
         private string GetNormalizedRigMode()
         {
             if (Rig == null)
@@ -8898,6 +8910,9 @@ namespace HolyLogger
                 case (OmniRig.RigParamX)PM_AM:
                     return "AM";
                 case (OmniRig.RigParamX)PM_DIG_L:
+                    // OmniRig has no RTTY: its lower digital slot is where the radio's .ini puts RTTY
+                    // (MapClusterModeToRigMode sends RTTY there), so a radio sitting on it is on RTTY.
+                    return "RTTY";
                 case (OmniRig.RigParamX)PM_DIG_U:
                     return "DIGI";
                 default:
@@ -18133,7 +18148,7 @@ namespace HolyLogger
             {
                 try
                 {
-                    Enum.TryParse(item.Mode, out qsoMode);
+                    qsoMode = MatrixModeOf(item.Mode);
                     MatrixC.SetMatrix(qsoMode, item.Band);
                     if (matrix != null)
                     {
@@ -18164,7 +18179,7 @@ namespace HolyLogger
             {
                 try
                 {
-                    Enum.TryParse(item.Mode, out qsoMode);
+                    qsoMode = MatrixModeOf(item.Mode);
                     MatrixC.SetMatrix(qsoMode, item.Band);
                     if (matrix != null)
                     {

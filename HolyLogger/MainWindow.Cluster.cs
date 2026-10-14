@@ -6597,7 +6597,14 @@ namespace HolyLogger
                 return mode;
             }
 
-            if (mode == "DIGI" || mode == "FT8" || mode == "RTTY" || mode == "PSK")
+            // RTTY has its own entry in the Mode box (and its own MODE in ADIF); the radio goes to
+            // the RTTY slot for it (MapClusterModeToRigMode).
+            if (mode == "RTTY")
+            {
+                return "RTTY";
+            }
+
+            if (mode == "DIGI" || mode == "FT8" || mode == "PSK")
             {
                 return "DIGI";
             }

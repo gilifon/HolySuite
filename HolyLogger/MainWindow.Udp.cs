@@ -475,7 +475,8 @@ namespace HolyLogger
                     {
                         string mode = Regex.Split(data, @"<Mode>(.*)?<", RegexOptions.IgnoreCase)[1].Trim().ToUpper();
                         if (mode == "SSB" || mode == "LSB" || mode == "USB") mode = "SSB";
-                        if (mode == "RTTY" || mode == "RTTY-R" || mode == "RTTY-L" || mode == "AFSK" || mode == "AFSK-R" || mode == "AFSK-L") mode = "DIGI";
+                        if (mode == "RTTY" || mode == "RTTY-R" || mode == "RTTY-L") mode = "RTTY";
+                        else if (mode == "AFSK" || mode == "AFSK-R" || mode == "AFSK-L") mode = "DIGI";
                         bool item_found = false;
                         foreach (System.Windows.Controls.ComboBoxItem item in CB_Mode.Items)
                         {
