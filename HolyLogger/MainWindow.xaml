@@ -1587,10 +1587,13 @@
             <TextBlock Text="Fill me" Style="{StaticResource FieldHintText}"/>
         </Border>
         <Label Content="Mode" HorizontalAlignment="Left" Margin="479,48,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16"  ToolTip="Select the working mode"/>
-        <ComboBox x:Name="CB_Mode" Text="{Binding Default.Mode, Source={StaticResource Settings}}" HorizontalAlignment="Left" Margin="528,49,0,0" Grid.Row="1" VerticalAlignment="Top" Width="50" FontSize="16" Height="28" TabIndex="7" SelectionChanged="CB_Mode_SelectionChanged" BorderBrush="#FFABADB3" Background="{DynamicResource ControlBg}" Foreground="{DynamicResource TextBrush}"
+        <ComboBox x:Name="CB_Mode" Text="{Binding Default.Mode, Source={StaticResource Settings}}" HorizontalAlignment="Left" Margin="526,49,0,0" Grid.Row="1" VerticalAlignment="Top" Width="53" FontSize="16" Height="28" TabIndex="7" SelectionChanged="CB_Mode_SelectionChanged" BorderBrush="#FFABADB3" Background="{DynamicResource ControlBg}" Foreground="{DynamicResource TextBrush}"
                   Template="{StaticResource FlatComboTemplate}">
             <ComboBoxItem x:Name="op_cw" Content="CW"/>
             <ComboBoxItem x:Name="op_digi" Content="DIGI"/>
+            <!-- RTTY has a MODE of its own in ADIF; DIGI is not an ADIF mode at all. The box is 3px wider
+                 than it was: "RTTY" is 35px at this size and the 50px box left it 34. -->
+            <ComboBoxItem x:Name="op_rtty" Content="RTTY"/>
             <ComboBoxItem x:Name="op_ssb" Content="SSB"/>
             <ComboBoxItem x:Name="op_fm" Content="FM"/>
             <ComboBoxItem x:Name="op_am" Content="AM"/>
