@@ -241,6 +241,7 @@ namespace HolyLogger
 
         LogUploadWindow logupload = null;
         SignboardWindow signboard = null;
+        private bool _signboardLocatorWired;
         TimerWindow timerscreen = null;
         MatrixWindow matrix = null;
 
@@ -12722,7 +12723,18 @@ namespace HolyLogger
 
         private void GenerateNewSignboardWindow()
         {
-            signboard = new SignboardWindow(TB_MyCallsign.Text, TB_MyHolyland.Text) { Owner = this };
+            signboard = new SignboardWindow(TB_MyCallsign.Text, TB_MyHolyland.Text, TB_MyLocator.Text) { Owner = this };
+
+            // One handler for the life of the window, as with the contest grid copy: it follows
+            // whichever signboard is current.
+            if (!_signboardLocatorWired)
+            {
+                _signboardLocatorWired = true;
+                TB_MyLocator.TextChanged += (s, e) =>
+                {
+                    if (signboard != null) signboard.signboardData.Locator = TB_MyLocator.Text;
+                };
+            }
 
             // Same as the Timer above: a position saved on a monitor that has since gone opens the
             // window where it cannot be seen, and clamping only negatives never noticed.
