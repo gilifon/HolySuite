@@ -30,9 +30,13 @@ namespace HolyLogger
     //
     // CALLSIGNS, AS IN THE OTHER BOXES (his request): a word shaped like a callsign gets the blue patch, is
     // checked on QRZ.com by itself and turns green if QRZ knows it; double-click logs it, right-click shows
-    // its QRZ card. Same test and colours as CwDecodedText. A word is judged only once the network has
-    // settled every letter in it (and a space has closed it), so the call checked is the CORRECTED one; its
-    // grey letters are left out of it - grey means the network heard nothing there.
+    // its QRZ card. Same test and colours as CwDecodedText.
+    //
+    // JUDGED AT ONCE ON PLAIN'S WORD, AND AGAIN AFTER THE NETWORK (his rule, 2026-10-17). Plain is right
+    // most of the time, and an operator should not wait seconds for a call it already has: so a word is
+    // judged the moment a space closes it, and checked on QRZ then. When the network has read it, it is
+    // judged again on the corrected word - grey letters left out, grey meaning the network heard nothing
+    // there - and the patch moves to the corrected call, or goes if it is no callsign after all.
     //
     // THE NETWORK'S WORD GAPS (his choice, 2026-10-17). Plain's spaces split "LY2PX" into "L Y2PX", and Y2PX
     // was offered as a call. Between two letters the network has settled (bold), its word gaps are taken
@@ -63,6 +67,7 @@ namespace HolyLogger
             public Run Run;
             public bool Settled, FromNet, Doubted;   // Doubted: grey - a network letter just over the edge of the next stretch may still claim it
             public string Call;                      // on a word's first letter: the callsign the word is shown as, or null
+            public string Judged;                    // on a word's first letter: the word as it read when last judged
         }
 
         readonly RichTextBox _box;
@@ -128,6 +133,7 @@ namespace HolyLogger
                     if (!_entries.Exists(x => x.Call == call)) QrzLookup.Forget(call);
             }
             _changed = true;
+            if (space) JudgeWords();          // Plain has just closed a word
         }
 
         /// <summary>One of the network's letters; held until the stretch it is in has been read whole.</summary>
@@ -225,7 +231,8 @@ namespace HolyLogger
             return e.Settled && !e.Doubted && !double.IsNaN(e.T);
         }
 
-        // Every word closed by a space and with all its letters settled: a callsign or not?
+        // Every word closed by a space - Plain's as it stands, or the network's correction of it once it
+        // has one: a callsign or not? A word already judged as it now reads is not asked again.
         void JudgeWords()
         {
             int i = 0;
@@ -233,16 +240,16 @@ namespace HolyLogger
             {
                 if (_entries[i].Text == " ") { i++; continue; }
                 int j = i;
-                bool settled = true;
                 var text = new System.Text.StringBuilder();
                 for (; j < _entries.Count && _entries[j].Text != " "; j++)
                 {
-                    if (!_entries[j].Settled) settled = false;
                     if (!_entries[j].Doubted) text.Append(_entries[j].Text);
+                    if (j > i) _entries[j].Judged = null;       // was the start of a word before two were joined
                 }
-                if (j < _entries.Count && settled)
+                string word = text.ToString();
+                if (j < _entries.Count && word != _entries[i].Judged)
                 {
-                    string word = text.ToString();
+                    _entries[i].Judged = word;
                     string call = word.IndexOf('<') < 0 && CwDecodedText.IsOfferableCall(word) ? word : null;
                     if (call != _entries[i].Call) Paint(i, j, call);
                 }
@@ -253,7 +260,7 @@ namespace HolyLogger
         void Paint(int from, int to, string call)
         {
             _entries[from].Call = call;
-            for (int k = from + 1; k < to; k++) _entries[k].Call = null;
+            for (int k = from + 1; k < to; k++) { _entries[k].Call = null; _entries[k].Judged = null; }
             var runs = new List<Run>();
             for (int k = from; k < to; k++)
             {
