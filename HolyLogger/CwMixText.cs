@@ -38,6 +38,12 @@ namespace HolyLogger
     // judged again on the corrected word - grey letters left out, grey meaning the network heard nothing
     // there - and the patch moves to the corrected call, or goes if it is no callsign after all.
     //
+    // A NEW LINE FOR EVERY TRANSMISSION, as in the other boxes (agreed long ago; Mix lacked it - his screen,
+    // 2026-10-17). The same rules as CwDecodedText, judged by the letters' own times instead of the clock:
+    // after a prosign that ends a turn (<AR> <KN> <SK> <AS>) at once; after a K or BK standing alone, when
+    // the next letter comes from somebody else (another note or speed) or 2 s later; and after a pause of
+    // PauseInDits dits when the next letter comes from somebody else. A line break is also a word gap.
+    //
     // THE NETWORK'S WORD GAPS (his choice, 2026-10-17). Plain's spaces split "LY2PX" into "L Y2PX", and Y2PX
     // was offered as a call. Between two letters the network has settled (bold), its word gaps are taken
     // instead of Plain's: a space Plain put where the network heard none is taken out, and one the network
@@ -68,6 +74,7 @@ namespace HolyLogger
             public bool Settled, FromNet, Doubted;   // Doubted: grey - a network letter just over the edge of the next stretch may still claim it
             public string Call;                      // on a word's first letter: the callsign the word is shown as, or null
             public string Judged;                    // on a word's first letter: the word as it read when last judged
+            public LineBreak Break;                  // a new transmission: Text is " " (a word gap), Run is empty
         }
 
         readonly RichTextBox _box;
@@ -106,16 +113,39 @@ namespace HolyLogger
             _entries.Clear();
             _netWaiting.Clear();
             _netGaps.Clear();
+            _seen.Clear();
+            _breakNext = false; _handOver = false;
+            _lastLetterT = double.NaN; _lastNote = 0; _lastWpm = 0;
             QrzLookup.ForgetAll();
             _changed = true;
         }
 
-        /// <summary>One of Plain's letters (or " " between words), in the order Plain printed them.</summary>
-        public void AddPlain(string text, double t)
+        static readonly string[] ProsignHandOver = { "<KN>", "<AR>", "<SK>", "<AS>" };
+        const double SilenceThatProvesOver = 2.0;
+        bool _breakNext, _handOver;
+        double _lastLetterT = double.NaN, _lastNote, _lastWpm;
+
+        /// <summary>One of Plain's letters (or " " between words), in the order Plain printed them, with the
+        /// note and speed Plain hears as it prints it.</summary>
+        public void AddPlain(string text, double t, double note, double wpm)
         {
             if (string.IsNullOrEmpty(text)) return;
             bool space = text == " ";
-            if (space && (_entries.Count == 0 || _entries[_entries.Count - 1].Text == " ")) return;
+            if (space)
+            {
+                if (_entries.Count == 0 || _entries[_entries.Count - 1].Text == " ") return;
+                string closed = LastWord();
+                if (closed == "K" || closed == "BK") _handOver = true;
+            }
+            else
+            {
+                if (NewTransmission(t, note, wpm)) AddBreak();
+                _breakNext = Array.IndexOf(ProsignHandOver, text) >= 0;
+                _handOver = false;
+                _lastLetterT = t;
+                if (note > 0) _lastNote = note;
+                if (wpm > 0) _lastWpm = wpm;
+            }
             var e = new Entry { Text = text, T = space ? double.NaN : t, Run = new Run(text) };
             _paragraph.Inlines.Add(e.Run);
             _entries.Add(e);
@@ -125,6 +155,7 @@ namespace HolyLogger
                 for (int i = 0; i < 500; i++)
                 {
                     _paragraph.Inlines.Remove(_entries[i].Run);
+                    if (_entries[i].Break != null) _paragraph.Inlines.Remove(_entries[i].Break);
                     if (_entries[i].Call != null) gone.Add(_entries[i].Call);
                 }
                 _entries.RemoveRange(0, 500);
@@ -134,6 +165,44 @@ namespace HolyLogger
             }
             _changed = true;
             if (space) JudgeWords();          // Plain has just closed a word
+        }
+
+        bool NewTransmission(double t, double note, double wpm)
+        {
+            if (_entries.Count == 0 || _entries[_entries.Count - 1].Break != null) return false;
+            if (_breakNext) return true;
+            if (double.IsNaN(_lastLetterT) || double.IsNaN(t)) return false;
+            bool somebodyElse = (_lastNote > 0 && note > 0 && Math.Abs(note - _lastNote) >= CwDecodedText.DifferentNoteHz)
+                || (_lastWpm > 0 && wpm > 0 && Math.Abs(wpm - _lastWpm) >= _lastWpm * CwDecodedText.DifferentSpeedFraction);
+            double gap = t - _lastLetterT;
+            if (_handOver && (somebodyElse || gap >= SilenceThatProvesOver)) return true;
+            double dit = 1.2 / (_lastWpm > 0 ? _lastWpm : 20);
+            return somebodyElse && gap >= dit * CwDecodedText.PauseInDits;
+        }
+
+        // The last word Plain closed (its letters since the last word gap).
+        string LastWord()
+        {
+            var sb = new System.Text.StringBuilder();
+            for (int k = _entries.Count - 1; k >= 0 && _entries[k].Text != " "; k--) sb.Insert(0, _entries[k].Text);
+            return sb.ToString();
+        }
+
+        void AddBreak()
+        {
+            if (_entries.Count > 0 && _entries[_entries.Count - 1].Text == " " && _entries[_entries.Count - 1].Break == null)
+            {
+                // Plain's own word gap just before: it becomes the line break.
+                Entry last = _entries[_entries.Count - 1];
+                last.Break = new LineBreak();
+                last.Run.Text = string.Empty;
+                _paragraph.Inlines.InsertAfter(last.Run, last.Break);
+                return;
+            }
+            var e = new Entry { Text = " ", T = double.NaN, Run = new Run(string.Empty), Settled = true, Break = new LineBreak() };
+            _paragraph.Inlines.Add(e.Run);
+            _paragraph.Inlines.Add(e.Break);
+            _entries.Add(e);
         }
 
         /// <summary>One of the network's letters; held until the stretch it is in has been read whole.</summary>
@@ -205,7 +274,10 @@ namespace HolyLogger
                 {
                     bool netGap = _netGaps.Exists(g => g > prev.T && g < e.T);
                     int spaces = i - prevAt - 1;                         // Plain's spaces between them
-                    if (netGap && spaces == 0)
+                    bool lineBreak = false;
+                    for (int k = prevAt + 1; k < i; k++) if (_entries[k].Break != null) lineBreak = true;
+                    if (lineBreak) { }                                  // a new transmission stays one
+                    else if (netGap && spaces == 0)
                     {
                         var space = new Entry { Text = " ", T = double.NaN, Run = new Run(" "), Settled = true };
                         _paragraph.Inlines.InsertBefore(e.Run, space.Run);
@@ -226,6 +298,15 @@ namespace HolyLogger
             }
         }
 
+        readonly SeenCalls _seen = new SeenCalls();
+
+        double WordTime(int from, int to)
+        {
+            double t = double.NaN;
+            for (int k = from; k < to; k++) if (!double.IsNaN(_entries[k].T)) t = _entries[k].T;
+            return t;
+        }
+
         static bool NetBacked(Entry e)
         {
             return e.Settled && !e.Doubted && !double.IsNaN(e.T);
@@ -239,26 +320,68 @@ namespace HolyLogger
             while (i < _entries.Count)
             {
                 if (_entries[i].Text == " ") { i++; continue; }
+                // A PROSIGN IS A WORD OF ITS OWN, as in CwDecodedText: "LY2PX<AR>" came in glued (no gap heard
+                // before the <AR>) and the call lost its patch.
+                if (IsProsign(_entries[i]))
+                {
+                    if (_entries[i].Run.Tag != null) Paint(i, i + 1, null);
+                    i++;
+                    continue;
+                }
                 int j = i;
                 var text = new System.Text.StringBuilder();
-                for (; j < _entries.Count && _entries[j].Text != " "; j++)
+                var all = new System.Text.StringBuilder();
+                for (; j < _entries.Count && _entries[j].Text != " " && !IsProsign(_entries[j]); j++)
                 {
                     if (!_entries[j].Doubted) text.Append(_entries[j].Text);
+                    all.Append(_entries[j].Text);
                     if (j > i) _entries[j].Judged = null;       // was the start of a word before two were joined
                 }
                 string word = text.ToString();
                 if (j < _entries.Count && word != _entries[i].Judged)
                 {
                     _entries[i].Judged = word;
-                    string call = word.IndexOf('<') < 0 && CwDecodedText.IsOfferableCall(word) ? word : null;
-                    if (call != _entries[i].Call) Paint(i, j, call);
+                    // A call sent twice with no gap: tried with its grey letters too, as one grey letter in one
+                    // copy ("IT9ECYIT9ECY" with the first Y grey) would otherwise hide the repeat.
+                    string call = word.IndexOf('<') >= 0 ? null
+                        : CwDecodedText.IsOfferableCall(word) ? word
+                        : CwDecodedText.RepeatedCall(word) ?? CwDecodedText.RepeatedCall(all.ToString());
+                    double at = WordTime(i, j);
+                    if (call != null) { _seen.Saw(call, at); if (call != _entries[i].Call) Paint(i, j, call); }
+                    else
+                    {
+                        // A call heard a moment ago, inside this word: only its own letters get the patch.
+                        string inside = _seen.Inside(word, at) ?? _seen.Inside(all.ToString(), at);
+                        int start = inside == null ? -1 : all.ToString().IndexOf(inside, StringComparison.Ordinal);
+                        int a = j, b = j;
+                        if (start >= 0)
+                        {
+                            int pos = 0;
+                            for (int k = i; k < j; k++)
+                            {
+                                int len = _entries[k].Text.Length;
+                                if (pos + len > start && pos < start + inside.Length) { if (a == j) a = k; b = k + 1; }
+                                pos += len;
+                            }
+                        }
+                        else if (inside != null) { a = i; b = j; }
+                        Paint(i, j, inside, a, b);
+                    }
                 }
                 i = j;
             }
         }
 
-        void Paint(int from, int to, string call)
+        static bool IsProsign(Entry e)
         {
+            return e.Text.Length > 1 && e.Text[0] == '<';
+        }
+
+        // The word [from, to) shows the callsign `call` (or none): the letters [paintFrom, paintTo) get the
+        // patch - all of them unless told otherwise - and the rest lose it.
+        void Paint(int from, int to, string call, int paintFrom = -1, int paintTo = -1)
+        {
+            if (paintFrom < 0) { paintFrom = from; paintTo = to; }
             _entries[from].Call = call;
             for (int k = from + 1; k < to; k++) { _entries[k].Call = null; _entries[k].Judged = null; }
             var runs = new List<Run>();
@@ -267,7 +390,7 @@ namespace HolyLogger
                 Entry e = _entries[k];
                 Run r = e.Run;
                 runs.Add(r);
-                if (call != null)
+                if (call != null && k >= paintFrom && k < paintTo)
                 {
                     r.Background = CwDecodedText.CallsignPatch;
                     r.Foreground = e.Doubted ? DoubtOnPatch : CwDecodedText.CallsignInk;
