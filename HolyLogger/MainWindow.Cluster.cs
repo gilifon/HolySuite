@@ -4375,8 +4375,12 @@ namespace HolyLogger
                             _clusterAutoFilledDXCall = false;
                             // Flagged as OUR clear, not the operator's, so it does not count as
                             // dismissing the call (see _clusterAutoClearingDxCall).
+                            //
+                            // ClearBtn_Click itself, NOT a faked F9 press. While the CW keyer is open
+                            // F9 belongs to the keyer, so faking it here sent the F9 macro on the air
+                            // every time the operator turned the knob off a spotted station.
                             _clusterAutoClearingDxCall = true;
-                            try { HandleGlobalFunctionKey(System.Windows.Input.Key.F9, false); }
+                            try { ClearBtn_Click(null, null); }
                             finally { _clusterAutoClearingDxCall = false; }
                         }
                         catch (Exception swallowed) { Log.Swallow(swallowed); }
