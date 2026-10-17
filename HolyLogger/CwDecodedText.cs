@@ -52,11 +52,11 @@ namespace HolyLogger
         // InterpolatedNote in CwDecoder, which fits a curve through the strongest filter and its two
         // neighbours instead of rounding to the nearest 25 - so fifteen is comfortably outside what
         // the measurement itself can wobble by, and well inside how far apart two operators net.
-        const double DifferentNoteHz = 25.0;
+        internal const double DifferentNoteHz = 25.0;
 
         // And a speed this much apart, as a fraction. Operators an eighth apart in speed are not the
         // same operator; the same operator does not change by an eighth in one second.
-        const double DifferentSpeedFraction = 0.20;
+        internal const double DifferentSpeedFraction = 0.20;
 
         // With the note and speed both unchanged - two stations truly nose to nose - there is
         // nothing left but the gap. Long, because a gap this size inside one transmission would be
@@ -71,7 +71,7 @@ namespace HolyLogger
         // think beats it every time. Lines were breaking three and four times inside one
         // transmission - after "BE", after "EE", after a lone C. Thirty is about a second at 32 WPM
         // and over a second and a half at 20, which is a turnaround and not a hesitation.
-        const double PauseInDits = 30.0;
+        internal const double PauseInDits = 30.0;
 
         // WHITE ON BLUE, not blue text. A callsign in the middle of decoded text has to be findable
         // at a glance while the operator is listening, and a coloured word among black ones is easy
@@ -158,6 +158,7 @@ namespace HolyLogger
             _noteAtHandover = 0; _speedAtHandover = 0;
             _lastLetterAt = DateTime.MinValue; _lastNote = 0; _lastSpeed = 0;
             _recentCalls.Clear(); _recentCallOrder.Clear();
+            _seen.Clear();
         }
 
         /// <summary>Adds newly decoded text, colouring any callsign as its last letter arrives.</summary>
@@ -379,11 +380,16 @@ namespace HolyLogger
             foreach (string over in LetterHandOver)
                 if (string.Equals(call, over, StringComparison.Ordinal)) return true;
 
+            string repeated = RepeatedCall(call);
+            string inside;
             if (IsOfferableCall(call))
             {
                 ColourAsCallsign(word, call);
                 RememberCall(call, new[] { word });
+                _seen.Saw(call, Clock());
             }
+            else if (repeated != null) { ColourAsCallsign(word, repeated); _seen.Saw(repeated, Clock()); }
+            else if ((inside = _seen.Inside(call, Clock())) != null) ColourAsCallsign(word, inside);
             else JoinPiecesEndingWith(word);
 
             return false;
@@ -407,6 +413,26 @@ namespace HolyLogger
 
             return string.IsNullOrWhiteSpace(mine) || !CallsignIdentity.Same(call, mine);
         }
+
+        // A CALL SENT TWICE (OR THREE TIMES) WITH NO GAP HEARD BETWEEN: "IT9ECYIT9ECY" (his screen,
+        // 2026-10-17). Neither reader heard the word gap, so it arrived as one word - no callsign shape, and
+        // not offered. A word that is the same callsign over again is that callsign.
+        internal static string RepeatedCall(string word)
+        {
+            if (string.IsNullOrEmpty(word)) return null;
+            for (int k = 2; k <= 3; k++)
+            {
+                if (word.Length % k != 0) continue;
+                string part = word.Substring(0, word.Length / k);
+                bool same = true;
+                for (int i = 1; i < k && same; i++) same = string.CompareOrdinal(word, i * part.Length, part, 0, part.Length) == 0;
+                if (same && IsOfferableCall(part)) return part;
+            }
+            return null;
+        }
+
+        readonly SeenCalls _seen = new SeenCalls();
+        static double Clock() { return DateTime.UtcNow.Ticks / (double)TimeSpan.TicksPerSecond; }
 
         static DXCCManager.EntityResolver _resolver;
 
@@ -608,6 +634,46 @@ namespace HolyLogger
 
                 if (!stillThere) QrzLookup.Forget(call);
             }
+        }
+    }
+
+    // CALLSIGNS HEARD IN THE LAST MINUTE AND A HALF, to find one inside a word the readers ran together.
+    //
+    // "IT9ECIT9ECY" (his screen, 2026-10-17): the call sent twice with no gap heard, and one copy misread, so
+    // the word is neither a callsign nor one callsign twice. A listener still knows it at once - he heard
+    // IT9ECY a moment ago. So does this: a word holding a callsign heard as a word of its own in the last
+    // KeepSeconds is shown as that callsign (the longest, if several). Only calls of Shortest letters or
+    // more, and only in a word at most three times as long, so a short call is not found in any run of
+    // letters that happens to hold it.
+    internal sealed class SeenCalls
+    {
+        const double KeepSeconds = 90;
+        const int Shortest = 4;
+        readonly List<KeyValuePair<string, double>> _calls = new List<KeyValuePair<string, double>>();
+
+        public void Clear() { _calls.Clear(); }
+
+        public void Saw(string call, double t)
+        {
+            if (string.IsNullOrEmpty(call) || double.IsNaN(t)) return;
+            _calls.RemoveAll(c => c.Key == call);
+            _calls.Add(new KeyValuePair<string, double>(call, t));
+            if (_calls.Count > 100) _calls.RemoveAt(0);
+        }
+
+        public string Inside(string word, double t)
+        {
+            if (string.IsNullOrEmpty(word) || double.IsNaN(t)) return null;
+            string best = null;
+            foreach (var c in _calls)
+            {
+                string call = c.Key;
+                if (t - c.Value > KeepSeconds || c.Value > t + 1) continue;
+                if (call.Length < Shortest || call.Length >= word.Length || word.Length > 3 * call.Length) continue;
+                if (word.IndexOf(call, StringComparison.Ordinal) < 0) continue;
+                if (best == null || call.Length > best.Length) best = call;
+            }
+            return best;
         }
     }
 

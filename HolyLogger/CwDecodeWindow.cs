@@ -1475,11 +1475,13 @@ namespace HolyLogger
 
             // The time line is kept whichever reader is on show, and drawn only in Both.
             double wpm = heard != null && heard.Wpm >= 5 ? heard.Wpm : 20;
+            double noteNow = heard != null && heard.SignalPresent ? heard.ToneHz : 0;
+            double speedNow = heard != null && heard.SignalPresent ? heard.Wpm : 0;
             double netEarly = 0.8 * 1.2 / wpm;       // the network says a letter 0.8 dit after it ends
             foreach (var e in plainTimed)
             {
                 if (e.Key != " ") _timeLine.AddPlain(e.Key, e.Value, wpm);
-                _mix.AddPlain(e.Key, e.Value);
+                _mix.AddPlain(e.Key, e.Value, noteNow, speedNow);
             }
             foreach (var e in netTimed)
             {
