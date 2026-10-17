@@ -77,15 +77,15 @@ namespace HolyLogger
         // at a glance while the operator is listening, and a coloured word among black ones is easy
         // to miss; a filled patch is not. It also reads the same on every colour scheme, where blue
         // text on dark paper does not.
-        static readonly Brush CallsignInk = Brushes.White;
-        static readonly Brush CallsignPatch = Frozen(Color.FromRgb(0x00, 0x77, 0xCC));
+        internal static readonly Brush CallsignInk = Brushes.White;
+        internal static readonly Brush CallsignPatch = Frozen(Color.FromRgb(0x00, 0x77, 0xCC));
 
         // GREEN MEANS QRZ.COM KNOWS IT. Blue says only "shaped like a callsign", and the decoder can
         // make a wrong one look every bit as right - 4Z5SR for 4Z5SL. A callsign with a QRZ record
         // is far more likely to be what was sent, so it is checked by itself as it is decoded and
         // turns green when QRZ answers yes. Still an offer and not an answer: a misread can land on
         // somebody else's real call. Stays blue when QRZ says no, and when it cannot be asked.
-        static readonly Brush RegisteredPatch = Frozen(Color.FromRgb(0x1E, 0x8E, 0x3E));
+        internal static readonly Brush RegisteredPatch = Frozen(Color.FromRgb(0x1E, 0x8E, 0x3E));
 
         static Brush Frozen(Color colour)
         {
@@ -391,16 +391,33 @@ namespace HolyLogger
 
         // Shaped like a callsign, and not his own - never a stroke variant of it either, a man does
         // not log himself.
-        static bool IsOfferableCall(string call)
+        //
+        // AND ITS PREFIX IS A REAL COUNTRY'S (his rule, 2026-10-17): a word whose prefix belongs to no
+        // DXCC entity in cty.dat is not painted at all - the same file the rest of the program resolves
+        // countries by.
+        internal static bool IsOfferableCall(string call)      // also Mix's test (CwMixText)
         {
             if (!CallsignIdentity.LooksLikeCallsign(call)) return false;
             if (!CouldStartACallsign(call)) return false;
+            if (!HasRealPrefix(call)) return false;
 
             string mine = null;
             try { mine = Properties.Settings.Default.my_callsign; }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
 
             return string.IsNullOrWhiteSpace(mine) || !CallsignIdentity.Same(call, mine);
+        }
+
+        static DXCCManager.EntityResolver _resolver;
+
+        static bool HasRealPrefix(string call)
+        {
+            try
+            {
+                if (_resolver == null) _resolver = new DXCCManager.EntityResolver();
+                return _resolver.GetDXCC(call).Entity != "-1";
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); return true; }     // cannot tell: do not hide it
         }
 
         void ColourAsCallsign(Run word, string call)

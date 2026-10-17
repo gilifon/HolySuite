@@ -26,7 +26,7 @@ namespace HolyLogger
     // the letter after it, rather than printing empty lines through a silence.
     //
     // Both readers are timed by the END of the letter: Plain by its last mark, Net by where it says the
-    // letter less 0.8 dit (see CwDeepDecoder.LetterTimed). Net's letters arrive about 6 s after Plain's
+    // letter less 0.8 dit (see CwDeepDecoder.LetterTimed). Net's letters arrive some seconds after Plain's
     // and fill in under them; a letter only Net heard gets a line of its own if no line covers its time.
     //
     // SAME LETTER, SAME MOMENT, SAME COLUMN (his check, 2026-10-17). The two readers' times for the same
@@ -101,6 +101,7 @@ namespace HolyLogger
             };
             box.Document = new FlowDocument { PagePadding = new Thickness(4, 2, 4, 2), PageWidth = 4000, LineHeight = double.NaN };
             box.Document.Blocks.Clear();
+            CwStripes.Apply(box.Document);      // same row height as the other boxes; its lines are striped by paragraph
             return box;
         }
 
@@ -125,6 +126,7 @@ namespace HolyLogger
 
         public void AddNet(string letter, double seconds, double wpm)
         {
+            if (letter == " ") return;            // the gaps show by themselves here
             if (!PutUnderPlain(letter, seconds)) Add(NetRow, letter, seconds, wpm, 0);
         }
 

@@ -21,7 +21,11 @@ namespace HolyLogger
     {
         public const int Rate = 3200;
         const int Fft = 256, Hop = 48, Bin0 = 24;
-        const double WindowSeconds = 15, StrideSeconds = 3, LagSeconds = 6;
+        const double WindowSeconds = 15, StrideSeconds = 3, LagSeconds = 3;
+        // LAG 3, NOT 6 (2026-10-17, his choice after the test - own.py LIVE_LAG reads exactly as this does):
+        //   6 s: IC-7610 bench 25, his own sending 928 words, W1AW 1147, the hard fist 76
+        //   3 s: IC-7610 bench 27, his own sending 927 words, W1AW 1136, the hard fist 57
+        // Three seconds sooner for about the same reading, except on the hardest fist.
         static readonly string Chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789,./?=+ ";
 
         static CwDeepNet _shared;
@@ -51,9 +55,13 @@ namespace HolyLogger
         public event Action<string> Text;
 
         // EVERY LETTER WITH ITS TIME, in seconds from the first sound given - for the time-lined view in
-        // Both. The time is where the network said it: 0.8 dit after the letter's last mark ended
+        // Both, and for Mix. A word gap comes as " ", timed at the middle of the gap. The time is where the network said it: 0.8 dit after the letter's last mark ended
         // (measured 2026-10-17, deepnet/spike_offset.py: median -0.004 s, 80% within 0.03 s).
         public event Action<string, double> LetterTimed;
+
+        // The stretch [from, to) in seconds has now been read whole - every letter in it has been given out
+        // (for Mix: a Plain letter in it that the network did not read was not confirmed).
+        public event Action<double, double> Covered;
 
         readonly CwDeepNet _net;
         readonly Resampler _resampler;
@@ -151,9 +159,11 @@ namespace HolyLogger
                 string letter = ch == '=' ? "<BT>" : ch == '+' ? "<AR>" : ch.ToString();
                 said.Append(letter);
                 var timed = LetterTimed;
-                if (timed != null && ch != ' ') timed(letter, at / (double)Rate);
+                if (timed != null) timed(letter, at / (double)Rate);       // " " too: Mix takes its word gaps
             }
             _printedTo = to;
+            var covered = Covered;
+            if (covered != null) covered(from / (double)Rate, to / (double)Rate);
             var text = Text;
             if (said.Length > 0 && text != null) text(said.ToString());
         }
