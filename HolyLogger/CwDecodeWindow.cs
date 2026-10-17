@@ -101,6 +101,26 @@ namespace HolyLogger
         // decoder - comparing those two on the air is what it is here for.
         CwElementDecoder _element;
 
+        // OUR OWN NETWORK, ON TEST (see CwDeepDecoder): reads 15 s at a time, prints 6 s behind the sound.
+        // Only there when Data\CwDeep.bin is; in Both it gets a third box under Plain and New.
+        CwDeepDecoder _deep;
+        CwDecodedText _deepText;
+        Border _deepFrame;
+        TextBlock _deepLabel;
+        RowDefinition _deepRow;
+        Button _deepBtn;
+        readonly StringBuilder _pendingDeep = new StringBuilder();
+
+        // BOTH SHOWS PLAIN AND NET ON ONE TIME LINE (see CwTimeLine): each letter in the column for when
+        // it was sent. Plain's printed letters get their times from its LetterTimed, matched in order -
+        // a timed letter that was never printed (held back as noise, then dropped) is skipped over.
+        CwTimeLine _timeLine;
+        Border _mainFrame, _timePlainFrame, _timeNetFrame;
+        int _plainRate;
+        readonly System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<string, double>> _plainTimes = new System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<string, double>>();
+        readonly System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<string, double>> _pendingPlainTimed = new System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<string, double>>();
+        readonly System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<string, double>> _pendingNetTimed = new System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<string, double>>();
+
         CwDecodedText _text;
         TextBlock _speedText;
         Ellipse _lamp;
@@ -119,7 +139,7 @@ namespace HolyLogger
         readonly object _pendingGate = new object();
 
         /// <summary>Which reader's letters are shown.</summary>
-        public enum Reader { Plain, Network, Both, New }
+        public enum Reader { Plain, Network, Both, New, Deep }
 
         // The lamp falls back gently instead of snapping to grey between characters. Without it it
         // flickers on CW - which is silence half the time - and cannot be read at all.
@@ -154,6 +174,10 @@ namespace HolyLogger
             // CaptionHeight matches the bar built below, so dragging the bar still moves the window.
             WindowStyle = WindowStyle.None;
             SetResourceReference(BackgroundProperty, "WindowBg");
+            // A blue edge all round (2026-10-17, his request): with no OS frame the window melted into
+            // the main window behind it.
+            BorderBrush = Frozen(Color.FromRgb(0x0D, 0x47, 0xA1));
+            BorderThickness = new Thickness(3);
             System.Windows.Shell.WindowChrome.SetWindowChrome(this, new System.Windows.Shell.WindowChrome
             {
                 CaptionHeight = 32,
@@ -220,6 +244,13 @@ namespace HolyLogger
             };
 
             var frame = Paper(_text.Box);
+            _mainFrame = frame;
+
+            _timeLine = new CwTimeLine();
+            _timePlainFrame = Paper(_timeLine.PlainBox);
+            _timePlainFrame.Visibility = Visibility.Collapsed;
+            _timeNetFrame = Paper(_timeLine.NetBox);
+            _timeNetFrame.Visibility = Visibility.Collapsed;
 
             // The second reader's box, shown only in Both.
             _networkText = MakeTextBox();
@@ -229,6 +260,12 @@ namespace HolyLogger
             _plainLabel = Label("Plain");
             _networkLabel = Label("New (test)");
             _plainLabel.Visibility = Visibility.Collapsed;
+
+            _deepText = MakeTextBox();
+            _deepFrame = Paper(_deepText.Box);
+            _deepFrame.Visibility = Visibility.Collapsed;
+            _deepLabel = Label("Net (test) - 6 s behind");
+            _deepLabel.Visibility = Visibility.Collapsed;
 
             var titleBar = BuildTitleBar();
             DockPanel.SetDock(titleBar, Dock.Top);
@@ -242,6 +279,9 @@ namespace HolyLogger
             boxes.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             _networkRow = new RowDefinition { Height = new GridLength(1, GridUnitType.Star) };
             boxes.RowDefinitions.Add(_networkRow);
+            boxes.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            _deepRow = new RowDefinition { Height = new GridLength(0) };
+            boxes.RowDefinitions.Add(_deepRow);
 
             // THE WATERFALL ON TOP, THE TEXT UNDER IT (his placing, 2026-10-03; it sat between the two
             // boxes before): the sound first, then what was read from it.
@@ -252,12 +292,20 @@ namespace HolyLogger
             Grid.SetRow(frame, 2);
             Grid.SetRow(_networkLabel, 3);
             Grid.SetRow(_networkFrame, 4);
+            Grid.SetRow(_deepLabel, 5);
+            Grid.SetRow(_deepFrame, 6);
+            Grid.SetRow(_timePlainFrame, 2);
+            Grid.SetRow(_timeNetFrame, 6);
 
             boxes.Children.Add(_plainLabel);
             boxes.Children.Add(frame);
             boxes.Children.Add(waterfall);
             boxes.Children.Add(_networkLabel);
             boxes.Children.Add(_networkFrame);
+            boxes.Children.Add(_deepLabel);
+            boxes.Children.Add(_deepFrame);
+            boxes.Children.Add(_timePlainFrame);
+            boxes.Children.Add(_timeNetFrame);
 
             var body = new DockPanel();
             body.Children.Add(titleBar);
@@ -303,7 +351,7 @@ namespace HolyLogger
         // A thin dark line round the paper, exactly as the keyer frames its send row and its record:
         // it is what makes the text look like something written down rather than something floating
         // on the window.
-        static Border Paper(RichTextBox box)
+        static Border Paper(Control box)
         {
             var frame = new Border
             {
@@ -393,12 +441,14 @@ namespace HolyLogger
             // question with two answers rather than as two separate switches.
             _plainBtn = BarButton("Plain", "The arithmetic decoder - no network, and the one that has been on the air longest.");
             _networkBtn = RunNetwork ? BarButton("Net", "The neural network. Better on some signals, worse on others.") : null;
-            _newBtn = BarButton("New", "The new decoder, on test. Better on weak signals, still worse on some strong fast ones.");
-            _bothBtn = BarButton("Both", "Plain and New at once, one under the other, reading the same signal - the only fair way to see which suits your station.");
+            // NEW IS NO LONGER OFFERED (2026-10-17, his decision): our network reads better, so the choice is
+            // Plain, Net, or the two at once. CwElementDecoder stays in the source; it is just not run.
+            _deepBtn = CwDeepDecoder.Available ? BarButton("Net", "Our own network, on test. Reads 15 seconds at a time, so its text comes about 6 seconds after the sound.") : null;
+            _bothBtn = BarButton("Both", "Plain and Net at once, one under the other, reading the same signal - the only fair way to see which suits your station.");
             _plainBtn.Click += (s, e) => ShowWhich(Reader.Plain);
             if (_networkBtn != null) _networkBtn.Click += (s, e) => ShowWhich(Reader.Network);
-            _newBtn.Click += (s, e) => ShowWhich(Reader.New);
             _bothBtn.Click += (s, e) => ShowWhich(Reader.Both);
+            if (_deepBtn != null) _deepBtn.Click += (s, e) => ShowWhich(Reader.Deep);
 
             var whichPanel = new StackPanel
             {
@@ -407,7 +457,7 @@ namespace HolyLogger
             };
             whichPanel.Children.Add(_plainBtn);
             if (_networkBtn != null) whichPanel.Children.Add(_networkBtn);
-            whichPanel.Children.Add(_newBtn);
+            if (_deepBtn != null) whichPanel.Children.Add(_deepBtn);
             whichPanel.Children.Add(_bothBtn);
 
             var right = new StackPanel { Orientation = Orientation.Horizontal };
@@ -462,6 +512,7 @@ namespace HolyLogger
         void ShowWhich(Reader which)
         {
             if (which == Reader.Network && (!RunNetwork || !SharedNet.Loaded)) return;
+            if (which == Reader.Deep && !CwDeepDecoder.Available) return;
 
             try
             {
@@ -482,6 +533,7 @@ namespace HolyLogger
             PaintChoice(_networkBtn, which == Reader.Network);
             PaintChoice(_bothBtn, which == Reader.Both);
             PaintChoice(_newBtn, which == Reader.New);
+            PaintChoice(_deepBtn, which == Reader.Deep);
 
             if (!SharedNet.Loaded && _networkBtn != null)
             {
@@ -503,12 +555,24 @@ namespace HolyLogger
         {
             bool both = Showing == Reader.Both;
 
-            _networkFrame.Visibility = both ? Visibility.Visible : Visibility.Collapsed;
-            _networkLabel.Visibility = both ? Visibility.Visible : Visibility.Collapsed;
+            // New's box is never shown now (see the bar buttons); in Both the Net box is the second one.
+            _networkFrame.Visibility = Visibility.Collapsed;
+            _networkLabel.Visibility = Visibility.Collapsed;
             _plainLabel.Visibility = both ? Visibility.Visible : Visibility.Collapsed;
 
-            _networkRow.Height = both ? new GridLength(1, GridUnitType.Star) : new GridLength(0);
-            SizeLetterLines(both);
+            _networkRow.Height = new GridLength(0);
+            bool deepBox = both && CwDeepDecoder.Available;
+            _deepLabel.Visibility = deepBox ? Visibility.Visible : Visibility.Collapsed;
+            _deepRow.Height = deepBox ? new GridLength(1, GridUnitType.Star) : new GridLength(0);
+
+            // In Both the two time-lined boxes stand where the ordinary ones are (which go on being
+            // written, unseen, so Plain or Net alone is up to date the moment it is chosen).
+            _mainFrame.Visibility = deepBox ? Visibility.Collapsed : Visibility.Visible;
+            _deepFrame.Visibility = Visibility.Collapsed;
+            _timePlainFrame.Visibility = deepBox ? Visibility.Visible : Visibility.Collapsed;
+            _timeNetFrame.Visibility = deepBox ? Visibility.Visible : Visibility.Collapsed;
+            if (deepBox) _timeLine.Show();
+            SizeLetterLines(false);     // only Plain puts letters under the waterfall now
         }
 
         static void PaintChoice(Button button, bool chosen)
@@ -526,7 +590,9 @@ namespace HolyLogger
                 {
                     var which = (Reader)Properties.Settings.Default.CwDecodeShow;
                     if (which == Reader.Network && (!RunNetwork || !SharedNet.Loaded)) return Reader.Plain;
-                    if (which < Reader.Plain || which > Reader.New) return Reader.Plain;
+                    if (which == Reader.Deep && !CwDeepDecoder.Available) return Reader.Plain;
+                    if (which == Reader.New) return Reader.Plain;          // no longer offered
+                    if (which < Reader.Plain || which > Reader.Deep) return Reader.Plain;
                     return which;
                 }
                 catch (Exception swallowed) { Log.Swallow(swallowed); return Reader.Plain; }
@@ -660,6 +726,7 @@ namespace HolyLogger
             var decoder = new CwDecoder(_recorder.ActualSampleRate);
             decoder.Text += OnPlainText;
             decoder.LetterTimed += OnPlainLetterTimed;
+            _plainRate = _recorder.ActualSampleRate;
             _decoder = decoder;
 
             // NET IS NO LONGER RUN (2026-10-03, his decision). Verified correct, but trained only on clean
@@ -673,11 +740,15 @@ namespace HolyLogger
                 _neural = neural;
             }
 
-            var element = new CwElementDecoder(_recorder.ActualSampleRate);
-            element.Text += OnElementText;
-            lock (_wfGate) _wfBase = _wfWritten;       // its sample count starts here
-            element.LetterTimed += OnElementLetterTimed;
-            _element = element;
+            lock (_wfGate) _wfBase = _wfWritten;       // the readers' sample count starts here
+
+            if (CwDeepDecoder.Available)
+            {
+                var deep = new CwDeepDecoder(_recorder.ActualSampleRate);
+                deep.Text += OnDeepText;
+                deep.LetterTimed += OnDeepLetterTimed;
+                _deep = deep;
+            }
 
             _shownLevel = 0;
             _screenTimer.Start();
@@ -701,6 +772,10 @@ namespace HolyLogger
             _element = null;
             if (element != null) { element.Text -= OnElementText; element.LetterTimed -= OnElementLetterTimed; element.Dispose(); }
 
+            var deep = _deep;
+            _deep = null;
+            if (deep != null) { deep.Text -= OnDeepText; deep.LetterTimed -= OnDeepLetterTimed; deep.Dispose(); }
+
             FlushPendingText();
 
             _shownLevel = 0;
@@ -710,9 +785,15 @@ namespace HolyLogger
 
         void ClearEverything()
         {
-            lock (_pendingGate) { _pendingPlain.Clear(); _pendingNetwork.Clear(); _pendingElement.Clear(); }
+            lock (_pendingGate) { _pendingPlain.Clear(); _pendingNetwork.Clear(); _pendingElement.Clear(); _pendingDeep.Clear(); _pendingPlainTimed.Clear(); _pendingNetTimed.Clear(); }
+            lock (_plainTimes) _plainTimes.Clear();
+            _timeLine.Clear();
+            _timeLine.Show();
             _text.Clear();
             if (_networkText != null) _networkText.Clear();
+            if (_deepText != null) _deepText.Clear();
+            var deepReader = _deep;
+            if (deepReader != null) deepReader.Reset();
 
             var decoder = _decoder;
             if (decoder != null) decoder.Reset();
@@ -784,7 +865,7 @@ namespace HolyLogger
                 BorderThickness = new Thickness(1),
                 BorderBrush = GroupEdgeBrush,
                 ClipToBounds = true,          // the picture slides left between columns - see WaterfallFrame
-                ToolTip = "What the decoders hear: time runs right to left, the note up (300 to 1000 Hz). The dotted green line is the note being read.\nUnder it, the letters each reader made of it: Plain in white, New in yellow."
+                ToolTip = "What the decoders hear: time runs right to left, the note up (300 to 1000 Hz). The dotted green line is the note being read.\nUnder it, the letters Plain made of it."
             };
             return _wfBorder;
         }
@@ -815,6 +896,43 @@ namespace HolyLogger
         void OnPlainLetterTimed(string letter, long start, long end)
         {
             lock (_wfLetterQueue) _wfLetterQueue.Add(new WfLetter { Text = letter, Sample = _wfBase + (start + end) / 2, Row = 0 });
+            if (_plainRate <= 0) return;
+            lock (_plainTimes)
+            {
+                _plainTimes.Add(new System.Collections.Generic.KeyValuePair<string, double>(letter, end / (double)_plainRate));
+                if (_plainTimes.Count > 200) _plainTimes.RemoveRange(0, _plainTimes.Count - 200);
+            }
+        }
+
+        // Plain's printed letters, each given the time of the same letter in LetterTimed (raised just
+        // before it). Earlier timed letters not printed were held back as noise and dropped: skipped.
+        void TimePlainLetters(string text)
+        {
+            for (int i = 0; i < text.Length; i++)
+            {
+                char c = text[i];
+                if (c == ' ' || c == '\r' || c == '\n') continue;
+                string letter = c.ToString();
+                if (c == '<')
+                {
+                    int close = text.IndexOf('>', i);
+                    if (close > i) { letter = text.Substring(i, close - i + 1); i = close; }
+                }
+                lock (_plainTimes)
+                {
+                    int at = _plainTimes.FindIndex(e => e.Key == letter);
+                    if (at < 0) continue;
+                    double t = _plainTimes[at].Value;
+                    _plainTimes.RemoveRange(0, at + 1);
+                    lock (_pendingGate) _pendingPlainTimed.Add(new System.Collections.Generic.KeyValuePair<string, double>(letter, t));
+                }
+            }
+        }
+
+        // On our network's own thread.
+        void OnDeepLetterTimed(string letter, double seconds)
+        {
+            lock (_pendingGate) _pendingNetTimed.Add(new System.Collections.Generic.KeyValuePair<string, double>(letter, seconds));
         }
 
         void OnElementLetterTimed(string letter, long start, long end)
@@ -1218,6 +1336,13 @@ namespace HolyLogger
                 catch (Exception swallowed) { Log.Swallow(swallowed); }
             }
 
+            var deep = _deep;
+            if (deep != null)
+            {
+                try { deep.Process(samples, count); }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
+            }
+
             // BOTH READERS ARE FED, WHICHEVER IS ON SHOW, so changing the choice on the bar is
             // instant and the one that was hidden is not starting from cold.
             var neural = _neural;
@@ -1238,8 +1363,10 @@ namespace HolyLogger
         // show is still running and still being fed - its letters are simply dropped here.
         void OnPlainText(string text)
         {
+            try { TimePlainLetters(text); }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
             var showing = Showing;
-            if (showing == Reader.Network || showing == Reader.New) return;
+            if (showing == Reader.Network || showing == Reader.New || showing == Reader.Deep) return;
             lock (_pendingGate) _pendingPlain.Append(text);
         }
 
@@ -1247,6 +1374,14 @@ namespace HolyLogger
         {
             if (Showing != Reader.Network) return;
             lock (_pendingGate) _pendingNetwork.Append(text);
+        }
+
+        // On our network's own thread.
+        void OnDeepText(string text)
+        {
+            var showing = Showing;
+            if (showing != Reader.Deep && showing != Reader.Both) return;
+            lock (_pendingGate) _pendingDeep.Append(text);
         }
 
         // On the new decoder's own thread.
@@ -1267,15 +1402,22 @@ namespace HolyLogger
 
         void FlushPendingText()
         {
-            string plain, network, element;
+            string plain, network, element, deepText;
+            System.Collections.Generic.KeyValuePair<string, double>[] plainTimed, netTimed;
             lock (_pendingGate)
             {
+                plainTimed = _pendingPlainTimed.ToArray();
+                netTimed = _pendingNetTimed.ToArray();
+                _pendingPlainTimed.Clear();
+                _pendingNetTimed.Clear();
                 plain = _pendingPlain.ToString();
                 network = _pendingNetwork.ToString();
                 element = _pendingElement.ToString();
+                deepText = _pendingDeep.ToString();
                 _pendingPlain.Clear();
                 _pendingNetwork.Clear();
                 _pendingElement.Clear();
+                _pendingDeep.Clear();
             }
 
             // The readers are told the note and the speed before they are given the letters: it is
@@ -1287,18 +1429,26 @@ namespace HolyLogger
                 double speed = heard.SignalPresent ? heard.Wpm : 0;
                 _text.ToneHz = note; _text.Wpm = speed;
                 if (_networkText != null) { _networkText.ToneHz = note; _networkText.Wpm = speed; }
+                if (_deepText != null) { _deepText.ToneHz = note; _deepText.Wpm = speed; }
             }
+
+            // The time line is kept whichever reader is on show, and drawn only in Both.
+            double wpm = heard != null && heard.Wpm >= 5 ? heard.Wpm : 20;
+            foreach (var e in plainTimed) _timeLine.AddPlain(e.Key, e.Value, wpm);
+            foreach (var e in netTimed) _timeLine.AddNet(e.Key, e.Value - 0.8 * 1.2 / wpm, wpm);
 
             // With one reader on show it writes into the top box; in Both the plain decoder has the
             // top box and the new one the box under it.
             var showing = Showing;
             if (showing == Reader.Network) AppendTo(_text, network);
             else if (showing == Reader.New) AppendTo(_text, element);
+            else if (showing == Reader.Deep) AppendTo(_text, deepText);
             else
             {
                 AppendTo(_text, plain);
-                if (showing == Reader.Both) AppendTo(_networkText, element);
+                if (showing == Reader.Both) { AppendTo(_networkText, element); AppendTo(_deepText, deepText); }
             }
+            if (showing == Reader.Both && CwDeepDecoder.Available) _timeLine.Show();
         }
 
                 static void AppendTo(CwDecodedText box, string text)

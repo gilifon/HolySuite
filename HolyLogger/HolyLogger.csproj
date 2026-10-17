@@ -338,6 +338,9 @@
     <Compile Include="CwNeuralFrontEnd.cs" />
     <Compile Include="CwNeuralDecoder.cs" />
     <Compile Include="CwElementDecoder.cs" />
+    <Compile Include="CwDeepNet.cs" />
+    <Compile Include="CwDeepDecoder.cs" />
+    <Compile Include="CwTimeLine.cs" />
     <Compile Include="MainWindow.CwDecode.cs" />
     <Compile Include="ClusterSettingsWindow.xaml.cs">
       <DependentUpon>ClusterSettingsWindow.xaml</DependentUpon>
@@ -1172,6 +1175,9 @@
     <Resource Include="Images\flags\zw.png" />
     <Content Include="..\WhatsNew.txt">
       <Link>WhatsNew.txt</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Data\CwDeep.bin" Condition="Exists('Data\CwDeep.bin')">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="Data\CwNeural.bin">
