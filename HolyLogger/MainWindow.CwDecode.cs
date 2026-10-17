@@ -118,6 +118,8 @@ namespace HolyLogger
                 try { cwDecodeWindow.Owner = this; } catch (Exception swallowed) { Log.Swallow(swallowed); }
                 cwDecodeWindow.Closed += (s, args) => { cwDecodeWindow = null; cwDecodeOpenedItself = false; };
                 cwDecodeWindow.CallsignChosen += TakeCallsignFromDecode;
+                cwDecodeWindow.ShiftRadio = ShiftRigForPitch;
+                cwDecodeWindow.WentWrongWay = TuneWentWrongWay;
                 cwDecodeWindow.Show();
             }
             catch (Exception ex)

@@ -53,6 +53,57 @@ namespace HolyLogger
             }
         }
 
+        // ---- TUNE: the station the decoder hears, moved to his pitch (2026-10-17, his request) ----------
+        //
+        // The decoder measures the note it hears the station on; his pitch is set in Options > General.
+        // The dial moves by the difference - up or down depending on which side the radio's CW listens on,
+        // which on OmniRig is CW_U (upper) or CW_L (lower), turned round by "Swap CW and CW-R" for an Icom
+        // whose menu has its normal CW side changed. The decoder checks the note afterwards and, if it went
+        // the wrong way on this radio, says so (TuneWentWrongWay) and the other way is used from then on.
+        bool _tuneTheOtherWay;
+
+        /// <summary>Moves the dial so a note heard offHz too high comes down by offHz (negative: up).
+        /// Returns null when sent, else a short reason for the operator.</summary>
+        internal string ShiftRigForPitch(double offHz)
+        {
+            if (!IsCatLive()) return "No radio";
+            try
+            {
+                int mode = (int)Rig.Mode;
+                bool upper;
+                if (mode == PM_CW_U) upper = true;
+                else if (mode == PM_CW_L) upper = false;
+                else return "Not in CW";
+                if (Properties.Settings.Default.SwapCwSideband) upper = !upper;
+                if (_tuneTheOtherWay) upper = !upper;
+
+                if (_writeableParamsCache < 0) _writeableParamsCache = (int)Rig.WriteableParams;
+                bool viaFreq = (_writeableParamsCache & PM_FREQ) != 0;
+                if (!viaFreq && (_writeableParamsCache & PM_FREQA) == 0) return "Cannot tune";
+                int now = viaFreq ? Rig.Freq : Rig.FreqA;
+                if (now <= 0) now = viaFreq ? Rig.FreqA : Rig.Freq;
+                if (now <= 0) return "No frequency";
+
+                int to = now + (int)Math.Round(upper ? offHz : -offHz);
+                if (viaFreq) Rig.Freq = to; else Rig.FreqA = to;
+                try
+                {
+                    TB_Frequency.Text = (to / 1000000.0).ToString("###0.000000", CultureInfo.InvariantCulture);
+                    UpdateFreqLed();
+                }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
+                return null;
+            }
+            catch (Exception swallowed)
+            {
+                Log.Swallow(swallowed);
+                _writeableParamsCache = -1;
+                return "No answer";
+            }
+        }
+
+        internal void TuneWentWrongWay() { _tuneTheOtherWay = !_tuneTheOtherWay; }
+
         // CAT is "live" only when OmniRig is enabled AND the selected rig is actually online.
         internal bool IsCatLive()
             => Properties.Settings.Default.EnableOmniRigCAT && Rig != null && Rig.Status == OmniRig.RigStatusX.ST_ONLINE;
