@@ -143,8 +143,33 @@ namespace HolyLogger.OptionsUserControls
             Loaded += (sender, args) => ListenForPorts(true);
             Unloaded += (sender, args) => ListenForPorts(false);
             InitCwDecodeDevicePicker();
+            _loadingCwPitch = true;
+            TB_CwPitch.Text = Properties.Settings.Default.CwPitchHz.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            _loadingCwPitch = false;
 
             HasChanged = false;
+        }
+
+        bool _loadingCwPitch;
+
+        // A good number is saved at once and the decoder's waterfall follows; anything else is shown red
+        // and not saved, so the last good pitch stays.
+        private void TB_CwPitch_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (_loadingCwPitch) return;
+            int hz;
+            bool good = int.TryParse(TB_CwPitch.Text.Trim(), System.Globalization.NumberStyles.Integer,
+                System.Globalization.CultureInfo.InvariantCulture, out hz) && hz >= CwDecodeWindow.LowestPitchHz && hz <= CwDecodeWindow.HighestPitchHz;
+            TB_CwPitch.Foreground = good ? System.Windows.Media.Brushes.Black : System.Windows.Media.Brushes.Red;
+            CwPitchNote.Foreground = good ? System.Windows.Media.Brushes.Gray : System.Windows.Media.Brushes.Red;
+            if (!good) return;
+            try
+            {
+                Properties.Settings.Default.CwPitchHz = hz;
+                Properties.Settings.Default.Save();
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+            CwDecodeWindow.RaisePitchChanged();
         }
 
         // ── CW VIA: CAT commands, or a COM port HolyLogger keys itself ────────────────────────────

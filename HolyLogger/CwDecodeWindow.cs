@@ -42,6 +42,18 @@ namespace HolyLogger
         /// </summary>
         public event Action<string> CallsignChosen;
 
+        /// <summary>The CW pitch was changed in Options: the waterfall's mark moves to it.</summary>
+        public static event Action PitchChanged;
+        public const int LowestPitchHz = 300, HighestPitchHz = 1000;     // the waterfall's own range
+
+        internal static void RaisePitchChanged()
+        {
+            var handler = PitchChanged;
+            if (handler == null) return;
+            try { handler(); }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
         internal static void RaiseInputDeviceChanged()
         {
             var handler = InputDeviceChanged;
@@ -201,6 +213,7 @@ namespace HolyLogger
             _recorder.Failed += OnRecorderFailed;
             _recorder.Samples += OnSamples;
             InputDeviceChanged += OnInputDeviceChanged;
+            PitchChanged += OnPitchChanged;
 
             _screenTimer = new DispatcherTimer(DispatcherPriority.Background)
             {
@@ -881,8 +894,28 @@ namespace HolyLogger
                 Background = new SolidColorBrush(Color.FromRgb(0, 0, 0)),
                 ClipToBounds = true
             };
+            // HIS PITCH MARKED (his request, 2026-10-17; the pitch is set in Options > General, 700 Hz unless
+            // changed): a short bright line at each edge of the strip, laid over the picture (not drawn into
+            // it, so it does not slide away with the sound).
+            var picture = new Grid { Height = WfRows };
+            picture.Children.Add(image);
+            foreach (var side in new[] { HorizontalAlignment.Left, HorizontalAlignment.Right })
+            {
+                var mark = new Rectangle
+                {
+                    Width = 22,
+                    Height = 3,
+                    Fill = MarkBrush,
+                    HorizontalAlignment = side,
+                    VerticalAlignment = VerticalAlignment.Top,
+                    IsHitTestVisible = false
+                };
+                _pitchMarks.Add(mark);
+                picture.Children.Add(mark);
+            }
+            PlacePitchMarks();
             var stack = new StackPanel();
-            stack.Children.Add(image);
+            stack.Children.Add(picture);
             stack.Children.Add(_wfLetterCanvas);
 
             int inner = WfRows + 2 * LetterRowHeight + 2;
@@ -894,12 +927,35 @@ namespace HolyLogger
                 BorderThickness = new Thickness(1),
                 BorderBrush = GroupEdgeBrush,
                 ClipToBounds = true,          // the picture slides left between columns - see WaterfallFrame
-                ToolTip = "What the decoders hear: time runs right to left, the note up (300 to 1000 Hz). The dotted green line is the note being read.\nUnder it, the letters Plain made of it."
             };
+            PlacePitchMarks();
             return _wfBorder;
         }
 
         Border _wfBorder;
+        readonly System.Collections.Generic.List<Rectangle> _pitchMarks = new System.Collections.Generic.List<Rectangle>();
+
+        void PlacePitchMarks()
+        {
+            int hz = 700;
+            try { hz = Properties.Settings.Default.CwPitchHz; }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+            hz = Math.Max(LowestPitchHz, Math.Min(HighestPitchHz, hz));
+            double y = (WfHighHz - hz) / (WfHighHz - WfLowHz) * (WfRows - 1) + 0.5;
+            foreach (Rectangle mark in _pitchMarks) mark.Margin = new Thickness(0, y - 1.5, 0, 0);
+            if (_wfBorder != null) _wfBorder.ToolTip = WaterfallTip(hz);
+        }
+
+        static string WaterfallTip(int pitchHz)
+        {
+            return "What the decoders hear: time runs right to left, the note up (300 to 1000 Hz). The dotted green line is the note being read; the short red lines at the edges mark your pitch, " + pitchHz + " Hz.\nUnder it, the letters Plain made of it.";
+        }
+
+        void OnPitchChanged()
+        {
+            Dispatcher.BeginInvoke(new Action(PlacePitchMarks));
+        }
+        static readonly Brush MarkBrush = Frozen(Color.FromRgb(0xFF, 0x50, 0x50));
 
         // ONE LINE OF LETTERS UNLESS BOTH ARE ON SHOW (2026-10-03, his request): with one reader the
         // second line was always empty and only took room from the text above.
@@ -1551,6 +1607,7 @@ namespace HolyLogger
             _recorder.Failed -= OnRecorderFailed;
             _recorder.Samples -= OnSamples;
             InputDeviceChanged -= OnInputDeviceChanged;
+            PitchChanged -= OnPitchChanged;
             StopListening();
             try { _recorder.Dispose(); }
             catch (Exception swallowed) { Log.Swallow(swallowed); }

@@ -3782,6 +3782,18 @@ namespace HolyLogger.Properties {
                 this["SwapCwSideband"] = value;
             }
         }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("700")]
+        public int CwPitchHz {
+            get {
+                return ((int)(this["CwPitchHz"]));
+            }
+            set {
+                this["CwPitchHz"] = value;
+            }
+        }
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
