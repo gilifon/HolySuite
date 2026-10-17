@@ -42,6 +42,12 @@ namespace HolyLogger
         /// </summary>
         public event Action<string> CallsignChosen;
 
+        /// <summary>Set by the main window: moves the radio so a note heard offHz too high comes down by
+        /// offHz. Returns null when done, else a short reason. Null when there is no radio to move.</summary>
+        public Func<double, string> ShiftRadio;
+        /// <summary>Set by the main window: the last move went the wrong way on this radio.</summary>
+        public Action WentWrongWay;
+
         /// <summary>The CW pitch was changed in Options: the waterfall's mark moves to it.</summary>
         public static event Action PitchChanged;
         public const int LowestPitchHz = 300, HighestPitchHz = 1000;     // the waterfall's own range
@@ -166,16 +172,17 @@ namespace HolyLogger
         public CwDecodeWindow()
         {
             Title = "CW Decoder";
-            Width = 660;
+            Width = 720;
             Height = 300 + WaterfallRowHeight;
 
             // WIDE ENOUGH FOR THE BAR, SHORT ENOUGH FOR ONE LINE. The floor on the height is the bar
             // plus a single row of text: an operator who wants a one-line ticker along the bottom of
             // his screen must be able to have one, and any taller floor than this would refuse him.
-            // The width floor is the whole bar - title, lamp, speed, the four reader keys, Clear and
-            // the close cross - measured at 618 px with the speed showing; at the old 380 the Clear key
-            // and the close cross were pushed out of the window.
-            MinWidth = 630;
+            // The width floor is the whole bar - title, lamp, speed, the four reader keys, Tune, Clear
+            // and the close cross. Measured 2026-10-17 (the Bar harness) with the widest speed,
+            // "38 WPM   1000 Hz": 683 px of bar once Tune moved beside the name, plus the window's 3 px
+            // blue edge each side, plus a little air; 630 had been too narrow even before Tune was added.
+            MinWidth = 700;
 
             // The bar, plus the framed paper with one row of text in it. Anything taller than this
             // would refuse an operator who wants a one-line ticker along the edge of his screen.
@@ -438,6 +445,18 @@ namespace HolyLogger
             };
             clearBtn.Click += (s, e) => ClearEverything();
 
+            // TUNE (his request, 2026-10-17): the station Plain is reading, moved to his pitch.
+            // Green and next to the window's name (his choice): it is the one key that does something to
+            // the radio, not to the text.
+            var tuneBtn = BarButton("Tune", "Moves the radio so the station being read is heard at your pitch (set in Options > General).");
+            tuneBtn.Background = TuneGreen;
+            tuneBtn.Foreground = Brushes.White;
+            tuneBtn.Margin = new Thickness(10, 0, 0, 0);
+            tuneBtn.VerticalAlignment = VerticalAlignment.Center;
+            tuneBtn.Style = TuneStyle();
+            System.Windows.Shell.WindowChrome.SetIsHitTestVisibleInChrome(tuneBtn, true);
+            tuneBtn.Click += (s, e) => TuneToPitch();
+
             var clearPanel = new StackPanel
             {
                 Orientation = Orientation.Horizontal,
@@ -518,13 +537,39 @@ namespace HolyLogger
             var icon = BuildIcon();
             DockPanel.SetDock(icon, Dock.Left);
             DockPanel.SetDock(titleText, Dock.Left);
+            DockPanel.SetDock(tuneBtn, Dock.Left);
 
             var bar = new DockPanel { LastChildFill = false };
             bar.Children.Add(right);
             bar.Children.Add(icon);
             bar.Children.Add(titleText);
+            bar.Children.Add(tuneBtn);
 
             return new Border { Height = 32, Child = bar, Background = CwKeyBrush };
+        }
+
+        static readonly Brush TuneGreen = Frozen(Color.FromRgb(0x2E, 0x7D, 0x32));
+        static readonly Brush TuneGreenHover = Frozen(Color.FromRgb(0x43, 0xA0, 0x47));
+
+        // The plain button look would paint its own grey over the green on hover; this keeps it green.
+        static Style TuneStyle()
+        {
+            var face = new FrameworkElementFactory(typeof(Border));
+            face.Name = "face";
+            face.SetValue(Border.BackgroundProperty, new TemplateBindingExtension(Control.BackgroundProperty));
+            face.SetValue(Border.CornerRadiusProperty, new CornerRadius(3));
+            face.SetValue(Border.PaddingProperty, new TemplateBindingExtension(Control.PaddingProperty));
+            var text = new FrameworkElementFactory(typeof(ContentPresenter));
+            text.SetValue(ContentPresenter.HorizontalAlignmentProperty, HorizontalAlignment.Center);
+            text.SetValue(ContentPresenter.VerticalAlignmentProperty, VerticalAlignment.Center);
+            face.AppendChild(text);
+            var template = new ControlTemplate(typeof(Button)) { VisualTree = face };
+            var hover = new Trigger { Property = UIElement.IsMouseOverProperty, Value = true };
+            hover.Setters.Add(new Setter(Border.BackgroundProperty, TuneGreenHover, "face"));
+            template.Triggers.Add(hover);
+            var style = new Style(typeof(Button));
+            style.Setters.Add(new Setter(Control.TemplateProperty, template));
+            return style;
         }
 
         // A key on the bar, cut to the keyer's pattern.
@@ -1578,8 +1623,56 @@ namespace HolyLogger
             else _lamp.Fill = GoodBrush;
         }
 
+        // A word from the Tune key, shown where the speed is for a few seconds.
+        string _tuneSay;
+        DateTime _tuneSayUntil;
+        DispatcherTimer _tuneCheck;
+
+        void SayTune(string text)
+        {
+            _tuneSay = text;
+            _tuneSayUntil = DateTime.UtcNow.AddSeconds(3);
+            UpdateSpeed();
+        }
+
+        // The note Plain hears, minus his pitch, is how far to move. Two seconds later the note is read
+        // again: if it went further from the pitch, this radio tunes the other way round - put right at
+        // once, and remembered (WentWrongWay).
+        void TuneToPitch()
+        {
+            var decoder = _decoder;
+            if (ShiftRadio == null) { SayTune("No radio"); return; }
+            if (decoder == null || !decoder.SignalPresent || decoder.ToneHz <= 0) { SayTune("No station"); return; }
+            int pitch = 700;
+            try { pitch = Properties.Settings.Default.CwPitchHz; }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+            double heard = decoder.ToneHz, off = heard - pitch;
+            if (Math.Abs(off) < 10) { SayTune("On " + pitch + " Hz"); return; }
+            string why = ShiftRadio(off);
+            if (why != null) { SayTune(why); return; }
+            SayTune("Moved " + Math.Round(Math.Abs(off)).ToString("N0") + " Hz");
+
+            if (_tuneCheck != null) _tuneCheck.Stop();
+            _tuneCheck = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
+            _tuneCheck.Tick += (s, e) =>
+            {
+                _tuneCheck.Stop();
+                var d = _decoder;
+                if (d == null || !d.SignalPresent || d.ToneHz <= 0) return;
+                double after = d.ToneHz;
+                if (Math.Abs(after - pitch) <= Math.Abs(off) * 0.5) return;          // it came our way
+                if (Math.Abs(after - pitch) < Math.Abs(off) * 1.5) return;          // not clear - leave it
+                if (WentWrongWay != null) WentWrongWay();
+                string again = ShiftRadio(after - pitch);
+                SayTune(again ?? "Moved " + Math.Round(Math.Abs(after - pitch)).ToString("N0") + " Hz");
+            };
+            _tuneCheck.Start();
+        }
+
         void UpdateSpeed()
         {
+            if (_tuneSay != null && DateTime.UtcNow < _tuneSayUntil) { _speedText.Text = _tuneSay; return; }
+            _tuneSay = null;
             var decoder = _decoder;
             if (decoder == null || !decoder.SignalPresent)
             {
