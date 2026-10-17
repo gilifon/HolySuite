@@ -101,7 +101,7 @@ namespace HolyLogger
         // decoder - comparing those two on the air is what it is here for.
         CwElementDecoder _element;
 
-        // OUR OWN NETWORK, ON TEST (see CwDeepDecoder): reads 15 s at a time, prints 6 s behind the sound.
+        // OUR OWN NETWORK, ON TEST (see CwDeepDecoder): reads 15 s at a time, prints a few seconds behind the sound.
         // Only there when Data\CwDeep.bin is; in Both it gets a third box under Plain and New.
         CwDeepDecoder _deep;
         CwDecodedText _deepText;
@@ -115,6 +115,12 @@ namespace HolyLogger
         // it was sent. Plain's printed letters get their times from its LetterTimed, matched in order -
         // a timed letter that was never printed (held back as noise, then dropped) is skipped over.
         CwTimeLine _timeLine;
+
+        // MIX (see CwMixText): Plain at once, then each letter confirmed (bold) or corrected by the network.
+        CwMixText _mix;
+        Border _mixFrame;
+        Button _mixBtn;
+        readonly System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<double, double>> _pendingCovered = new System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<double, double>>();
         Border _mainFrame, _timePlainFrame, _timeNetFrame;
         int _plainRate;
         readonly System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<string, double>> _plainTimes = new System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<string, double>>();
@@ -139,7 +145,7 @@ namespace HolyLogger
         readonly object _pendingGate = new object();
 
         /// <summary>Which reader's letters are shown.</summary>
-        public enum Reader { Plain, Network, Both, New, Deep }
+        public enum Reader { Plain, Network, Both, New, Deep, Mix }
 
         // The lamp falls back gently instead of snapping to grey between characters. Without it it
         // flickers on CW - which is silence half the time - and cannot be read at all.
@@ -252,6 +258,17 @@ namespace HolyLogger
             _timeNetFrame = Paper(_timeLine.NetBox);
             _timeNetFrame.Visibility = Visibility.Collapsed;
 
+            _mix = new CwMixText();
+            _mix.CallsignChosen += call =>
+            {
+                var handler = CallsignChosen;
+                if (handler == null) return;
+                try { handler(call); }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
+            };
+            _mixFrame = Paper(_mix.Box);
+            _mixFrame.Visibility = Visibility.Collapsed;
+
             // The second reader's box, shown only in Both.
             _networkText = MakeTextBox();
             _networkFrame = Paper(_networkText.Box);
@@ -264,7 +281,7 @@ namespace HolyLogger
             _deepText = MakeTextBox();
             _deepFrame = Paper(_deepText.Box);
             _deepFrame.Visibility = Visibility.Collapsed;
-            _deepLabel = Label("Net (test) - 6 s behind");
+            _deepLabel = Label("Net (test) - a few seconds behind");
             _deepLabel.Visibility = Visibility.Collapsed;
 
             var titleBar = BuildTitleBar();
@@ -296,6 +313,7 @@ namespace HolyLogger
             Grid.SetRow(_deepFrame, 6);
             Grid.SetRow(_timePlainFrame, 2);
             Grid.SetRow(_timeNetFrame, 6);
+            Grid.SetRow(_mixFrame, 2);
 
             boxes.Children.Add(_plainLabel);
             boxes.Children.Add(frame);
@@ -306,6 +324,7 @@ namespace HolyLogger
             boxes.Children.Add(_deepFrame);
             boxes.Children.Add(_timePlainFrame);
             boxes.Children.Add(_timeNetFrame);
+            boxes.Children.Add(_mixFrame);
 
             var body = new DockPanel();
             body.Children.Add(titleBar);
@@ -338,6 +357,7 @@ namespace HolyLogger
             box.Foreground = PaperInk;
 
             var decoded = new CwDecodedText(box);
+            CwStripes.Apply(box.Document);
             decoded.CallsignChosen += call =>
             {
                 var handler = CallsignChosen;
@@ -443,12 +463,14 @@ namespace HolyLogger
             _networkBtn = RunNetwork ? BarButton("Net", "The neural network. Better on some signals, worse on others.") : null;
             // NEW IS NO LONGER OFFERED (2026-10-17, his decision): our network reads better, so the choice is
             // Plain, Net, or the two at once. CwElementDecoder stays in the source; it is just not run.
-            _deepBtn = CwDeepDecoder.Available ? BarButton("Net", "Our own network, on test. Reads 15 seconds at a time, so its text comes about 6 seconds after the sound.") : null;
+            _deepBtn = CwDeepDecoder.Available ? BarButton("Net", "Our own network, on test. Reads 15 seconds at a time, so its text comes about 3 to 7 seconds after the sound.") : null;
+            _mixBtn = CwDeepDecoder.Available ? BarButton("Mix", "Plain at once; a few seconds later each letter the network agrees with turns bold, and one it reads differently is corrected (also bold).") : null;
             _bothBtn = BarButton("Both", "Plain and Net at once, one under the other, reading the same signal - the only fair way to see which suits your station.");
             _plainBtn.Click += (s, e) => ShowWhich(Reader.Plain);
             if (_networkBtn != null) _networkBtn.Click += (s, e) => ShowWhich(Reader.Network);
             _bothBtn.Click += (s, e) => ShowWhich(Reader.Both);
             if (_deepBtn != null) _deepBtn.Click += (s, e) => ShowWhich(Reader.Deep);
+            if (_mixBtn != null) _mixBtn.Click += (s, e) => ShowWhich(Reader.Mix);
 
             var whichPanel = new StackPanel
             {
@@ -458,6 +480,7 @@ namespace HolyLogger
             whichPanel.Children.Add(_plainBtn);
             if (_networkBtn != null) whichPanel.Children.Add(_networkBtn);
             if (_deepBtn != null) whichPanel.Children.Add(_deepBtn);
+            if (_mixBtn != null) whichPanel.Children.Add(_mixBtn);
             whichPanel.Children.Add(_bothBtn);
 
             var right = new StackPanel { Orientation = Orientation.Horizontal };
@@ -512,7 +535,7 @@ namespace HolyLogger
         void ShowWhich(Reader which)
         {
             if (which == Reader.Network && (!RunNetwork || !SharedNet.Loaded)) return;
-            if (which == Reader.Deep && !CwDeepDecoder.Available) return;
+            if ((which == Reader.Deep || which == Reader.Mix) && !CwDeepDecoder.Available) return;
 
             try
             {
@@ -534,6 +557,7 @@ namespace HolyLogger
             PaintChoice(_bothBtn, which == Reader.Both);
             PaintChoice(_newBtn, which == Reader.New);
             PaintChoice(_deepBtn, which == Reader.Deep);
+            PaintChoice(_mixBtn, which == Reader.Mix);
 
             if (!SharedNet.Loaded && _networkBtn != null)
             {
@@ -567,7 +591,10 @@ namespace HolyLogger
 
             // In Both the two time-lined boxes stand where the ordinary ones are (which go on being
             // written, unseen, so Plain or Net alone is up to date the moment it is chosen).
-            _mainFrame.Visibility = deepBox ? Visibility.Collapsed : Visibility.Visible;
+            bool mix = Showing == Reader.Mix;
+            _mainFrame.Visibility = deepBox || mix ? Visibility.Collapsed : Visibility.Visible;
+            _mixFrame.Visibility = mix ? Visibility.Visible : Visibility.Collapsed;
+            if (mix) _mix.Show();
             _deepFrame.Visibility = Visibility.Collapsed;
             _timePlainFrame.Visibility = deepBox ? Visibility.Visible : Visibility.Collapsed;
             _timeNetFrame.Visibility = deepBox ? Visibility.Visible : Visibility.Collapsed;
@@ -590,9 +617,9 @@ namespace HolyLogger
                 {
                     var which = (Reader)Properties.Settings.Default.CwDecodeShow;
                     if (which == Reader.Network && (!RunNetwork || !SharedNet.Loaded)) return Reader.Plain;
-                    if (which == Reader.Deep && !CwDeepDecoder.Available) return Reader.Plain;
+                    if ((which == Reader.Deep || which == Reader.Mix) && !CwDeepDecoder.Available) return Reader.Plain;
                     if (which == Reader.New) return Reader.Plain;          // no longer offered
-                    if (which < Reader.Plain || which > Reader.Deep) return Reader.Plain;
+                    if (which < Reader.Plain || which > Reader.Mix) return Reader.Plain;
                     return which;
                 }
                 catch (Exception swallowed) { Log.Swallow(swallowed); return Reader.Plain; }
@@ -747,6 +774,7 @@ namespace HolyLogger
                 var deep = new CwDeepDecoder(_recorder.ActualSampleRate);
                 deep.Text += OnDeepText;
                 deep.LetterTimed += OnDeepLetterTimed;
+                deep.Covered += OnDeepCovered;
                 _deep = deep;
             }
 
@@ -774,7 +802,7 @@ namespace HolyLogger
 
             var deep = _deep;
             _deep = null;
-            if (deep != null) { deep.Text -= OnDeepText; deep.LetterTimed -= OnDeepLetterTimed; deep.Dispose(); }
+            if (deep != null) { deep.Text -= OnDeepText; deep.LetterTimed -= OnDeepLetterTimed; deep.Covered -= OnDeepCovered; deep.Dispose(); }
 
             FlushPendingText();
 
@@ -785,10 +813,11 @@ namespace HolyLogger
 
         void ClearEverything()
         {
-            lock (_pendingGate) { _pendingPlain.Clear(); _pendingNetwork.Clear(); _pendingElement.Clear(); _pendingDeep.Clear(); _pendingPlainTimed.Clear(); _pendingNetTimed.Clear(); }
+            lock (_pendingGate) { _pendingPlain.Clear(); _pendingNetwork.Clear(); _pendingElement.Clear(); _pendingDeep.Clear(); _pendingPlainTimed.Clear(); _pendingNetTimed.Clear(); _pendingCovered.Clear(); }
             lock (_plainTimes) _plainTimes.Clear();
             _timeLine.Clear();
             _timeLine.Show();
+            _mix.Clear();
             _text.Clear();
             if (_networkText != null) _networkText.Clear();
             if (_deepText != null) _deepText.Clear();
@@ -911,7 +940,11 @@ namespace HolyLogger
             for (int i = 0; i < text.Length; i++)
             {
                 char c = text[i];
-                if (c == ' ' || c == '\r' || c == '\n') continue;
+                if (c == ' ' || c == '\r' || c == '\n')
+                {
+                    lock (_pendingGate) _pendingPlainTimed.Add(new System.Collections.Generic.KeyValuePair<string, double>(" ", double.NaN));
+                    continue;
+                }
                 string letter = c.ToString();
                 if (c == '<')
                 {
@@ -933,6 +966,11 @@ namespace HolyLogger
         void OnDeepLetterTimed(string letter, double seconds)
         {
             lock (_pendingGate) _pendingNetTimed.Add(new System.Collections.Generic.KeyValuePair<string, double>(letter, seconds));
+        }
+
+        void OnDeepCovered(double from, double to)
+        {
+            lock (_pendingGate) _pendingCovered.Add(new System.Collections.Generic.KeyValuePair<double, double>(from, to));
         }
 
         void OnElementLetterTimed(string letter, long start, long end)
@@ -1404,8 +1442,11 @@ namespace HolyLogger
         {
             string plain, network, element, deepText;
             System.Collections.Generic.KeyValuePair<string, double>[] plainTimed, netTimed;
+            System.Collections.Generic.KeyValuePair<double, double>[] covered;
             lock (_pendingGate)
             {
+                covered = _pendingCovered.ToArray();
+                _pendingCovered.Clear();
                 plainTimed = _pendingPlainTimed.ToArray();
                 netTimed = _pendingNetTimed.ToArray();
                 _pendingPlainTimed.Clear();
@@ -1434,8 +1475,18 @@ namespace HolyLogger
 
             // The time line is kept whichever reader is on show, and drawn only in Both.
             double wpm = heard != null && heard.Wpm >= 5 ? heard.Wpm : 20;
-            foreach (var e in plainTimed) _timeLine.AddPlain(e.Key, e.Value, wpm);
-            foreach (var e in netTimed) _timeLine.AddNet(e.Key, e.Value - 0.8 * 1.2 / wpm, wpm);
+            double netEarly = 0.8 * 1.2 / wpm;       // the network says a letter 0.8 dit after it ends
+            foreach (var e in plainTimed)
+            {
+                if (e.Key != " ") _timeLine.AddPlain(e.Key, e.Value, wpm);
+                _mix.AddPlain(e.Key, e.Value);
+            }
+            foreach (var e in netTimed)
+            {
+                _timeLine.AddNet(e.Key, e.Value - netEarly, wpm);
+                _mix.AddNet(e.Key, e.Key == " " ? e.Value : e.Value - netEarly);   // a gap is timed at its middle
+            }
+            foreach (var c in covered) _mix.Covered(c.Key - netEarly, c.Value - netEarly);
 
             // With one reader on show it writes into the top box; in Both the plain decoder has the
             // top box and the new one the box under it.
@@ -1449,6 +1500,7 @@ namespace HolyLogger
                 if (showing == Reader.Both) { AppendTo(_networkText, element); AppendTo(_deepText, deepText); }
             }
             if (showing == Reader.Both && CwDeepDecoder.Available) _timeLine.Show();
+            if (showing == Reader.Mix) _mix.Show();
         }
 
                 static void AppendTo(CwDecodedText box, string text)
