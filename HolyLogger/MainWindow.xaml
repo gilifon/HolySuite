@@ -1125,18 +1125,19 @@
                      could work a whole session without knowing every QSO was being marked as a
                      satellite contact. Right-aligned rather than placed beside the clock: the clock is
                      centred text in this same stretched cell, so its right edge moves with the time
-                     string, and the dish would have wandered with it. Pinned 38px in from the right it
-                     sits between the clock and the heartbeat button (24 wide, 8 in) and never moves,
-                     and it still appears when the clock itself is switched off. 56 in, not 38: at 38
-                     the two icons read as one pair of buttons. -->
+                     string, and the dish would have wandered with it. Pinned in from the right it
+                     sits between the clock and the heartbeat button and never moves, and it still
+                     appears when the clock itself is switched off. 48 px clear of the heartbeat button,
+                     not 14: closer, the two icons read as one pair of buttons. Since 2026-10-20 the
+                     settings gear is the right-most icon (26 wide, 8 in), the heartbeat 40 in, the dish 88. -->
                 <Image x:Name="SatModeIcon" Source="Images/satV.png" Width="26" Height="26"
-                       HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,56,0"
+                       HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,88,0"
                        Cursor="Hand" Visibility="Collapsed" MouseUp="SatModeIcon_MouseUp"/>
 
                 <!-- Heartbeat button, at the top right corner of the window, past the clock. The clock
                      stretches across this same cell but is centred text and not hit-testable, so the two
                      do not fight over the space or over the click. -->
-                <Button x:Name="ShareStatusButton" Width="24" Height="24" Padding="0" Margin="0,0,8,0"
+                <Button x:Name="ShareStatusButton" Width="24" Height="24" Padding="0" Margin="0,0,40,0"
                         HorizontalAlignment="Right" VerticalAlignment="Center"
                         Background="#4CAF50" BorderBrush="#2E7D32" BorderThickness="1"
                         ToolTipService.Placement="Left" Visibility="Visible" Cursor="Hand" Click="ShareStatusButton_Click">
@@ -1155,6 +1156,41 @@
                             <Ellipse Canvas.Left="14.5" Canvas.Top="13.5" Width="7" Height="7" Stroke="#303030" StrokeThickness="2" Fill="Transparent"/>
                         </Canvas>
                     </Viewbox>
+                </Button>
+                <!-- THE SETTINGS GEAR (his request, 2026-10-20): the right-most icon of the bar, one press to
+                     Tools > Options. The same gear as the cluster's, the radio panel's and the CW decoder's. -->
+                <Button x:Name="MainSettingsGear"
+                        Content="&#xE713;" FontFamily="Segoe MDL2 Assets" FontSize="16"
+                        Width="26" Height="26" Padding="0" Margin="0,0,8,0"
+                        HorizontalAlignment="Right" VerticalAlignment="Center"
+                        UseLayoutRounding="True" SnapsToDevicePixels="True"
+                        Foreground="{DynamicResource TextBrush}"
+                        Background="{DynamicResource WindowBg}"
+                        BorderBrush="{DynamicResource MutedTextBrush}" BorderThickness="1"
+                        Cursor="Hand"
+                        Click="MainSettingsGear_Click"
+                        ToolTip="Settings (Tools > Options)">
+                    <Button.Template>
+                        <ControlTemplate TargetType="Button">
+                            <Border Background="Transparent" Padding="1">
+                                <Border x:Name="face"
+                                        Background="{TemplateBinding Background}"
+                                        BorderBrush="{TemplateBinding BorderBrush}"
+                                        BorderThickness="{TemplateBinding BorderThickness}"
+                                        SnapsToDevicePixels="True">
+                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="face" Property="Background" Value="#A8D8FF"/>
+                                </Trigger>
+                                <Trigger Property="IsPressed" Value="True">
+                                    <Setter TargetName="face" Property="Background" Value="#7DC0F5"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Button.Template>
                 </Button>
             </Grid>
         </DockPanel>

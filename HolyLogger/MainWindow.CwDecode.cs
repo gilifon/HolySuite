@@ -120,6 +120,7 @@ namespace HolyLogger
                 cwDecodeWindow.CallsignChosen += TakeCallsignFromDecode;
                 cwDecodeWindow.ShiftRadio = ShiftRigForPitch;
                 cwDecodeWindow.WentWrongWay = TuneWentWrongWay;
+                cwDecodeWindow.OpenSettings = OpenOptionsOnCwDecoder;
                 cwDecodeWindow.Show();
             }
             catch (Exception ex)

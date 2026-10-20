@@ -3794,6 +3794,18 @@ namespace HolyLogger.Properties {
                 this["CwPitchHz"] = value;
             }
         }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool MixHideUnconfirmed {
+            get {
+                return ((bool)(this["MixHideUnconfirmed"]));
+            }
+            set {
+                this["MixHideUnconfirmed"] = value;
+            }
+        }
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]

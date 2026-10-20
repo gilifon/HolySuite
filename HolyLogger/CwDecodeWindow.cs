@@ -48,6 +48,9 @@ namespace HolyLogger
         /// <summary>Set by the main window: the last move went the wrong way on this radio.</summary>
         public Action WentWrongWay;
 
+        /// <summary>Set by the main window: open Options on the page with the decoder's settings.</summary>
+        public Action OpenSettings;
+
         /// <summary>The CW pitch was changed in Options: the waterfall's mark moves to it.</summary>
         public static event Action PitchChanged;
         public const int LowestPitchHz = 300, HighestPitchHz = 1000;     // the waterfall's own range
@@ -172,7 +175,7 @@ namespace HolyLogger
         public CwDecodeWindow()
         {
             Title = "CW Decoder";
-            Width = 720;
+            Width = 740;
             Height = 300 + WaterfallRowHeight;
 
             // WIDE ENOUGH FOR THE BAR, SHORT ENOUGH FOR ONE LINE. The floor on the height is the bar
@@ -180,9 +183,10 @@ namespace HolyLogger
             // his screen must be able to have one, and any taller floor than this would refuse him.
             // The width floor is the whole bar - title, lamp, speed, the four reader keys, Tune, Clear
             // and the close cross. Measured 2026-10-17 (the Bar harness) with the widest speed,
-            // "38 WPM   1000 Hz": 683 px of bar once Tune moved beside the name, plus the window's 3 px
-            // blue edge each side, plus a little air; 630 had been too narrow even before Tune was added.
-            MinWidth = 700;
+            // "38 WPM   1000 Hz": 644 px of bar with the gear and Tune beside the name and only Plain and
+            // Hybrid to choose from (2026-10-20), plus the window's 3 px blue edge each side, plus a little
+            // air.
+            MinWidth = 662;
 
             // The bar, plus the framed paper with one row of text in it. Anything taller than this
             // would refuse an operator who wants a one-line ticker along the edge of his screen.
@@ -287,6 +291,7 @@ namespace HolyLogger
                 catch (Exception swallowed) { Log.Swallow(swallowed); }
             };
             _mixFrame = Paper(_mix.Box);
+            ApplyMixHide();
             _mixFrame.Visibility = Visibility.Collapsed;
 
             // The second reader's box, shown only in Both.
@@ -495,13 +500,14 @@ namespace HolyLogger
             _networkBtn = RunNetwork ? BarButton("Net", "The neural network. Better on some signals, worse on others.") : null;
             // NEW IS NO LONGER OFFERED (2026-10-17, his decision): our network reads better, so the choice is
             // Plain, Net, or the two at once. CwElementDecoder stays in the source; it is just not run.
-            _deepBtn = CwDeepDecoder.Available ? BarButton("Net", "Our own network, on test. Reads 15 seconds at a time, so its text comes about 3 to 7 seconds after the sound.") : null;
-            _mixBtn = CwDeepDecoder.Available ? BarButton("Mix", "Plain at once; a few seconds later each letter the network agrees with turns bold, and one it reads differently is corrected (also bold).") : null;
-            _bothBtn = BarButton("Both", "Plain and Net at once, one under the other, reading the same signal - the only fair way to see which suits your station.");
+            // PLAIN OR HYBRID ONLY (2026-10-20, his decision): the network alone prints seconds behind the
+            // sound, and an operator waiting for text stops trusting it; Both was a tool for comparing the
+            // two readers, not for operating. So the bar offers Plain and Hybrid (what was called Mix:
+            // Plain at once, corrected by the network). Net and Both stay in the code for testing - a saved
+            // choice of either opens in Hybrid (see Showing).
+            _mixBtn = CwDeepDecoder.Available ? BarButton("Hybrid", "Plain at once; a few seconds later each letter the network agrees with turns bold, and one it reads differently is corrected (also bold).") : null;
             _plainBtn.Click += (s, e) => ShowWhich(Reader.Plain);
             if (_networkBtn != null) _networkBtn.Click += (s, e) => ShowWhich(Reader.Network);
-            _bothBtn.Click += (s, e) => ShowWhich(Reader.Both);
-            if (_deepBtn != null) _deepBtn.Click += (s, e) => ShowWhich(Reader.Deep);
             if (_mixBtn != null) _mixBtn.Click += (s, e) => ShowWhich(Reader.Mix);
 
             var whichPanel = new StackPanel
@@ -511,9 +517,7 @@ namespace HolyLogger
             };
             whichPanel.Children.Add(_plainBtn);
             if (_networkBtn != null) whichPanel.Children.Add(_networkBtn);
-            if (_deepBtn != null) whichPanel.Children.Add(_deepBtn);
             if (_mixBtn != null) whichPanel.Children.Add(_mixBtn);
-            whichPanel.Children.Add(_bothBtn);
 
             var right = new StackPanel { Orientation = Orientation.Horizontal };
             DockPanel.SetDock(right, Dock.Right);
@@ -539,10 +543,39 @@ namespace HolyLogger
             DockPanel.SetDock(titleText, Dock.Left);
             DockPanel.SetDock(tuneBtn, Dock.Left);
 
+            // THE GEAR (his request, 2026-10-20): the decoder's settings - pitch, hiding the grey letters,
+            // the input device - are in Options > General, and Tools > Options > General was too far away.
+            // It opens Options already on that page. The same gear as the cluster's and the radio panel's:
+            // the Segoe MDL2 settings glyph in a framed 26x26 square, the same hover and pressed blues.
+            var gearBtn = new Button
+            {
+                Content = "\uE713",
+                FontFamily = new FontFamily("Segoe MDL2 Assets"),
+                FontSize = 16,
+                Width = 26,
+                Height = 26,
+                Padding = new Thickness(0),
+                Margin = new Thickness(8, 0, 0, 0),
+                VerticalAlignment = VerticalAlignment.Center,
+                Foreground = Brushes.Black,
+                Background = Brushes.White,
+                BorderBrush = GroupEdgeBrush,
+                BorderThickness = new Thickness(1),
+                Cursor = System.Windows.Input.Cursors.Hand,
+                ToolTip = "CW decoder settings",
+                Style = GearStyle(),
+                UseLayoutRounding = true,
+                SnapsToDevicePixels = true
+            };
+            System.Windows.Shell.WindowChrome.SetIsHitTestVisibleInChrome(gearBtn, true);
+            gearBtn.Click += (s, e) => { var open = OpenSettings; if (open != null) open(); };
+            DockPanel.SetDock(gearBtn, Dock.Left);
+
             var bar = new DockPanel { LastChildFill = false };
             bar.Children.Add(right);
             bar.Children.Add(icon);
             bar.Children.Add(titleText);
+            bar.Children.Add(gearBtn);
             bar.Children.Add(tuneBtn);
 
             return new Border { Height = 32, Child = bar, Background = CwKeyBrush };
@@ -567,6 +600,33 @@ namespace HolyLogger
             var hover = new Trigger { Property = UIElement.IsMouseOverProperty, Value = true };
             hover.Setters.Add(new Setter(Border.BackgroundProperty, TuneGreenHover, "face"));
             template.Triggers.Add(hover);
+            var style = new Style(typeof(Button));
+            style.Setters.Add(new Setter(Control.TemplateProperty, template));
+            return style;
+        }
+
+        static Style GearStyle()
+        {
+            var outer = new FrameworkElementFactory(typeof(Border));
+            outer.SetValue(Border.BackgroundProperty, Brushes.Transparent);
+            outer.SetValue(Border.PaddingProperty, new Thickness(1));
+            var face = new FrameworkElementFactory(typeof(Border));
+            face.Name = "face";
+            face.SetValue(Border.BackgroundProperty, new TemplateBindingExtension(Control.BackgroundProperty));
+            face.SetValue(Border.BorderBrushProperty, new TemplateBindingExtension(Control.BorderBrushProperty));
+            face.SetValue(Border.BorderThicknessProperty, new TemplateBindingExtension(Control.BorderThicknessProperty));
+            var text = new FrameworkElementFactory(typeof(ContentPresenter));
+            text.SetValue(ContentPresenter.HorizontalAlignmentProperty, HorizontalAlignment.Center);
+            text.SetValue(ContentPresenter.VerticalAlignmentProperty, VerticalAlignment.Center);
+            face.AppendChild(text);
+            outer.AppendChild(face);
+            var template = new ControlTemplate(typeof(Button)) { VisualTree = outer };
+            var hover = new Trigger { Property = UIElement.IsMouseOverProperty, Value = true };
+            hover.Setters.Add(new Setter(Border.BackgroundProperty, Frozen(Color.FromRgb(0xA8, 0xD8, 0xFF)), "face"));
+            template.Triggers.Add(hover);
+            var pressed = new Trigger { Property = System.Windows.Controls.Primitives.ButtonBase.IsPressedProperty, Value = true };
+            pressed.Setters.Add(new Setter(Border.BackgroundProperty, Frozen(Color.FromRgb(0x7D, 0xC0, 0xF5)), "face"));
+            template.Triggers.Add(pressed);
             var style = new Style(typeof(Button));
             style.Setters.Add(new Setter(Control.TemplateProperty, template));
             return style;
@@ -675,7 +735,8 @@ namespace HolyLogger
                 {
                     var which = (Reader)Properties.Settings.Default.CwDecodeShow;
                     if (which == Reader.Network && (!RunNetwork || !SharedNet.Loaded)) return Reader.Plain;
-                    if ((which == Reader.Deep || which == Reader.Mix) && !CwDeepDecoder.Available) return Reader.Plain;
+                    if ((which == Reader.Deep || which == Reader.Mix || which == Reader.Both) && !CwDeepDecoder.Available) return Reader.Plain;
+                    if (which == Reader.Deep || which == Reader.Both) return Reader.Mix;   // no longer on the bar: Hybrid
                     if (which == Reader.New) return Reader.Plain;          // no longer offered
                     if (which < Reader.Plain || which > Reader.Mix) return Reader.Plain;
                     return which;
@@ -1000,7 +1061,20 @@ namespace HolyLogger
 
         void OnPitchChanged()
         {
-            Dispatcher.BeginInvoke(new Action(PlacePitchMarks));
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                PlacePitchMarks();
+                ApplyMixHide();
+            }));
+        }
+
+        // Options > General > CW Decoder: in Mix, hide the letters the network did not confirm.
+        void ApplyMixHide()
+        {
+            bool hide = false;
+            try { hide = Properties.Settings.Default.MixHideUnconfirmed; }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+            if (_mix != null) _mix.HideUnconfirmed = hide;
         }
         static readonly Brush MarkBrush = Frozen(Color.FromRgb(0xFF, 0x50, 0x50));
 
