@@ -17,6 +17,14 @@ namespace HolyLogger
     // The spectrogram is computed exactly as the training's (deepnet/common.py): 256-point Hann window
     // every 48 samples, reflect padding, 300-1100 Hz, each note divided by its own 25th percentile over
     // the window, then log(1 + x).
+    //
+    // TOLD WHICH STATION TO READ (2026-10-19, a network file "CWD2"). With three or four stations inside the
+    // receiver's filter at once the network used to write a mixture of them, where Plain locks onto one. So
+    // Plain's note is handed in (Note, after every block of sound) and every frame's 65 notes are taken around
+    // it, the followed station always in the middle column - exactly as deepnet/common.spectrogram_centred,
+    // which it was trained on. Where Plain hears nothing the last note it had is kept; before Plain has ever
+    // locked on, its first note; before that, his pitch (PitchHz). On the IC-7610 bench this took the network
+    // from 27 to 33 of 34 - past Plain's 32 - and it now beats Plain on all four benches.
     public sealed class CwDeepDecoder : IDisposable
     {
         public const int Rate = 3200;
@@ -53,6 +61,25 @@ namespace HolyLogger
         }
 
         public event Action<string> Text;
+
+        /// <summary>Where the station is expected when Plain has not yet heard one: his CW pitch.</summary>
+        public double PitchHz = 700;
+
+        // Plain's note, block by block: (samples at 3200 written when it was measured, Hz; 0 = no signal).
+        readonly List<KeyValuePair<long, double>> _notes = new List<KeyValuePair<long, double>>();
+
+        /// <summary>The note Plain follows now (0 when it hears no signal) - after each block of sound.</summary>
+        public void Note(double hz)
+        {
+            lock (_gate)
+            {
+                _notes.Add(new KeyValuePair<long, double>(_written, hz));
+                long keep = _written - _ring.Length;
+                int drop = 0;
+                while (drop < _notes.Count - 1 && _notes[drop + 1].Key < keep) drop++;
+                if (drop > 0) _notes.RemoveRange(0, drop);
+            }
+        }
 
         // EVERY LETTER WITH ITS TIME, in seconds from the first sound given - for the time-lined view in
         // Both, and for Mix. A word gap comes as " ", timed at the middle of the gap. The time is where the network said it: 0.8 dit after the letter's last mark ended
@@ -109,7 +136,7 @@ namespace HolyLogger
             {
                 _wake.WaitOne(1000);
                 if (_stopping) break;
-                if (_resetAsked) { _resetAsked = false; lock (_gate) { _printedTo = -1; _nextRun = _written + (long)(WindowSeconds * Rate); } }
+                if (_resetAsked) { _resetAsked = false; lock (_gate) { _printedTo = -1; _nextRun = _written + (long)(WindowSeconds * Rate); _notes.Clear(); } }
                 try { RunDue(); }
                 catch (Exception swallowed) { Log.Swallow(swallowed); }
             }
@@ -134,7 +161,7 @@ namespace HolyLogger
             lock (_gate) for (int i = 0; i < n; i++) a[i] = _ring[(int)((start + i) % _ring.Length)];
 
             int frames;
-            float[] spec = Spectrogram(a, out frames);
+            float[] spec = _net.Centred ? SpectrogramCentred(a, start, out frames) : Spectrogram(a, out frames);
             int steps;
             float[] lp = _net.Forward(spec, frames, out steps);
 
@@ -197,6 +224,68 @@ namespace HolyLogger
                 int lo = (int)Math.Floor(h);
                 double floor = col[lo] + (lo + 1 < frames ? (col[lo + 1] - col[lo]) * (h - lo) : 0) + 1e-9;
                 for (int f = 0; f < frames; f++) spec[f * bins + k] = (float)Math.Log(1 + spec[f * bins + k] / floor);
+            }
+            return spec;
+        }
+
+        const int FullBins = Fft / 2 + 1;           // 0 .. 1600 Hz
+        const double HzPerBin = (double)Rate / Fft; // 12.5
+
+        float[] SpectrogramCentred(float[] a, long start, out int frames)
+        {
+            int n = a.Length, pad = Fft / 2, bins = _net.NBins, mid = bins / 2;
+            frames = 1 + n / Hop;
+            var full = new float[frames * FullBins];
+            var re = new double[Fft];
+            var im = new double[Fft];
+            for (int f = 0; f < frames; f++)
+            {
+                for (int i = 0; i < Fft; i++)
+                {
+                    int j = f * Hop + i - pad;
+                    if (j < 0) j = -j; else if (j >= n) j = 2 * (n - 1) - j;
+                    re[i] = a[j] * (0.5 - 0.5 * Math.Cos(2 * Math.PI * i / Fft));
+                    im[i] = 0;
+                }
+                FftInPlace(re, im);
+                for (int k = 0; k < FullBins; k++)
+                    full[f * FullBins + k] = (float)Math.Sqrt(re[k] * re[k] + im[k] * im[k]);
+            }
+            var col = new float[frames];
+            for (int k = 0; k < FullBins; k++)
+            {
+                for (int f = 0; f < frames; f++) col[f] = full[f * FullBins + k];
+                Array.Sort(col);
+                double h = (frames - 1) * 0.25;
+                int lo = (int)Math.Floor(h);
+                double floor = col[lo] + (lo + 1 < frames ? (col[lo + 1] - col[lo]) * (h - lo) : 0) + 1e-9;
+                for (int f = 0; f < frames; f++) full[f * FullBins + k] = (float)Math.Log(1 + full[f * FullBins + k] / floor);
+            }
+
+            KeyValuePair<long, double>[] notes;
+            lock (_gate) notes = _notes.ToArray();
+            double first = PitchHz;
+            foreach (var e in notes) if (e.Value > 0) { first = e.Value; break; }
+
+            var spec = new float[frames * bins];
+            int ni = 0;
+            double held = first;
+            for (int f = 0; f < frames; f++)
+            {
+                long t = start + (long)f * Hop;
+                while (ni < notes.Length && notes[ni].Key <= t)
+                {
+                    if (notes[ni].Value > 0) held = notes[ni].Value;
+                    ni++;
+                }
+                int c = (int)Math.Round(held / HzPerBin);
+                if (c < 0) c = 0; else if (c > FullBins - 1) c = FullBins - 1;
+                for (int b = 0; b < bins; b++)
+                {
+                    int k = Math.Abs(c + b - mid);
+                    if (k > FullBins - 1) k = 2 * (FullBins - 1) - k;
+                    spec[f * bins + b] = full[f * FullBins + k];
+                }
             }
             return spec;
         }

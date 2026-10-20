@@ -19,6 +19,9 @@ namespace HolyLogger
         public int D, Heads, Ff, Blocks, K, C1, C2, C3, NBins, NClass, FBins;
         public bool Loaded { get; private set; }
 
+        /// <summary>The network reads frames centred on the followed note (file "CWD2"), not 300-1100 Hz.</summary>
+        public bool Centred { get; private set; }
+
         // How many processors one window may use. Using all of them starved the waterfall's drawing for
         // the second the window took (measured 2026-10-17 on his i7, 8 processors: all 8 = 3-6% of frames
         // late in bursts every 3 s, worst 97 ms; 4 = worst 46 ms; 2 = none late, worst 22 ms). With 2 a
@@ -46,7 +49,11 @@ namespace HolyLogger
             {
                 using (var r = new BinaryReader(File.OpenRead(path)))
                 {
-                    if (new string(r.ReadChars(4)) != "CWD1") { error = "not a CW network file"; return false; }
+                    // "CWD2" (2026-10-19): the same network, trained to read frames centred on the station being
+                    // followed - see CwDeepDecoder.SpectrogramCentred.
+                    string magic = new string(r.ReadChars(4));
+                    if (magic != "CWD1" && magic != "CWD2") { error = "not a CW network file"; return false; }
+                    Centred = magic == "CWD2";
                     D = r.ReadInt32(); Heads = r.ReadInt32(); Ff = r.ReadInt32(); Blocks = r.ReadInt32(); K = r.ReadInt32();
                     C1 = r.ReadInt32(); C2 = r.ReadInt32(); C3 = r.ReadInt32(); NBins = r.ReadInt32(); NClass = r.ReadInt32(); FBins = r.ReadInt32();
                     Func<int, float[]> read = n =>
