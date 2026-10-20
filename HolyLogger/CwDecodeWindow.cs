@@ -1072,7 +1072,10 @@ namespace HolyLogger
         void ApplyMixHide()
         {
             bool hide = false;
-            try { hide = Properties.Settings.Default.MixHideUnconfirmed; }
+            // HybridHideUnconfirmed, ticked unless he unticks it (2026-10-20, his choice after 8.9.22). A new
+            // name rather than a new default on MixHideUnconfirmed: 8.9.22 had already saved "false" for its
+            // users, and an upgrade keeps saved values, so a changed default would never have reached them.
+            try { hide = Properties.Settings.Default.HybridHideUnconfirmed; }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
             if (_mix != null) _mix.HideUnconfirmed = hide;
         }
