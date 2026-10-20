@@ -830,6 +830,8 @@ namespace HolyLogger
             if (CwDeepDecoder.Available)
             {
                 var deep = new CwDeepDecoder(_recorder.ActualSampleRate);
+                try { deep.PitchHz = Properties.Settings.Default.CwPitchHz; }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
                 deep.Text += OnDeepText;
                 deep.LetterTimed += OnDeepLetterTimed;
                 deep.Covered += OnDeepCovered;
@@ -1478,7 +1480,12 @@ namespace HolyLogger
             var deep = _deep;
             if (deep != null)
             {
-                try { deep.Process(samples, count); }
+                try
+                {
+                    deep.Process(samples, count);
+                    // which station to read: the one Plain follows (see CwDeepDecoder - a "CWD2" network)
+                    deep.Note(decoder.SignalPresent ? decoder.ToneHz : 0);
+                }
                 catch (Exception swallowed) { Log.Swallow(swallowed); }
             }
 
