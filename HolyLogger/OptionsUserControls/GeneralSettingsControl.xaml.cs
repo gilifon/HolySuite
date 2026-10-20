@@ -146,7 +146,7 @@ namespace HolyLogger.OptionsUserControls
             _loadingCwPitch = true;
             TB_CwPitch.Text = Properties.Settings.Default.CwPitchHz.ToString(System.Globalization.CultureInfo.InvariantCulture);
             _loadingCwPitch = false;
-            CBX_MixHideUnconfirmed.IsChecked = Properties.Settings.Default.MixHideUnconfirmed;
+            CBX_MixHideUnconfirmed.IsChecked = Properties.Settings.Default.HybridHideUnconfirmed;
 
             HasChanged = false;
         }
@@ -173,7 +173,7 @@ namespace HolyLogger.OptionsUserControls
         {
             try
             {
-                Properties.Settings.Default.MixHideUnconfirmed = CBX_MixHideUnconfirmed.IsChecked == true;
+                Properties.Settings.Default.HybridHideUnconfirmed = CBX_MixHideUnconfirmed.IsChecked == true;
                 Properties.Settings.Default.Save();
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
