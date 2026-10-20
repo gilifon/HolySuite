@@ -146,11 +146,39 @@ namespace HolyLogger.OptionsUserControls
             _loadingCwPitch = true;
             TB_CwPitch.Text = Properties.Settings.Default.CwPitchHz.ToString(System.Globalization.CultureInfo.InvariantCulture);
             _loadingCwPitch = false;
+            CBX_MixHideUnconfirmed.IsChecked = Properties.Settings.Default.MixHideUnconfirmed;
 
             HasChanged = false;
         }
 
         bool _loadingCwPitch;
+
+        // The CW decoder's gear lands here: the pitch box, with the CW Decoder frame in view.
+        internal void FocusCwPitch()
+        {
+            try
+            {
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    TB_CwPitch.BringIntoView();
+                    TB_CwPitch.Focus();
+                    TB_CwPitch.SelectAll();
+                }), System.Windows.Threading.DispatcherPriority.Input);
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        // Saved at once, and an open decoder window shows or hides the grey letters straight away.
+        private void CBX_MixHideUnconfirmed_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                Properties.Settings.Default.MixHideUnconfirmed = CBX_MixHideUnconfirmed.IsChecked == true;
+                Properties.Settings.Default.Save();
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+            CwDecodeWindow.RaisePitchChanged();
+        }
 
         // A good number is saved at once and the decoder's waterfall follows; anything else is shown red
         // and not saved, so the last good pitch stays.

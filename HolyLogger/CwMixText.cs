@@ -25,6 +25,11 @@ namespace HolyLogger
     //                                                     a grey letter is doubtful, not wrong
     //   not read by the network yet                    -> ordinary black
     //
+    // HIDDEN INSTEAD OF GREY, if he ticks it (Options > General > CW Decoder, 2026-10-20): on a QSO with one
+    // strong and one very weak station the grey letters were most of the screen - noise read as E and T in the
+    // gaps. A word left with no letter showing takes its space with it, and a line with nothing showing its
+    // line break, so the junk does not leave holes either. Nothing is thrown away: untick it and they are back.
+    //
     // "There" is by time: both readers time a letter by its end, and for the same letter the two times
     // were measured within 0.03 s of each other (see CwTimeLine), so SameLetterSeconds is plenty.
     //
@@ -85,6 +90,43 @@ namespace HolyLogger
         bool _changed;
 
         public Control Box { get { return _box; } }
+
+        bool _hide;
+
+        /// <summary>Hide the letters the network did not confirm (grey ones), instead of showing them grey.</summary>
+        public bool HideUnconfirmed
+        {
+            get { return _hide; }
+            set { if (_hide == value) return; _hide = value; ApplyHide(); }
+        }
+
+        // Every letter, space and line break shown or not, by the rule above.
+        void ApplyHide()
+        {
+            bool wordShown = false, lineShown = false;
+            foreach (Entry e in _entries)
+            {
+                if (e.Break != null)
+                {
+                    bool show = !_hide || lineShown;
+                    if (show && e.Break.Parent == null) _paragraph.Inlines.InsertAfter(e.Run, e.Break);
+                    else if (!show && e.Break.Parent != null) _paragraph.Inlines.Remove(e.Break);
+                    lineShown = false; wordShown = false;
+                    continue;
+                }
+                if (e.Text == " ")
+                {
+                    string want = !_hide || wordShown ? " " : string.Empty;
+                    if (e.Run.Text != want) e.Run.Text = want;
+                    wordShown = false;
+                    continue;
+                }
+                string text = _hide && e.Doubted ? string.Empty : e.Text;
+                if (e.Run.Text != text) e.Run.Text = text;
+                if (text.Length > 0) { wordShown = true; lineShown = true; }
+            }
+            _changed = true;
+        }
 
         public CwMixText()
         {
@@ -155,7 +197,7 @@ namespace HolyLogger
                 for (int i = 0; i < 500; i++)
                 {
                     _paragraph.Inlines.Remove(_entries[i].Run);
-                    if (_entries[i].Break != null) _paragraph.Inlines.Remove(_entries[i].Break);
+                    if (_entries[i].Break != null && _entries[i].Break.Parent != null) _paragraph.Inlines.Remove(_entries[i].Break);
                     if (_entries[i].Call != null) gone.Add(_entries[i].Call);
                 }
                 _entries.RemoveRange(0, 500);
@@ -257,6 +299,7 @@ namespace HolyLogger
 
             TakeNetSpacing(from, to);
             JudgeWords();
+            if (_hide) ApplyHide();
         }
 
         // Between each two network-settled letters, the second of them in [from, to): a space exactly

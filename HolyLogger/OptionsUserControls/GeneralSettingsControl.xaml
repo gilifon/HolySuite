@@ -126,10 +126,11 @@
             </StackPanel>
         </GroupBox>
 
-        <!-- CW PITCH (his request, 2026-10-17): the note he likes to hear CW on. Saved the moment a
-             good number is typed, like the input device below, and marked at once on the decoder's
-             waterfall. -->
-        <GroupBox Header="CW Pitch" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,12,0,0" Width="580" FontSize="16">
+        <!-- CW DECODER (was CW Pitch). The pitch (his request, 2026-10-17): the note he likes to hear CW
+             on - saved the moment a good number is typed, like the input device below, and marked at once
+             on the decoder's waterfall. The Mix box (2026-10-20): hide the letters the network did not
+             confirm - most of the junk lines between transmissions. Saved and applied at once. -->
+        <GroupBox Header="CW Decoder" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,12,0,0" Width="580" FontSize="16">
             <StackPanel Margin="4,4,4,4">
                 <StackPanel Orientation="Horizontal" Margin="0,2,0,2">
                     <TextBlock Text="Pitch:" VerticalAlignment="Center" FontSize="16" Margin="0,0,8,0"/>
@@ -139,6 +140,8 @@
                 </StackPanel>
                 <TextBlock x:Name="CwPitchNote" TextWrapping="Wrap" Margin="0,6,0,0" FontSize="16" Foreground="Gray"
                            Text="The note you like to hear CW on, 300 to 1000 Hz. It is marked on the decoder's waterfall."/>
+                <CheckBox x:Name="CBX_MixHideUnconfirmed" Content="In Hybrid, hide letters the network did not confirm"
+                          Margin="0,10,0,0" FontSize="16" Click="CBX_MixHideUnconfirmed_Click"/>
             </StackPanel>
         </GroupBox>
 

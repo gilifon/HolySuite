@@ -1398,6 +1398,7 @@ namespace HolyLogger
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
             Log.Warn("STARTUP " + Log.SinceLaunch() + "  main window: loaded, running its startup work");
+            Dispatcher.BeginInvoke(new Action(AlignLockOverSquareBox), DispatcherPriority.Loaded);
 
             // A WATCH ON THE THREAD THAT DRAWS THE WINDOW.
             //
@@ -11935,6 +11936,46 @@ namespace HolyLogger
                     options.Activate();
                     // Put the caret on the audio-device picker so it doesn't have to be hunted for.
                     options.GeneralSettingsControlControlInstance?.FocusSoundDevicePicker();
+                }
+            }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        // THE LOCK STANDS OVER THE HOLYLAND SQUARE BOX (his request, 2026-10-20): its left edge exactly on the
+        // box's left edge in the row below. It follows the menu, whose width depends on the fonts, so it is
+        // lined up by measuring both once the window is laid out, not by a guessed margin.
+        private void AlignLockOverSquareBox()
+        {
+            try
+            {
+                if (LockBtnBorder == null || TB_MyHolyland == null || !LockBtnBorder.IsVisible || !TB_MyHolyland.IsVisible) return;
+                double lockX = LockBtnBorder.TranslatePoint(new Point(0, 0), this).X;
+                double boxX = TB_MyHolyland.TranslatePoint(new Point(0, 0), this).X;
+                double left = LockBtnBorder.Margin.Left + (boxX - lockX);
+                if (left < 0) return;          // the menu has grown past the box: leave it where it is
+                var m = LockBtnBorder.Margin;
+                LockBtnBorder.Margin = new Thickness(left, m.Top, m.Right, m.Bottom);
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        // The gear at the end of the menu line: exactly Tools > Options.
+        private void MainSettingsGear_Click(object sender, RoutedEventArgs e)
+        {
+            OptionsMenuItemMenuItem_Click(sender, e);
+        }
+
+        // Open Options on the General page, at the CW Decoder box - the gear on the CW decoder's bar.
+        internal void OpenOptionsOnCwDecoder()
+        {
+            try
+            {
+                OptionsMenuItemMenuItem_Click(null, null);
+                if (options != null)
+                {
+                    options.GeneralItem.IsSelected = true;
+                    options.Activate();
+                    options.GeneralSettingsControlControlInstance?.FocusCwPitch();
                 }
             }
             catch (System.Exception swallowed) { Log.Swallow(swallowed); }
