@@ -11214,6 +11214,12 @@ namespace HolyLogger
             // The keying port is let go first of all: a key left down is a transmitter left on.
             try { ClosePortKeyer(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
 
+            // THE CW DECODER CLOSED BY US, PROPERLY, BEFORE THIS WINDOW GOES: torn down along with it instead, its
+            // waterfall's drawing thread could still be hooked in and WPF threw "Index was out of range" (see
+            // App.IsTheHostVisualTeardownBug). After _isShutdownCleanupDone, so it still counts as open and comes
+            // back at the next start (see RememberCwDecodeOpen).
+            try { if (cwDecodeWindow != null) cwDecodeWindow.Close(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+
             // Stop all timers before shutdown to prevent pending async operations
             try { if (HeartbeatTimer != null && HeartbeatTimer.IsEnabled) HeartbeatTimer.Stop(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
             try { if (UTCTimer != null && UTCTimer.IsEnabled) UTCTimer.Stop(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
