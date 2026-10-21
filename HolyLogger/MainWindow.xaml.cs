@@ -4877,6 +4877,8 @@ namespace HolyLogger
             cwKeyboard.Closed += (s, e) =>
             {
                 cwKeyboard = null;
+                // Closed by him: closed at the next start too. Not when the program closed it, or is going.
+                if (!_keyerClosingByProgram && !_isShutdownCleanupDone) RememberCwKeyerOpen(false);
                 UpdateActionKeyLabels();
                 TakeBackTheKeyboard();
 
@@ -4884,6 +4886,7 @@ namespace HolyLogger
                 if (cwLiteKeyer != null) cwLiteKeyer.KeyerWindowOpen = false;
             };
             cwKeyboard.Show();
+            RememberCwKeyerOpen(true);
 
             // The CW decoder is NOT opened or closed with the keyer (his rule, 2026-10-21): each window
             // has its own control, from the View menu. It used to come up with the keyer and go down
@@ -9068,6 +9071,38 @@ namespace HolyLogger
         // opened on the CHANGE into CW and not on every pass through it.
         private bool _cwKeyboardWasWanted = false;
 
+        // THE KEYER WINDOW IS SHOWN UNLESS HE CLOSED IT (his rule, 2026-10-21: "the user must know that there is a
+        // keyer window"). He closed it, closed HolyLogger, and at the next start it came up again because the
+        // radio was in CW; then, closed in CW, it came up again the moment the radio went to SSB and back.
+        // Now one rule: closed BY HIM, it stays closed - at the next start and when the radio comes back into
+        // CW - until he opens it himself (Ctrl+K, the View menu). Not closed by him, it comes up at start
+        // whatever the radio's mode, and with the radio coming into CW as before. Closed by the program (the
+        // radio leaving CW, a contest without CW) does not count as his.
+        private bool _keyerClosingByProgram;
+
+        private void CloseCwKeyboardByProgram()
+        {
+            _keyerClosingByProgram = true;
+            try { CloseCwKeyboard(); }
+            finally { _keyerClosingByProgram = false; }
+        }
+
+        private static void RememberCwKeyerOpen(bool open)
+        {
+            if (Properties.Settings.Default.CwKeyerWindowWasOpen == open) return;
+            Properties.Settings.Default.CwKeyerWindowWasOpen = open;
+            SettingsFlush.RequestSave();
+        }
+
+        private void ReopenCwKeyerIfItWasOpen()
+        {
+            try
+            {
+                if (cwKeyboard == null && Properties.Settings.Default.CwKeyerWindowWasOpen) OpenCwKeyboard();
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
         // THE KEYER WAITS ITS TURN. A radio already sitting in CW at startup had its keyer opened on
         // the first OmniRig event, which arrives while the program is still building itself - so the
         // first window on the desktop was the CW keyer, ahead of the log and ahead of the cluster.
@@ -9087,6 +9122,7 @@ namespace HolyLogger
                 try { UpdateVoiceMessageAvailabilityState(); }
                 catch (Exception swallowed) { Log.Swallow(swallowed); }
                 ReopenCwDecodeIfItWasOpen();
+                ReopenCwKeyerIfItWasOpen();
             }), DispatcherPriority.Background);
         }
 
@@ -9173,7 +9209,7 @@ namespace HolyLogger
                 // second later, shut it again. On the edge, the keyer goes as the radio leaves CW,
                 // and a keyer he then opens by hand stays open for as long as he wants it, because
                 // the radio only leaves CW once.
-                if (_cwKeyboardWasWanted) CloseCwKeyboard();
+                if (_cwKeyboardWasWanted) CloseCwKeyboardByProgram();
                 _cwKeyboardWasWanted = false;
             }
             else if (!_cwKeyboardWasWanted && IsLoaded && _startupWindowsReady)
@@ -9185,7 +9221,7 @@ namespace HolyLogger
                 // The state still moves, so switching it back on does not open the keyer retrospectively
                 // for a mode change that happened while it was off: the next time he comes INTO CW is the
                 // next time it opens.
-                if (Properties.Settings.Default.OpenCwKeyerOnCw) OpenCwKeyboard();
+                if (Properties.Settings.Default.OpenCwKeyerOnCw && Properties.Settings.Default.CwKeyerWindowWasOpen) OpenCwKeyboard();
                 _cwKeyboardWasWanted = true;
             }
 
