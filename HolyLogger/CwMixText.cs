@@ -369,6 +369,11 @@ namespace HolyLogger
         // (DL1QSL). 5NN, 599 and TNX are taken out even of a word shaped like a call: no callsign holds them,
         // and "5NN5NQSB" itself is call-shaped (5N is Nigeria) - it got the blue patch on his screen.
         static readonly string[] NeverInCalls = { "5NN", "599", "TNX" };
+
+        // CQ DE IS ALWAYS TWO WORDS (his rule, 2026-10-21, on "Q CQDEDG8NRI"): "CQDE" glued together can only be
+        // "CQ DE", so it is split in the middle and set off from what is glued to it. Only the pair - CQ or DE
+        // alone are too short to be told from letters inside another word.
+        const string CqDe = "CQDE";
         static readonly string[] QCodes =
         {
             "QRG", "QRL", "QRM", "QRN", "QRO", "QRP", "QRQ", "QRS", "QRT", "QRU", "QRV", "QRX", "QRZ",
@@ -411,7 +416,8 @@ namespace HolyLogger
             // reads differently, and the callsign test runs only where a Q-code is actually inside it.
             if (_entries[from].SplitSeen == word) return to;
             _entries[from].SplitSeen = word;
-            if (word.Length <= 3 || !HasAny(word, NeverInCalls) && !HasAny(word, QCodes)) return to;
+            bool cqDe = word.IndexOf(CqDe, StringComparison.Ordinal) >= 0;
+            if (word.Length <= 3 || !cqDe && !HasAny(word, NeverInCalls) && !HasAny(word, QCodes)) return to;
             bool digits = true;
             foreach (char c in word) if (!char.IsDigit(c)) digits = false;
             if (digits) return to;
@@ -420,6 +426,12 @@ namespace HolyLogger
             // words no call holds, then round the Q-codes in each piece that is not a callsign.
             var cuts = new SortedSet<int>();
             CutAround(word, 0, word.Length, NeverInCalls, cuts);
+            for (int p = word.IndexOf(CqDe, StringComparison.Ordinal); p >= 0; p = word.IndexOf(CqDe, p + 1, StringComparison.Ordinal))
+            {
+                if (p > 0) cuts.Add(p);
+                cuts.Add(p + 2);
+                if (p + 4 < word.Length) cuts.Add(p + 4);
+            }
             int start = 0;
             foreach (int end in new List<int>(cuts) { word.Length })
             {
