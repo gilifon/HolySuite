@@ -5539,6 +5539,8 @@ namespace HolyLogger
                 };
                 // Every key-down and key-up, for the decoder's waterfall to draw our sending from.
                 portCwKeyer.Edge += (down, ms) => CwDecodeWindow.KeyEdge(down);
+                // And every letter as it is finished, written under its marks there.
+                portCwKeyer.LetterSent += (letter, lengthMs) => CwDecodeWindow.TxLetter(letter, CwDecodeWindow.TxClockMs - lengthMs / 2);
                 Log.Warn("CW keying port " + port + " (" + portCwKeyer.Line + ") opened at " + CwPortWpm + " WPM.");
             }
             return portCwKeyer;
