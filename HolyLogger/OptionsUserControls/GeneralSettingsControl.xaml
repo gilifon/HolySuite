@@ -140,7 +140,7 @@
                 </StackPanel>
                 <TextBlock x:Name="CwPitchNote" TextWrapping="Wrap" Margin="0,6,0,0" FontSize="16" Foreground="Gray"
                            Text="The note you like to hear CW on, 300 to 1000 Hz. It is marked on the decoder's waterfall."/>
-                <CheckBox x:Name="CBX_MixHideUnconfirmed" Content="In Hybrid, hide letters the network did not confirm"
+                <CheckBox x:Name="CBX_MixHideUnconfirmed" Content="Hide letters the network did not confirm"
                           Margin="0,10,0,0" FontSize="16" Click="CBX_MixHideUnconfirmed_Click"/>
             </StackPanel>
         </GroupBox>

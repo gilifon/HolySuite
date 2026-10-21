@@ -156,7 +156,7 @@ namespace HolyLogger
             _netWaiting.Clear();
             _netGaps.Clear();
             _seen.Clear();
-            _breakNext = false; _handOver = false;
+            _breakNext = false; _handOver = false; _newLetter = false;
             _lastLetterT = double.NaN; _lastNote = 0; _lastWpm = 0;
             QrzLookup.ForgetAll();
             _changed = true;
@@ -164,7 +164,7 @@ namespace HolyLogger
 
         static readonly string[] ProsignHandOver = { "<KN>", "<AR>", "<SK>", "<AS>" };
         const double SilenceThatProvesOver = 2.0;
-        bool _breakNext, _handOver;
+        bool _breakNext, _handOver, _newLetter;
         double _lastLetterT = double.NaN, _lastNote, _lastWpm;
 
         /// <summary>One of Plain's letters (or " " between words), in the order Plain printed them, with the
@@ -187,6 +187,7 @@ namespace HolyLogger
                 _lastLetterT = t;
                 if (note > 0) _lastNote = note;
                 if (wpm > 0) _lastWpm = wpm;
+                _newLetter = true;
             }
             var e = new Entry { Text = text, T = space ? double.NaN : t, Run = new Run(text) };
             _paragraph.Inlines.Add(e.Run);
@@ -250,6 +251,10 @@ namespace HolyLogger
         /// <summary>One of the network's letters; held until the stretch it is in has been read whole.</summary>
         public void AddNet(string letter, double t)
         {
+            // The BT sign (-...-) is "=" from Plain and "<BT>" from the network - one sign, two spellings. Measured
+            // on his 20 m session (2026-10-21, mix_truth.py): every "=" Plain read right was "replaced" by "<BT>".
+            // Written Plain's way, it is confirmed like any other letter.
+            if (letter == "<BT>") letter = "=";
             _netWaiting.Add(new KeyValuePair<string, double>(letter, t));
         }
 
@@ -527,11 +532,16 @@ namespace HolyLogger
         }
 
         /// <summary>Keeps the newest text in sight. On the screen timer.</summary>
+        // A NEW LETTER IS ALWAYS SEEN (his rule, 2026-10-21): it used to follow only while the view was at the
+        // bottom, so after he scrolled up new letters were typed out of sight. Now a new letter from Plain brings
+        // the last line back into view; the network settling older letters does not move the view.
         public void Show()
         {
             if (!_changed) return;
             _changed = false;
-            if (_box.VerticalOffset + _box.ViewportHeight >= _box.ExtentHeight - 30) _box.ScrollToEnd();
+            bool newLetter = _newLetter;
+            _newLetter = false;
+            if (newLetter || _box.VerticalOffset + _box.ViewportHeight >= _box.ExtentHeight - 30) _box.ScrollToEnd();
         }
     }
 }
