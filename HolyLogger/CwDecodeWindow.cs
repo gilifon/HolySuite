@@ -183,10 +183,8 @@ namespace HolyLogger
             // his screen must be able to have one, and any taller floor than this would refuse him.
             // The width floor is the whole bar - title, lamp, speed, the four reader keys, Tune, Clear
             // and the close cross. Measured 2026-10-17 (the Bar harness) with the widest speed,
-            // "38 WPM   1000 Hz": 644 px of bar with the gear and Tune beside the name and only Plain and
-            // Hybrid to choose from (2026-10-20), plus the window's 3 px blue edge each side, plus a little
-            // air.
-            MinWidth = 662;
+            // (see NormalMinWidth: the bar with no reader buttons since 2026-10-21; developer mode widens it)
+            MinWidth = NormalMinWidth;
 
             // The bar, plus the framed paper with one row of text in it. Anything taller than this
             // would refuse an operator who wants a one-line ticker along the edge of his screen.
@@ -255,6 +253,15 @@ namespace HolyLogger
             Loaded += (s, e) => CompositionTarget.Rendering += WaterfallFrame;
             Closed += (s, e) => CompositionTarget.Rendering -= WaterfallFrame;
             Closing += OnClosing;
+            PreviewKeyDown += (s, e) =>
+            {
+                var mods = System.Windows.Input.Keyboard.Modifiers;
+                if (e.Key == System.Windows.Input.Key.D && mods == (System.Windows.Input.ModifierKeys.Control | System.Windows.Input.ModifierKeys.Shift))
+                {
+                    ToggleDeveloperMode();
+                    e.Handled = true;
+                }
+            };
         }
 
         // ---- what is on screen ----
@@ -505,10 +512,20 @@ namespace HolyLogger
             // two readers, not for operating. So the bar offers Plain and Hybrid (what was called Mix:
             // Plain at once, corrected by the network). Net and Both stay in the code for testing - a saved
             // choice of either opens in Hybrid (see Showing).
+            //
+            // HYBRID ONLY (2026-10-21, his decision): Hybrid is better than Plain on everything measured and
+            // still shows Plain's letters at once, so there is no choice to make and none on the bar - the
+            // decoder always runs Hybrid, or Plain if the network file is missing or will not load. The
+            // buttons are kept for DEVELOPER MODE: Ctrl+Shift+D in this window shows Plain, Net, Both and
+            // Hybrid, for trying out an idea; pressed again they go. Not remembered - every start is Hybrid.
             _mixBtn = CwDeepDecoder.Available ? BarButton("Hybrid", "Plain at once; a few seconds later each letter the network agrees with turns bold, and one it reads differently is corrected (also bold).") : null;
+            _deepBtn = CwDeepDecoder.Available ? BarButton("Net", "The network alone (developer mode).") : null;
+            _bothBtn = CwDeepDecoder.Available ? BarButton("Both", "Plain and the network one above the other (developer mode).") : null;
             _plainBtn.Click += (s, e) => ShowWhich(Reader.Plain);
             if (_networkBtn != null) _networkBtn.Click += (s, e) => ShowWhich(Reader.Network);
             if (_mixBtn != null) _mixBtn.Click += (s, e) => ShowWhich(Reader.Mix);
+            if (_deepBtn != null) _deepBtn.Click += (s, e) => ShowWhich(Reader.Deep);
+            if (_bothBtn != null) _bothBtn.Click += (s, e) => ShowWhich(Reader.Both);
 
             var whichPanel = new StackPanel
             {
@@ -517,13 +534,17 @@ namespace HolyLogger
             };
             whichPanel.Children.Add(_plainBtn);
             if (_networkBtn != null) whichPanel.Children.Add(_networkBtn);
+            if (_deepBtn != null) whichPanel.Children.Add(_deepBtn);
+            if (_bothBtn != null) whichPanel.Children.Add(_bothBtn);
             if (_mixBtn != null) whichPanel.Children.Add(_mixBtn);
 
             var right = new StackPanel { Orientation = Orientation.Horizontal };
             DockPanel.SetDock(right, Dock.Right);
             right.Children.Add(_lamp);
             right.Children.Add(_speedText);
-            right.Children.Add(GroupFrame(whichPanel));
+            _whichFrame = GroupFrame(whichPanel);
+            _whichFrame.Visibility = _devMode ? Visibility.Visible : Visibility.Collapsed;
+            right.Children.Add(_whichFrame);
             right.Children.Add(GroupFrame(clearPanel));
             right.Children.Add(closeBtn);
 
@@ -727,16 +748,33 @@ namespace HolyLogger
             button.Opacity = chosen ? 1.0 : 0.65;
         }
 
+        // Developer mode (Ctrl+Shift+D): the reader buttons are on the bar and the choice is the saved one.
+        static bool _devMode;
+        // Measured 2026-10-21 (Bar harness, widest speed "38 WPM   1000 Hz"): the bar needs 503 px with no reader
+        // buttons and 739 with the four developer ones; plus the 3 px blue edge each side and a little air.
+        const double NormalMinWidth = 521, DevMinWidth = 757;
+        UIElement _whichFrame;
+
+        void ToggleDeveloperMode()
+        {
+            _devMode = !_devMode;
+            if (_whichFrame != null) _whichFrame.Visibility = _devMode ? Visibility.Visible : Visibility.Collapsed;
+            MinWidth = _devMode ? DevMinWidth : NormalMinWidth;
+            FlushPendingText();
+            PaintWhich();
+            ApplyShowLayout();
+        }
+
         static Reader Showing
         {
             get
             {
                 try
                 {
+                    if (!_devMode) return CwDeepDecoder.Available ? Reader.Mix : Reader.Plain;
                     var which = (Reader)Properties.Settings.Default.CwDecodeShow;
                     if (which == Reader.Network && (!RunNetwork || !SharedNet.Loaded)) return Reader.Plain;
                     if ((which == Reader.Deep || which == Reader.Mix || which == Reader.Both) && !CwDeepDecoder.Available) return Reader.Plain;
-                    if (which == Reader.Deep || which == Reader.Both) return Reader.Mix;   // no longer on the bar: Hybrid
                     if (which == Reader.New) return Reader.Plain;          // no longer offered
                     if (which < Reader.Plain || which > Reader.Mix) return Reader.Plain;
                     return which;
