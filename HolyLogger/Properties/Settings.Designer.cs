@@ -3809,6 +3809,18 @@ namespace HolyLogger.Properties {
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool CwDecodeWindowWasOpen {
+            get {
+                return ((bool)(this["CwDecodeWindowWasOpen"]));
+            }
+            set {
+                this["CwDecodeWindowWasOpen"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("False")]
         public bool EsmSearchAndPounce {
             get {

@@ -12,7 +12,7 @@ namespace HolyLogger
     /// <summary>
     /// Reads the CW being received and shows nothing else.
     ///
-    /// BUILT AS THE KEYER'S OPPOSITE NUMBER. It opens with the keyer, wears the keyer's pale cyan
+    /// BUILT AS THE KEYER'S OPPOSITE NUMBER. It wears the keyer's pale cyan
     /// bar, and carries what it needs in that bar the way the keyer carries Type/Enter and its
     /// speed - so the two windows read as one pair, the sending and the reading, rather than as two
     /// programs that happen to be open. Everything below the bar is decoded text and nothing else,
@@ -144,7 +144,6 @@ namespace HolyLogger
         readonly System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<double, double>> _pendingCovered = new System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<double, double>>();
         Border _mainFrame, _timePlainFrame, _timeNetFrame;
         int _plainRate;
-        readonly System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<string, double>> _plainTimes = new System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<string, double>>();
         readonly System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<string, double>> _pendingPlainTimed = new System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<string, double>>();
         readonly System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<string, double>> _pendingNetTimed = new System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<string, double>>();
 
@@ -249,9 +248,10 @@ namespace HolyLogger
 
             Loaded += (s, e) => StartListening();
 
-            // The waterfall moves with every screen refresh - see WaterfallFrame.
-            Loaded += (s, e) => CompositionTarget.Rendering += WaterfallFrame;
-            Closed += (s, e) => CompositionTarget.Rendering -= WaterfallFrame;
+            // The waterfall runs on its own thread - see CwWaterfallStrip. It is let go while the window is
+            // still whole (Closing), not after (Closed): see CwWaterfallStrip.Close.
+            Closing += (s, e) => { if (!e.Cancel && _strip != null) _strip.Close(); };
+            Closed += (s, e) => { if (_strip != null) _strip.Close(); };
             Closing += OnClosing;
             PreviewKeyDown += (s, e) =>
             {
@@ -885,15 +885,6 @@ namespace HolyLogger
             StartListening();
         }
 
-        /// <summary>
-        /// Kept for the main window, which opens this alongside the keyer. Listening starts by
-        /// itself now, so this only makes sure of it.
-        /// </summary>
-        public void StartListeningNow()
-        {
-            StartListening();
-        }
-
         void StartListening()
         {
             if (_recorder.IsRunning) return;
@@ -910,6 +901,8 @@ namespace HolyLogger
             var decoder = new CwDecoder(_recorder.ActualSampleRate);
             decoder.Text += OnPlainText;
             decoder.LetterTimed += OnPlainLetterTimed;
+            decoder.WordGapTimed += OnPlainWordGap;
+            _plainStartSamples = _inputSamples;   // (the temporary input save: where this decoder's sample count starts)
             _plainRate = _recorder.ActualSampleRate;
             _decoder = decoder;
 
@@ -924,7 +917,7 @@ namespace HolyLogger
                 _neural = neural;
             }
 
-            lock (_wfGate) _wfBase = _wfWritten;       // the readers' sample count starts here
+            _wfBase = _strip != null ? _strip.Written : 0;   // the readers' sample count starts here
 
             if (CwDeepDecoder.Available)
             {
@@ -949,7 +942,7 @@ namespace HolyLogger
 
             var decoder = _decoder;
             _decoder = null;
-            if (decoder != null) { decoder.Text -= OnPlainText; decoder.LetterTimed -= OnPlainLetterTimed; }
+            if (decoder != null) { decoder.Text -= OnPlainText; decoder.LetterTimed -= OnPlainLetterTimed; decoder.WordGapTimed -= OnPlainWordGap; }
 
             var neural = _neural;
             _neural = null;
@@ -973,7 +966,6 @@ namespace HolyLogger
         void ClearEverything()
         {
             lock (_pendingGate) { _pendingPlain.Clear(); _pendingNetwork.Clear(); _pendingElement.Clear(); _pendingDeep.Clear(); _pendingPlainTimed.Clear(); _pendingNetTimed.Clear(); _pendingCovered.Clear(); }
-            lock (_plainTimes) _plainTimes.Clear();
             _timeLine.Clear();
             _timeLine.Show();
             _mix.Clear();
@@ -1007,44 +999,23 @@ namespace HolyLogger
         // short bright dash at its note and the station's letters can be read off it by eye. A dotted
         // green line marks the note the plain decoder is listening to.
         //
-        // IT CANNOT SLOW THE DECODERS: the capture thread only copies the samples into a ring, and
-        // the drawing - one small FFT per 10 ms of sound - runs on the screen timer.
+        // IT CANNOT SLOW THE DECODERS, AND NOTHING CAN SLOW IT: the capture thread only copies the samples
+        // into a ring, and the drawing - one small FFT per 10 ms of sound - runs on the strip's own thread
+        // (CwWaterfallStrip, at the end of this file).
         const int LetterRowHeight = 22;                // one line of letters under the strip
         const int WaterfallRowHeight = 64 + 2 * LetterRowHeight;   // the strip, its two letter lines, margins
-        const int WfColumns = 600, WfRows = 56;        // six seconds at one column per 10 ms
-        const double WfLowHz = 300, WfHighHz = 1000;
-        readonly short[] _wfRing = new short[1 << 15];
-        long _wfWritten, _wfRead;
-        readonly object _wfGate = new object();
-        WriteableBitmap _wfBitmap;
-        int[] _wfPixels;
-        double[] _wfRowFloor;
-        static readonly int[] WfPalette = MakeWaterfallPalette();
+        CwWaterfallStrip _strip;                     // the strip itself, drawn on its own thread - see CwWaterfallStrip
 
         UIElement BuildWaterfall()
         {
-            _wfBitmap = new WriteableBitmap(WfColumns, WfRows, 96, 96, PixelFormats.Bgr32, null);
-            _wfPixels = new int[WfColumns * WfRows];
-            for (int i = 0; i < _wfPixels.Length; i++) _wfPixels[i] = WfPalette[0];
-            _wfBitmap.WritePixels(new Int32Rect(0, 0, WfColumns, WfRows), _wfPixels, WfColumns * 4, 0);
+            _strip = new CwWaterfallStrip(KeyAt);
+            _strip.Element.Height = CwWaterfallStrip.Rows + LetterRowHeight;
 
-            var image = new Image { Source = _wfBitmap, Stretch = Stretch.Fill, Height = WfRows };
-            RenderOptions.SetBitmapScalingMode(image, BitmapScalingMode.LowQuality);
-            _wfImage = image;
-
-            // THE LETTERS UNDER THEIR OWN DITS AND DAHS (his idea): Plain's line, then New's, moving left
-            // with the strip, so a missed or wrong letter can be seen against the marks it came from.
-            _wfLetterCanvas = new Canvas
-            {
-                Height = 2 * LetterRowHeight,
-                Background = new SolidColorBrush(Color.FromRgb(0, 0, 0)),
-                ClipToBounds = true
-            };
             // HIS PITCH MARKED (his request, 2026-10-17; the pitch is set in Options > General, 700 Hz unless
             // changed): a short bright line at each edge of the strip, laid over the picture (not drawn into
             // it, so it does not slide away with the sound).
-            var picture = new Grid { Height = WfRows };
-            picture.Children.Add(image);
+            var picture = new Grid();
+            picture.Children.Add(_strip.Element);
             foreach (var side in new[] { HorizontalAlignment.Left, HorizontalAlignment.Right })
             {
                 var mark = new Rectangle
@@ -1060,19 +1031,17 @@ namespace HolyLogger
                 picture.Children.Add(mark);
             }
             PlacePitchMarks();
-            var stack = new StackPanel();
-            stack.Children.Add(picture);
-            stack.Children.Add(_wfLetterCanvas);
 
-            int inner = WfRows + 2 * LetterRowHeight + 2;
+            int inner = CwWaterfallStrip.Rows + 2 * LetterRowHeight + 2;
             _wfBorder = new Border
             {
-                Child = stack,
+                Child = picture,
                 Height = inner,
                 Margin = new Thickness(0, (WaterfallRowHeight - inner) / 2, 0, (WaterfallRowHeight - inner) / 2),
                 BorderThickness = new Thickness(1),
                 BorderBrush = GroupEdgeBrush,
-                ClipToBounds = true,          // the picture slides left between columns - see WaterfallFrame
+                Background = Brushes.Black,   // so the mouse finds it for the tooltip: the strip's own drawing cannot be hit
+                ClipToBounds = true,
             };
             PlacePitchMarks();
             return _wfBorder;
@@ -1087,7 +1056,8 @@ namespace HolyLogger
             try { hz = Properties.Settings.Default.CwPitchHz; }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
             hz = Math.Max(LowestPitchHz, Math.Min(HighestPitchHz, hz));
-            double y = (WfHighHz - hz) / (WfHighHz - WfLowHz) * (WfRows - 1) + 0.5;
+            if (_strip != null) _strip.PitchHz = hz;
+            double y = (CwWaterfallStrip.HighHz - hz) / (CwWaterfallStrip.HighHz - CwWaterfallStrip.LowHz) * (CwWaterfallStrip.Rows - 1) + 0.5;
             foreach (Rectangle mark in _pitchMarks) mark.Margin = new Thickness(0, y - 1.5, 0, 0);
             if (_wfBorder != null) _wfBorder.ToolTip = WaterfallTip(hz);
         }
@@ -1123,61 +1093,32 @@ namespace HolyLogger
         // second line was always empty and only took room from the text above.
         void SizeLetterLines(bool both)
         {
-            if (_wfLetterCanvas == null || _wfBorder == null) return;
+            if (_strip == null || _wfBorder == null) return;
             int lines = both ? 2 : 1;
-            _wfLetterCanvas.Height = lines * LetterRowHeight;
-            _wfBorder.Height = WfRows + lines * LetterRowHeight + 2;
+            _strip.Element.Height = CwWaterfallStrip.Rows + lines * LetterRowHeight;
+            _wfBorder.Height = CwWaterfallStrip.Rows + lines * LetterRowHeight + 2;
         }
 
-        Image _wfImage;
-        double _wfShift;                                // how far the picture has slid past the last column, in pixels
-        Canvas _wfLetterCanvas;
         long _wfBase;                                   // waterfall sample count when the readers were made
+        long _plainStartSamples;
 
-        sealed class WfLetter { public string Text; public long Sample; public int Row; public TextBlock Block; }
-        readonly System.Collections.Generic.List<WfLetter> _wfLetters = new System.Collections.Generic.List<WfLetter>();
-        readonly System.Collections.Generic.List<WfLetter> _wfLetterQueue = new System.Collections.Generic.List<WfLetter>();
-
-        // Each reader says where each letter began and ended: it is written under the middle of its marks,
-        // so the two lines sit one over the other and a difference is seen at once.
+        // EVERY LETTER PLAIN SPELLS OUT, THE MOMENT IT DOES (his rule, 2026-10-21): written under the middle of
+        // its marks on the waterfall, and at the same moment into Hybrid's text - not first held back by Plain
+        // (until it is sure this is Morse, and a lone E or T until a word follows), as it used to be, which left
+        // letters under the waterfall that the text never showed. Noise read as letters is the network's to
+        // judge: where it hears nothing, the letter goes grey (hidden unless he chose to see them).
         void OnPlainLetterTimed(string letter, long start, long end)
         {
-            lock (_wfLetterQueue) _wfLetterQueue.Add(new WfLetter { Text = letter, Sample = _wfBase + (start + end) / 2, Row = 0 });
+            if (_strip != null) _strip.AddLetter(letter, _wfBase + (start + end) / 2);
+            if (TxLogOn) _lettersSave.AppendFormat(System.Globalization.CultureInfo.InvariantCulture, "{0}\t{1}\t{2}\n", DateTime.Now.ToString("HH:mm:ss.f"), letter, _plainStartSamples + end);
             if (_plainRate <= 0) return;
-            lock (_plainTimes)
-            {
-                _plainTimes.Add(new System.Collections.Generic.KeyValuePair<string, double>(letter, end / (double)_plainRate));
-                if (_plainTimes.Count > 200) _plainTimes.RemoveRange(0, _plainTimes.Count - 200);
-            }
+            lock (_pendingGate) _pendingPlainTimed.Add(new System.Collections.Generic.KeyValuePair<string, double>(letter, end / (double)_plainRate));
         }
 
-        // Plain's printed letters, each given the time of the same letter in LetterTimed (raised just
-        // before it). Earlier timed letters not printed were held back as noise and dropped: skipped.
-        void TimePlainLetters(string text)
+        // Plain's word gap, the moment it is heard (see CwDecoder.WordGapTimed).
+        void OnPlainWordGap()
         {
-            for (int i = 0; i < text.Length; i++)
-            {
-                char c = text[i];
-                if (c == ' ' || c == '\r' || c == '\n')
-                {
-                    lock (_pendingGate) _pendingPlainTimed.Add(new System.Collections.Generic.KeyValuePair<string, double>(" ", double.NaN));
-                    continue;
-                }
-                string letter = c.ToString();
-                if (c == '<')
-                {
-                    int close = text.IndexOf('>', i);
-                    if (close > i) { letter = text.Substring(i, close - i + 1); i = close; }
-                }
-                lock (_plainTimes)
-                {
-                    int at = _plainTimes.FindIndex(e => e.Key == letter);
-                    if (at < 0) continue;
-                    double t = _plainTimes[at].Value;
-                    _plainTimes.RemoveRange(0, at + 1);
-                    lock (_pendingGate) _pendingPlainTimed.Add(new System.Collections.Generic.KeyValuePair<string, double>(letter, t));
-                }
-            }
+            lock (_pendingGate) _pendingPlainTimed.Add(new System.Collections.Generic.KeyValuePair<string, double>(" ", double.NaN));
         }
 
         // On our network's own thread.
@@ -1193,382 +1134,183 @@ namespace HolyLogger
 
         void OnElementLetterTimed(string letter, long start, long end)
         {
-            lock (_wfLetterQueue) _wfLetterQueue.Add(new WfLetter { Text = letter, Sample = _wfBase + (start + end) / 2, Row = 1 });
+            // (New's letters are no longer written under the strip: only Plain's line is shown there.)
         }
 
-        void MoveWaterfallLetters(int rate)
+        // WHILE WE TRANSMIT (his request, 2026-10-21). The radio's sound then is our own keying - on his
+        // IC-7610 every dit and dah came through as a bright bar across the whole strip, and the readers
+        // printed it as letters ("DU EATE I EGLE T E"). So while we transmit the readers are given silence
+        // (the same length, so every reader's clock keeps step with the sound), and the waterfall draws our
+        // keying as clean cyan marks at his pitch - see DrawWaterfall. Set by the main window: by the keyer
+        // when HolyLogger keys through a COM port, from the radio's TX state otherwise. TxHangMs more after
+        // the end, for the sound still on its way from the sound card and the radio's break-in delay.
+        public static volatile bool KeyerTransmitting, RadioTransmitting;
+        const double TxHangMs = 400;
+        static readonly System.Diagnostics.Stopwatch _txClock = System.Diagnostics.Stopwatch.StartNew();
+
+        /// <summary>Now, on the clock our key edges and the CAT layout are stamped with (KeyAt reads it). The
+        /// waterfall times its sound on this same clock - on a clock of its own its key look-ups all missed and
+        /// no cyan mark was ever drawn (his report, 2026-10-21).</summary>
+        internal static double TxClockMs { get { return _txClock.Elapsed.TotalMilliseconds; } }
+
+        // OUR KEYER'S OWN EDGES (COM port). Keyed on its KEY jack, his IC-7610 sends nothing of it down the USB
+        // sound - the strip stayed empty - so the marks are drawn from the moments the keyer pressed and released
+        // the line, laid on the sound by the time each block of it arrived.
+        static readonly System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<double, bool>> _keyEdges = new System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<double, bool>>();
+
+        /// <summary>Our keyer pressed (true) or released the key, now. From the keying thread.</summary>
+        public static void KeyEdge(bool down)
         {
-            if (_wfLetterCanvas == null || _wfImage == null) return;
-            lock (_wfLetterQueue)
-            {
-                foreach (WfLetter l in _wfLetterQueue)
-                {
-                    l.Block = new TextBlock
-                    {
-                        Text = l.Text,
-                        FontSize = 16,
-                        FontWeight = FontWeights.Bold,
-                        FontFamily = new FontFamily("Consolas"),
-                        Foreground = l.Row == 0 ? Brushes.White : new SolidColorBrush(Color.FromRgb(255, 210, 0))
-                    };
-                    Canvas.SetTop(l.Block, l.Row * LetterRowHeight + 1);
-                    _wfLetterCanvas.Children.Add(l.Block);
-                    _wfLetters.Add(l);
-                }
-                _wfLetterQueue.Clear();
-            }
+            KeyEdgeAt(_txClock.Elapsed.TotalMilliseconds, down);
+        }
 
-            // ONLY THE READER ON SHOW (2026-10-03, his choice): Plain's letters with Plain, New's with New,
-            // both lines only in Both - and a single line always sits on the top row.
-            Reader showing = Showing;
-            bool both = showing == Reader.Both;
-
-            int hop = rate / 100, window = rate * 40 / 1000;
-            double width = _wfImage.ActualWidth;
-            long rightCentre = _wfRead - hop + window / 2;     // the sound under the newest column
-            for (int i = _wfLetters.Count - 1; i >= 0; i--)
+        // At a given moment - for CAT, moments still to come (see CatCwSent). Kept in time order.
+        static void KeyEdgeAt(double ms, bool down)
+        {
+            lock (_keyEdges)
             {
-                WfLetter l = _wfLetters[i];
-                double column = WfColumns - 1 - (rightCentre - l.Sample) / (double)hop;
-                double x = column * width / WfColumns - 5 - _wfShift;
-                if (x < -20)
-                {
-                    _wfLetterCanvas.Children.Remove(l.Block);
-                    _wfLetters.RemoveAt(i);
-                    continue;
-                }
-                bool mine = both || (l.Row == 0 ? showing != Reader.New : showing == Reader.New);
-                l.Block.Visibility = x > width || !mine ? Visibility.Hidden : Visibility.Visible;   // not drawn yet, or not on show
-                Canvas.SetTop(l.Block, (both ? l.Row : 0) * LetterRowHeight + 1);
-                Canvas.SetLeft(l.Block, x);
+                int at = _keyEdges.Count;
+                while (at > 0 && _keyEdges[at - 1].Key > ms) at--;
+                _keyEdges.Insert(at, new System.Collections.Generic.KeyValuePair<double, bool>(ms, down));
+                if (_keyEdges.Count > 4000) _keyEdges.RemoveRange(0, 1000);
             }
         }
 
-        void FeedWaterfall(short[] samples, int count)
+        // 0 = no keyer edges near this moment (tell key-down from the sound), 1 = key up, 2 = key down.
+        static byte KeyAt(double ms)
         {
-            lock (_wfGate)
-                for (int i = 0; i < count; i++) _wfRing[(int)(_wfWritten++ & (_wfRing.Length - 1))] = samples[i];
-        }
-
-        // SMOOTH, NOT IN JUMPS. The sound arrives in blocks of a tenth of a second, and drawn as it came
-        // the strip jumped ten columns at a time - "aggressive steps", he said. So the strip is moved
-        // at the pace of the clock, one column per 10 ms, on every screen refresh, running WfBehindMs
-        // behind the sound so the next column is always there. If the sound card's clock and this one
-        // drift apart, the strip catches up (or waits) a little at a time rather than jumping.
-        const double WfBehindMs = 200;
-        readonly System.Diagnostics.Stopwatch _wfClock = new System.Diagnostics.Stopwatch();
-        long _wfShown;                                  // columns drawn
-        long _wfOffset;                                 // columns the clock is moved by, to follow the sound card
-
-        // TEMPORARY - TO FIND THE JUMPS HE SEES. Outside HolyLogger the strip moved within a pixel of
-        // where it should on 1,168 frames of 1,169, so what jumps in HolyLogger must be its frames: this
-        // writes every frame that came late, or took long, to %TEMP%\HolyLogger_cw_flow.tsv. Remove
-        // once the cause is found.
-        readonly System.Diagnostics.Stopwatch _flowClock = System.Diagnostics.Stopwatch.StartNew();
-        readonly StringBuilder _flowLog = new StringBuilder();
-        double _flowLast, _flowSaved;
-        int _flowFrames, _flowLate;
-
-        // TEMPORARY, WITH THE FLOW LOG: every piece of work on the window's thread that takes over 40 ms
-        // is written to the same file ("slow" lines), named by the method that ran - for a timer, the
-        // Tick handlers - so the jumps that remain with Live Scale off can be put to their cause.
-        bool _probeOn;
-        readonly System.Collections.Generic.Dictionary<DispatcherOperation, long> _probeStart = new System.Collections.Generic.Dictionary<DispatcherOperation, long>();
-
-        void StartProbe()
-        {
-            _probeOn = true;
-            var hooks = Dispatcher.Hooks;
-            hooks.OperationStarted += (s, e) => _probeStart[e.Operation] = System.Diagnostics.Stopwatch.GetTimestamp();
-            hooks.OperationAborted += (s, e) => _probeStart.Remove(e.Operation);
-            hooks.OperationCompleted += (s, e) =>
+            lock (_keyEdges)
             {
-                long t0;
-                if (!_probeStart.TryGetValue(e.Operation, out t0)) return;
-                _probeStart.Remove(e.Operation);
-                double ms = (System.Diagnostics.Stopwatch.GetTimestamp() - t0) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
-                if (ms > 40)
-                    _flowLog.AppendFormat(System.Globalization.CultureInfo.InvariantCulture, "slow\t{0:F0}\t{1:F1}\t{2}\n",
-                        _flowClock.Elapsed.TotalMilliseconds, ms, DescribeOperation(e.Operation));
-            };
-        }
-
-        // Everything in every open window that has an animation running on it right now, by window,
-        // type and name - an animation that never stops makes the one drawing engine all HolyLogger's
-        // windows share redraw on every frame.
-        // Every window of the program by type, shown or not, its size, and "SEE-THROUGH" for a layered
-        // window (AllowsTransparency) - those are drawn by the processor, not the graphics card, and
-        // redrawing one is far dearer than an ordinary window.
-        static string OpenWindowsNow()
-        {
-            var parts = new System.Collections.Generic.List<string>();
-            try
-            {
-                foreach (Window w in Application.Current.Windows)
-                    parts.Add(string.Format(System.Globalization.CultureInfo.InvariantCulture, "{0}{1} {2:F0}x{3:F0}{4}",
-                        w.GetType().Name, w.IsVisible ? "" : "(hidden)", w.ActualWidth, w.ActualHeight, w.AllowsTransparency ? " SEE-THROUGH" : ""));
+                for (int i = _keyEdges.Count - 1; i >= 0; i--)
+                    if (_keyEdges[i].Key <= ms)
+                        return ms - _keyEdges[i].Key > 10000 ? (byte)0 : _keyEdges[i].Value ? (byte)2 : (byte)1;
             }
-            catch (Exception swallowed) { Log.Swallow(swallowed); }
-            return string.Join(", ", parts);
+            return 0;
         }
+        double _txLastMs = double.NegativeInfinity;
+        short[] _silence = new short[0];
 
-        static string AnimatingNow()
+        // TEMPORARY (2026-10-21) - TO SEE WHY PARTS OF HIS SENDING WERE STILL DRAWN AS WHITE BARS: only when
+        // %TEMP%\HolyLogger_cw_tx.on exists, every block of sound goes to %TEMP%\HolyLogger_cw_tx.tsv - the
+        // time, the two transmit flags, the verdict, and the block's loudness. Remove once the cause is found.
+        static readonly bool TxLogOn = TxLogWanted();
+        readonly StringBuilder _txLog = new StringBuilder();
+        double _txLogSaved;
+
+        static bool TxLogWanted()
         {
-            var found = new System.Collections.Generic.List<string>();
-            try
-            {
-                foreach (Window w in Application.Current.Windows)
-                {
-                    if (!w.IsVisible) continue;
-                    var stack = new System.Collections.Generic.Stack<DependencyObject>();
-                    stack.Push(w);
-                    while (stack.Count > 0 && found.Count < 12)
-                    {
-                        DependencyObject d = stack.Pop();
-                        var ui = d as UIElement;
-                        if (ui != null)
-                        {
-                            var rt = ui.RenderTransform as System.Windows.Media.Animation.Animatable;
-                            bool animated = ui.HasAnimatedProperties || (rt != null && rt.HasAnimatedProperties)
-                                || (ui.Effect != null && ui.Effect.HasAnimatedProperties);
-                            if (animated)
-                            {
-                                var fe = ui as FrameworkElement;
-                                found.Add(w.GetType().Name + "/" + ui.GetType().Name + (fe != null && !string.IsNullOrEmpty(fe.Name) ? ":" + fe.Name : "")
-                                          + (ui.IsVisible ? "" : "(hidden)"));
-                            }
-                        }
-                        if (d is Visual || d is System.Windows.Media.Media3D.Visual3D)
-                            for (int i = VisualTreeHelper.GetChildrenCount(d) - 1; i >= 0; i--) stack.Push(VisualTreeHelper.GetChild(d, i));
-                    }
-                }
-            }
-            catch (Exception swallowed) { Log.Swallow(swallowed); }
-            return found.Count == 0 ? "nothing" : string.Join(", ", found);
-        }
-
-        static string DescribeOperation(DispatcherOperation op)
-        {
-            try
-            {
-                var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
-                var d = typeof(DispatcherOperation).GetField("_method", flags)?.GetValue(op) as Delegate;
-                if (d == null) return op.Priority.ToString();
-                string s = (d.Method.DeclaringType != null ? d.Method.DeclaringType.Name : "?") + "." + d.Method.Name;
-                if (d.Target is DispatcherTimer timer)
-                {
-                    var tick = typeof(DispatcherTimer).GetField("Tick", flags)?.GetValue(timer) as Delegate;
-                    if (tick != null)
-                        foreach (Delegate h in tick.GetInvocationList())
-                            s += " tick:" + (h.Method.DeclaringType != null ? h.Method.DeclaringType.Name : "?") + "." + h.Method.Name;
-                }
-                return s + " (" + op.Priority + ")";
-            }
-            catch (Exception swallowed) { Log.Swallow(swallowed); return op.Priority.ToString(); }
-        }
-
-        // ONLY ON A MACHINE THAT ASKS FOR IT: the frame log and the probe run only when the file
-        // %TEMP%\HolyLogger_cw_flow.on exists (his, for finding the jumps), so a released program never
-        // writes a growing log for anybody else.
-        static readonly bool FlowLogOn = FlowLogWanted();
-
-        static bool FlowLogWanted()
-        {
-            try { return System.IO.File.Exists(System.IO.Path.Combine(System.IO.Path.GetTempPath(), "HolyLogger_cw_flow.on")); }
+            try { return System.IO.File.Exists(System.IO.Path.Combine(System.IO.Path.GetTempPath(), "HolyLogger_cw_tx.on")); }
             catch (Exception swallowed) { Log.Swallow(swallowed); return false; }
         }
 
-        void WaterfallFrame(object sender, EventArgs e)
+        // TEMPORARY, WITH THE TRANSMIT LOG (2026-10-21: a clear CQ read badly live, read well from a recording):
+        // the exact sound Plain is given goes to %TEMP%\HolyLogger_cw_input_<rate>.raw (16-bit, mono) and every
+        // letter it spells, with the sample it ends at, to %TEMP%\HolyLogger_cw_letters.tsv - so the same
+        // stretch can be played through Plain again outside and the two compared. Remove with the log.
+        readonly System.Collections.Generic.List<byte> _inputSave = new System.Collections.Generic.List<byte>();
+        long _inputSamples;
+
+        void SaveInput(short[] samples, int count)
         {
-            if (!FlowLogOn) { WaterfallFrameInner(); return; }
-            if (!_probeOn) StartProbe();
-            double flowStart = _flowClock.Elapsed.TotalMilliseconds;
-            long flowShown = _wfShown, flowOffset = _wfOffset;
-            WaterfallFrameInner();
-            double flowEnd = _flowClock.Elapsed.TotalMilliseconds;
             try
             {
-                var re = e as RenderingEventArgs;
-                double gap = _flowLast > 0 ? flowStart - _flowLast : 0;
-                _flowLast = flowStart;
-                _flowFrames++;
-                if (gap > 25 || flowEnd - flowStart > 8 || _wfOffset != flowOffset)
+                for (int i = 0; i < count; i++) { _inputSave.Add((byte)(samples[i] & 0xFF)); _inputSave.Add((byte)((samples[i] >> 8) & 0xFF)); }
+                _inputSamples += count;
+                if (_inputSave.Count >= 2 * _recorder.ActualSampleRate)
                 {
-                    _flowLate++;
-                    _flowLog.AppendFormat(System.Globalization.CultureInfo.InvariantCulture,
-                        "{0:F0}\t{1:F1}\t{2:F1}\t{3}\t{4}\t{5:F0}\n", flowStart, gap, flowEnd - flowStart,
-                        _wfShown - flowShown, _wfOffset, re != null ? re.RenderingTime.TotalMilliseconds : 0);
-                }
-                if (flowStart - _flowSaved > 10000)
-                {
-                    _flowSaved = flowStart;
-                    _flowLog.AppendFormat("# {0:F0} ms: {1} frames, {2} late or long\n", flowStart, _flowFrames, _flowLate);
-                    _flowLog.AppendFormat("# tier {0}, windows {1}, animating: {2}\n", RenderCapability.Tier >> 16,
-                        Application.Current.Windows.Count, AnimatingNow());
-                    _flowLog.AppendFormat("# open: {0}\n", OpenWindowsNow());
-                    System.IO.File.AppendAllText(System.IO.Path.Combine(System.IO.Path.GetTempPath(), "HolyLogger_cw_flow.tsv"), _flowLog.ToString());
-                    _flowLog.Clear();
-                    _flowFrames = 0; _flowLate = 0;
+                    System.IO.File.AppendAllText(System.IO.Path.Combine(System.IO.Path.GetTempPath(), "HolyLogger_cw_letters.tsv"), _lettersSave.ToString());
+                    _lettersSave.Clear();
+                    using (var f = new System.IO.FileStream(System.IO.Path.Combine(System.IO.Path.GetTempPath(), "HolyLogger_cw_input_" + _recorder.ActualSampleRate + ".raw"), System.IO.FileMode.Append))
+                        f.Write(_inputSave.ToArray(), 0, _inputSave.Count);
+                    _inputSave.Clear();
                 }
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
         }
 
-        void WaterfallFrameInner()
+        readonly StringBuilder _lettersSave = new StringBuilder();
+
+        void LogTxBlock(short[] samples, int count, bool tx)
         {
             try
             {
-                int rate = _recorder.ActualSampleRate;
-                if (rate <= 0) return;
-                long written; lock (_wfGate) written = _wfWritten;
-                if (written == 0) return;
-                if (!_wfClock.IsRunning) { _wfClock.Start(); _wfShown = 0; _wfOffset = 0; }
-
-                int hop = rate / 100, window = rate * 40 / 1000;
-                long ready = _wfShown + Math.Max(0, (written - _wfRead - window) / hop);
-                long due = (long)((_wfClock.Elapsed.TotalMilliseconds - WfBehindMs) / 10) + _wfOffset;
-                if (ready - due > 30) _wfOffset++;                        // sound ahead: one column extra now and then
-                else if (due - ready > 30) _wfOffset -= due - ready - 10;  // sound late: wait for it without a jump later
-                due = (long)((_wfClock.Elapsed.TotalMilliseconds - WfBehindMs) / 10) + _wfOffset;
-
-                long take = Math.Min(due, ready) - _wfShown;
-                if (take > 0) _wfShown += DrawWaterfall((int)Math.Min(take, 6));
-
-                // BETWEEN COLUMNS, A SLIDE. Whole columns at the screen's 60 a second came one, two, one,
-                // two - small jumps he could see ("not smooth enough"). The picture is also moved left
-                // by the part of a column that is due by now, so it glides; the next column then lands
-                // exactly where the slide has got to.
-                double exact = (_wfClock.Elapsed.TotalMilliseconds - WfBehindMs) / 10 + _wfOffset;
-                double part = Math.Max(0, Math.Min(1, exact - _wfShown));
-                _wfShift = _wfImage != null ? part * _wfImage.ActualWidth / WfColumns : 0;
-                if (_wfImage != null)
+                double sum = 0; int peak = 0;
+                for (int i = 0; i < count; i++) { int v = Math.Abs((int)samples[i]); sum += (double)v * v; if (v > peak) peak = v; }
+                double ms = _txClock.Elapsed.TotalMilliseconds;
+                _txLog.AppendFormat(System.Globalization.CultureInfo.InvariantCulture, "{0:F0}\t{1}\t{2}\t{3}\t{4:F0}\t{5}\n",
+                    ms, KeyerTransmitting ? 1 : 0, RadioTransmitting ? 1 : 0, tx ? 1 : 0, Math.Sqrt(sum / Math.Max(1, count)), peak);
+                if (ms - _txLogSaved > 2000)
                 {
-                    if (!(_wfImage.RenderTransform is TranslateTransform)) _wfImage.RenderTransform = new TranslateTransform();
-                    ((TranslateTransform)_wfImage.RenderTransform).X = -_wfShift;
+                    _txLogSaved = ms;
+                    System.IO.File.AppendAllText(System.IO.Path.Combine(System.IO.Path.GetTempPath(), "HolyLogger_cw_tx.tsv"), _txLog.ToString());
+                    _txLog.Clear();
                 }
-                MoveWaterfallLetters(rate);
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
         }
 
-        int DrawWaterfall(int columns)
+        // CW HANDED TO THE RADIO BY CAT. The radio's own TX report comes through OmniRig's polling, late and with
+        // holes - on his screen the first elements and some in the middle were still drawn as big white bars and
+        // read as letters. So from the moment HolyLogger hands the radio a text, it counts as transmitting for as
+        // long as that text takes at the speed (worked out from its dits, dahs and gaps), plus CatStartMs for the
+        // radio to begin; a text handed over while one is still going is added on after it.
+        //
+        // THE MARKS TOO ARE WORKED OUT, NOT HEARD. His transmit log (2026-10-21) showed the radio's USB sound
+        // silent for the whole of a CAT message - level 3 against about 1000 receiving - so there is nothing in
+        // the sound to draw. The dits and dahs are laid out from the text and the speed instead, as key edges
+        // (see KeyEdge) from CatStartMs after the hand-over: the log had the sound go quiet 0.1 s after it.
+        const double CatStartMs = 150;
+        static double _catUntilMs = double.NegativeInfinity;
+        static readonly object _catGate = new object();
+
+        /// <summary>A CW text has just been handed to the radio over CAT, to be sent at about wpm.</summary>
+        public static void CatCwSent(string text, double wpm)
         {
-            int rate = _recorder.ActualSampleRate;
-            if (_wfBitmap == null || rate <= 0) return 0;
-            int window = rate * 40 / 1000, hop = rate / 100;
-            int nfft = 1; while (nfft < window * 3 / 2) nfft <<= 1;
-
-            double note = 0;
-            var heard = _decoder;
-            if (heard != null && heard.SignalPresent) note = heard.ToneHz;
-
-            var re = new double[nfft]; var im = new double[nfft];
-            var column = new int[WfRows];
-            int drawn = 0;
-            while (true)
+            if (string.IsNullOrEmpty(text)) return;
+            double unitMs = 1200.0 / (wpm >= 5 ? wpm : 20);
+            double now = _txClock.Elapsed.TotalMilliseconds;
+            lock (_catGate)
             {
-                lock (_wfGate)
+                double at = Math.Max(now + CatStartMs, _catUntilMs);
+                foreach (char c in text.ToUpperInvariant())
                 {
-                    // Fallen far behind (the window was hidden, the machine busy): skip to the present.
-                    if (_wfWritten - _wfRead > _wfRing.Length / 2) _wfRead = _wfWritten - window - hop * 20;
-                    if (_wfWritten - _wfRead < window) break;
-                    for (int i = 0; i < nfft; i++)
+                    string pattern;
+                    if (c == ' ') at += (CwSendMonitorWindow.WordGapUnits - CwSendMonitorWindow.LetterGapUnits) * unitMs;
+                    else if (CwSendMonitorWindow.TryGetMorse(c, out pattern))
                     {
-                        // Blackman-Harris, not Hann: a strong station leaked into every row of the strip
-                        // through a Hann window's sidelobes, 31 dB down; these are 92 dB down.
-                        double a = 2 * Math.PI * i / (window - 1);
-                        double shape = 0.35875 - 0.48829 * Math.Cos(a) + 0.14128 * Math.Cos(2 * a) - 0.01168 * Math.Cos(3 * a);
-                        re[i] = i < window ? _wfRing[(int)((_wfRead + i) & (_wfRing.Length - 1))] * shape : 0;
-                        im[i] = 0;
-                    }
-                    _wfRead += hop;
-                }
-
-                WaterfallFft(re, im);
-                double binHz = (double)rate / nfft;
-                var db = new double[WfRows];
-                for (int y = 0; y < WfRows; y++)
-                {
-                    double f = WfHighHz - (WfHighHz - WfLowHz) * y / (WfRows - 1);
-                    double b = f / binHz; int b0 = (int)b; double w = b - b0;
-                    double m0 = Math.Sqrt(re[b0] * re[b0] + im[b0] * im[b0]);
-                    double m1 = Math.Sqrt(re[b0 + 1] * re[b0 + 1] + im[b0 + 1] * im[b0 + 1]);
-                    db[y] = 20 * Math.Log10(m0 + (m1 - m0) * w + 1);
-                }
-
-                // EACH NOTE ITS OWN QUIET LEVEL. One level for the whole strip made the noise inside the
-                // radio's CW filter bright yellow and the station hardly brighter (his screenshot): the
-                // dark stretch outside the filter pulled the level down. Each row's level drops at once
-                // to anything quieter and creeps up slowly, so it settles on that note's noise, and only
-                // a station stands out above it.
-                if (_wfRowFloor == null) _wfRowFloor = (double[])db.Clone();
-                for (int y = 0; y < WfRows; y++)
-                    _wfRowFloor[y] += (db[y] < _wfRowFloor[y] ? 0.05 : 0.002) * (db[y] - _wfRowFloor[y]);
-
-                int noteRow = note > 0 ? (int)Math.Round((WfHighHz - note) / (WfHighHz - WfLowHz) * (WfRows - 1)) : -1;
-                bool dot = (_wfRead / hop) % 3 == 0;
-                for (int y = 0; y < WfRows; y++)
-                {
-                    double v = (db[y] - _wfRowFloor[y] - 6) / 30;   // tried on his YT3T recording, strong and weak
-                    int shade = (int)(Math.Max(0, Math.Min(1, v)) * 255);
-                    column[y] = y == noteRow && dot ? 0x40E040 : WfPalette[shade];
-                }
-
-                // Everything one column to the left, the new column at the right edge.
-                for (int y = 0; y < WfRows; y++)
-                {
-                    Array.Copy(_wfPixels, y * WfColumns + 1, _wfPixels, y * WfColumns, WfColumns - 1);
-                    _wfPixels[y * WfColumns + WfColumns - 1] = column[y];
-                }
-                if (++drawn >= columns) break;
-            }
-            if (drawn > 0) _wfBitmap.WritePixels(new Int32Rect(0, 0, WfColumns, WfRows), _wfPixels, WfColumns * 4, 0);
-            return drawn;
-        }
-
-        // Black for silence, dark blue for noise, bright yellow for a station, white for the loudest -
-        // the noise kept dim so the dits and dahs are what the eye finds.
-        static int[] MakeWaterfallPalette()
-        {
-            var stops = new[] { new[] { 0, 0, 0 }, new[] { 10, 30, 110 }, new[] { 255, 200, 0 }, new[] { 255, 255, 255 } };
-            var p = new int[256];
-            for (int i = 0; i < 256; i++)
-            {
-                double t = i / 255.0 * (stops.Length - 1);
-                int k = Math.Min(stops.Length - 2, (int)t); double w = t - k;
-                int r = (int)(stops[k][0] + (stops[k + 1][0] - stops[k][0]) * w);
-                int g = (int)(stops[k][1] + (stops[k + 1][1] - stops[k][1]) * w);
-                int b = (int)(stops[k][2] + (stops[k + 1][2] - stops[k][2]) * w);
-                p[i] = (r << 16) | (g << 8) | b;
-            }
-            return p;
-        }
-
-        static void WaterfallFft(double[] re, double[] im)
-        {
-            int n = re.Length;
-            for (int i = 1, j = 0; i < n; i++)
-            {
-                int bit = n >> 1;
-                for (; (j & bit) != 0; bit >>= 1) j ^= bit;
-                j ^= bit;
-                if (i < j) { double t = re[i]; re[i] = re[j]; re[j] = t; t = im[i]; im[i] = im[j]; im[j] = t; }
-            }
-            for (int len = 2; len <= n; len <<= 1)
-            {
-                double ang = -2 * Math.PI / len, wr = Math.Cos(ang), wi = Math.Sin(ang);
-                for (int i = 0; i < n; i += len)
-                {
-                    double cr = 1, ci = 0;
-                    for (int k = 0; k < len / 2; k++)
-                    {
-                        int a = i + k, b = i + k + len / 2;
-                        double tr = re[b] * cr - im[b] * ci, ti = re[b] * ci + im[b] * cr;
-                        re[b] = re[a] - tr; im[b] = im[a] - ti; re[a] += tr; im[a] += ti;
-                        double nr = cr * wr - ci * wi; ci = cr * wi + ci * wr; cr = nr;
+                        foreach (char e in pattern)
+                        {
+                            KeyEdgeAt(at, true);
+                            at += (e == '-' ? 3 : 1) * unitMs;
+                            KeyEdgeAt(at, false);
+                            at += unitMs;
+                        }
+                        at += (CwSendMonitorWindow.LetterGapUnits - 1) * unitMs;
                     }
                 }
+                _catUntilMs = at;
             }
+        }
+
+        /// <summary>The CAT sending was stopped (Esc): the sound is the band's again.</summary>
+        public static void CatCwStopped()
+        {
+            double now = _txClock.Elapsed.TotalMilliseconds;
+            lock (_catGate) _catUntilMs = double.NegativeInfinity;
+            lock (_keyEdges)
+            {
+                _keyEdges.RemoveAll(e => e.Key > now);   // the rest of the text will not be sent
+                _keyEdges.Add(new System.Collections.Generic.KeyValuePair<double, bool>(now, false));
+            }
+        }
+
+        bool TransmittingNow()
+        {
+            double now = _txClock.Elapsed.TotalMilliseconds;
+            double catUntil;
+            lock (_catGate) catUntil = _catUntilMs;
+            if (KeyerTransmitting || RadioTransmitting || now < catUntil) _txLastMs = now;
+            return now - _txLastMs <= TxHangMs;
         }
 
         // On the capture thread. Hand the block straight to the decoder - it is a few thousand
@@ -1578,11 +1320,20 @@ namespace HolyLogger
             var decoder = _decoder;
             if (decoder == null) return;
 
+            // A copy for the waterfall, drawn on the screen timer - nothing is worked out here.
+            bool tx = TransmittingNow();
+            if (TxLogOn) LogTxBlock(samples, count, tx);
+            if (_strip != null) _strip.Feed(samples, count, _recorder.ActualSampleRate, tx);
+            if (tx)
+            {
+                if (_silence.Length < count) _silence = new short[count];
+                samples = _silence;
+            }
+
+            if (TxLogOn) SaveInput(samples, count);
             try { decoder.Process(samples, count); }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
-
-            // A copy for the waterfall, drawn on the screen timer - nothing is worked out here.
-            FeedWaterfall(samples, count);
+            if (_strip != null) _strip.NoteHz = decoder.SignalPresent ? decoder.ToneHz : 0;   // the dotted line on the strip
 
             // Only copied here; the reading itself runs on the new decoder's own thread.
             var element = _element;
@@ -1624,8 +1375,6 @@ namespace HolyLogger
         // show is still running and still being fed - its letters are simply dropped here.
         void OnPlainText(string text)
         {
-            try { TimePlainLetters(text); }
-            catch (Exception swallowed) { Log.Swallow(swallowed); }
             var showing = Showing;
             if (showing == Reader.Network || showing == Reader.New || showing == Reader.Deep) return;
             lock (_pendingGate) _pendingPlain.Append(text);
@@ -1826,6 +1575,444 @@ namespace HolyLogger
             StopListening();
             try { _recorder.Dispose(); }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+    }
+
+    // THE WATERFALL, REBUILT (2026-10-21, his request: "rethink how to make it and rewrite it").
+    //
+    // What was wrong. It was drawn on the one thread every HolyLogger window shares: whenever anything else was
+    // busy - the main window, the radio panel, a timer, the decoded text - the strip missed its turn. His frame
+    // log: about one frame in five missed, all the time. And every new column moved the whole picture a step,
+    // with a slide in between trying to catch up; when frames were missed the two fell out of step and it
+    // jumped back and forth.
+    //
+    // What it is now:
+    //   ITS OWN THREAD. The strip is drawn on a thread of its own (a HostVisual in the window, its content made
+    //   on that thread), so nothing else in the program can hold it up.
+    //   A PICTURE THAT IS NEVER MOVED. Each new column is written once into a circular picture (twice, in fact,
+    //   at i and i + RingColumns, so the six seconds on show are always one piece with no seam). Where the
+    //   picture sits on the screen comes from one steady clock alone: 100 columns a second, eased by at most
+    //   5% to keep a fifth of a second behind the sound. So it can only glide - a late frame moves it exactly
+    //   as far as the time that passed, never back.
+    //   THE LETTERS ON THE SAME THREAD AND CLOCK, drawn under their own marks.
+    //
+    // The capture thread hands it sound (Feed); the window hands it letters, the pitch, the note being read.
+    sealed class CwWaterfallStrip
+    {
+        public const int Rows = 56;                         // 300 .. 1000 Hz
+        public const int ShownColumns = 600;                // six seconds at one column per 10 ms
+        const int RingColumns = 1024;                       // more than shown plus the lead the sound may have
+        public const double LowHz = 300, HighHz = 1000;
+        const double BehindColumns = 20;                    // a fifth of a second behind the sound
+        const double MaxEase = 0.05;                        // the clock eased by at most 5% to keep that distance
+
+        // ---- handed over from other threads ----
+        readonly short[] _ring = new short[1 << 16];
+        long _written;                                      // samples ever written
+        int _rate;
+        readonly object _gate = new object();
+        const int SlotShift = 6;                            // our transmitting / key state, per 64 samples
+        readonly bool[] _tx = new bool[(1 << 16) >> SlotShift];
+        readonly byte[] _key = new byte[(1 << 16) >> SlotShift];
+        double _soundStartMs = double.NaN;
+        readonly Func<double, byte> _keyAt;
+        static readonly System.Diagnostics.Stopwatch Clock = System.Diagnostics.Stopwatch.StartNew();   // the frames' own clock
+
+        public volatile int PitchHz = 700;
+        double _noteHz;
+        public double NoteHz
+        {
+            get { return System.Threading.Volatile.Read(ref _noteHz); }
+            set { System.Threading.Volatile.Write(ref _noteHz, value); }
+        }
+
+        sealed class Letter { public string Text; public long Sample; public FormattedText Shape; }
+        readonly System.Collections.Generic.List<Letter> _letterQueue = new System.Collections.Generic.List<Letter>();
+
+        // ---- the strip's own thread ----
+        readonly HostVisual _host = new HostVisual();
+        readonly System.Threading.Thread _thread;
+        Dispatcher _dispatcher;
+        DrawingVisual _picture;
+        WriteableBitmap _bitmap;
+        int[] _column;
+        double[] _rowFloor;
+        long _read;                                         // the sample the next column starts at
+        long _columnsMade;
+        double _shownAt = double.NaN;                       // the column at the right edge, fractional
+        double _lastFrameMs;
+        readonly System.Collections.Generic.List<Letter> _letters = new System.Collections.Generic.List<Letter>();
+        double _width, _height;                             // the element's size, from the window's thread
+        static readonly int[] Palette = MakePalette();
+        static readonly Typeface LetterFace = new Typeface(new FontFamily("Consolas"), FontStyles.Normal, FontWeights.Bold, FontStretches.Normal);
+
+        public FrameworkElement Element { get; private set; }
+
+        public CwWaterfallStrip(Func<double, byte> keyAt)
+        {
+            _keyAt = keyAt;
+            var element = new HostElement(_host);
+            element.SizeChanged += (s, e) => { lock (_gate) { _width = e.NewSize.Width; _height = e.NewSize.Height; } };
+            Element = element;
+
+            _thread = new System.Threading.Thread(Run) { IsBackground = true, Name = "CW waterfall", Priority = System.Threading.ThreadPriority.AboveNormal };
+            _thread.SetApartmentState(System.Threading.ApartmentState.STA);
+            _thread.Start();
+        }
+
+        /// <summary>Samples ever handed in - the waterfall's own sample count.</summary>
+        public long Written { get { lock (_gate) return _written; } }
+
+        /// <summary>Stops the strip's thread. Called as the window closes, BEFORE it is torn down.</summary>
+        // DETACHED FIRST, AND WAITED FOR (his error, 2026-10-21: "Index was out of range" on closing the decoder).
+        // The window being torn down let go of the HostVisual while the strip's thread still had its drawing
+        // attached to it - a race inside WPF. So the strip's own thread takes its drawing off first, and the
+        // window's thread waits until it has, before the window goes. Only then is the thread stopped.
+        //
+        // AND UNHOOKED FROM THE WINDOW FIRST (the same error again, closing the whole program: the decoder then
+        // goes down as part of the main window closing, and WPF tore the window down with the detach still
+        // pending). So the window's own thread takes the strip's picture out of the window first, while both
+        // ends are alive; only then is the drawing let go on the strip's thread.
+        public void Close()
+        {
+            var d = _dispatcher;
+            if (d == null || _closed) return;
+            _closed = true;
+            try { ((HostElement)Element).Unhook(); }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+            try
+            {
+                d.Invoke(new Action(() =>
+                {
+                    CompositionTarget.Rendering -= Frame;
+                    if (_target != null) { _target.RootVisual = null; _target.Dispose(); _target = null; }
+                }));
+                d.BeginInvokeShutdown(DispatcherPriority.Normal);
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        bool _closed;
+        VisualTarget _target;
+
+        /// <summary>A block of sound, on the capture thread; tx = we were transmitting.</summary>
+        public void Feed(short[] samples, int count, int rate, bool tx)
+        {
+            // On the window's transmit clock: the moments looked up in _keyAt are stamped on it.
+            double endMs = CwDecodeWindow.TxClockMs;           // the block's last sample has just arrived
+            lock (_gate)
+            {
+                // One steady clock for the sound (the CAT marks came out in several lengths when each block was
+                // timed by its arrival): a fixed start plus the count over the rate, the start the earliest any
+                // block allows, creeping later only slowly to follow the sound card's clock.
+                if (rate > 0)
+                {
+                    double start = endMs - (_written + count) * 1000.0 / rate;
+                    if (rate != _rate || double.IsNaN(_soundStartMs) || start < _soundStartMs) _soundStartMs = start;
+                    else _soundStartMs += 0.002 * (start - _soundStartMs);
+                    _rate = rate;
+                }
+                for (int i = 0; i < count; i++)
+                {
+                    if (i == 0 || (_written & ((1 << SlotShift) - 1)) == 0)
+                    {
+                        int slot = (int)((_written >> SlotShift) & (_tx.Length - 1));
+                        _tx[slot] = tx;
+                        _key[slot] = tx && rate > 0 ? _keyAt(_soundStartMs + _written * 1000.0 / rate) : (byte)0;
+                    }
+                    _ring[(int)(_written++ & (_ring.Length - 1))] = samples[i];
+                }
+            }
+        }
+
+        /// <summary>A letter, written under the sound around `sample` (the waterfall's own count). Any thread.</summary>
+        public void AddLetter(string text, long sample)
+        {
+            lock (_letterQueue) _letterQueue.Add(new Letter { Text = text, Sample = sample });
+        }
+
+        // ---------------- on the strip's thread ----------------
+
+        void Run()
+        {
+            try
+            {
+                _dispatcher = Dispatcher.CurrentDispatcher;
+                _bitmap = new WriteableBitmap(2 * RingColumns, Rows, 96, 96, PixelFormats.Bgr32, null);
+                var black = new int[2 * RingColumns * Rows];
+                for (int i = 0; i < black.Length; i++) black[i] = Palette[0];
+                _bitmap.WritePixels(new Int32Rect(0, 0, 2 * RingColumns, Rows), black, 2 * RingColumns * 4, 0);
+                _column = new int[Rows];
+
+                _picture = new DrawingVisual();
+                RenderOptions.SetBitmapScalingMode(_picture, BitmapScalingMode.LowQuality);
+                // Moving text: not snapped to whole pixels, or the letters hop while the picture glides.
+                TextOptions.SetTextHintingMode(_picture, TextHintingMode.Animated);
+                _target = new VisualTarget(_host) { RootVisual = _picture };
+                CompositionTarget.Rendering += Frame;
+                Dispatcher.Run();
+            }
+            catch (Exception ex) { Log.Swallow(ex); }
+        }
+
+        TimeSpan _lastRendering;
+
+        void Frame(object sender, EventArgs e)
+        {
+            try
+            {
+                // WPF can ask twice for the same frame; moving the picture again for it put an uneven step in.
+                var re = e as RenderingEventArgs;
+                if (re != null)
+                {
+                    if (re.RenderingTime == _lastRendering) return;
+                    _lastRendering = re.RenderingTime;
+                }
+                double now = CwDecodeWindow.TxClockMs;
+                int rate; long written; double width, height, soundStart;
+                lock (_gate) { rate = _rate; written = _written; width = _width; height = _height; soundStart = _soundStartMs; }
+                if (rate <= 0 || width <= 0 || double.IsNaN(soundStart)) { _lastFrameMs = now; return; }
+                int hop = rate / 100, window = rate * 40 / 1000;
+
+                // Every column the sound now allows - a few a frame. Far behind (the window was hidden): to the present.
+                if (written - _read > _ring.Length / 2)
+                {
+                    long columns = (written - window) / hop - (long)BehindColumns - 2;
+                    _read = columns * hop;
+                    _columnsMade = columns;
+                    _shownAt = double.NaN;
+                }
+                int made = 0;
+                while (written - _read >= window && made < 40) { MakeColumn(rate, hop, window); made++; }
+
+                // THE STEADY CLOCK. Where the strip should be is worked out from the sound's own clock (see Feed:
+                // a fixed start plus samples over the rate), not from how many columns are ready - those come ten
+                // at a time with each block of sound, and following them made the pace wobble ten times a second.
+                // The picture moves 100 columns a second, frame by frame, and is nudged towards that place by at
+                // most MaxEase of its speed. Only at the start, or after falling far out, does it jump.
+                double ready = _columnsMade;
+                double target = ((now - soundStart) * rate / 1000.0 - window / 2.0) / hop - BehindColumns;
+                double dt = Math.Min(250, Math.Max(0, now - _lastFrameMs));
+                double before = _shownAt;
+                if (double.IsNaN(_shownAt) || Math.Abs(target - _shownAt) > 50) _shownAt = target;
+                else
+                {
+                    double moved = _shownAt + dt / 10.0;
+                    double most = MaxEase * dt / 10.0;
+                    _shownAt = moved + Math.Max(-most, Math.Min(most, (target - moved) * 0.1));
+                }
+                if (_shownAt > ready - 1) { _shownAt = ready - 1; _flowWaited++; }   // never a column not made yet
+                if (!double.IsNaN(before)) _flowStepWorst = Math.Max(_flowStepWorst, Math.Abs((_shownAt - before) - dt / 10.0));
+                _lastFrameMs = now;
+
+                Draw(width, height, hop, window);
+                LogFrame(now);
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        void Draw(double width, double height, int hop, int window)
+        {
+            double perColumn = width / ShownColumns;
+            double leftColumn = _shownAt - ShownColumns;               // the column at the left edge
+            double startInRing = leftColumn - Math.Floor(leftColumn / RingColumns) * RingColumns;
+            using (DrawingContext dc = _picture.RenderOpen())
+            {
+                dc.PushClip(new RectangleGeometry(new Rect(0, 0, width, height)));
+                dc.DrawRectangle(Brushes.Black, null, new Rect(0, 0, width, height));
+                dc.DrawImage(_bitmap, new Rect(-startInRing * perColumn, 0, 2 * RingColumns * perColumn, Rows));
+
+                // The letters, each under the middle of its own marks.
+                lock (_letterQueue) { _letters.AddRange(_letterQueue); _letterQueue.Clear(); }
+                for (int i = _letters.Count - 1; i >= 0; i--)
+                {
+                    Letter l = _letters[i];
+                    double column = (l.Sample - window / 2) / (double)hop;
+                    double x = (column - leftColumn) * perColumn - 5;
+                    if (x < -20) { _letters.RemoveAt(i); continue; }
+                    if (x > width) continue;
+                    if (l.Shape == null)
+                        l.Shape = new FormattedText(l.Text, System.Globalization.CultureInfo.InvariantCulture, FlowDirection.LeftToRight,
+                                                    LetterFace, 16, Brushes.White, 1.0);
+                    dc.DrawText(l.Shape, new Point(x, Rows + 1));
+                }
+                dc.Pop();
+            }
+        }
+
+        // One column: 40 ms of sound under a Blackman-Harris window, 300 to 1000 Hz up the strip.
+        void MakeColumn(int rate, int hop, int window)
+        {
+            int nfft = 1; while (nfft < window * 3 / 2) nfft <<= 1;
+            if (_re == null || _re.Length != nfft) { _re = new double[nfft]; _im = new double[nfft]; }
+            bool tx; byte key;
+            lock (_gate)
+            {
+                int slot = (int)(((_read + window / 2) >> SlotShift) & (_tx.Length - 1));
+                tx = _tx[slot]; key = _key[slot];
+                for (int i = 0; i < nfft; i++)
+                {
+                    // Blackman-Harris, not Hann: a strong station leaked into every row of the strip through a
+                    // Hann window's sidelobes, 31 dB down; these are 92 dB down.
+                    double a = 2 * Math.PI * i / (window - 1);
+                    double shape = 0.35875 - 0.48829 * Math.Cos(a) + 0.14128 * Math.Cos(2 * a) - 0.01168 * Math.Cos(3 * a);
+                    _re[i] = i < window ? _ring[(int)((_read + i) & (_ring.Length - 1))] * shape : 0;
+                    _im[i] = 0;
+                }
+            }
+            _read += hop;
+            Fft(_re, _im);
+
+            double binHz = (double)rate / nfft;
+            var db = _db ?? (_db = new double[Rows]);
+            for (int y = 0; y < Rows; y++)
+            {
+                double f = HighHz - (HighHz - LowHz) * y / (Rows - 1);
+                double b = f / binHz; int b0 = (int)b; double w = b - b0;
+                double m0 = Math.Sqrt(_re[b0] * _re[b0] + _im[b0] * _im[b0]);
+                double m1 = Math.Sqrt(_re[b0 + 1] * _re[b0 + 1] + _im[b0 + 1] * _im[b0 + 1]);
+                db[y] = 20 * Math.Log10(m0 + (m1 - m0) * w + 1);
+            }
+
+            // EACH NOTE ITS OWN QUIET LEVEL. Each row's level drops at once to anything quieter and creeps up
+            // slowly, so it settles on that note's noise, and only a station stands out above it.
+            if (_rowFloor == null) _rowFloor = (double[])db.Clone();
+            // (Not "any column loud across the whole strip is ours", tried before: a received station's key clicks
+            // span the strip for a moment too, and its marks got cyan edges. Our sending is known without it - from
+            // the keyer, the CAT text laid out, and the radio's TX report.)
+            if (tx) TxColumn(db, key);
+            else
+            {
+                for (int y = 0; y < Rows; y++)
+                    _rowFloor[y] += (db[y] < _rowFloor[y] ? 0.05 : 0.002) * (db[y] - _rowFloor[y]);
+                double note = NoteHz;
+                int noteRow = note > 0 ? (int)Math.Round((HighHz - note) / (HighHz - LowHz) * (Rows - 1)) : -1;
+                bool dot = _columnsMade % 3 == 0;
+                for (int y = 0; y < Rows; y++)
+                {
+                    double v = (db[y] - _rowFloor[y] - 6) / 30;   // tried on his YT3T recording, strong and weak
+                    int shade = (int)(Math.Max(0, Math.Min(1, v)) * 255);
+                    _column[y] = y == noteRow && dot ? 0x40E040 : Palette[shade];
+                }
+            }
+
+            int x = (int)(_columnsMade % RingColumns);
+            _bitmap.WritePixels(new Int32Rect(x, 0, 1, Rows), _column, 4, 0);
+            _bitmap.WritePixels(new Int32Rect(x + RingColumns, 0, 1, Rows), _column, 4, 0);
+            _columnsMade++;
+        }
+
+        double[] _re, _im, _db, _over;
+
+        // OUR OWN KEYING, DRAWN CLEAN (his design): a cyan mark of fixed height at his pitch while the key is
+        // down, black between. Key down from our own keyer's edges or the CAT text laid out (key 2 down, 1 up);
+        // with neither (0), from the sound: half the strip or more TxKeyDownDb over its quiet level. The quiet
+        // levels are left alone while we transmit, so receiving starts again on the band's own.
+        const double TxKeyDownDb = 24;
+        const int TxMarkRows = 5;
+        const int TxInk = (0x00 << 16) | (0xE0 << 8) | 0xFF;
+
+        bool WholeStripLoud(double[] db)
+        {
+            var over = _over ?? (_over = new double[Rows]);
+            for (int y = 0; y < Rows; y++) over[y] = db[y] - _rowFloor[y];
+            Array.Sort(over);
+            return over[Rows / 2] >= TxKeyDownDb;
+        }
+
+        void TxColumn(double[] db, byte key)
+        {
+            bool down = key != 0 ? key == 2 : WholeStripLoud(db);
+            int hz = Math.Max(CwDecodeWindow.LowestPitchHz, Math.Min(CwDecodeWindow.HighestPitchHz, PitchHz));
+            int mid = (int)Math.Round((HighHz - hz) / (HighHz - LowHz) * (Rows - 1));
+            for (int y = 0; y < Rows; y++)
+                _column[y] = down && Math.Abs(y - mid) <= TxMarkRows / 2 ? TxInk : Palette[0];
+        }
+
+        // Black for silence, dark blue for noise, bright yellow for a station, white for the loudest - the noise
+        // kept dim so the dits and dahs are what the eye finds.
+        static int[] MakePalette()
+        {
+            var stops = new[] { new[] { 0, 0, 0 }, new[] { 10, 30, 110 }, new[] { 255, 200, 0 }, new[] { 255, 255, 255 } };
+            var p = new int[256];
+            for (int i = 0; i < 256; i++)
+            {
+                double t = i / 255.0 * (stops.Length - 1);
+                int k = Math.Min(stops.Length - 2, (int)t); double w = t - k;
+                int r = (int)(stops[k][0] + (stops[k + 1][0] - stops[k][0]) * w);
+                int g = (int)(stops[k][1] + (stops[k + 1][1] - stops[k][1]) * w);
+                int b = (int)(stops[k][2] + (stops[k + 1][2] - stops[k][2]) * w);
+                p[i] = (r << 16) | (g << 8) | b;
+            }
+            return p;
+        }
+
+        static void Fft(double[] re, double[] im)
+        {
+            int n = re.Length;
+            for (int i = 1, j = 0; i < n; i++)
+            {
+                int bit = n >> 1;
+                for (; (j & bit) != 0; bit >>= 1) j ^= bit;
+                j ^= bit;
+                if (i < j) { double t = re[i]; re[i] = re[j]; re[j] = t; t = im[i]; im[i] = im[j]; im[j] = t; }
+            }
+            for (int len = 2; len <= n; len <<= 1)
+            {
+                double ang = -2 * Math.PI / len, wr = Math.Cos(ang), wi = Math.Sin(ang);
+                for (int i = 0; i < n; i += len)
+                {
+                    double cr = 1, ci = 0;
+                    for (int k = 0; k < len / 2; k++)
+                    {
+                        int a = i + k, b = i + k + len / 2;
+                        double tr = re[b] * cr - im[b] * ci, ti = re[b] * ci + im[b] * cr;
+                        re[b] = re[a] - tr; im[b] = im[a] - ti; re[a] += tr; im[a] += ti;
+                        double nr = cr * wr - ci * wi; ci = cr * wi + ci * wr; cr = nr;
+                    }
+                }
+            }
+        }
+
+        // TEMPORARY, AS BEFORE: with %TEMP%\HolyLogger_cw_flow.on present, every 10 s the strip's own frames -
+        // how many, how many came over 25 ms after the last, the longest gap - go to %TEMP%\HolyLogger_cw_flow.tsv.
+        static readonly bool FlowLogOn = System.IO.File.Exists(System.IO.Path.Combine(System.IO.Path.GetTempPath(), "HolyLogger_cw_flow.on"));
+        double _flowSince, _flowLast, _flowWorst, _flowStepWorst;
+        int _flowFrames, _flowLate, _flowWaited;
+
+        void LogFrame(double now)
+        {
+            if (!FlowLogOn) return;
+            if (_flowLast > 0)
+            {
+                double gap = now - _flowLast;
+                if (gap > 25) _flowLate++;
+                if (gap > _flowWorst) _flowWorst = gap;
+            }
+            _flowLast = now;
+            _flowFrames++;
+            if (_flowSince == 0) _flowSince = now;
+            if (now - _flowSince < 10000) return;
+            try
+            {
+                System.IO.File.AppendAllText(System.IO.Path.Combine(System.IO.Path.GetTempPath(), "HolyLogger_cw_flow.tsv"),
+                    string.Format(System.Globalization.CultureInfo.InvariantCulture,
+                        "strip thread\t{0:F0} ms\t{1} frames\t{2} over 25 ms\tlongest {3:F0} ms\tuneven step up to {4:F2} columns\twaited for sound {5}\n",
+                        now, _flowFrames, _flowLate, _flowWorst, _flowStepWorst, _flowWaited));
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+            _flowSince = now; _flowFrames = 0; _flowLate = 0; _flowWorst = 0; _flowStepWorst = 0; _flowWaited = 0;
+        }
+
+        // The window's end of it: an element that shows what the strip's thread draws.
+        sealed class HostElement : FrameworkElement
+        {
+            readonly HostVisual _visual;
+            bool _hooked = true;
+            public HostElement(HostVisual visual) { _visual = visual; AddVisualChild(visual); }
+            public void Unhook() { if (!_hooked) return; _hooked = false; RemoveVisualChild(_visual); }
+            protected override int VisualChildrenCount { get { return _hooked ? 1 : 0; } }
+            protected override Visual GetVisualChild(int index) { return _visual; }
         }
     }
 }

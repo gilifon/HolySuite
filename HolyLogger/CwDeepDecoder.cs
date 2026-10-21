@@ -123,6 +123,19 @@ namespace HolyLogger
             if (_worker != null) _wake.Set(); else RunDue();
         }
 
+        // HELD WHILE HOLYLOGGER KEYS THE RADIO ITSELF (COM-port CW, 2026-10-21). The network's work makes a lot
+        // of short-lived arrays, and .NET stops EVERY thread of the program to clear them away - the keying
+        // thread too, so dits and gaps came out long: he heard broken CW from COM4. Measured with
+        // tools/KeyTiming.cs at 25 WPM: network running, 10-20 elements off by over a quarter dit (one gap
+        // 588 ms late); network held, 0 (worst 2.9 ms). It cannot hear the other station while he transmits
+        // anyway; when the keying ends it reads the newest window and goes on. Plain is not held.
+        static volatile bool _holdForKeying;
+        public static bool HoldForKeying
+        {
+            get { return _holdForKeying; }
+            set { _holdForKeying = value; }
+        }
+
         public void Reset() { _resetAsked = true; _wake.Set(); }
 
         public void Dispose() { _stopping = true; _wake.Set(); }
@@ -137,6 +150,7 @@ namespace HolyLogger
                 _wake.WaitOne(1000);
                 if (_stopping) break;
                 if (_resetAsked) { _resetAsked = false; lock (_gate) { _printedTo = -1; _nextRun = _written + (long)(WindowSeconds * Rate); _notes.Clear(); } }
+                if (_holdForKeying) continue;
                 try { RunDue(); }
                 catch (Exception swallowed) { Log.Swallow(swallowed); }
             }
@@ -157,7 +171,9 @@ namespace HolyLogger
             int n = (int)(WindowSeconds * Rate);
             if (end < n) return;
             long start = end - n;
-            var a = new float[n];
+            // Kept from one reading to the next, as the network keeps its own (see CwDeepNet.Rent): each of these
+            // is over 85 KB, the size .NET clears away by stopping the whole program.
+            float[] a = Kept(ref _sound, n);
             lock (_gate) for (int i = 0; i < n; i++) a[i] = _ring[(int)((start + i) % _ring.Length)];
 
             int frames;
@@ -195,11 +211,20 @@ namespace HolyLogger
             if (said.Length > 0 && text != null) text(said.ToString());
         }
 
+        float[] _sound, _spec, _full;
+
+        // The array kept in `slot`, made (again) only when the size asked for is not the size it has.
+        static float[] Kept(ref float[] slot, int n)
+        {
+            if (slot == null || slot.Length != n) slot = new float[n];
+            return slot;
+        }
+
         float[] Spectrogram(float[] a, out int frames)
         {
             int n = a.Length, pad = Fft / 2, bins = _net.NBins;
             frames = 1 + n / Hop;
-            var spec = new float[frames * bins];
+            var spec = Kept(ref _spec, frames * bins);
             var re = new double[Fft];
             var im = new double[Fft];
             for (int f = 0; f < frames; f++)
@@ -235,7 +260,7 @@ namespace HolyLogger
         {
             int n = a.Length, pad = Fft / 2, bins = _net.NBins, mid = bins / 2;
             frames = 1 + n / Hop;
-            var full = new float[frames * FullBins];
+            var full = Kept(ref _full, frames * FullBins);
             var re = new double[Fft];
             var im = new double[Fft];
             for (int f = 0; f < frames; f++)
@@ -267,7 +292,7 @@ namespace HolyLogger
             double first = PitchHz;
             foreach (var e in notes) if (e.Value > 0) { first = e.Value; break; }
 
-            var spec = new float[frames * bins];
+            var spec = Kept(ref _spec, frames * bins);
             int ni = 0;
             double held = first;
             for (int f = 0; f < frames; f++)

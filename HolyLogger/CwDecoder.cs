@@ -1242,6 +1242,8 @@ namespace HolyLogger
             // as "P L AI S IR": every letter right, a space thrown in between most of them.
             if (_wordPending && !_letterPending && _stateMs >= _ditMs * 5.0)
             {
+                var gap = WordGapTimed;
+                if (gap != null) gap();
                 Output(" ");
                 _wordPending = false;
             }
@@ -1385,6 +1387,11 @@ namespace HolyLogger
         // before any holding back - a held letter is still this decoder's reading of those marks. In
         // samples from the first one given; TimingLagFrames takes off the smoothing's delay.
         public event Action<string, long, long> LetterTimed;
+
+        // A WORD GAP, the moment it is heard - like LetterTimed, before any holding back. With LetterTimed it is
+        // what Hybrid's text is made of (his rule, 2026-10-21: every letter in the text the moment it is under
+        // the waterfall, the network putting it right afterwards).
+        public event Action WordGapTimed;
         const int TimingLagFrames = 4;
         long _frameCount, _letterStartFrame, _letterEndFrame;
 

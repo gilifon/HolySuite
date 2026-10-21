@@ -79,6 +79,7 @@ namespace HolyLogger
             public bool Settled, FromNet, Doubted;   // Doubted: grey - a network letter just over the edge of the next stretch may still claim it
             public string Call;                      // on a word's first letter: the callsign the word is shown as, or null
             public string Judged;                    // on a word's first letter: the word as it read when last judged
+            public string SplitSeen;                 // on a word's first letter: the word as it read when last looked at for 5NN, QSB ...
             public LineBreak Break;                  // a new transmission: Text is " " (a word gap), Run is empty
         }
 
@@ -360,10 +361,116 @@ namespace HolyLogger
             return e.Settled && !e.Doubted && !double.IsNaN(e.T);
         }
 
+        // THE THREE-LETTER WORDS OF A CW CONTACT STAND ALONE (his rule, 2026-10-21): "5NN5NQSB" is "5NN 5N QSB" -
+        // 5NN and QSB are whole words of their own, so wherever one comes out glued to other letters (a word gap
+        // not heard) it gets a space before and after. He knows it can now and then be wrong, and takes that
+        // small risk. Kept safe: only these words, which do not turn up inside ordinary English; never inside a
+        // word of digits only (a serial number); and a Q-code is never taken out of a callsign - it can end one
+        // (DL1QSL). 5NN, 599 and TNX are taken out even of a word shaped like a call: no callsign holds them,
+        // and "5NN5NQSB" itself is call-shaped (5N is Nigeria) - it got the blue patch on his screen.
+        static readonly string[] NeverInCalls = { "5NN", "599", "TNX" };
+        static readonly string[] QCodes =
+        {
+            "QRG", "QRL", "QRM", "QRN", "QRO", "QRP", "QRQ", "QRS", "QRT", "QRU", "QRV", "QRX", "QRZ",
+            "QSB", "QSK", "QSL", "QSO", "QSP", "QSY", "QTH", "QTR"
+        };
+
+        // Only the last RecentEntries letters and spaces: older words are settled and were looked at already.
+        const int RecentEntries = 400;
+
+        void SplitStandAloneWords()
+        {
+            int first = Math.Max(0, _entries.Count - RecentEntries);
+            while (first > 0 && _entries[first - 1].Text != " ") first--;     // from the start of a word
+            for (int i = first; i < _entries.Count; )
+            {
+                if (_entries[i].Text == " " || IsProsign(_entries[i])) { i++; continue; }
+                int j = i;
+                while (j < _entries.Count && _entries[j].Text != " " && !IsProsign(_entries[j])) j++;
+                if (j < _entries.Count) i = SplitWord(i, j);   // only a word already closed
+                else i = j;
+            }
+        }
+
+        // The word [from, to): spaces put in around every stand-alone word glued inside it. -> where the
+        // next word starts.
+        int SplitWord(int from, int to)
+        {
+            // The letters as they show (a hidden grey letter is not there for the eye), and where each sits.
+            var shown = new System.Text.StringBuilder();
+            var at = new List<int>();
+            for (int k = from; k < to; k++)
+            {
+                if (_hide && _entries[k].Doubted) continue;
+                foreach (char c in _entries[k].Text) { shown.Append(c); at.Add(k); }
+            }
+            string word = shown.ToString();
+            // ONCE PER WORD, AND CHEAP FIRST (his frame log, 2026-10-21: the waterfall got worse the longer it ran).
+            // Every word on the screen was looked at again whenever a word ended, each time with the callsign test
+            // and its country lookup, so the work grew with the text. A word is now looked at again only when it
+            // reads differently, and the callsign test runs only where a Q-code is actually inside it.
+            if (_entries[from].SplitSeen == word) return to;
+            _entries[from].SplitSeen = word;
+            if (word.Length <= 3 || !HasAny(word, NeverInCalls) && !HasAny(word, QCodes)) return to;
+            bool digits = true;
+            foreach (char c in word) if (!char.IsDigit(c)) digits = false;
+            if (digits) return to;
+
+            // The cuts, as positions in the word, then as entries a space goes in front of: first round the
+            // words no call holds, then round the Q-codes in each piece that is not a callsign.
+            var cuts = new SortedSet<int>();
+            CutAround(word, 0, word.Length, NeverInCalls, cuts);
+            int start = 0;
+            foreach (int end in new List<int>(cuts) { word.Length })
+            {
+                string piece = word.Substring(start, end - start);
+                if (HasAny(piece, QCodes) && !CwDecodedText.IsOfferableCall(piece)) CutAround(word, start, end, QCodes, cuts);
+                start = end;
+            }
+            if (cuts.Count == 0) return to;
+
+            var before = new SortedSet<int>();
+            foreach (int p in cuts) before.Add(at[p]);
+            int added = 0;
+            foreach (int k in before.Reverse())
+            {
+                if (k <= from) continue;
+                var space = new Entry { Text = " ", T = double.NaN, Run = new Run(" "), Settled = true };
+                _paragraph.Inlines.InsertBefore(_entries[k].Run, space.Run);
+                _entries.Insert(k, space);
+                added++;
+            }
+            if (added > 0)
+            {
+                _entries[from].Judged = null;
+                _changed = true;
+            }
+            return to + added;
+        }
+
+        static bool HasAny(string word, string[] words)
+        {
+            foreach (string w in words) if (word.IndexOf(w, StringComparison.Ordinal) >= 0) return true;
+            return false;
+        }
+
+        // Positions before and after every one of `words` found in word[from, to) - the ends of the stretch excepted.
+        static void CutAround(string word, int from, int to, string[] words, SortedSet<int> cuts)
+        {
+            foreach (string w in words)
+                for (int p = word.IndexOf(w, from, to - from, StringComparison.Ordinal); p >= 0 && p + w.Length <= to;
+                     p = p + 1 < to ? word.IndexOf(w, p + 1, to - p - 1, StringComparison.Ordinal) : -1)
+                {
+                    if (p > from) cuts.Add(p);
+                    if (p + w.Length < to) cuts.Add(p + w.Length);
+                }
+        }
+
         // Every word closed by a space - Plain's as it stands, or the network's correction of it once it
         // has one: a callsign or not? A word already judged as it now reads is not asked again.
         void JudgeWords()
         {
+            SplitStandAloneWords();
             int i = 0;
             while (i < _entries.Count)
             {

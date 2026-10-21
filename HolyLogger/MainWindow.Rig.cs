@@ -1083,6 +1083,11 @@ namespace HolyLogger
         {
             ShowRigStatus();
 
+            // The CW decoder window: while the radio transmits, the sound is our own (see
+            // CwDecodeWindow.RadioTransmitting). A rig whose OmniRig .ini does not read the PTT counts as receiving.
+            try { CwDecodeWindow.RadioTransmitting = Rig != null && OmniRigEngine != null && Rig.Status == OmniRig.RigStatusX.ST_ONLINE && Rig.Tx == (OmniRig.RigParamX)PM_TX; }
+            catch (Exception swallowed) { Log.Swallow(swallowed); CwDecodeWindow.RadioTransmitting = false; }
+
             // Before any of the early returns below: the panel must follow the radio even in manual
             // mode or while a QSO is being edited, when the logger's own fields deliberately do not.
             UpdateRadioPanel();
