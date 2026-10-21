@@ -182,6 +182,27 @@ namespace HolyLogger
         //
         // MATCHED TIGHTLY, so no fault of ours can hide behind it: the right type, the right
         // parameter name, and WPF's own class in the stack.
+        // THE CW WATERFALL'S THREAD, LET GO AS A WINDOW IS DESTROYED (his "Index was out of range" on
+        // closing HolyLogger, 2026-10-21, four times, always under the Visual Studio debugger):
+        //
+        //   HwndSource.Dispose -> CompositionTarget.SetRootVisual -> HostVisual.FreeContent
+        //     -> HostVisual.DoPendingDisconnect -> DUCE.Map.Remove -> List.RemoveAt
+        //
+        // The waterfall is drawn on its own thread and shown through a HostVisual; WPF's bookkeeping for
+        // that link can fall out of step when the window it sits in is torn down. The decoder unhooks it
+        // first (CwWaterfallStrip.Close) and the main window closes the decoder before itself, but none of
+        // the ways tried could make it happen on demand, so it cannot be shown gone. It only happens while
+        // a window is being destroyed, so there is nothing left to lose - an error box is the wrong answer.
+        //
+        // MATCHED TIGHTLY: the right type, and HostVisual's own disconnect in the stack.
+        private static bool IsTheHostVisualTeardownBug(Exception ex)
+        {
+            if (!(ex is ArgumentOutOfRangeException)) return false;
+            string stack = ex.StackTrace ?? string.Empty;
+            return stack.IndexOf("HostVisual.Disconnect", StringComparison.Ordinal) >= 0
+                && stack.IndexOf("HwndSource.Dispose", StringComparison.Ordinal) >= 0;
+        }
+
         private static bool IsTheGridsAccessibilityBug(Exception ex)
         {
             var missing = ex as ArgumentNullException;
@@ -215,6 +236,16 @@ namespace HolyLogger
                     Log.Warn("WPF's DataGrid threw its known accessibility fault while committing a "
                              + "cell edit (CellAutomationValueHolder). Nothing was lost and the edit "
                              + "stands; the operator has not been told.");
+                    args.Handled = true;
+                    return;
+                }
+
+                // The same for the CW waterfall's drawing thread being let go as a window is destroyed -
+                // see IsTheHostVisualTeardownBug.
+                if (IsTheHostVisualTeardownBug(args.Exception))
+                {
+                    Log.Warn("WPF's HostVisual threw its known fault while a window was being destroyed "
+                             + "(the CW decoder's waterfall thread). Nothing was lost; the operator has not been told.");
                     args.Handled = true;
                     return;
                 }
