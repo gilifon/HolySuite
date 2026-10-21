@@ -1008,7 +1008,7 @@ namespace HolyLogger
 
         UIElement BuildWaterfall()
         {
-            _strip = new CwWaterfallStrip(KeyAt);
+            _strip = new CwWaterfallStrip(KeyAt, TxLettersBetween);
             _strip.Element.Height = CwWaterfallStrip.Rows + LetterRowHeight;
 
             // HIS PITCH MARKED (his request, 2026-10-17; the pitch is set in Options > General, 700 Hz unless
@@ -1263,6 +1263,36 @@ namespace HolyLogger
         static double _catUntilMs = double.NegativeInfinity;
         static readonly object _catGate = new object();
 
+        // OUR OWN LETTERS UNDER OUR CYAN MARKS (his idea, 2026-10-21: "print letters below the cyan signs as we do
+        // for receiving"): each letter we send, at the middle of its marks on the transmit clock - from the COM
+        // keyer as it finishes each one (LetterSent), or laid out from the CAT text at the speed (CatCwSent).
+        static readonly System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<double, string>> _txLetters =
+            new System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<double, string>>();
+
+        /// <summary>A letter we send, at `midMs` on the transmit clock (TxClockMs) - the middle of its marks.</summary>
+        public static void TxLetter(string letter, double midMs)
+        {
+            lock (_txLetters)
+            {
+                int at = _txLetters.Count;
+                while (at > 0 && _txLetters[at - 1].Key > midMs) at--;
+                _txLetters.Insert(at, new System.Collections.Generic.KeyValuePair<double, string>(midMs, letter));
+                double old = TxClockMs - 60000;
+                int drop = 0;
+                while (drop < _txLetters.Count && _txLetters[drop].Key < old) drop++;
+                if (drop > 0) _txLetters.RemoveRange(0, drop);
+            }
+        }
+
+        // The letters we sent between two moments, for the waterfall strip.
+        static void TxLettersBetween(System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<double, string>> into, double fromMs, double toMs)
+        {
+            into.Clear();
+            lock (_txLetters)
+                foreach (var l in _txLetters)
+                    if (l.Key >= fromMs && l.Key <= toMs) into.Add(l);
+        }
+
         /// <summary>A CW text has just been handed to the radio over CAT, to be sent at about wpm.</summary>
         public static void CatCwSent(string text, double wpm)
         {
@@ -1278,6 +1308,7 @@ namespace HolyLogger
                     if (c == ' ') at += (CwSendMonitorWindow.WordGapUnits - CwSendMonitorWindow.LetterGapUnits) * unitMs;
                     else if (CwSendMonitorWindow.TryGetMorse(c, out pattern))
                     {
+                        double letterStart = at;
                         foreach (char e in pattern)
                         {
                             KeyEdgeAt(at, true);
@@ -1285,6 +1316,7 @@ namespace HolyLogger
                             KeyEdgeAt(at, false);
                             at += unitMs;
                         }
+                        TxLetter(c.ToString(), (letterStart + at - unitMs) / 2);
                         at += (CwSendMonitorWindow.LetterGapUnits - 1) * unitMs;
                     }
                 }
@@ -1302,6 +1334,7 @@ namespace HolyLogger
                 _keyEdges.RemoveAll(e => e.Key > now);   // the rest of the text will not be sent
                 _keyEdges.Add(new System.Collections.Generic.KeyValuePair<double, bool>(now, false));
             }
+            lock (_txLetters) _txLetters.RemoveAll(e => e.Key > now);
         }
 
         bool TransmittingNow()
@@ -1616,6 +1649,18 @@ namespace HolyLogger
         readonly byte[] _key = new byte[(1 << 16) >> SlotShift];
         double _soundStartMs = double.NaN;
         readonly Func<double, byte> _keyAt;
+        readonly Action<System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<double, string>>, double, double> _txLetters;
+        readonly System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<double, string>> _txShown =
+            new System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<double, string>>();
+        readonly System.Collections.Generic.Dictionary<string, FormattedText> _txShapes = new System.Collections.Generic.Dictionary<string, FormattedText>();
+        static readonly Brush TxLetterInk = MakeTxLetterInk();
+
+        static Brush MakeTxLetterInk()
+        {
+            var b = new SolidColorBrush(Color.FromRgb(0x00, 0xE0, 0xFF));   // the cyan of the marks (TxInk)
+            b.Freeze();
+            return b;
+        }
         static readonly System.Diagnostics.Stopwatch Clock = System.Diagnostics.Stopwatch.StartNew();   // the frames' own clock
 
         public volatile int PitchHz = 700;
@@ -1648,9 +1693,11 @@ namespace HolyLogger
 
         public FrameworkElement Element { get; private set; }
 
-        public CwWaterfallStrip(Func<double, byte> keyAt)
+        public CwWaterfallStrip(Func<double, byte> keyAt,
+            Action<System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<double, string>>, double, double> txLetters)
         {
             _keyAt = keyAt;
+            _txLetters = txLetters;
             var element = new HostElement(_host);
             element.SizeChanged += (s, e) => { lock (_gate) { _width = e.NewSize.Width; _height = e.NewSize.Height; } };
             Element = element;
@@ -1805,13 +1852,13 @@ namespace HolyLogger
                 if (!double.IsNaN(before)) _flowStepWorst = Math.Max(_flowStepWorst, Math.Abs((_shownAt - before) - dt / 10.0));
                 _lastFrameMs = now;
 
-                Draw(width, height, hop, window);
+                Draw(width, height, hop, window, rate, soundStart);
                 LogFrame(now);
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
         }
 
-        void Draw(double width, double height, int hop, int window)
+        void Draw(double width, double height, int hop, int window, int rate, double soundStart)
         {
             double perColumn = width / ShownColumns;
             double leftColumn = _shownAt - ShownColumns;               // the column at the left edge
@@ -1835,6 +1882,23 @@ namespace HolyLogger
                         l.Shape = new FormattedText(l.Text, System.Globalization.CultureInfo.InvariantCulture, FlowDirection.LeftToRight,
                                                     LetterFace, 16, Brushes.White, 1.0);
                     dc.DrawText(l.Shape, new Point(x, Rows + 1));
+                }
+
+                // Our own letters, in cyan, from their moments on the transmit clock.
+                Func<double, double> msAt = column => soundStart + (column * hop + window / 2.0) * 1000.0 / rate;
+                if (_txLetters != null)
+                {
+                    _txLetters(_txShown, msAt(leftColumn - 2), msAt(_shownAt + 2));
+                    foreach (var l in _txShown)
+                    {
+                        double column = ((l.Key - soundStart) * rate / 1000.0 - window / 2.0) / hop;
+                        double x = (column - leftColumn) * perColumn - 5;
+                        FormattedText shape;
+                        if (!_txShapes.TryGetValue(l.Value, out shape))
+                            _txShapes[l.Value] = shape = new FormattedText(l.Value, System.Globalization.CultureInfo.InvariantCulture,
+                                FlowDirection.LeftToRight, LetterFace, 16, TxLetterInk, 1.0);
+                        dc.DrawText(shape, new Point(x, Rows + 1));
+                    }
                 }
                 dc.Pop();
             }

@@ -487,6 +487,13 @@ namespace HolyLogger
         /// </summary>
         public event Action<bool, double> Edge;
 
+        /// <summary>
+        /// A letter has just been keyed whole (raised the moment its last element ends, on the keying thread):
+        /// the letter and how long it took, first mark to last, in ms. For the decode window's waterfall, which
+        /// writes our own letters under their marks.
+        /// </summary>
+        public event Action<string, double> LetterSent;
+
         public double Wpm
         {
             get { lock (_gate) return _wpm; }
@@ -692,17 +699,19 @@ namespace HolyLogger
 
             // Never before the gap is over; and after a pause in the typing, not in the past either.
             double at = Math.Max(now, _nextStartMs);
+            double letterStart = at;
+            bool whole = true;
 
             for (int i = 0; i < pattern.Length; i++)
             {
-                if (gen != _stopGen || _closing) break;
-                if (!WaitUntil(at, gen)) break;
+                if (gen != _stopGen || _closing) { whole = false; break; }
+                if (!WaitUntil(at, gen)) { whole = false; break; }
 
                 double length = (pattern[i] == '-' ? 3 : 1) * unit;
                 Press(gen);
                 try
                 {
-                    if (!WaitUntil(at + length, gen)) break;
+                    if (!WaitUntil(at + length, gen)) { whole = false; break; }
                 }
                 finally
                 {
@@ -714,6 +723,10 @@ namespace HolyLogger
             // The letter ends where its last element ended; the next may start a letter gap later.
             _nextStartMs = at - unit + CwSendMonitorWindow.LetterGapUnits * unit;
             _afterLetter = true;
+
+            var sent = LetterSent;
+            if (whole && sent != null)
+                try { sent(c.ToString(), at - unit - letterStart); } catch (Exception swallowed) { Log.Swallow(swallowed); }
         }
 
         // Sleeps most of the way, then spins the last stretch: Sleep alone wakes up to a millisecond or
