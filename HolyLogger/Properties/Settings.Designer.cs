@@ -3821,6 +3821,18 @@ namespace HolyLogger.Properties {
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool CwKeyerWindowWasOpen {
+            get {
+                return ((bool)(this["CwKeyerWindowWasOpen"]));
+            }
+            set {
+                this["CwKeyerWindowWasOpen"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("False")]
         public bool EsmSearchAndPounce {
             get {

@@ -122,7 +122,7 @@ namespace HolyLogger
             if (c?.Modes == null || c.Modes.Count == 0) return;
             foreach (string mode in c.Modes)
                 if (string.Equals(mode, "CW", StringComparison.OrdinalIgnoreCase)) return;
-            CloseCwKeyboard();
+            CloseCwKeyboardByProgram();
             _cwKeyboardWasWanted = false;
         }
 
