@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
 
@@ -89,8 +90,47 @@ namespace HolyLogger
             catch (Exception ex) { error = ex.Message; return false; }
         }
 
+        // THE WORKING ARRAYS ARE KEPT, NOT THROWN AWAY (2026-10-21). One reading made dozens of arrays, many far
+        // over 85 KB (the front end's first layer alone is megabytes), every 3 s - and .NET clears arrays that
+        // size away with a collection that stops EVERY thread of the program. That broke his COM-port keying
+        // (see CwDeepDecoder.HoldForKeying) and made the waterfall skip frames all the time (his frame log: about
+        // 15 skipped frames every 10 s, one stop of 0.74 s). Now a reading rents its arrays from here and hands
+        // them all back at the end, and the next reading uses the same ones. Every array rented is written whole
+        // before it is read, so none needs clearing.
+        readonly Dictionary<int, Stack<float[]>> _spare = new Dictionary<int, Stack<float[]>>();
+        readonly List<float[]> _lent = new List<float[]>();
+        readonly object _forwardGate = new object();
+
+        float[] Rent(int n)
+        {
+            Stack<float[]> stack;
+            float[] a = _spare.TryGetValue(n, out stack) && stack.Count > 0 ? stack.Pop() : new float[n];
+            _lent.Add(a);
+            return a;
+        }
+
+        void GiveBackAll()
+        {
+            foreach (float[] a in _lent)
+            {
+                Stack<float[]> stack;
+                if (!_spare.TryGetValue(a.Length, out stack)) _spare[a.Length] = stack = new Stack<float[]>();
+                stack.Push(a);
+            }
+            _lent.Clear();
+        }
+
         /// <summary>Spectrogram [t, NBins] (row-major) -> log-probabilities [t', NClass], t' = steps after the front end.</summary>
         public float[] Forward(float[] spec, int t, out int tOut)
+        {
+            lock (_forwardGate)
+            {
+                try { return ForwardInner(spec, t, out tOut); }
+                finally { GiveBackAll(); }
+            }
+        }
+
+        float[] ForwardInner(float[] spec, int t, out int tOut)
         {
             // ---- the front end: three 3x3 convolutions, the last two halving time and frequency ----
             int tA = t, fA = NBins;
@@ -103,7 +143,7 @@ namespace HolyLogger
             tOut = tA;
             int T = tA, inWidth = C3 * fA;
             // [C3][T][F] -> [T][C3*F] (channel, then frequency)
-            var flat = new float[T * inWidth];
+            var flat = Rent(T * inWidth);
             for (int c = 0; c < C3; c++)
                 for (int i = 0; i < T; i++)
                     Array.Copy(m, (c * T + i) * fA, flat, i * inWidth + c * fA, fA);
@@ -125,7 +165,8 @@ namespace HolyLogger
                 x = LayerNorm(x, T, D, b.lnW, b.lnB);
             }
 
-            float[] logits = Linear(x, T, D, headW, headB, NClass);
+            // The answer is the caller's to keep, so it is a new array (a small one) - not a rented one.
+            float[] logits = (float[])Linear(x, T, D, headW, headB, NClass).Clone();
             for (int i = 0; i < T; i++)
             {
                 double max = double.MinValue;
@@ -141,10 +182,10 @@ namespace HolyLogger
         // ---- the layers ----
 
         // in [cin][t][f], weight [cout][cin][3][3], padding 1 -> out [cout][t'][f']
-        static float[] Conv2d(float[] input, int cin, int t, int f, float[] w, float[] bias, int cout, int stride, out int tOut, out int fOut)
+        float[] Conv2d(float[] input, int cin, int t, int f, float[] w, float[] bias, int cout, int stride, out int tOut, out int fOut)
         {
             int to = (t + 2 - 3) / stride + 1, fo = (f + 2 - 3) / stride + 1;
-            var output = new float[cout * to * fo];
+            var output = Rent(cout * to * fo);
             Parallel.For(0, cout, Opts(), co =>
             {
                 for (int i = 0; i < to; i++)
@@ -173,9 +214,9 @@ namespace HolyLogger
         }
 
         // x [rows][inW], w [outW][inW] (PyTorch's layout) -> [rows][outW]
-        static float[] Linear(float[] x, int rows, int inW, float[] w, float[] b, int outW)
+        float[] Linear(float[] x, int rows, int inW, float[] w, float[] b, int outW)
         {
-            var y = new float[rows * outW];
+            var y = Rent(rows * outW);
             Parallel.For(0, rows, Opts(), r =>
             {
                 int xb = r * inW;
@@ -198,9 +239,9 @@ namespace HolyLogger
             return y;
         }
 
-        static float[] LayerNorm(float[] x, int rows, int width, float[] g, float[] b)
+        float[] LayerNorm(float[] x, int rows, int width, float[] g, float[] b)
         {
-            var y = new float[x.Length];
+            var y = Rent(x.Length);
             for (int r = 0; r < rows; r++)
             {
                 double mean = 0, var = 0;
@@ -225,12 +266,12 @@ namespace HolyLogger
         {
             float[] qkv = Linear(y, T, D, b.inW, b.inB, 3 * D);
             int dh = D / Heads;
-            var outp = new float[T * D];
+            var outp = Rent(T * D);
             float scale = (float)(1.0 / Math.Sqrt(dh));
-            Parallel.For(0, Heads * T, Opts(), job =>
+            // One score row per worker, not one per row worked (that was thousands of small arrays a reading).
+            Parallel.For(0, Heads * T, Opts(), () => new double[T], (job, state, score) =>
             {
                 int h = job / T, i = job % T;
-                var score = new double[T];
                 double max = double.MinValue;
                 int qb = i * 3 * D + h * dh;
                 for (int j = 0; j < T; j++)
@@ -250,19 +291,20 @@ namespace HolyLogger
                     for (int j = 0; j < T; j++) acc += score[j] * qkv[j * 3 * D + 2 * D + h * dh + e];
                     outp[i * D + h * dh + e] = (float)(acc / sum);
                 }
-            });
+                return score;
+            }, score => { });
             return Linear(outp, T, D, b.outW, b.outB, D);
         }
 
         float[] ConvModule(float[] x, int T, Block b)
         {
             float[] y = Linear(LayerNorm(x, T, D, b.cLnW, b.cLnB), T, D, b.pw1W, b.pw1B, 2 * D);
-            var g = new float[T * D];
+            var g = Rent(T * D);
             for (int i = 0; i < T; i++)
                 for (int c = 0; c < D; c++)
                     g[i * D + c] = y[i * 2 * D + c] * Sigmoid(y[i * 2 * D + D + c]);
             // depthwise convolution over time, k taps, zero padding k/2
-            var z = new float[T * D];
+            var z = Rent(T * D);
             int pad = K / 2;
             for (int c = 0; c < D; c++)
                 for (int i = 0; i < T; i++)

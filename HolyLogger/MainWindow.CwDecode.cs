@@ -11,52 +11,11 @@ namespace HolyLogger
     // its own there is nothing to argue about.
     public partial class MainWindow
     {
+        // OPENED AND CLOSED ONLY BY HIM (2026-10-21). It used to open with the CW keyer and close with it,
+        // and before that with the radio's CW mode; both took the window out of his hands - he closed the
+        // decoder, opened the keyer from the View menu, and the decoder came back. Each window now has its
+        // own control: View menu > CW Decoder opens this one, its own close button shuts it.
         CwDecodeWindow cwDecodeWindow;
-
-        // Whether THIS program opened the window because the radio went to CW, or the operator asked
-        // for it from the View menu. Only a window that opened by itself is allowed to close by
-        // itself: one the operator opened on purpose stays where he put it, whatever the radio does.
-        bool cwDecodeOpenedItself;
-
-        /// <summary>
-        /// Opens the decode window alongside the CW keyer, listening from the moment it appears.
-        /// Called when the keyer window is shown.
-        ///
-        /// TIED TO THE KEYER, NOT TO THE RADIO'S MODE. It followed CW mode first, which looked right
-        /// and was not: a rig left sitting in CW all evening is not an operator working CW, and the
-        /// window kept opening - and holding the sound card - when nobody was using it. Opening the
-        /// keyer is the moment he actually starts, and closing it is the moment he stops.
-        /// </summary>
-        internal void OpenCwDecodeWithKeyer()
-        {
-            try
-            {
-                if (cwDecodeWindow != null) return;
-
-                OpenCwDecodeWindow();
-                cwDecodeOpenedItself = true;
-
-                // Opened by itself, so it listens by itself too. Being handed a window that then
-                // waits to be told to listen would waste the point of opening it automatically.
-                if (cwDecodeWindow != null) cwDecodeWindow.StartListeningNow();
-            }
-            catch (Exception swallowed) { Log.Swallow(swallowed); }
-        }
-
-        /// <summary>
-        /// Closes the decode window when the keyer closes - but only if it opened itself. The sound
-        /// card is given back as it goes, which matters where another program wants the same codec.
-        /// </summary>
-        internal void CloseCwDecodeIfItOpenedItself()
-        {
-            try
-            {
-                if (cwDecodeWindow == null || !cwDecodeOpenedItself) return;
-                cwDecodeOpenedItself = false;
-                cwDecodeWindow.Close();
-            }
-            catch (Exception swallowed) { Log.Swallow(swallowed); }
-        }
 
         /// <summary>
         /// A callsign double-clicked in the decoded text goes into the DX Callsign box - the same
@@ -97,10 +56,6 @@ namespace HolyLogger
         {
             // Modeless, and only ever one of it: the operator watches the decode while he works the
             // station, so it must not hold the log hostage the way a dialog would.
-            // Asked for by hand, so it is his window now: it will not close itself when the radio
-            // leaves CW.
-            cwDecodeOpenedItself = false;
-
             if (cwDecodeWindow != null)
             {
                 try { cwDecodeWindow.Activate(); } catch (Exception swallowed) { Log.Swallow(swallowed); }
@@ -116,18 +71,44 @@ namespace HolyLogger
             {
                 cwDecodeWindow = new CwDecodeWindow();
                 try { cwDecodeWindow.Owner = this; } catch (Exception swallowed) { Log.Swallow(swallowed); }
-                cwDecodeWindow.Closed += (s, args) => { cwDecodeWindow = null; cwDecodeOpenedItself = false; };
+                cwDecodeWindow.Closed += (s, args) =>
+                {
+                    cwDecodeWindow = null;
+                    // Closed by him, it stays closed next time; closed because the program is going, it
+                    // comes back with the program.
+                    if (!_isShutdownCleanupDone) RememberCwDecodeOpen(false);
+                };
                 cwDecodeWindow.CallsignChosen += TakeCallsignFromDecode;
                 cwDecodeWindow.ShiftRadio = ShiftRigForPitch;
                 cwDecodeWindow.WentWrongWay = TuneWentWrongWay;
                 cwDecodeWindow.OpenSettings = OpenOptionsOnCwDecoder;
                 cwDecodeWindow.Show();
+                RememberCwDecodeOpen(true);
             }
             catch (Exception ex)
             {
                 Log.Swallow(ex);
                 cwDecodeWindow = null;
             }
+        }
+
+        // OPEN AT THE NEXT START IF IT WAS OPEN AT THE LAST CLOSE (his report, 2026-10-21): it used to come
+        // back only because it opened with the keyer. Called once the startup windows are up - never from
+        // the constructor, where an owned window can stop the program starting.
+        void ReopenCwDecodeIfItWasOpen()
+        {
+            try
+            {
+                if (cwDecodeWindow == null && Properties.Settings.Default.CwDecodeWindowWasOpen) OpenCwDecodeWindow();
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        static void RememberCwDecodeOpen(bool open)
+        {
+            if (Properties.Settings.Default.CwDecodeWindowWasOpen == open) return;
+            Properties.Settings.Default.CwDecodeWindowWasOpen = open;
+            SettingsFlush.RequestSave();
         }
     }
 }

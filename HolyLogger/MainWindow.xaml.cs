@@ -4754,6 +4754,7 @@ namespace HolyLogger
                     AskIcomBreakInBeforeCw(rigType);
 
                     // A Yaesu takes two: the text into a memory, then the memory played.
+                    CwDecodeWindow.CatCwSent(chunk, CwWpmNow());   // the decoder: our sending, not his station
                     string[] pair = BuildYaesuCwCommands(rigType, chunk);
                     if (pair != null)
                     {
@@ -4769,6 +4770,7 @@ namespace HolyLogger
                 {
                     if (CwByPort) { StopCwByPort(); return; }
 
+                    CwDecodeWindow.CatCwStopped();
                     string stop = BuildCwStopCommand(rigType);
                     if (!string.IsNullOrWhiteSpace(stop)) TrySendOmniRigCustomCommand(stop);
                 },
@@ -4880,17 +4882,12 @@ namespace HolyLogger
 
                 // And the one line comes back to the bar - see CanTypeCwOnTheBar.
                 if (cwLiteKeyer != null) cwLiteKeyer.KeyerWindowOpen = false;
-
-                // The decode window came up with the keyer, so it goes down with it.
-                CloseCwDecodeIfItOpenedItself();
             };
             cwKeyboard.Show();
 
-            // Sending and reading belong together: the window that reads the other station opens
-            // with the one that answers him. Tied to the KEYER rather than to the radio being in CW,
-            // because a rig sitting in CW all evening is not the same as an operator working CW -
-            // this way the sound card is only taken while he is actually at it.
-            OpenCwDecodeWithKeyer();
+            // The CW decoder is NOT opened or closed with the keyer (his rule, 2026-10-21): each window
+            // has its own control, from the View menu. It used to come up with the keyer and go down
+            // with it, so closing the decoder and then opening the keyer brought the decoder back.
             UpdateActionKeyLabels();
             RefreshEsmHint();   // its first four buttons show the ESM hint from the moment it opens
         }
@@ -5430,6 +5427,7 @@ namespace HolyLogger
             AskIcomBreakInBeforeCw(rigType);
 
             // A Yaesu takes two: the text into a memory, then the memory played.
+            CwDecodeWindow.CatCwSent(chunk, CwWpmNow());   // the decoder: our sending, not his station
             string[] pair = BuildYaesuCwCommands(rigType, chunk);
             if (pair != null)
             {
@@ -5446,6 +5444,7 @@ namespace HolyLogger
         {
             if (CwByPort) { StopCwByPort(); return; }
 
+            CwDecodeWindow.CatCwStopped();
             string stop = BuildCwStopCommand(NormalizeRigType(Rig != null ? Rig.RigType : null));
             if (!string.IsNullOrWhiteSpace(stop)) TrySendOmniRigCustomCommand(stop);
         }
@@ -5528,7 +5527,15 @@ namespace HolyLogger
             if (portCwKeyer != null)
             {
                 portCwKeyer.BusyChanged += busy =>
+                {
+                    // The CW network waits while we key - it would break the timing (see HoldForKeying).
+                    // Set here, on the spot, not through the dispatcher: the first dit must not wait for it.
+                    CwDeepDecoder.HoldForKeying = busy;
+                    CwDecodeWindow.KeyerTransmitting = busy;   // the decoder window: our keying, not his station
                     Dispatcher.BeginInvoke(new Action(() => OnCwPortBusyChanged(busy)));
+                };
+                // Every key-down and key-up, for the decoder's waterfall to draw our sending from.
+                portCwKeyer.Edge += (down, ms) => CwDecodeWindow.KeyEdge(down);
                 Log.Warn("CW keying port " + port + " (" + portCwKeyer.Line + ") opened at " + CwPortWpm + " WPM.");
             }
             return portCwKeyer;
@@ -5543,6 +5550,8 @@ namespace HolyLogger
         {
             var keyer = portCwKeyer;
             portCwKeyer = null;
+            CwDeepDecoder.HoldForKeying = false;   // a keyer closed mid-message must not leave the network held
+            CwDecodeWindow.KeyerTransmitting = false;
             if (keyer == null) return;
             try { keyer.Dispose(); }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
@@ -5992,6 +6001,7 @@ namespace HolyLogger
             }
             else if (currentMessageNumber.HasValue)
             {
+                CwDecodeWindow.CatCwStopped();
                 string stopCommand = BuildCwStopCommand(rigType);
 
                 if (!string.IsNullOrWhiteSpace(stopCommand) && !TrySendOmniRigCustomCommand(stopCommand))
@@ -6077,6 +6087,7 @@ namespace HolyLogger
 
             // A Yaesu takes two commands - the text into memory 5, then that memory played - so it is
             // handled before the single-command path rather than inside it.
+            CwDecodeWindow.CatCwSent(cwText, CwWpmNow());   // the decoder: our sending, not his station
             string[] yaesu = BuildYaesuCwCommands(rigType, cwText);
             if (yaesu != null)
             {
@@ -8801,6 +8812,7 @@ namespace HolyLogger
             }
             else if (IsCwModeActive())
             {
+                CwDecodeWindow.CatCwStopped();
                 string stopCommand = BuildCwStopCommand(rigType);
                 if (!string.IsNullOrWhiteSpace(stopCommand))
                     TrySendOmniRigCustomCommand(stopCommand);
@@ -9074,6 +9086,7 @@ namespace HolyLogger
             {
                 try { UpdateVoiceMessageAvailabilityState(); }
                 catch (Exception swallowed) { Log.Swallow(swallowed); }
+                ReopenCwDecodeIfItWasOpen();
             }), DispatcherPriority.Background);
         }
 
