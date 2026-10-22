@@ -20,20 +20,16 @@ namespace HolyLogger
     /// gives the radio time to change over: a lead of steady mark before the first character, and a
     /// tail after the last.
     ///
-    /// WHAT IS SENT: 5-bit Baudot (ITA2), one start bit, five data bits first bit first, 1.5 stop bits.
-    /// Every transmission starts with two LTRS so the other station's decoder is in step and in
-    /// letters; figures are announced with FIGS, and announced again after a space, because nearly
-    /// every receiver drops back to letters at a space (unshift on space). Characters Baudot cannot
-    /// carry are left out.
+    /// WHAT IS SENT: 5-bit Baudot (ITA2, see RttyBaudot), one start bit, five data bits first bit
+    /// first, 1.5 stop bits.
     /// </summary>
-    public sealed class RttyFskKeyer : IDisposable
+    public sealed class RttyFskKeyer : IRttySender
     {
         public const double Baud = 45.45;
         const double StopBits = 1.5;
         const double LeadMs = 300;      // steady mark after transmit goes on, before the first character
         const double TailMs = 150;      // and after the last, before transmit goes off
 
-        const int LTRS = 0x1F, FIGS = 0x1B, SPACE = 0x04, CR = 0x02, LF = 0x08;
 
         readonly System.IO.Ports.SerialPort _port;
         readonly bool _useRts;
@@ -54,6 +50,7 @@ namespace HolyLogger
 
         public string PortName { get; private set; }
         public string Line { get { return _useRts ? "RTS" : "DTR"; } }
+        public string Describe { get { return PortName + " " + Line; } }
 
         /// <summary>
         /// Raised on the keying thread: true when sending starts (switch the radio to transmit now - the
@@ -128,8 +125,8 @@ namespace HolyLogger
             lock (_gate)
             {
                 bool fresh = !_busy && _waiting.Count == 0;
-                if (fresh) { _waiting.Enqueue(LTRS); _waiting.Enqueue(LTRS); _shift = 0; }
-                foreach (char raw in text.ToUpperInvariant()) Encode(raw);
+                if (fresh) { _waiting.Enqueue(RttyBaudot.LTRS); _waiting.Enqueue(RttyBaudot.LTRS); _shift = RttyBaudot.Letters; }
+                foreach (char raw in text) RttyBaudot.Encode(raw, ref _shift, _waiting);
             }
             _wake.Set();
             return true;
@@ -153,31 +150,6 @@ namespace HolyLogger
             try { _thread.Join(1000); } catch (Exception swallowed) { Log.Swallow(swallowed); }
             SetLine(true);
             try { if (_port != null) { _port.Close(); _port.Dispose(); } } catch (Exception swallowed) { Log.Swallow(swallowed); }
-        }
-
-        // ---- Baudot ----------------------------------------------------------------------------
-
-        // Called under _gate.
-        void Encode(char c)
-        {
-            if (c == '\r') { _waiting.Enqueue(CR); return; }
-            if (c == '\n') { _waiting.Enqueue(LF); return; }
-            if (c == ' ')
-            {
-                _waiting.Enqueue(SPACE);
-                if (_shift == 1) _shift = 2;      // he may have dropped back to letters on the space
-                return;
-            }
-            int code = Array.IndexOf(RttyDecoder.Letters, c);
-            int shift = 0;
-            if (code < 0 || c == '\0') { code = Array.IndexOf(RttyDecoder.Figures, c); shift = 1; }
-            if (code < 0 || c == '\0' || c == '#' || c == '\a') return;   // nothing Baudot can carry
-            if (shift != _shift)
-            {
-                _waiting.Enqueue(shift == 1 ? FIGS : LTRS);
-                _shift = shift;
-            }
-            _waiting.Enqueue(code);
         }
 
         // ---- the keying thread ------------------------------------------------------------------
@@ -300,14 +272,7 @@ namespace HolyLogger
 
         void RaiseSent(int code)
         {
-            char c = '\0';
-            if (code == LTRS) _sentShift = 0;
-            else if (code == FIGS) _sentShift = 1;
-            else
-            {
-                c = _sentShift == 1 ? RttyDecoder.Figures[code] : RttyDecoder.Letters[code];
-                if (c == ' ' && _sentShift == 1) _sentShift = 0;
-            }
+            char c = RttyBaudot.Print(code, ref _sentShift);
             if (c == '\0') return;
             var handler = CharacterSent;
             if (handler != null) try { handler(c); } catch (Exception swallowed) { Log.Swallow(swallowed); }

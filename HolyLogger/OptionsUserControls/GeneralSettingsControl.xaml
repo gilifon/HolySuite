@@ -266,16 +266,20 @@
                     </ComboBox>
                 </StackPanel>
             </GroupBox>
-            <!-- RTTY KEYING (2026-10-22): the port and line the radio's FSK input is on - on the IC-7610 its
-                 second USB port, as set in its USB Keying (RTTY) menu. HolyLogger keys the bits on that line
-                 and switches transmit over CAT (RttyFskKeyer). Saved the moment it changes. Here in the
+            <!-- RTTY SENDING (2026-10-22): FSK - the radio makes the tones, HolyLogger keys its FSK input on a
+                 COM port line (RttyFskKeyer); or AFSK - HolyLogger makes the tones and plays them into the radio
+                 through a sound card (RttyAfskSender). Each with one plain line saying what it is. Here in the
                  narrow column: the left one would have grown past the Options window's height. -->
-            <GroupBox Header="RTTY keying (FSK)" HorizontalAlignment="Left" Margin="0,16,0,0" Width="300" FontSize="16">
+            <GroupBox Header="RTTY sending" HorizontalAlignment="Left" Margin="0,16,0,0" Width="300" FontSize="16">
                 <StackPanel Margin="4,4,4,4">
-                    <ComboBox x:Name="CB_RttyKeyPort" HorizontalAlignment="Stretch" FontSize="16"
+                    <!-- The explanations are tooltips (his request, 2026-10-22: they took too much of the page). -->
+                    <RadioButton x:Name="RB_RttyFsk" Content="FSK" GroupName="RttyVia" FontSize="16" FontWeight="Bold"
+                                 Checked="RttyVia_Changed"
+                                 ToolTip="The radio makes the tones. HolyLogger keys it on a port. For radios with an FSK input. Put the radio in RTTY mode."/>
+                    <ComboBox x:Name="CB_RttyKeyPort" Margin="20,4,0,0" HorizontalAlignment="Stretch" FontSize="16"
                               DisplayMemberPath="Text" SelectionChanged="RttyVia_Changed"
                               ToolTip="The port your radio takes RTTY keying from."/>
-                    <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                    <StackPanel Orientation="Horizontal" Margin="20,6,0,0">
                         <TextBlock Text="Line:" FontSize="16" VerticalAlignment="Center" Margin="0,0,8,0"/>
                         <ComboBox x:Name="CB_RttyKeyLine" Width="80" FontSize="16" VerticalAlignment="Center"
                                   SelectionChanged="RttyVia_Changed"
@@ -284,10 +288,19 @@
                             <ComboBoxItem Content="RTS"/>
                         </ComboBox>
                     </StackPanel>
-                    <CheckBox x:Name="CBX_RttySwapFsk" Content="Swap mark and space" Margin="0,8,0,0" FontSize="16"
+
+                    <RadioButton x:Name="RB_RttyAfsk" Content="AFSK" GroupName="RttyVia" FontSize="16" FontWeight="Bold"
+                                 Margin="0,12,0,0" Checked="RttyVia_Changed"
+                                 ToolTip="HolyLogger makes the tones and plays them into the radio through the sound output you choose below - the one wired to the radio, often its own USB audio, not your speakers. Put the radio on LSB, and set its audio input so the ALC barely moves."/>
+                    <ComboBox x:Name="CB_RttyAfskDevice" Margin="20,4,0,0" HorizontalAlignment="Stretch" FontSize="16"
+                              SelectionChanged="RttyVia_Changed"
+                              ToolTip="The sound output wired to the radio - often the radio's own USB audio. Not your speakers."/>
+
+                    <CheckBox x:Name="CBX_RttySwapFsk" Content="Swap mark and space" Margin="0,12,0,0" FontSize="16"
                               Checked="RttyVia_Changed" Unchecked="RttyVia_Changed"
-                              ToolTip="Tick this if stations read your RTTY upside down."/>
-                    <TextBlock x:Name="RttyViaNote" TextWrapping="Wrap" Margin="0,6,0,0" FontSize="16" Foreground="Gray"/>
+                              ToolTip="Tick this if stations read your RTTY upside down - usually AFSK with the radio on USB."/>
+                    <!-- Only when something needs fixing, in red; otherwise it takes no room. -->
+                    <TextBlock x:Name="RttyViaNote" TextWrapping="Wrap" Margin="0,6,0,0" FontSize="16" Visibility="Collapsed"/>
                 </StackPanel>
             </GroupBox>
         </StackPanel>
