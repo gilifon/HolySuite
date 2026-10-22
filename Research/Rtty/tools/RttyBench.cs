@@ -31,6 +31,7 @@ namespace RttyBench
         public double Offset;                // Hz the station is off the expected mark
         public double QrmDb = -999, QrmHz;   // second station: level against ours, distance from our mark
         public int Seed = 1;
+        public double Lead = 1.0;            // seconds of noise alone before and after the station
         public string Text;
         public string QrmText;
 
@@ -244,11 +245,11 @@ namespace RttyBench
         {
             int fs = r.Rate;
             var codes = Baudot.Encode(r.Text, out sent);
-            double seconds = (16 + codes.Count * (6 + r.StopBits)) / r.Baud + 2.0;
+            double seconds = (16 + codes.Count * (6 + r.StopBits)) / r.Baud + 2 * r.Lead;
             int n = (int)(seconds * fs);
             var re = new double[n];
             var im = new double[n];
-            Modulate(codes, r, r.Mark + r.Offset, 1.0, re, im, 1.0);
+            Modulate(codes, r, r.Mark + r.Offset, r.Lead, re, im, 1.0);
 
             var rnd = new Random(r.Seed);
             double delayMs, spreadHz;
@@ -477,6 +478,8 @@ namespace RttyBench
                     case "one": return One(args[1], opts);
                     case "make": return MakeSet(args[1], opts);
                     case "mmtty": return RunMmtty(args[1], opts);
+                    case "ours": return RunOurs(args[1], opts);
+                    case "trace": return Trace(args[1], opts);
                 }
                 Usage();
                 return 1;
@@ -566,7 +569,7 @@ namespace RttyBench
             int rate = (int)D(o, "rate", 11025);
             var lines = new List<string> { "file\tchannel\tsnr\tkind\tseed\trecipe" };
             double[] snrs = { -10, -8, -6, -4, -2, 0, 3, 6 };
-            string[] channels = { "awgn", "moderate", "poor", "flutter", "qrm", "offset" };
+            string[] channels = { "awgn", "moderate", "poor", "flutter", "qrm", "offset", "gaps" };
             foreach (string ch in channels)
                 foreach (double snr in snrs)
                     for (int k = 0; k < 2; k++)
@@ -577,6 +580,7 @@ namespace RttyBench
                         if (ch == "moderate" || ch == "poor" || ch == "flutter") r.Fade = ch;
                         if (ch == "qrm") { r.QrmDb = 6; r.QrmHz = 300; }      // a louder station 300 Hz up
                         if (ch == "offset") r.Offset = 12;                    // tuned 12 Hz off
+                        if (ch == "gaps") r.Lead = 10;                        // ten seconds of noise each side
                         string name = string.Format(CultureInfo.InvariantCulture, "{0}_{1}{2}_{3}.wav",
                             ch, snr < 0 ? "m" : "p", Math.Abs(snr), kind);
                         string path = Path.Combine(folder, name);
@@ -607,7 +611,95 @@ namespace RttyBench
             int[] types = (o.TryGetValue("types", out v) ? v : "0,1,2,3").Split(',').Select(int.Parse).ToArray();
             int[] atcs = (o.TryGetValue("atc", out v) ? v : "0").Split(',').Select(int.Parse).ToArray();
             bool sq = D(o, "sq", 1) != 0;
-            bool quiet = D(o, "quiet", 0) != 0;
+            var decoders = new List<KeyValuePair<string, Func<short[], int, string>>>();
+            foreach (int type in types)
+                foreach (int atc in atcs)
+                {
+                    int t = type, a = atc;
+                    decoders.Add(new KeyValuePair<string, Func<short[], int, string>>(
+                        "MMTTY-" + MmttyReceiver.TypeNames[type] + (atc != 0 ? "+ATC" : ""),
+                        (s, rate) =>
+                        {
+                            var rx = new MmttyReceiver(rate, t, a != 0, 2125, 170, 45.45, sq);
+                            rx.Feed(s, s.Length);
+                            return rx.Text;
+                        }));
+                }
+            return RunDecoders(target, decoders, D(o, "quiet", 0) != 0);
+        }
+
+        /// <summary>
+        /// Our decoder, HolyLogger's own RttyDecoder.cs. Any setting can be swept by giving a comma
+        /// list: squelch=0.1,0.2,0.3 runs three times and prints the three side by side.
+        /// </summary>
+        // The decoder's settings the bench can sweep, by the short name used on the command line.
+        // The decoder's settings the bench can sweep, by the short name used on the command line.
+        static readonly string[] Knobs = { "decision", "squelch", "duesq", "mean", "open", "stay", "close", "balance", "width", "due", "afc" };
+
+        static void Apply(HolyLogger.RttyDecoder d, string knob, double x)
+        {
+            switch (knob)
+            {
+                case "decision": d.Decision = (int)x; break;
+                case "squelch": d.Squelch = x; break;
+                case "duesq": d.DueSquelch = x; break;
+                case "mean": d.MeanGate = x; break;
+                case "open": d.OpenGate = x; break;
+                case "stay": d.StayGate = x; break;
+                case "close": d.CloseAfterBits = x; break;
+                case "balance": d.AtcBalance = x; break;
+                case "width": d.SampleWidth = x; break;
+                case "due": d.UseDue = x != 0; break;
+                case "afc": d.FineTuning = x != 0; break;
+            }
+        }
+
+        static int RunOurs(string target, Dictionary<string, string> o)
+        {
+            // Every combination of the values given, e.g. decision=0,1 afc=0,1 runs four decoders.
+            var combos = new List<List<KeyValuePair<string, double>>> { new List<KeyValuePair<string, double>>() };
+            foreach (string knob in Knobs)
+            {
+                string v;
+                if (!o.TryGetValue(knob, out v)) continue;
+                var values = v.Split(',').Select(x => double.Parse(x, CultureInfo.InvariantCulture)).ToList();
+                combos = combos.SelectMany(c => values.Select(x => new List<KeyValuePair<string, double>>(c) { new KeyValuePair<string, double>(knob, x) })).ToList();
+            }
+            var decoders = new List<KeyValuePair<string, Func<short[], int, string>>>();
+            foreach (var combo in combos)
+            {
+                var settings = combo;
+                string name = "Ours" + string.Concat(settings.Where(kv => o[kv.Key].Contains(",")).Select(kv => " " + kv.Key + kv.Value.ToString(CultureInfo.InvariantCulture)));
+                decoders.Add(new KeyValuePair<string, Func<short[], int, string>>(name, (s, rate) =>
+                {
+                    var d = new HolyLogger.RttyDecoder(rate);
+                    foreach (var kv in settings) Apply(d, kv.Key, kv.Value);
+                    d.Tune(2125, 170, 45.45);
+                    var text = new StringBuilder();
+                    d.CharacterDecoded += c => text.Append(c);
+                    d.Process(s, s.Length);
+                    return text.ToString();
+                }));
+            }
+            return RunDecoders(target, decoders, D(o, "quiet", 0) != 0);
+        }
+
+        /// <summary>Every frame our decoder fits in one recording, with the numbers it decides on.</summary>
+        static int Trace(string wav, Dictionary<string, string> o)
+        {
+            int rate;
+            short[] s = Wav.Read(wav, out rate);
+            var d = new HolyLogger.RttyDecoder(rate);
+            foreach (string knob in Knobs) { string v; if (o.TryGetValue(knob, out v)) Apply(d, knob, double.Parse(v, CultureInfo.InvariantCulture)); }
+            d.Tune(2125, 170, 45.45);
+            d.FrameSeen += (start, clearest, mean) => Console.WriteLine(string.Format(CultureInfo.InvariantCulture,
+                "{0,8:0.000} s  clearest {1:0.00}  mean {2:0.00}", (double)start / rate, clearest, mean));
+            d.Process(s, s.Length);
+            return 0;
+        }
+
+        static int RunDecoders(string target, List<KeyValuePair<string, Func<short[], int, string>>> decoders, bool quiet)
+        {
             var results = new List<Result>();
             foreach (string wav in Wavs(target))
             {
@@ -615,18 +707,14 @@ namespace RttyBench
                 short[] s = Wav.Read(wav, out rate);
                 string sent = File.Exists(Path.ChangeExtension(wav, ".txt")) ? File.ReadAllText(Path.ChangeExtension(wav, ".txt")) : "";
                 var calls = File.Exists(Path.ChangeExtension(wav, ".calls")) ? File.ReadAllLines(Path.ChangeExtension(wav, ".calls")) : new string[0];
-                foreach (int type in types)
-                    foreach (int atc in atcs)
-                    {
-                        var rx = new MmttyReceiver(rate, type, atc != 0, 2125, 170, 45.45, sq);
-                        rx.Feed(s, s.Length);
-                        string got = rx.Text;
-                        string setting = "MMTTY-" + MmttyReceiver.TypeNames[type] + (atc != 0 ? "+ATC" : "");
-                        File.WriteAllText(Path.ChangeExtension(wav, "." + setting + ".txt"), got);
-                        var res = Result.Of(wav, setting, sent, got, calls);
-                        results.Add(res);
-                        if (!quiet) Console.WriteLine(res.Line());
-                    }
+                foreach (var dec in decoders)
+                {
+                    string got = dec.Value(s, rate);
+                    File.WriteAllText(Path.ChangeExtension(wav, "." + dec.Key.Replace(' ', '_') + ".txt"), got);
+                    var res = Result.Of(wav, dec.Key, sent, got, calls);
+                    results.Add(res);
+                    if (!quiet) Console.WriteLine(res.Line());
+                }
             }
             Result.Summary(results);
             return 0;
