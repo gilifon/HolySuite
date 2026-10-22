@@ -347,6 +347,7 @@
     <Compile Include="MainWindow.Rtty.cs" />
     <Compile Include="RttyDecoder.cs" />
     <Compile Include="RttyDecodeWindow.cs" />
+    <Compile Include="RttyFskKeyer.cs" />
     <Compile Include="ClusterSettingsWindow.xaml.cs">
       <DependentUpon>ClusterSettingsWindow.xaml</DependentUpon>
     </Compile>

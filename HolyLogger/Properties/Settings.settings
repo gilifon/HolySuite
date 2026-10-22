@@ -965,6 +965,15 @@
     <Setting Name="RttySnap" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">True</Value>
     </Setting>
+    <Setting Name="RttyKeyPort" Type="System.String" Scope="User">
+      <Value Profile="(Default)" />
+    </Setting>
+    <Setting Name="RttyKeyLine" Type="System.String" Scope="User">
+      <Value Profile="(Default)">RTS</Value>
+    </Setting>
+    <Setting Name="RttySwapFsk" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">False</Value>
+    </Setting>
     <Setting Name="CwKeyerWindowWasOpen" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">True</Value>
     </Setting>

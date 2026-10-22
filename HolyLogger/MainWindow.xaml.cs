@@ -11257,6 +11257,7 @@ namespace HolyLogger
 
             // The keying port is let go first of all: a key left down is a transmitter left on.
             try { ClosePortKeyer(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+            try { CloseRttyKeyer(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }   // and the RTTY one, transmit off
 
             // THE CW DECODER CLOSED BY US, PROPERLY, BEFORE THIS WINDOW GOES: torn down along with it instead, its
             // waterfall's drawing thread could still be hooked in and WPF threw "Index was out of range" (see

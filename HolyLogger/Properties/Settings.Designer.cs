@@ -3866,6 +3866,42 @@ namespace HolyLogger.Properties {
                 this["RttySnap"] = value;
             }
         }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string RttyKeyPort {
+            get {
+                return ((string)(this["RttyKeyPort"]));
+            }
+            set {
+                this["RttyKeyPort"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("RTS")]
+        public string RttyKeyLine {
+            get {
+                return ((string)(this["RttyKeyLine"]));
+            }
+            set {
+                this["RttyKeyLine"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool RttySwapFsk {
+            get {
+                return ((bool)(this["RttySwapFsk"]));
+            }
+            set {
+                this["RttySwapFsk"] = value;
+            }
+        }
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
