@@ -456,6 +456,18 @@ namespace HolyLogger.OptionsUserControls
                 CB_RttyKeyLine.SelectedIndex =
                     string.Equals(Properties.Settings.Default.RttyKeyLine, "DTR", StringComparison.OrdinalIgnoreCase) ? 0 : 1;
                 CBX_RttySwapFsk.IsChecked = Properties.Settings.Default.RttySwapFsk;
+
+                // The sound cards, as Windows names them - no "system default" here: that is usually the
+                // speakers, which is never where RTTY tones should go.
+                var cards = WaveOutPlayer.GetOutputDeviceNames();
+                string savedCard = (Properties.Settings.Default.RttyAfskDevice ?? string.Empty).Trim();
+                if (savedCard.Length > 0 && !cards.Contains(savedCard)) cards.Add(savedCard);
+                CB_RttyAfskDevice.ItemsSource = cards;
+                CB_RttyAfskDevice.SelectedItem = savedCard.Length > 0 ? savedCard : null;
+
+                bool afsk = string.Equals(Properties.Settings.Default.RttyVia, "AFSK", StringComparison.OrdinalIgnoreCase);
+                RB_RttyAfsk.IsChecked = afsk;
+                RB_RttyFsk.IsChecked = !afsk;
             }
             finally { _loadingRttyVia = false; }
             ShowRttyViaNote();
@@ -463,13 +475,16 @@ namespace HolyLogger.OptionsUserControls
 
         private void RttyVia_Changed(object sender, RoutedEventArgs e)
         {
-            if (_loadingRttyVia || CB_RttyKeyPort == null || CB_RttyKeyLine == null || CBX_RttySwapFsk == null) return;
+            if (_loadingRttyVia || CB_RttyKeyPort == null || CB_RttyKeyLine == null || CBX_RttySwapFsk == null
+                || RB_RttyAfsk == null || CB_RttyAfskDevice == null) return;
             try
             {
                 var choice = CB_RttyKeyPort.SelectedItem as PortChoice;
                 Properties.Settings.Default.RttyKeyPort = choice == null ? string.Empty : choice.Port;
                 Properties.Settings.Default.RttyKeyLine = CB_RttyKeyLine.SelectedIndex == 0 ? "DTR" : "RTS";
                 Properties.Settings.Default.RttySwapFsk = CBX_RttySwapFsk.IsChecked == true;
+                Properties.Settings.Default.RttyVia = RB_RttyAfsk.IsChecked == true ? "AFSK" : "FSK";
+                Properties.Settings.Default.RttyAfskDevice = CB_RttyAfskDevice.SelectedItem as string ?? string.Empty;
                 Properties.Settings.Default.Save();
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
@@ -482,23 +497,25 @@ namespace HolyLogger.OptionsUserControls
             catch (Exception swallowed) { Log.Swallow(swallowed); }
         }
 
+        // Only a problem is shown, in red; when all is well the line takes no room - what each choice
+        // means is in its tooltip.
         void ShowRttyViaNote()
         {
-            if (RttyViaNote == null || CB_RttyKeyPort == null) return;
+            if (RttyViaNote == null || CB_RttyKeyPort == null || RB_RttyAfsk == null) return;
             var choice = CB_RttyKeyPort.SelectedItem as PortChoice;
             string catPort = MainWindow.ReadOmniRigCatPortFromFile(Properties.Settings.Default.SelectedOmniRig2);
-            bool bad = false;
-            string text;
-            if (choice == null)
-                text = "Choose the port your radio takes RTTY keying from. On the IC-7610 it is its second USB port.";
+            string problem = null;
+            if (RB_RttyAfsk.IsChecked == true)
+            {
+                if (CB_RttyAfskDevice.SelectedItem == null) problem = "Choose the sound card that goes to the radio.";
+            }
+            else if (choice == null)
+                problem = "Choose the port your radio takes RTTY keying from.";
             else if (catPort != null && string.Equals(choice.Port, catPort, StringComparison.OrdinalIgnoreCase))
-            { text = choice.Port + " is the radio's CAT port. Choose the other one."; bad = true; }
-            else
-                text = "HolyLogger keys RTTY on " + choice.Port + " and switches transmit by CAT. The radio must be in RTTY mode.";
-            RttyViaNote.Text = text;
-            RttyViaNote.Foreground = bad
-                ? new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0xC6, 0x28, 0x28))
-                : System.Windows.Media.Brushes.Gray;
+                problem = "That is the radio's CAT port. Choose the other one.";
+            RttyViaNote.Text = problem ?? string.Empty;
+            RttyViaNote.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0xC6, 0x28, 0x28));
+            RttyViaNote.Visibility = problem == null ? Visibility.Collapsed : Visibility.Visible;
         }
 
         // One short line under the choice: what it means, or what is wrong with it.

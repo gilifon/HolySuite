@@ -3902,6 +3902,30 @@ namespace HolyLogger.Properties {
                 this["RttySwapFsk"] = value;
             }
         }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("FSK")]
+        public string RttyVia {
+            get {
+                return ((string)(this["RttyVia"]));
+            }
+            set {
+                this["RttyVia"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string RttyAfskDevice {
+            get {
+                return ((string)(this["RttyAfskDevice"]));
+            }
+            set {
+                this["RttyAfskDevice"] = value;
+            }
+        }
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]

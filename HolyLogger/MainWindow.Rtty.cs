@@ -119,47 +119,72 @@ namespace HolyLogger
             OpenRttyDecodeWindow();
         }
 
-        // -- SENDING RTTY BY FSK ------------------------------------------------------------------------
+        // -- SENDING RTTY: FSK OR AFSK ------------------------------------------------------------------
         //
-        // Options > General > "RTTY keying": the port and the line the radio's FSK input is on (on the
-        // IC-7610 its second USB port, as set in the radio's USB Keying (RTTY) menu). HolyLogger keys the
-        // bits on that line (RttyFskKeyer) and switches the radio to transmit and back over CAT.
+        // Options > General > "RTTY sending" chooses how:
+        //   FSK - the radio makes the tones itself; HolyLogger keys its FSK input on one line of a COM port
+        //         (on the IC-7610 its second USB port, as set in its USB Keying (RTTY) menu). RttyFskKeyer.
+        //   AFSK - HolyLogger makes the tones and plays them through a sound card into the radio, on LSB.
+        //          RttyAfskSender.
+        // Either way transmit is switched on and off over CAT.
         //
         // OPENED WHEN FIRST NEEDED and held open, like the CW keying port; a change in Options lets it go
         // (OnRttyViaChanged) and the next send opens the new one.
-        RttyFskKeyer rttyKeyer;
+        IRttySender rttyKeyer;
         string rttyKeyerTrouble;
+        string _rttyKeyerSetup;      // what the open sender was opened with, to know when to open another
         bool _rttyTransmitOn;
 
-        RttyFskKeyer RttyKeyer()
+        static bool RttyByAfsk()
+        {
+            try { return string.Equals(Properties.Settings.Default.RttyVia, "AFSK", StringComparison.OrdinalIgnoreCase); }
+            catch (Exception swallowed) { Log.Swallow(swallowed); return false; }
+        }
+
+        IRttySender RttyKeyer()
         {
             if (_isShutdownCleanupDone) return null;
+            bool swap = Properties.Settings.Default.RttySwapFsk;
+            bool afsk = RttyByAfsk();
             string port = (Properties.Settings.Default.RttyKeyPort ?? string.Empty).Trim();
             bool rts = !string.Equals(Properties.Settings.Default.RttyKeyLine, "DTR", StringComparison.OrdinalIgnoreCase);
-            bool markIsOn = Properties.Settings.Default.RttySwapFsk;
-            if (port.Length == 0)
-            {
-                CloseRttyKeyer();
-                rttyKeyerTrouble = "Choose the RTTY keying port in Options > General.";
-                return null;
-            }
-            if (rttyKeyer != null && string.Equals(rttyKeyer.PortName, port, StringComparison.OrdinalIgnoreCase)
-                && rttyKeyer.Line == (rts ? "RTS" : "DTR") && _rttyKeyerMarkIsOn == markIsOn)
-                return rttyKeyer;
+            string device = (Properties.Settings.Default.RttyAfskDevice ?? string.Empty).Trim();
+            string setup = afsk ? "AFSK|" + device + "|" + swap : "FSK|" + port + "|" + rts + "|" + swap;
 
+            if (rttyKeyer != null && setup == _rttyKeyerSetup) return rttyKeyer;
             CloseRttyKeyer();
-            string catPort = ReadOmniRigCatPortFromFile(Properties.Settings.Default.SelectedOmniRig2);
-            if (Properties.Settings.Default.EnableOmniRigCAT && catPort != null
-                && string.Equals(catPort, port, StringComparison.OrdinalIgnoreCase))
-            {
-                rttyKeyerTrouble = port + " is the radio's CAT port. Choose the RTTY keying port in Options > General.";
-                return null;
-            }
 
             string whyNot;
-            rttyKeyer = RttyFskKeyer.Open(port, rts, markIsOn, out whyNot);
-            _rttyKeyerMarkIsOn = markIsOn;
-            rttyKeyerTrouble = whyNot == null ? null : whyNot + " Choose the port in Options > General.";
+            if (afsk)
+            {
+                // NEVER THE SYSTEM DEFAULT BY ACCIDENT: that is usually the speakers, and RTTY tones out of
+                // the speakers with the transmitter keyed would put a dead carrier on the air.
+                if (device.Length == 0)
+                {
+                    rttyKeyerTrouble = "Choose the sound card that goes to the radio in Options > General.";
+                    return null;
+                }
+                rttyKeyer = RttyAfskSender.Open(device, swap, 0.5, out whyNot);
+            }
+            else
+            {
+                if (port.Length == 0)
+                {
+                    rttyKeyerTrouble = "Choose the RTTY keying port in Options > General.";
+                    return null;
+                }
+                string catPort = ReadOmniRigCatPortFromFile(Properties.Settings.Default.SelectedOmniRig2);
+                if (Properties.Settings.Default.EnableOmniRigCAT && catPort != null
+                    && string.Equals(catPort, port, StringComparison.OrdinalIgnoreCase))
+                {
+                    rttyKeyerTrouble = port + " is the radio's CAT port. Choose the RTTY keying port in Options > General.";
+                    return null;
+                }
+                // Mark with the line OFF is right for the IC-7610 (checked on the air); the swap turns it round.
+                rttyKeyer = RttyFskKeyer.Open(port, rts, swap, out whyNot);
+            }
+            _rttyKeyerSetup = setup;
+            rttyKeyerTrouble = whyNot == null ? null : whyNot + " Choose it in Options > General.";
             if (rttyKeyer != null)
             {
                 rttyKeyer.BusyChanged += busy => Dispatcher.BeginInvoke(new Action(() => OnRttyBusyChanged(busy)));
@@ -168,12 +193,10 @@ namespace HolyLogger
                     var w = rttyDecodeWindow;
                     if (w != null) w.ShowSent(c);
                 };
-                Log.Warn("RTTY keying port " + port + " (" + rttyKeyer.Line + (markIsOn ? ", mark = on" : ", mark = off") + ") opened.");
+                Log.Warn("RTTY sending opened: " + (afsk ? "AFSK on " : "FSK on ") + rttyKeyer.Describe + (swap ? ", mark and space swapped" : "") + ".");
             }
             return rttyKeyer;
         }
-
-        bool _rttyKeyerMarkIsOn;
 
         /// <summary>
         /// Sends text from the RTTY window. Null when it is on its way, else a short reason to show.
@@ -184,8 +207,8 @@ namespace HolyLogger
             if (string.IsNullOrWhiteSpace(text)) return null;
             if (!IsCatLive()) return "No radio on CAT - HolyLogger cannot switch it to transmit.";
             var keyer = RttyKeyer();
-            if (keyer == null) return rttyKeyerTrouble ?? "The RTTY keying port could not be opened.";
-            return keyer.Send("\r\n" + text.Trim() + " ") ? null : "The RTTY keying port is closing.";
+            if (keyer == null) return rttyKeyerTrouble ?? "RTTY sending could not be started.";
+            return keyer.Send("\r\n" + text.Trim() + " ") ? null : "RTTY sending is closing.";
         }
 
         /// <summary>Esc in the RTTY window: stop at once and back to receive.</summary>
@@ -227,7 +250,7 @@ namespace HolyLogger
             if (_rttyTransmitOn) SetRttyTransmit(false);
         }
 
-        /// <summary>Options changed the RTTY keying port, line or swap: the open port is let go.</summary>
+        /// <summary>Options changed how RTTY is sent: the open port or sound card is let go.</summary>
         internal void OnRttyViaChanged()
         {
             CloseRttyKeyer();
