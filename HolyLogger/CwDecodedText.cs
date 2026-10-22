@@ -115,6 +115,37 @@ namespace HolyLogger
         /// <summary>A line feed in the text starts a new line (RTTY); off for CW.</summary>
         public bool LineEndsAsSent { get; set; }
 
+        // OUR OWN SENDING, in its own colour (the RTTY window, 2026-10-22): what went out, written into the
+        // same running text as what came in, so the QSO reads as one conversation. Never offered as a
+        // callsign - it is our own text.
+        static readonly Brush SentInk = MakeSentInk();
+        static Brush MakeSentInk()
+        {
+            var b = new SolidColorBrush(Color.FromRgb(0xB7, 0x1C, 0x1C));
+            b.Freeze();
+            return b;
+        }
+
+        /// <summary>Text we sent ourselves: written in red, line ends kept, no callsigns picked out of it.</summary>
+        public void AppendSent(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return;
+            EndWordHere();
+            _word = null;
+            foreach (char c in text)
+            {
+                if (c == '\r') continue;
+                if (c == '\n') { BreakLineNow(); continue; }
+                if (c == ' ' && _atLineStart) continue;
+                var last = _paragraph.Inlines.LastInline as Run;
+                if (last != null && ReferenceEquals(last.Foreground, SentInk)) last.Text += c;
+                else _paragraph.Inlines.Add(new Run(c.ToString()) { Foreground = SentInk });
+                _atLineStart = false;
+            }
+            Trim();
+            _box.ScrollToEnd();
+        }
+
         /// <summary>A callsign the operator double-clicked, ready for the log.</summary>
         public event Action<string> CallsignChosen;
 

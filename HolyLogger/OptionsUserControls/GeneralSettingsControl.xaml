@@ -266,6 +266,30 @@
                     </ComboBox>
                 </StackPanel>
             </GroupBox>
+            <!-- RTTY KEYING (2026-10-22): the port and line the radio's FSK input is on - on the IC-7610 its
+                 second USB port, as set in its USB Keying (RTTY) menu. HolyLogger keys the bits on that line
+                 and switches transmit over CAT (RttyFskKeyer). Saved the moment it changes. Here in the
+                 narrow column: the left one would have grown past the Options window's height. -->
+            <GroupBox Header="RTTY keying (FSK)" HorizontalAlignment="Left" Margin="0,16,0,0" Width="300" FontSize="16">
+                <StackPanel Margin="4,4,4,4">
+                    <ComboBox x:Name="CB_RttyKeyPort" HorizontalAlignment="Stretch" FontSize="16"
+                              DisplayMemberPath="Text" SelectionChanged="RttyVia_Changed"
+                              ToolTip="The port your radio takes RTTY keying from."/>
+                    <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                        <TextBlock Text="Line:" FontSize="16" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                        <ComboBox x:Name="CB_RttyKeyLine" Width="80" FontSize="16" VerticalAlignment="Center"
+                                  SelectionChanged="RttyVia_Changed"
+                                  ToolTip="The line of the port the radio takes FSK from - as set in the radio's menu.">
+                            <ComboBoxItem Content="DTR"/>
+                            <ComboBoxItem Content="RTS"/>
+                        </ComboBox>
+                    </StackPanel>
+                    <CheckBox x:Name="CBX_RttySwapFsk" Content="Swap mark and space" Margin="0,8,0,0" FontSize="16"
+                              Checked="RttyVia_Changed" Unchecked="RttyVia_Changed"
+                              ToolTip="Tick this if stations read your RTTY upside down."/>
+                    <TextBlock x:Name="RttyViaNote" TextWrapping="Wrap" Margin="0,6,0,0" FontSize="16" Foreground="Gray"/>
+                </StackPanel>
+            </GroupBox>
         </StackPanel>
 
     </Grid>

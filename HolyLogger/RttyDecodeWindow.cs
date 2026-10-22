@@ -32,6 +32,12 @@ namespace HolyLogger
         /// <summary>A callsign double-clicked in the text: the main window puts it in the DX Callsign box.</summary>
         public event Action<string> CallsignChosen;
 
+        /// <summary>Set by the main window: sends the text by FSK; null when it is on its way, else why not.</summary>
+        public Func<string, string> SendText;
+
+        /// <summary>Set by the main window: stop sending now and back to receive (Esc).</summary>
+        public Action StopSending;
+
         // The shift and speed of nearly all amateur RTTY. Not offered for change until somebody needs it.
         const double ShiftHz = 170, BaudRate = 45.45;
 
@@ -91,14 +97,14 @@ namespace HolyLogger
                 if (saved >= LowestWaterfall && saved <= RttyWaterfall.Rows) _waterfallHeight = saved;
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
-            Height = 32 + RulerHeight + _waterfallHeight + 2 + SplitterHeight + 200;
+            Height = 32 + RulerHeight + _waterfallHeight + 2 + SplitterHeight + 200 + SendRowHeight;
             // NO NARROWER THAN THE WHOLE BAR (his request, 2026-10-22): name, dial, lamp, tones, Snap, Rev,
             // Clear and the close cross. With the tones centred on the window, each side needs room for the
             // wider of the two outer groups: measured with the widest dial, 432,100.000 kHz, 2 x 257 + 141 =
             // 654, plus 6 for the window's edge; a little over that so the groups never touch.
             MinWidth = 700;
             // The bar, the ruler and the lowest the waterfall goes, plus a framed paper with one line of text.
-            MinHeight = 32 + RulerHeight + LowestWaterfall + 2 + SplitterHeight + 52;
+            MinHeight = 32 + RulerHeight + LowestWaterfall + 2 + SplitterHeight + 52 + SendRowHeight;
             ResizeMode = ResizeMode.CanResize;
             ShowInTaskbar = false;
             WindowStartupLocation = WindowStartupLocation.CenterOwner;
@@ -133,7 +139,17 @@ namespace HolyLogger
             // fine tuning has them now. Taken before the text box can use them to move its caret.
             PreviewKeyDown += (s, e) =>
             {
+                // ESC STOPS SENDING, wherever the focus is - the one key that must always work.
+                if (e.Key == Key.Escape && _transmitting)
+                {
+                    var stop = StopSending;
+                    if (stop != null) stop();
+                    e.Handled = true;
+                    return;
+                }
                 if (e.Key != Key.Left && e.Key != Key.Right) return;
+                // In the send line the arrows move the caret, as in any text box.
+                if (Keyboard.FocusedElement is TextBox) return;
                 if ((Keyboard.Modifiers & ~ModifierKeys.Shift) != 0) return;
                 double step = (Keyboard.Modifiers & ModifierKeys.Shift) != 0 ? 10 : 1;
                 MoveLinesTo(ListeningLowHz() + (e.Key == Key.Right ? step : -step));
@@ -214,7 +230,8 @@ namespace HolyLogger
             };
 
             _text = MakeTextBox();
-            var paper = new Border { BorderThickness = new Thickness(1), Margin = new Thickness(8, 2, 8, 8), Child = _text.Box };
+            var paper = new Border { BorderThickness = new Thickness(1), Margin = new Thickness(8, 2, 8, 4), Child = _text.Box };
+            var sendRow = BuildSendRow();
             paper.SetResourceReference(Border.BorderBrushProperty, "MutedTextBrush");
             paper.Background = Brushes.White;
 
@@ -252,14 +269,17 @@ namespace HolyLogger
             body.RowDefinitions.Add(_waterfallRow);
             body.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             body.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star), MinHeight = 52 });
+            body.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             Grid.SetRow(bar, 0);
             Grid.SetRow(waterfall, 1);
             Grid.SetRow(splitter, 2);
             Grid.SetRow(paper, 3);
+            Grid.SetRow(sendRow, 4);
             body.Children.Add(bar);
             body.Children.Add(waterfall);
             body.Children.Add(splitter);
             body.Children.Add(paper);
+            body.Children.Add(sendRow);
             Content = body;
         }
 
@@ -678,8 +698,12 @@ namespace HolyLogger
                 decoder.Reverse = _reverse;
                 decoder.Tune(_lowHz, ShiftHz, BaudRate);
             }
-            try { decoder.Process(samples, count); }
-            catch (Exception swallowed) { Log.Swallow(swallowed); }
+            // NOT WHILE WE SEND: what comes back then is our own signal, already written in red.
+            if (!_transmitting)
+            {
+                try { decoder.Process(samples, count); }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
+            }
             try { _waterfall.Feed(samples, count, _recorder.ActualSampleRate); }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
         }
@@ -697,13 +721,107 @@ namespace HolyLogger
             UpdateLamp();
             double low = ListeningLowHz();
             _readout.Text = Math.Round(low).ToString("N0") + " / " + Math.Round(low + ShiftHz).ToString("N0") + " Hz";
+            _readout.Foreground = _transmitting ? RevOnBrush : ReadoutBrush;
         }
+
+        // Received and sent characters wait in one queue, in the order they happened; a sent one is
+        // marked by SentMark in front of it.
+        const char SentMark = '\uE000';
 
         void FlushPending()
         {
             string text;
             lock (_pendingGate) { text = _pending.ToString(); _pending.Clear(); }
-            if (text.Length > 0 && _text != null) _text.Append(text);
+            if (text.Length == 0 || _text == null) return;
+            var received = new StringBuilder();
+            var sent = new StringBuilder();
+            for (int i = 0; i < text.Length; i++)
+            {
+                if (text[i] == SentMark && i + 1 < text.Length)
+                {
+                    if (received.Length > 0) { _text.Append(received.ToString()); received.Clear(); }
+                    sent.Append(text[++i]);
+                }
+                else
+                {
+                    if (sent.Length > 0) { _text.AppendSent(sent.ToString()); sent.Clear(); }
+                    received.Append(text[i]);
+                }
+            }
+            if (received.Length > 0) _text.Append(received.ToString());
+            if (sent.Length > 0) _text.AppendSent(sent.ToString());
+        }
+
+        /// <summary>A character we have just sent - any thread. Written in red into the running text.</summary>
+        public void ShowSent(char c)
+        {
+            lock (_pendingGate) { _pending.Append(SentMark); _pending.Append(c); }
+        }
+
+        volatile bool _transmitting;
+
+        /// <summary>The main window: sending started or ended. The tones turn orange while we transmit.</summary>
+        public void ShowTransmitting(bool on)
+        {
+            _transmitting = on;
+            if (_sendBtn != null) _sendBtn.Content = on ? "Stop" : "Send";
+        }
+
+        // ---- the send line ----
+
+        const int SendRowHeight = 40;
+        TextBox _sendBox;
+        Button _sendBtn;
+
+        // A line to type in and a Send key: Enter sends the line, Esc stops. What goes out appears in red
+        // in the text above as it is sent.
+        UIElement BuildSendRow()
+        {
+            _sendBox = new TextBox
+            {
+                FontSize = 18,
+                FontFamily = new FontFamily("Consolas"),
+                VerticalContentAlignment = VerticalAlignment.Center,
+                Height = 32,
+                CharacterCasing = CharacterCasing.Upper,
+                ToolTip = "Type what to send. Enter sends it, Esc stops."
+            };
+            _sendBox.KeyDown += (s, e) =>
+            {
+                if (e.Key != Key.Enter) return;
+                SendTyped();
+                e.Handled = true;
+            };
+            _sendBtn = new Button
+            {
+                Content = "Send",
+                FontSize = 16,
+                FontWeight = FontWeights.Bold,
+                Width = 80,
+                Height = 32,
+                Margin = new Thickness(6, 0, 0, 0),
+                ToolTip = "Send the line (Enter). While sending: stop (Esc)."
+            };
+            _sendBtn.Click += (s, e) =>
+            {
+                if (_transmitting) { var stop = StopSending; if (stop != null) stop(); }
+                else SendTyped();
+            };
+            var row = new DockPanel { Margin = new Thickness(8, 0, 8, 8), Height = 32 };
+            DockPanel.SetDock(_sendBtn, Dock.Right);
+            row.Children.Add(_sendBtn);
+            row.Children.Add(_sendBox);
+            return row;
+        }
+
+        void SendTyped()
+        {
+            string line = _sendBox.Text;
+            if (string.IsNullOrWhiteSpace(line)) return;
+            var send = SendText;
+            string why = send == null ? "Sending is not available." : send(line);
+            if (why != null) { ShowTrouble(why); return; }
+            _sendBox.Clear();
         }
 
         void UpdateLamp()

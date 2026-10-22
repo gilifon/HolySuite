@@ -294,6 +294,7 @@ namespace HolyLogger.OptionsUserControls
             }
 
             ShowCwViaNote();
+            InitRttyKeyPicker();
         }
 
         // -- LISTENING FOR USB PLUGS --------------------------------------------------------------
@@ -415,6 +416,89 @@ namespace HolyLogger.OptionsUserControls
                 if (main != null) main.OnCwViaChanged();
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        // ── RTTY KEYING: the port and line the radio's FSK input is on ──────────────────────────────
+        //
+        // The same port list as CW via (names from Device Manager, the radio's CAT port marked), filled
+        // whenever that one is - on opening and on every USB plug. Saved the moment it changes, and
+        // MainWindow lets go of the old port (OnRttyViaChanged).
+        bool _loadingRttyVia;
+
+        void InitRttyKeyPicker()
+        {
+            if (CB_RttyKeyPort == null) return;
+            _loadingRttyVia = true;
+            try
+            {
+                string saved = (Properties.Settings.Default.RttyKeyPort ?? string.Empty).Trim();
+                string catPort = MainWindow.ReadOmniRigCatPortFromFile(Properties.Settings.Default.SelectedOmniRig2);
+                var present = new List<string>();
+                try { present.AddRange(System.IO.Ports.SerialPort.GetPortNames()); }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
+                var names = new List<string>(present);
+                if (saved.Length > 0 && !names.Contains(saved, StringComparer.OrdinalIgnoreCase)) names.Add(saved);
+                var friendly = FriendlyPortNames();
+                var items = names.Distinct(StringComparer.OrdinalIgnoreCase)
+                                 .OrderBy(n => PortNumber(n))
+                                 .Select(n =>
+                                 {
+                                     string what;
+                                     friendly.TryGetValue(n, out what);
+                                     string text = n + (string.IsNullOrEmpty(what) ? string.Empty : "  " + what);
+                                     if (catPort != null && string.Equals(n, catPort, StringComparison.OrdinalIgnoreCase)) text += "  (radio CAT)";
+                                     else if (!present.Contains(n, StringComparer.OrdinalIgnoreCase)) text += "  (not plugged in)";
+                                     return new PortChoice { Port = n, Text = text };
+                                 })
+                                 .ToList();
+                CB_RttyKeyPort.ItemsSource = items;
+                CB_RttyKeyPort.SelectedItem = items.FirstOrDefault(i => string.Equals(i.Port, saved, StringComparison.OrdinalIgnoreCase));
+                CB_RttyKeyLine.SelectedIndex =
+                    string.Equals(Properties.Settings.Default.RttyKeyLine, "DTR", StringComparison.OrdinalIgnoreCase) ? 0 : 1;
+                CBX_RttySwapFsk.IsChecked = Properties.Settings.Default.RttySwapFsk;
+            }
+            finally { _loadingRttyVia = false; }
+            ShowRttyViaNote();
+        }
+
+        private void RttyVia_Changed(object sender, RoutedEventArgs e)
+        {
+            if (_loadingRttyVia || CB_RttyKeyPort == null || CB_RttyKeyLine == null || CBX_RttySwapFsk == null) return;
+            try
+            {
+                var choice = CB_RttyKeyPort.SelectedItem as PortChoice;
+                Properties.Settings.Default.RttyKeyPort = choice == null ? string.Empty : choice.Port;
+                Properties.Settings.Default.RttyKeyLine = CB_RttyKeyLine.SelectedIndex == 0 ? "DTR" : "RTS";
+                Properties.Settings.Default.RttySwapFsk = CBX_RttySwapFsk.IsChecked == true;
+                Properties.Settings.Default.Save();
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+            ShowRttyViaNote();
+            try
+            {
+                var main = Application.Current != null ? Application.Current.MainWindow as MainWindow : null;
+                if (main != null) main.OnRttyViaChanged();
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        void ShowRttyViaNote()
+        {
+            if (RttyViaNote == null || CB_RttyKeyPort == null) return;
+            var choice = CB_RttyKeyPort.SelectedItem as PortChoice;
+            string catPort = MainWindow.ReadOmniRigCatPortFromFile(Properties.Settings.Default.SelectedOmniRig2);
+            bool bad = false;
+            string text;
+            if (choice == null)
+                text = "Choose the port your radio takes RTTY keying from. On the IC-7610 it is its second USB port.";
+            else if (catPort != null && string.Equals(choice.Port, catPort, StringComparison.OrdinalIgnoreCase))
+            { text = choice.Port + " is the radio's CAT port. Choose the other one."; bad = true; }
+            else
+                text = "HolyLogger keys RTTY on " + choice.Port + " and switches transmit by CAT. The radio must be in RTTY mode.";
+            RttyViaNote.Text = text;
+            RttyViaNote.Foreground = bad
+                ? new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0xC6, 0x28, 0x28))
+                : System.Windows.Media.Brushes.Gray;
         }
 
         // One short line under the choice: what it means, or what is wrong with it.

@@ -435,12 +435,12 @@ namespace HolyLogger
         // ---- Baudot ---------------------------------------------------------------------------
 
         // ITA2 with the first bit on the air as the top bit of five (the order MMTTY uses).
-        static readonly char[] Letters = {
+        internal static readonly char[] Letters = {
             '\0', 'T', '\r', 'O', ' ', 'H', 'N', 'M',
             '\n', 'L', 'R', 'G', 'I', 'P', 'C', 'V',
             'E', 'Z', 'D', 'B', 'S', 'Y', 'F', 'X',
             'A', 'W', 'J', '\0', 'U', 'Q', 'K', '\0' };
-        static readonly char[] Figures = {
+        internal static readonly char[] Figures = {
             '\0', '5', '\r', '9', ' ', '#', ',', '.',
             '\n', ')', '4', '&', '8', '0', ':', ';',
             '3', '"', '$', '?', '\a', '6', '!', '/',
