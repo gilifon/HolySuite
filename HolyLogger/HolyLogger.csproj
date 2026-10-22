@@ -344,6 +344,9 @@
     <Compile Include="CwMixText.cs" />
     <Compile Include="CwStripes.cs" />
     <Compile Include="MainWindow.CwDecode.cs" />
+    <Compile Include="MainWindow.Rtty.cs" />
+    <Compile Include="RttyDecoder.cs" />
+    <Compile Include="RttyDecodeWindow.cs" />
     <Compile Include="ClusterSettingsWindow.xaml.cs">
       <DependentUpon>ClusterSettingsWindow.xaml</DependentUpon>
     </Compile>

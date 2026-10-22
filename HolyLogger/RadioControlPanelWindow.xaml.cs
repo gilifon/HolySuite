@@ -628,6 +628,9 @@ namespace HolyLogger
             _mode = mode;
             if (IsHfMode(mode)) _lastHfMode = mode.ToUpperInvariant();
 
+            // RTTY opens the RTTY decoder and any other mode shuts it (his request, 2026-10-22).
+            _main.FollowPanelMode(mode);
+
             // SSB, CW and RTTY each have their own frequency for every band (the Options page), so
             // asking for CW on 20m puts the radio on the 20m CW frequency, not on CW where the SSB
             // part of the band was - and the same now holds for RTTY. AM and FM have no frequency of

@@ -634,7 +634,7 @@ namespace RttyBench
         /// </summary>
         // The decoder's settings the bench can sweep, by the short name used on the command line.
         // The decoder's settings the bench can sweep, by the short name used on the command line.
-        static readonly string[] Knobs = { "decision", "squelch", "duesq", "mean", "open", "stay", "close", "balance", "width", "due", "afc" };
+        static readonly string[] Knobs = { "decision", "squelch", "duesq", "mean", "open", "stay", "close", "balance", "width", "due", "afc", "hold" };
 
         static void Apply(HolyLogger.RttyDecoder d, string knob, double x)
         {
@@ -651,6 +651,7 @@ namespace RttyBench
                 case "width": d.SampleWidth = x; break;
                 case "due": d.UseDue = x != 0; break;
                 case "afc": d.FineTuning = x != 0; break;
+                case "hold": d.HoldTuningOnNoise = x != 0; break;
             }
         }
 

@@ -11,11 +11,33 @@ namespace HolyLogger
     // its own there is nothing to argue about.
     public partial class MainWindow
     {
-        // OPENED AND CLOSED ONLY BY HIM (2026-10-21). It used to open with the CW keyer and close with it,
-        // and before that with the radio's CW mode; both took the window out of his hands - he closed the
-        // decoder, opened the keyer from the View menu, and the decoder came back. Each window now has its
-        // own control: View menu > CW Decoder opens this one, its own close button shuts it.
+        // IT FOLLOWS THE RADIO INTO AND OUT OF CW, UNLESS HE CLOSED IT (2026-10-21, his rules, in this order):
+        // first it was tied to the keyer, which brought it back when he had closed it; then it was left to him
+        // alone, and stayed on in SSB ("this is not good"). Now: the radio leaving CW closes it, coming into CW
+        // opens it - the same moments the keyer uses (UpdateVoiceMessageAvailabilityState). Closed BY HIM, it
+        // stays closed, in CW too, until he opens it from the View menu - as the keyer does. Closed by the
+        // program (leaving CW, or the program closing) does not count as his.
         CwDecodeWindow cwDecodeWindow;
+        bool _cwDecodeClosingByProgram;
+
+        void CloseCwDecodeByProgram()
+        {
+            if (cwDecodeWindow == null) return;
+            _cwDecodeClosingByProgram = true;
+            try { cwDecodeWindow.Close(); }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+            finally { _cwDecodeClosingByProgram = false; }
+        }
+
+        // The radio came into CW: open, unless he closed it himself.
+        void OpenCwDecodeOnCw()
+        {
+            try
+            {
+                if (cwDecodeWindow == null && Properties.Settings.Default.CwDecodeWindowWasOpen) OpenCwDecodeWindow();
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
 
         /// <summary>
         /// A callsign double-clicked in the decoded text goes into the DX Callsign box - the same
@@ -74,9 +96,9 @@ namespace HolyLogger
                 cwDecodeWindow.Closed += (s, args) =>
                 {
                     cwDecodeWindow = null;
-                    // Closed by him, it stays closed next time; closed because the program is going, it
-                    // comes back with the program.
-                    if (!_isShutdownCleanupDone) RememberCwDecodeOpen(false);
+                    // Closed by him, it stays closed - next time and in CW; closed by the program (leaving CW,
+                    // or the program going), it comes back.
+                    if (!_isShutdownCleanupDone && !_cwDecodeClosingByProgram) RememberCwDecodeOpen(false);
                 };
                 cwDecodeWindow.CallsignChosen += TakeCallsignFromDecode;
                 cwDecodeWindow.ShiftRadio = ShiftRigForPitch;
@@ -90,18 +112,6 @@ namespace HolyLogger
                 Log.Swallow(ex);
                 cwDecodeWindow = null;
             }
-        }
-
-        // OPEN AT THE NEXT START IF IT WAS OPEN AT THE LAST CLOSE (his report, 2026-10-21): it used to come
-        // back only because it opened with the keyer. Called once the startup windows are up - never from
-        // the constructor, where an owned window can stop the program starting.
-        void ReopenCwDecodeIfItWasOpen()
-        {
-            try
-            {
-                if (cwDecodeWindow == null && Properties.Settings.Default.CwDecodeWindowWasOpen) OpenCwDecodeWindow();
-            }
-            catch (Exception swallowed) { Log.Swallow(swallowed); }
         }
 
         static void RememberCwDecodeOpen(bool open)
