@@ -3818,6 +3818,54 @@ namespace HolyLogger.Properties {
                 this["CwDecodeWindowWasOpen"] = value;
             }
         }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("2125")]
+        public double RttyLowToneHz {
+            get {
+                return ((double)(this["RttyLowToneHz"]));
+            }
+            set {
+                this["RttyLowToneHz"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool RttyReverse {
+            get {
+                return ((bool)(this["RttyReverse"]));
+            }
+            set {
+                this["RttyReverse"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("160")]
+        public double RttyWaterfallHeight {
+            get {
+                return ((double)(this["RttyWaterfallHeight"]));
+            }
+            set {
+                this["RttyWaterfallHeight"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool RttySnap {
+            get {
+                return ((bool)(this["RttySnap"]));
+            }
+            set {
+                this["RttySnap"] = value;
+            }
+        }
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]

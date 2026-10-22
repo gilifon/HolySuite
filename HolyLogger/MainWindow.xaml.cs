@@ -9123,7 +9123,6 @@ namespace HolyLogger
             {
                 try { UpdateVoiceMessageAvailabilityState(); }
                 catch (Exception swallowed) { Log.Swallow(swallowed); }
-                ReopenCwDecodeIfItWasOpen();
                 ReopenCwKeyerIfItWasOpen();
             }), DispatcherPriority.Background);
         }
@@ -9201,6 +9200,12 @@ namespace HolyLogger
 
             if (!isAvailable)
             {
+                // LEAVING CW FOR A MODE WITH NOTHING TO SEND IS STILL LEAVING CW (his report, 2026-10-22: CW
+                // to RTTY left the CW decoder up; CW to SSB closed it). Out of CW, nothing here can be
+                // sent - no keyer, no voice messages in RTTY - and that used to only drop the flag,
+                // closing nothing. The radio going quiet while still IN CW is not a leaving, and still
+                // closes nothing (he wants the keyer kept then - see CannotKey above).
+                if (_cwKeyboardWasWanted && !isCw) { CloseCwKeyboardByProgram(); CloseCwDecodeByProgram(); }
                 _cwKeyboardWasWanted = false;
             }
             else if (!cwKeyboardWanted)
@@ -9211,7 +9216,7 @@ namespace HolyLogger
                 // second later, shut it again. On the edge, the keyer goes as the radio leaves CW,
                 // and a keyer he then opens by hand stays open for as long as he wants it, because
                 // the radio only leaves CW once.
-                if (_cwKeyboardWasWanted) CloseCwKeyboardByProgram();
+                if (_cwKeyboardWasWanted) { CloseCwKeyboardByProgram(); CloseCwDecodeByProgram(); }
                 _cwKeyboardWasWanted = false;
             }
             else if (!_cwKeyboardWasWanted && IsLoaded && _startupWindowsReady)
@@ -9224,6 +9229,7 @@ namespace HolyLogger
                 // for a mode change that happened while it was off: the next time he comes INTO CW is the
                 // next time it opens.
                 if (Properties.Settings.Default.OpenCwKeyerOnCw && Properties.Settings.Default.CwKeyerWindowWasOpen) OpenCwKeyboard();
+                OpenCwDecodeOnCw();     // the CW decoder comes into CW with the radio too (see MainWindow.CwDecode)
                 _cwKeyboardWasWanted = true;
             }
 

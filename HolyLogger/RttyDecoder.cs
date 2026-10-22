@@ -100,6 +100,9 @@ namespace HolyLogger
         /// <summary>Look for a character where it is due, not only where an edge was seen.</summary>
         public bool UseDue { get; set; }
 
+        /// <summary>The fine tuning stands still while no station is being read.</summary>
+        public bool HoldTuningOnNoise { get; set; }
+
         /// <summary>Bench trace: every frame that fits (start sample, clearest bit, mean bit).</summary>
         public event Action<long, double, double> FrameSeen;
 
@@ -157,6 +160,7 @@ namespace HolyLogger
             AtcBalance = 0.5;
             SampleWidth = 0.25;
             UseDue = true;
+            HoldTuningOnNoise = true;
             Configure();
         }
 
@@ -245,7 +249,11 @@ namespace HolyLogger
             _cum[at] = _cum[(int)((_n - 1) & (Ring - 1))] + v;
 
             // 5. Fine tuning.
-            if (FineTuning) Follow(v);
+            // Only while a station is being read - the squelch open, or a first clear character held
+            // waiting for its second. On noise alone it used to wander off (9 Hz in ten seconds of
+            // noise after a station stopped), and the lines on the waterfall walked away with it.
+            if (FineTuning && (!HoldTuningOnNoise || _open || (_heldAt >= 0 && _n - _heldAt < (long)(16 * _bit)))) Follow(v);
+            else KeepFollowHistory();
 
             // 3. Framing. The filter's output crosses from mark to space about half a window after
             // the start bit really began.
@@ -290,6 +298,15 @@ namespace HolyLogger
             _afcHz += errHz / (8 * _bit);
             if (_afcHz > FineTuningRange) _afcHz = FineTuningRange;
             if (_afcHz < -FineTuningRange) _afcHz = -FineTuningRange;
+        }
+
+        // The history Follow compares against must stay current even while it is not following, or the
+        // first comparison after a pause would measure a turn over seconds, not over _lag samples.
+        void KeepFollowHistory()
+        {
+            _mHistRe[_h] = _mReSum; _mHistIm[_h] = _mImSum;
+            _sHistRe[_h] = _sReSum; _sHistIm[_h] = _sImSum;
+            if (++_h >= _lag) _h = 0;
         }
 
         long LastSampleNeeded(long start)

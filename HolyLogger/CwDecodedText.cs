@@ -112,6 +112,9 @@ namespace HolyLogger
         public double ToneHz { get; set; }
         public double Wpm { get; set; }
 
+        /// <summary>A line feed in the text starts a new line (RTTY); off for CW.</summary>
+        public bool LineEndsAsSent { get; set; }
+
         /// <summary>A callsign the operator double-clicked, ready for the log.</summary>
         public event Action<string> CallsignChosen;
 
@@ -176,6 +179,15 @@ namespace HolyLogger
                 if (c == '<') EndWordHere();
                 if (_lastWasProsignEnd) { EndWordHere(); _lastWasProsignEnd = false; }
                 _lastWasProsignEnd = c == '>';
+
+                // RTTY SENDS ITS OWN LINE ENDS (the RTTY decoder sets this): a station's CR LF is a new line
+                // in the box, as it was on his screen. CW has none, and keeps its turn rules below.
+                if (LineEndsAsSent && (c == '\r' || c == '\n'))
+                {
+                    EndWordHere();
+                    if (c == '\n') BreakLineNow();
+                    continue;
+                }
 
                 if (c == ' ' || c == '\r' || c == '\n')
                 {

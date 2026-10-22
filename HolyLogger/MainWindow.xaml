@@ -729,6 +729,22 @@
                             </Viewbox>
                         </MenuItem.Icon>
                     </MenuItem>
+                    <!-- Never greyed, like the CW decoder above: it only listens to a sound card. -->
+                    <MenuItem x:Name="RttyDecodeMenuItem" Header="RTTY Decoder" ToolTip="Listen to the radio's audio and read the RTTY being received" Click="RttyDecodeMenuItem_Click">
+                        <MenuItem.Icon>
+                            <!-- A pulse on the left, then the two stripes of an RTTY signal on the waterfall. -->
+                            <Viewbox Width="20" Height="20">
+                                <Canvas Width="24" Height="24">
+                                    <Path Data="M 1,12 L 3.5,12 L 5,5.5 L 6.5,18.5 L 8,9.5 L 9.5,12 L 11,12"
+                                          Stroke="{DynamicResource TextBrush}" StrokeThickness="1.7"
+                                          StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                          Fill="Transparent"/>
+                                    <Rectangle Canvas.Left="14" Canvas.Top="4" Width="2.6" Height="16" RadiusX="1.2" RadiusY="1.2" Fill="{DynamicResource TextBrush}"/>
+                                    <Rectangle Canvas.Left="20" Canvas.Top="4" Width="2.6" Height="16" RadiusX="1.2" RadiusY="1.2" Fill="{DynamicResource TextBrush}"/>
+                                </Canvas>
+                            </Viewbox>
+                        </MenuItem.Icon>
+                    </MenuItem>
                     <MenuItem x:Name="RadioControlPanelMenuItem" Header="Radio Control Panel" ToolTip="Open the radio control panel - frequency, bands and mode" Click="RadioControlPanelMenuItem_Click">
                         <MenuItem.Icon>
                             <!-- A front panel seen head on: a knob and two sliders. Drawn here rather

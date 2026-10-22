@@ -953,6 +953,18 @@
     <Setting Name="CwDecodeWindowWasOpen" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">True</Value>
     </Setting>
+    <Setting Name="RttyLowToneHz" Type="System.Double" Scope="User">
+      <Value Profile="(Default)">2125</Value>
+    </Setting>
+    <Setting Name="RttyReverse" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">False</Value>
+    </Setting>
+    <Setting Name="RttyWaterfallHeight" Type="System.Double" Scope="User">
+      <Value Profile="(Default)">160</Value>
+    </Setting>
+    <Setting Name="RttySnap" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">True</Value>
+    </Setting>
     <Setting Name="CwKeyerWindowWasOpen" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">True</Value>
     </Setting>

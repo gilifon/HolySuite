@@ -1091,6 +1091,7 @@ namespace HolyLogger
             // Before any of the early returns below: the panel must follow the radio even in manual
             // mode or while a QSO is being edited, when the logger's own fields deliberately do not.
             UpdateRadioPanel();
+            FollowRadioModeForRtty();
 
             bool rigOnline = OmniRigEngine != null && Rig != null
                              && Rig.Status == OmniRig.RigStatusX.ST_ONLINE
