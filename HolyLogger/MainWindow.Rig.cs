@@ -1160,7 +1160,10 @@ namespace HolyLogger
                         Properties.Settings.Default.Frequency = RX;
                     }
 
-                    CB_Mode.Text = GetNormalizedRigMode();
+                    // RTTY WHILE THE RTTY DECODER IS OPEN (his rule, 2026-10-23): with AFSK the radio is on SSB,
+                    // but nobody makes an SSB contact with the RTTY window open - so the mode box, and with it
+                    // the log and the 599 report, says RTTY.
+                    CB_Mode.Text = rttyDecodeWindow != null ? "RTTY" : GetNormalizedRigMode();
                     UpdateVoiceMessageState();
                     UpdateVoiceMessageAvailabilityState();
                     // Always refresh the LED — WPF skips no-op binding updates so TextChanged
@@ -1714,6 +1717,10 @@ namespace HolyLogger
                 }
             }
 
+            // AFSK (his request, 2026-10-23): the radio is on SSB and the decoder makes it RTTY - so both
+            // buttons light, RTTY in its yellow beside SSB in its blue.
+            radioPanel.RttyOverSsb = online && rttyDecodeWindow != null && RttyByAfsk()
+                                     && string.Equals(mode, "SSB", StringComparison.OrdinalIgnoreCase);
             try { radioPanel.ShowRigState(online, khz, mode, transmitting); }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
         }

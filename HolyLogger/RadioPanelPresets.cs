@@ -147,6 +147,10 @@ namespace HolyLogger
         // 9cm and 6cm: the only sourced calling points found were Region 2/3 ones (3400.10, 5760.1),
         // not Region 1 - left unchanged rather than importing another region's number as if it were
         // this one's.
+        //
+        // RTTY KEPT OFF FT8 AND FT4 (his report, 2026-10-23: 14.080 was full of them). Each sits on about
+        // 3 kHz above its dial, so 30m, 20m, 17m and 12m moved: 10.145 (FT4 10.140), 14.085 (FT4 14.080),
+        // 18.097 (FT8 18.100), 24.925 (FT4 24.919) - all still inside IARU Region 1's digimode segments.
         private static readonly object[][] Factory =
         {
             //   label   name    low     high    ssb     cw      rtty
@@ -154,11 +158,11 @@ namespace HolyLogger
             new object[] { "3.5", "80m",   3500,   4000,   3750,   3530,   3580 },
             new object[] { "5",   "60m",   5351,   5367,   5357,   5352,   5352 },
             new object[] { "7",   "40m",   7000,   7200,   7150,   7030,   7040 },
-            new object[] { "10",  "30m",  10100,  10150,  10120,  10120,  10140 },
-            new object[] { "14",  "20m",  14000,  14350,  14250,  14030,  14080 },
-            new object[] { "18",  "17m",  18068,  18168,  18140,  18080,  18100 },
+            new object[] { "10",  "30m",  10100,  10150,  10120,  10120,  10145 },
+            new object[] { "14",  "20m",  14000,  14350,  14250,  14030,  14085 },
+            new object[] { "18",  "17m",  18068,  18168,  18140,  18080,  18097 },
             new object[] { "21",  "15m",  21000,  21450,  21250,  21030,  21080 },
-            new object[] { "24",  "12m",  24890,  24990,  24950,  24900,  24920 },
+            new object[] { "24",  "12m",  24890,  24990,  24950,  24900,  24925 },
             new object[] { "28",  "10m",  28000,  29700,  28450,  28030,  28080 },
             new object[] { "40",  "8m",   40660,  40700,  40680,  40680,  40680 },
             new object[] { "50",  "6m",   50000,  54000,  50125,  50090,  50090 },

@@ -38,6 +38,20 @@ namespace HolyLogger
         /// <summary>Set by the main window: stop sending now and back to receive (Esc).</summary>
         public Action StopSending;
 
+        /// <summary>Set by the main window: moves the radio so the lower tone heard at this Hz comes to 2125. Null when done, else why not.</summary>
+        public Func<double, string> TuneRadio;
+
+        /// <summary>Set by the main window: the last move went the wrong way on this radio.</summary>
+        public Action TuneWentWrongWay;
+
+        /// <summary>The tones being listened to now, mark and space, in Hz - what AFSK answers on.</summary>
+        public void ListeningTones(out double markHz, out double spaceHz)
+        {
+            double low = ListeningLowHz();
+            markHz = _reverse ? low + ShiftHz : low;
+            spaceHz = _reverse ? low : low + ShiftHz;
+        }
+
         // The shift and speed of nearly all amateur RTTY. Not offered for change until somebody needs it.
         const double ShiftHz = 170, BaudRate = 45.45;
 
@@ -100,9 +114,9 @@ namespace HolyLogger
             Height = 32 + RulerHeight + _waterfallHeight + 2 + SplitterHeight + 200 + SendRowHeight;
             // NO NARROWER THAN THE WHOLE BAR (his request, 2026-10-22): name, dial, lamp, tones, Snap, Rev,
             // Clear and the close cross. With the tones centred on the window, each side needs room for the
-            // wider of the two outer groups: measured with the widest dial, 432,100.000 kHz, 2 x 257 + 141 =
-            // 654, plus 6 for the window's edge; a little over that so the groups never touch.
-            MinWidth = 700;
+            // wider of the two outer groups: measured with the widest dial, 432,100.000 kHz, and the gear,
+            // 2 x 291 + 141 = 723, plus 6 for the window's edge; a little over that so the groups never touch.
+            MinWidth = 740;
             // The bar, the ruler and the lowest the waterfall goes, plus a framed paper with one line of text.
             MinHeight = 32 + RulerHeight + LowestWaterfall + 2 + SplitterHeight + 52 + SendRowHeight;
             ResizeMode = ResizeMode.CanResize;
@@ -152,7 +166,19 @@ namespace HolyLogger
                 if (Keyboard.FocusedElement is TextBox) return;
                 if ((Keyboard.Modifiers & ~ModifierKeys.Shift) != 0) return;
                 double step = (Keyboard.Modifiers & ModifierKeys.Shift) != 0 ? 10 : 1;
-                MoveLinesTo(ListeningLowHz() + (e.Key == Key.Right ? step : -step));
+                double toward = e.Key == Key.Right ? step : -step;
+                var clickTunes = ClickTunesRadio;
+                if (clickTunes != null && clickTunes())
+                {
+                    // IN FSK THE ARROWS TURN THE RADIO, like a fine tuning knob (his decision, 2026-10-23):
+                    // nudging only the lines would pull them off where the radio sends again. The radio
+                    // moves as if onto a station that many Hz to that side, and the lines stay on 2125.
+                    var tune = TuneRadio;
+                    string why = tune == null ? "No radio" : tune(OnTuneHz + toward);
+                    if (why != null) Say(why);
+                    MoveLinesTo(OnTuneHz);
+                }
+                else MoveLinesTo(ListeningLowHz() + toward);
                 Remember();
                 e.Handled = true;
             };
@@ -358,7 +384,7 @@ namespace HolyLogger
             var closeBtn = new Button
             {
                 Content = "",   // the Segoe MDL2 cross, as on the CW decoder
-                Width = 32,
+                Width = 28,   // narrower than 32, so Snap and the keys sit nearer the cross (his eye, 2026-10-23)
                 Style = Application.Current.Resources["CaptionCloseButtonStyle"] as Style,
                 Foreground = Brushes.Black,
                 ToolTip = "Close"
@@ -450,8 +476,8 @@ namespace HolyLogger
             DockPanel.SetDock(right, Dock.Right);
             right.Children.Add(snapPanel);
             var keysFrame = GroupFrame(keys);
-            // Nearer the cross than the frame's usual 12 (his eye, 2026-10-22: "a little to the right").
-            ((Border)keysFrame).Margin = new Thickness(0, 0, 4, 0);
+            // Right against the cross (his eye, 2026-10-22 and again 2026-10-23: "a few more pixels to the right").
+            ((Border)keysFrame).Margin = new Thickness(0);
             right.Children.Add(keysFrame);
             right.Children.Add(closeBtn);
 
@@ -467,6 +493,31 @@ namespace HolyLogger
             };
             DockPanel.SetDock(titleText, Dock.Left);
 
+            // THE GEAR (his request, 2026-10-23), right of the name: Options > General, where RTTY sending
+            // is set. The same gear as the CW decoder's.
+            var gearBtn = new Button
+            {
+                Content = "",
+                FontFamily = new FontFamily("Segoe MDL2 Assets"),
+                FontSize = 16,
+                Width = 26,
+                Height = 26,
+                Padding = new Thickness(0),
+                Margin = new Thickness(8, 0, 0, 0),
+                VerticalAlignment = VerticalAlignment.Center,
+                Foreground = Brushes.Black,
+                Background = Brushes.White,
+                BorderBrush = GroupEdgeBrush,
+                BorderThickness = new Thickness(1),
+                Cursor = Cursors.Hand,
+                ToolTip = "RTTY settings",
+                Style = CwDecodeWindow.GearStyle(),
+                UseLayoutRounding = true,
+                SnapsToDevicePixels = true
+            };
+            System.Windows.Shell.WindowChrome.SetIsHitTestVisibleInChrome(gearBtn, true);
+            gearBtn.Click += (s, e) => { var open = OpenSettings; if (open != null) open(); };
+            DockPanel.SetDock(gearBtn, Dock.Left);
 
             // THE RADIO'S DIAL (his request, 2026-10-22), told by the main window as the radio reports it.
             _dial = new TextBlock
@@ -484,6 +535,7 @@ namespace HolyLogger
             var sides = new DockPanel { LastChildFill = false };
             sides.Children.Add(right);
             sides.Children.Add(titleText);
+            sides.Children.Add(gearBtn);
             sides.Children.Add(_dial);
 
             var bar = new Grid();
@@ -491,6 +543,9 @@ namespace HolyLogger
             bar.Children.Add(middle);
             return new Border { Height = 32, Child = bar, Background = BarBrush };
         }
+
+        /// <summary>Set by the main window: opens Options where RTTY is set.</summary>
+        public Action OpenSettings;
 
         static Button BarButton(string text, string tip)
         {
@@ -535,13 +590,100 @@ namespace HolyLogger
         }
 
         /// <summary>The radio's dial in kHz, from the main window; 0 = no radio, and nothing is shown.</summary>
-        public void ShowRadioKhz(double khz)
+        // THE STATION'S OWN FREQUENCY ON THE BAR (his request, 2026-10-23, after looking at MixW): not the
+        // radio's dial but where the station being read really is - his mark, as RTTY frequencies are given -
+        // worked out from the dial, the way the radio is listening, and the lines. It follows the lines at
+        // every move (a click, a drag, the arrow keys, the fine tuning), and it is what the QSO is logged on.
+        //
+        //   The radio in its RTTY mode: the radio's own mark tone (2125 Hz) is the dial, and a higher audio
+        //   tone is a lower radio frequency - so his mark is the dial plus (2125 - his mark tone).
+        //   On LSB (AFSK): every tone is the dial minus the tone.   On USB: the dial plus the tone.
+        public enum DialSense { Unknown, RttyMode, RttyModeOtherWay, Lsb, Usb }
+
+        double _dialKhz;
+        DialSense _dialSense;
+
+        /// <summary>The radio's dial in kHz (0 = no radio) and how its audio maps to the air - from the main window.</summary>
+        public void ShowRadioKhz(double khz, DialSense sense)
+        {
+            _dialKhz = khz;
+            _dialSense = sense;
+            ShowStationFrequency();
+        }
+
+        /// <summary>The station being read, in kHz - his mark. 0 when it cannot be worked out.</summary>
+        public double StationKhz
+        {
+            get
+            {
+                if (_dialKhz <= 0) return 0;
+                double mark, space;
+                ListeningTones(out mark, out space);
+                switch (_dialSense)
+                {
+                    case DialSense.RttyMode: return _dialKhz + (RttyAfskSender.MarkHz - mark) / 1000.0;
+                    case DialSense.RttyModeOtherWay: return _dialKhz + (mark - RttyAfskSender.MarkHz) / 1000.0;
+                    case DialSense.Lsb: return _dialKhz - mark / 1000.0;
+                    case DialSense.Usb: return _dialKhz + mark / 1000.0;
+                    default: return 0;
+                }
+            }
+        }
+
+        void ShowStationFrequency()
         {
             if (_dial == null) return;
+            double station = StationKhz;
+            double khz = station > 0 ? station : _dialKhz;
             _dial.Text = khz > 0 ? khz.ToString("N3", System.Globalization.CultureInfo.InvariantCulture) + " kHz" : string.Empty;
+            _dial.ToolTip = station > 0
+                ? "The frequency of the station you are reading - the QSO is logged on it. The radio's dial is "
+                  + _dialKhz.ToString("N3", System.Globalization.CultureInfo.InvariantCulture) + " kHz."
+                : "The radio's frequency";
         }
 
         // ---- tuning ----
+
+        // A word from the Tune key, shown where the tones are for a few seconds.
+        string _say;
+        DateTime _sayUntil;
+        void Say(string text) { _say = text; _sayUntil = DateTime.UtcNow.AddSeconds(3); }
+
+        // Where 2125 is, give or take what the fine tuning can pull in on its own.
+        const double OnTuneHz = 2125, CloseEnoughHz = 8;
+
+        void TuneOntoStation()
+        {
+            var tune = TuneRadio;
+            if (tune == null) { Say("No radio"); return; }
+            double low = ListeningLowHz();
+            double off = low - OnTuneHz;
+            if (Math.Abs(off) < CloseEnoughHz) { Say("On frequency"); return; }
+            string why = tune(low);
+            if (why != null) { Say(why); return; }
+            Say("Moved " + Math.Round(Math.Abs(off)).ToString("N0") + " Hz");
+            // The lines go to 2125 with the station; the fine tuning pulls in the last few Hz.
+            MoveLinesTo(OnTuneHz);
+            Remember();
+
+            // TWO SECONDS LATER, A LOOK: if the station is now further off than before, this radio
+            // tunes the other way round - put right at once, and remembered (as the CW decoder's Tune).
+            var check = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
+            check.Tick += (s, e) =>
+            {
+                check.Stop();
+                double found = _waterfall.FindStation(OnTuneHz, ShiftHz, Math.Abs(off) * 2.5 + 30);
+                if (double.IsNaN(found)) return;
+                double now = found - OnTuneHz;
+                if (Math.Abs(now) <= Math.Abs(off) * 0.5 + CloseEnoughHz) return;     // it came our way
+                if (Math.Abs(now) < Math.Abs(off) * 1.5) return;                       // not clear - leave it
+                var wrong = TuneWentWrongWay;
+                if (wrong != null) wrong();
+                string again = tune(found);
+                Say(again ?? "Moved " + Math.Round(Math.Abs(now)).ToString("N0") + " Hz");
+            };
+            check.Start();
+        }
 
         // TUNING BY MOUSE. A click between a station's two stripes puts the lines on it (the lower tone
         // half the shift below the click). And the lines can be DRAGGED (his request, 2026-10-22): press
@@ -599,7 +741,24 @@ namespace HolyLogger
             double snapped = _snap ? _waterfall.FindStation(_lowHz, ShiftHz, 60) : double.NaN;
             if (!double.IsNaN(snapped)) MoveLinesTo(snapped);
             Remember();
+
+            // AND IN FSK THE RADIO GOES ONTO HIM (his decision, 2026-10-23). In FSK the radio sends on its own
+            // dial, wherever the lines are - and a man who clicks a station and starts reading it will answer
+            // it, and be off his frequency where nobody hears him. So the click that chooses the station also
+            // moves the radio onto it. Not with AFSK, which sends on the lines themselves; and not with the
+            // arrow keys, which are for the last few Hz while listening.
+            var clickTunes = ClickTunesRadio;
+            if (clickTunes != null && clickTunes()) TuneOntoStation();
         }
+
+        /// <summary>Set by the main window: true when a click should also move the radio (FSK with a radio).</summary>
+        public Func<bool> ClickTunesRadio;
+
+        /// <summary>How far the station being read is from where the radio sends in FSK, in Hz.</summary>
+        public double OffTransmitHz { get { return ListeningLowHz() - OnTuneHz; } }
+
+        /// <summary>Moves the radio onto the station being read (the safety question before sending).</summary>
+        public void TuneNow() { TuneOntoStation(); }
 
         void MoveLinesTo(double lowHz)
         {
@@ -704,6 +863,10 @@ namespace HolyLogger
                 try { decoder.Process(samples, count); }
                 catch (Exception swallowed) { Log.Swallow(swallowed); }
             }
+            // NOR IS IT DRAWN (his screenshot, 2026-10-22): the radio sends its own transmit audio back,
+            // and our tones filled the picture. The waterfall stands still while we send; a red line
+            // across it marks where we did (see ShowTransmitting).
+            if (_transmitting) return;
             try { _waterfall.Feed(samples, count, _recorder.ActualSampleRate); }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
         }
@@ -720,8 +883,10 @@ namespace HolyLogger
             PlaceToneLines();
             UpdateLamp();
             double low = ListeningLowHz();
-            _readout.Text = Math.Round(low).ToString("N0") + " / " + Math.Round(low + ShiftHz).ToString("N0") + " Hz";
+            _readout.Text = _say != null && DateTime.UtcNow < _sayUntil ? _say
+                          : Math.Round(low).ToString("N0") + " / " + Math.Round(low + ShiftHz).ToString("N0") + " Hz";
             _readout.Foreground = _transmitting ? RevOnBrush : ReadoutBrush;
+            ShowStationFrequency();
         }
 
         // Received and sent characters wait in one queue, in the order they happened; a sent one is
@@ -763,7 +928,10 @@ namespace HolyLogger
         /// <summary>The main window: sending started or ended. The tones turn orange while we transmit.</summary>
         public void ShowTransmitting(bool on)
         {
+            if (on && !_transmitting) _waterfall.MarkTransmission();
             _transmitting = on;
+            // Back to listening: what was half gathered for the next line was our own signal - dropped.
+            if (!on) _waterfall.ForgetPartialLine();
             if (_sendBtn != null) _sendBtn.Content = on ? "Stop" : "Send";
         }
 
@@ -956,6 +1124,7 @@ namespace HolyLogger
         {
             if (rate < 1000) return;
             if (rate != _rate) Setup(rate);
+            if (_forget) { _forget = false; _have = 0; }
             int hop = rate / LinesPerSecond;
             for (int i = 0; i < count; i++)
             {
@@ -1026,6 +1195,22 @@ namespace HolyLogger
                 _lines.Enqueue(line);
                 while (_lines.Count > Rows) _lines.Dequeue();
             }
+        }
+
+        volatile bool _forget;
+
+        /// <summary>Any thread: the next sound starts a fresh line (after we have transmitted).</summary>
+        public void ForgetPartialLine() { _forget = true; }
+
+        // A thin red line across the picture where we transmitted: two rows, so it is seen at a glance.
+        static readonly int TxRed = (0xD3 << 16) | (0x2F << 8) | 0x2F;
+
+        /// <summary>Any thread: marks the moment we start sending.</summary>
+        public void MarkTransmission()
+        {
+            var line = new int[Bins];
+            for (int x = 0; x < Bins; x++) line[x] = TxRed;
+            lock (_lines) { _lines.Enqueue(line); _lines.Enqueue((int[])line.Clone()); }
         }
 
         /// <summary>On the window's thread: the new lines in at the top, the rest moved down.</summary>

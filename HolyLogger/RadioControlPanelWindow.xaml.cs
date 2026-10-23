@@ -420,6 +420,9 @@ namespace HolyLogger
             ShowRigState(rigOnline, khz, mode, _transmitting);
         }
 
+        /// <summary>Set by the main window: AFSK RTTY on SSB - the RTTY button lights too, in its own yellow.</summary>
+        internal bool RttyOverSsb { get; set; }
+
         public void ShowRigState(bool rigOnline, double khz, string mode, bool? transmitting)
         {
             _rigOnline = rigOnline;
@@ -458,7 +461,19 @@ namespace HolyLogger
             {
                 foreach (var entry in _modeButtons)
                 {
-                    entry.Button.IsChecked = rigOnline && string.Equals(mode, entry.Mode, StringComparison.OrdinalIgnoreCase);
+                    bool rttyOverSsb = RttyOverSsb && string.Equals(entry.Mode, "RTTY", StringComparison.OrdinalIgnoreCase);
+                    entry.Button.IsChecked = rigOnline && (rttyOverSsb || string.Equals(mode, entry.Mode, StringComparison.OrdinalIgnoreCase));
+                    // Its own lit colours on the button itself, over the shared ones, which are SSB's blue.
+                    if (rttyOverSsb)
+                    {
+                        entry.Button.Resources["PanelLitBrush"] = BrushForMode("RTTY");
+                        entry.Button.Resources["PanelLitTextBrush"] = TextBrushForMode("RTTY");
+                    }
+                    else
+                    {
+                        entry.Button.Resources.Remove("PanelLitBrush");
+                        entry.Button.Resources.Remove("PanelLitTextBrush");
+                    }
                     bool isPhoneMode = string.Equals(entry.Mode, "SSB", StringComparison.OrdinalIgnoreCase)
                         || string.Equals(entry.Mode, "AM", StringComparison.OrdinalIgnoreCase)
                         || string.Equals(entry.Mode, "FM", StringComparison.OrdinalIgnoreCase);
@@ -643,7 +658,17 @@ namespace HolyLogger
             double khz = hasOwnFrequency && _currentBand != null ? _currentBand.FrequencyFor(mode, _main.ActivityFrequencySet) : _rigKhz;
             if (khz <= 0) return;
 
-            _main.TuneRadioToKhz(khz, mode);
+            // AFSK (his request, 2026-10-23): the tones come from the sound card, so the radio goes to LSB,
+            // not its RTTY mode. The dial 2.125 kHz above the band's RTTY frequency, so a station there
+            // sits on the 2125 Hz line - the same place the RTTY mode would show it.
+            string sendMode = mode;
+            if (string.Equals(mode, "RTTY", StringComparison.OrdinalIgnoreCase) && MainWindow.RttyByAfsk())
+            {
+                sendMode = "LSB";
+                if (_currentBand != null) khz += 2.125;
+            }
+
+            _main.TuneRadioToKhz(khz, sendMode);
         }
 
         // The gear beside the frequency box. What a band button sends the radio to is set on the

@@ -626,7 +626,7 @@ namespace HolyLogger
             return style;
         }
 
-        static Style GearStyle()
+        internal static Style GearStyle()
         {
             var outer = new FrameworkElementFactory(typeof(Border));
             outer.SetValue(Border.BackgroundProperty, Brushes.Transparent);

@@ -140,11 +140,24 @@ namespace HolyLogger
         Part _part;
         int _code = -1, _bitIndex;  // the character being made and which of its 7 elements
 
-        double MarkTone { get { return _swap ? SpaceHz : MarkHz; } }
-        double SpaceTone { get { return _swap ? MarkHz : SpaceHz; } }
+        // ON THE STATION BEING READ (2026-10-22): an AFSK program answers a station on the tones it is
+        // listening to, so the reply lands exactly on his frequency without moving the radio. The main
+        // window hands them over before each send (SetTones); 2125/2295 until it does.
+        double _markHz = MarkHz, _spaceHz = SpaceHz;
+
+        /// <summary>The two tones to send on, mark and space, in Hz - taken at the start of the next transmission.</summary>
+        public void SetTones(double markHz, double spaceHz)
+        {
+            lock (_gate) { _markHz = markHz; _spaceHz = spaceHz; }
+        }
+
+        double _sendMark = MarkHz, _sendSpace = SpaceHz;
+        double MarkTone { get { return _swap ? _sendSpace : _sendMark; } }
+        double SpaceTone { get { return _swap ? _sendMark : _sendSpace; } }
 
         void BeginTransmission()
         {
+            lock (_gate) { _sendMark = _markHz; _sendSpace = _spaceHz; }
             _part = Part.Lead;
             _elementMark = true;
             _samplesLeft = LeadMs / 1000.0 * Rate;
