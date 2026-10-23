@@ -980,6 +980,21 @@
     <Setting Name="RttyAfskDevice" Type="System.String" Scope="User">
       <Value Profile="(Default)" />
     </Setting>
+    <Setting Name="RttyMsgText1" Type="System.String" Scope="User">
+      <Value Profile="(Default)">CQ CQ CQ DE * * * K</Value>
+    </Setting>
+    <Setting Name="RttyMsgText2" Type="System.String" Scope="User">
+      <Value Profile="(Default)">! DE * TNX FOR CALL UR RST 599 599 BK</Value>
+    </Setting>
+    <Setting Name="RttyMsgText3" Type="System.String" Scope="User">
+      <Value Profile="(Default)">! TU 73 DE * SK</Value>
+    </Setting>
+    <Setting Name="RttyMsgText4" Type="System.String" Scope="User">
+      <Value Profile="(Default)">* *</Value>
+    </Setting>
+    <Setting Name="RttyMsgLabelsJson" Type="System.String" Scope="User">
+      <Value Profile="(Default)">[&quot;CQ&quot;,&quot;Reply&quot;,&quot;TU&quot;,&quot;Call&quot;]</Value>
+    </Setting>
     <Setting Name="CwKeyerWindowWasOpen" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">True</Value>
     </Setting>

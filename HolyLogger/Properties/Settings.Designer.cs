@@ -3926,6 +3926,66 @@ namespace HolyLogger.Properties {
                 this["RttyAfskDevice"] = value;
             }
         }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("CQ CQ CQ DE * * * K")]
+        public string RttyMsgText1 {
+            get {
+                return ((string)(this["RttyMsgText1"]));
+            }
+            set {
+                this["RttyMsgText1"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("! DE * TNX FOR CALL UR RST 599 599 BK")]
+        public string RttyMsgText2 {
+            get {
+                return ((string)(this["RttyMsgText2"]));
+            }
+            set {
+                this["RttyMsgText2"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("! TU 73 DE * SK")]
+        public string RttyMsgText3 {
+            get {
+                return ((string)(this["RttyMsgText3"]));
+            }
+            set {
+                this["RttyMsgText3"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("* *")]
+        public string RttyMsgText4 {
+            get {
+                return ((string)(this["RttyMsgText4"]));
+            }
+            set {
+                this["RttyMsgText4"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("[\"CQ\",\"Reply\",\"TU\",\"Call\"]")]
+        public string RttyMsgLabelsJson {
+            get {
+                return ((string)(this["RttyMsgLabelsJson"]));
+            }
+            set {
+                this["RttyMsgLabelsJson"] = value;
+            }
+        }
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]

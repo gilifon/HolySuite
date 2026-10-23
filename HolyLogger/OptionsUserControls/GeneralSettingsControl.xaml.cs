@@ -154,6 +154,31 @@ namespace HolyLogger.OptionsUserControls
         bool _loadingCwPitch;
 
         // The CW decoder's gear lands here: the pitch box, with the CW Decoder frame in view.
+        // THE GEAR SHOWS WHERE (his request, 2026-10-23): the CW and RTTY decoders' gears open this page,
+        // and the box they mean is scrolled into view with its frame lit yellow while Options is open, so
+        // he does not have to hunt for it among the others. Only one box lit at a time.
+        internal void ShowCwDecoderBox() { LightBox(CwDecoderBox); }
+        internal void ShowRttyBox() { LightBox(RttySendingBox); }
+
+        void LightBox(GroupBox box)
+        {
+            try
+            {
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    foreach (var other in new[] { CwDecoderBox, RttySendingBox })
+                    {
+                        other.ClearValue(Control.BorderBrushProperty);
+                        other.ClearValue(Control.BorderThicknessProperty);
+                    }
+                    box.BringIntoView();
+                    box.BorderBrush = new SolidColorBrush(Color.FromRgb(0xFF, 0xD0, 0x00));
+                    box.BorderThickness = new Thickness(3);
+                }), System.Windows.Threading.DispatcherPriority.Input);
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
         internal void FocusCwPitch()
         {
             try

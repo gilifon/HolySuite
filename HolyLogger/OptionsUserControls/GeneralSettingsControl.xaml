@@ -130,7 +130,7 @@
              on - saved the moment a good number is typed, like the input device below, and marked at once
              on the decoder's waterfall. The Mix box (2026-10-20): hide the letters the network did not
              confirm - most of the junk lines between transmissions. Saved and applied at once. -->
-        <GroupBox Header="CW Decoder" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,12,0,0" Width="580" FontSize="16">
+        <GroupBox x:Name="CwDecoderBox" Header="CW Decoder" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,12,0,0" Width="580" FontSize="16">
             <StackPanel Margin="4,4,4,4">
                 <StackPanel Orientation="Horizontal" Margin="0,2,0,2">
                     <TextBlock Text="Pitch:" VerticalAlignment="Center" FontSize="16" Margin="0,0,8,0"/>
@@ -270,7 +270,7 @@
                  COM port line (RttyFskKeyer); or AFSK - HolyLogger makes the tones and plays them into the radio
                  through a sound card (RttyAfskSender). Each with one plain line saying what it is. Here in the
                  narrow column: the left one would have grown past the Options window's height. -->
-            <GroupBox Header="RTTY sending" HorizontalAlignment="Left" Margin="0,16,0,0" Width="300" FontSize="16">
+            <GroupBox x:Name="RttySendingBox" Header="RTTY sending" HorizontalAlignment="Left" Margin="0,16,0,0" Width="300" FontSize="16">
                 <StackPanel Margin="4,4,4,4">
                     <!-- The explanations are tooltips (his request, 2026-10-22: they took too much of the page). -->
                     <RadioButton x:Name="RB_RttyFsk" Content="FSK" GroupName="RttyVia" FontSize="16" FontWeight="Bold"

@@ -2215,7 +2215,7 @@ namespace HolyLogger
                 qso.Mode = CB_Mode.Text;
                 qso.SRX = TB_Exchange.Text;
                 qso.Band = BandForLog();
-                qso.Freq = FreqForLog(qso.Band);
+                qso.Freq = RttyStationFreqForLog() ?? FreqForLog(qso.Band);   // RTTY: the station's own frequency
                 qso.Country = Country;
                 qso.Continent = Continent;
                 qso.CQZone = TB_CQZone.Text;
@@ -3297,6 +3297,7 @@ namespace HolyLogger
             // stopping Click stopped TriggerVoiceMessage, which is where the reason is said - so the
             // whole point of pressing the button went nowhere. The answer is given here instead.
             if (_messageSendAvailable) return;
+            if (!IsCwModeActive() && IsRttyModeActive()) return;   // RTTY says its own reasons when pressed
 
             e.Handled = true;
             ExplainWhyMessageCannotBeSent();
@@ -6548,15 +6549,22 @@ namespace HolyLogger
         private void UpdateMessageButtonLabels()
         {
             bool isCw = IsCwModeActive();
-            UpdateMessageButtonLabel(Btn_Msg1, 1, isCw);
-            UpdateMessageButtonLabel(Btn_Msg2, 2, isCw);
-            UpdateMessageButtonLabel(Btn_Msg3, 3, isCw);
-            UpdateMessageButtonLabel(Btn_Msg4, 4, isCw);
+            bool isRtty = !isCw && IsRttyModeActive();
+            UpdateMessageButtonLabel(Btn_Msg1, 1, isCw, isRtty);
+            UpdateMessageButtonLabel(Btn_Msg2, 2, isCw, isRtty);
+            UpdateMessageButtonLabel(Btn_Msg3, 3, isCw, isRtty);
+            UpdateMessageButtonLabel(Btn_Msg4, 4, isCw, isRtty);
         }
 
-        private void UpdateMessageButtonLabel(Button button, int messageNumber, bool isCw)
+        // THREE STATES (RTTY joined voice and CW on 2026-10-22, his request): purple keycaps play the
+        // radio's voice memories, cyan ones send CW text, yellow ones send RTTY text - see MainWindow.Rtty.
+        private void UpdateMessageButtonLabel(Button button, int messageNumber, bool isCw, bool? isRttyGiven = null)
         {
             if (button == null) return;
+
+            // A caller that does not say (the CQ painter, the keyer's rename) gets RTTY worked out here -
+            // left to them, button 1 went back to the voice look in RTTY (his screenshot, 2026-10-22).
+            bool isRtty = isRttyGiven ?? (!isCw && IsRttyModeActive());
 
             var panel = button.Content as StackPanel;
             if (panel == null || panel.Children.Count < 1) return;
@@ -6571,11 +6579,11 @@ namespace HolyLogger
                 // carries the key that presses it, and nothing at all while the CW keyer has taken
                 // that key for its own macros: a button naming a key that would do something else is
                 // worse than a blank one.
-                string own = MsgButtonLabel(messageNumber, isCw);
+                string own = isRtty ? RttyMsgButtonLabel(messageNumber) : MsgButtonLabel(messageNumber, isCw);
 
                 // THE CQ BUTTON HAS A SECOND NAME while the next press would ask QRL? rather than
                 // call - see CwKeyboardWindow.QrlLabel. Only where he has given it one.
-                if (messageNumber == 1 && ShouldAskQrlNow())
+                if (!isRtty && messageNumber == 1 && ShouldAskQrlNow())
                 {
                     string asking = CwKeyboardWindow.QrlLabel();
                     if (asking.Length > 0) own = asking;
@@ -6601,7 +6609,8 @@ namespace HolyLogger
             // Swap the entire style so hover/press colours are also correct
             Style cwStyle  = (Style)FindResource("MsgButtonCwStyle");
             Style ssbStyle = (Style)FindResource("MsgButtonStyle");
-            button.Style = isCw ? cwStyle : ssbStyle;
+            Style rttyStyle = (Style)FindResource("MsgButtonRttyStyle");
+            button.Style = isRtty ? rttyStyle : isCw ? cwStyle : ssbStyle;
         }
 
         // -- THE CQ BUTTON AND ITS QUESTION ------------------------------------------------------
@@ -6704,7 +6713,9 @@ namespace HolyLogger
             // AND THE NAME WITH IT, whenever the name it should wear has changed - the state turning
             // over, the words edited in the keyer's own editor, or the name taken away again. Asking
             // "is there a name?" was not enough: clearing one left the old word on the keycap.
-            string wantedName = ShouldAskQrlNow() ? CwKeyboardWindow.QrlLabel() : string.Empty;
+            // The QRL? question is CW's: in RTTY the CQ button is just the CQ.
+            bool askQrl = !(!IsCwModeActive() && IsRttyModeActive()) && ShouldAskQrlNow();
+            string wantedName = askQrl ? CwKeyboardWindow.QrlLabel() : string.Empty;
 
             if (!string.Equals(wantedName, _qrlNameShown, StringComparison.Ordinal))
             {
@@ -6712,7 +6723,7 @@ namespace HolyLogger
                 UpdateMessageButtonLabel(button, 1, IsCwModeActive());
             }
 
-            if (ShouldAskQrlNow())
+            if (askQrl)
             {
                 button.ToolTip = "This frequency has not been called on. Pressing this sends "
                                + CwKeyboardWindow.QrlText() + " instead, to ask whether it is free.";
@@ -8676,6 +8687,13 @@ namespace HolyLogger
                 return;
             }
 
+            // RTTY sends its own text by its own road (FSK or AFSK) - see MainWindow.Rtty.
+            if (!IsCwModeActive() && IsRttyModeActive())
+            {
+                TriggerRttyTextMessage(messageNumber);
+                return;
+            }
+
             // Sending needs the radio/CAT. The buttons stay enabled only so they can be right-clicked
             // to edit the CW text - but a left-click that did NOTHING AT ALL was the fault here: the
             // row dims and the reason sits in a tooltip, and a man pressing F5 does not hover.
@@ -8805,6 +8823,13 @@ namespace HolyLogger
         // Called by Esc (which otherwise clears the entry form).
         private bool StopActiveMessageTransmission()
         {
+            // Esc stops RTTY going out too, whichever way it was started.
+            if (rttyKeyer != null && rttyKeyer.Busy)
+            {
+                StopRtty();
+                return true;
+            }
+
             int? current = activeVoiceMessageNumber ?? pendingVoiceMessageNumber;
             if (!current.HasValue)
                 return false;
@@ -9135,8 +9160,10 @@ namespace HolyLogger
             }
 
             bool isCw = IsCwModeActive();
+            bool isRtty = !isCw && IsRttyModeActive();
             bool isVoiceAvailable = TryGetVoiceMessageAvailability(out _, out string errorMessage);
-            bool isAvailable = isVoiceAvailable
+            bool isAvailable = (isRtty && IsCatLive())
+                               || isVoiceAvailable
                                || (isCw && CwByPort && PortKeyer() != null)
                                || (isCw && !CwByPort && Properties.Settings.Default.EnableOmniRigCAT && OmniRigEngine != null && Rig != null && Rig.Status == OmniRig.RigStatusX.ST_ONLINE);
 
@@ -9148,7 +9175,13 @@ namespace HolyLogger
             SetVoiceMessageButtonsEnabled(true);
             PlayCommandsBorder.Opacity = isAvailable ? 1.0 : 0.5;
 
-            if (isCw)
+            if (isRtty)
+            {
+                PlayCommandsBorder.ToolTip = isAvailable
+                    ? "Send RTTY text (F5-F8) - right-click to edit"
+                    : "Radio off - sending is disabled. Right-click a button to edit its RTTY text.";
+            }
+            else if (isCw)
             {
                 PlayCommandsBorder.ToolTip = isAvailable
                     ? "Send CW text to radio (F5-F8) — right-click to edit"
@@ -9280,6 +9313,15 @@ namespace HolyLogger
             // Background = null) when idle: a local null value would beat the style's Background
             // setter and make the inner KeyFace transparent, exposing the dark outer border across
             // the whole button. While transmitting, apply the same orange highlight as SSB.
+            //
+            // RTTY THE SAME WAY (2026-10-22): its yellow keycap from the style, orange on the one whose
+            // text is going out. Without this the voice colour below was painted over the yellow.
+            if (!IsCwModeActive() && IsRttyModeActive())
+            {
+                if (RttyMessageGoingOut(messageNumber)) button.Background = VoiceMessageActiveBrush;
+                else button.ClearValue(Control.BackgroundProperty);
+                return;
+            }
             if (IsCwModeActive())
             {
                 if (isActive)
@@ -12040,6 +12082,23 @@ namespace HolyLogger
                     options.GeneralItem.IsSelected = true;
                     options.Activate();
                     options.GeneralSettingsControlControlInstance?.FocusCwPitch();
+                    options.GeneralSettingsControlControlInstance?.ShowCwDecoderBox();
+                }
+            }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        // Open Options on the General page, where RTTY sending is set. Used by the RTTY decoder's gear.
+        internal void OpenOptionsOnRtty()
+        {
+            try
+            {
+                OptionsMenuItemMenuItem_Click(null, null);
+                if (options != null)
+                {
+                    options.GeneralItem.IsSelected = true;
+                    options.Activate();
+                    options.GeneralSettingsControlControlInstance?.ShowRttyBox();
                 }
             }
             catch (System.Exception swallowed) { Log.Swallow(swallowed); }
@@ -19397,6 +19456,8 @@ namespace HolyLogger
                 // memory, so there's no text to edit here, but the name is still his to give.
                 if (IsCwModeActive())
                     ShowCwMessageEditDialog(messageNumber);
+                else if (IsRttyModeActive())
+                    ShowRttyMessageEditDialog(messageNumber);
                 else
                     ShowMsgButtonRenameDialog(messageNumber);
             }

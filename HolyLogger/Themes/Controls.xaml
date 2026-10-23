@@ -463,6 +463,48 @@
         </Setter>
     </Style>
 
+    <!-- The yellow keycap of the RTTY message buttons (2026-10-22): the yellow of the Radio Control
+         Panel's RTTY button, so the mode and the buttons that send in it read as one. Fixed, like the
+         CW cyan, so the black writing on it stays readable in every colour scheme. -->
+    <Style x:Key="MsgButtonRttyStyle" TargetType="Button">
+        <Setter Property="Background" Value="#FFFF00"/>
+        <Setter Property="Foreground" Value="#000000"/>
+        <Setter Property="FontWeight" Value="Bold"/>
+        <Setter Property="FontSize" Value="11"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Margin" Value="0,1,0,1"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="KeyOuter" CornerRadius="5" Background="#B8A800" SnapsToDevicePixels="True" Padding="0,0,0,3">
+                        <Border x:Name="KeyFace" CornerRadius="5" BorderThickness="1" BorderBrush="#D6C600" SnapsToDevicePixels="True" Background="{TemplateBinding Background}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="4,2,4,2"/>
+                        </Border>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="KeyOuter" Property="Background" Value="#8A7E00"/>
+                            <Setter TargetName="KeyFace" Property="Background" Value="#F0E800"/>
+                            <Setter TargetName="KeyFace" Property="BorderBrush" Value="#A89A00"/>
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="KeyFace" Property="Margin" Value="0,2,0,0"/>
+                            <Setter TargetName="KeyOuter" Property="Padding" Value="0,2,0,1"/>
+                            <Setter TargetName="KeyFace" Property="Background" Value="#DDD400"/>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="KeyOuter" Property="Background" Value="#888888"/>
+                            <Setter TargetName="KeyFace" Property="Background" Value="#E4E4E4"/>
+                            <Setter TargetName="KeyFace" Property="BorderBrush" Value="#B5B5B5"/>
+                            <Setter Property="Foreground" Value="#7A7A7A"/>
+                            <Setter Property="Opacity" Value="0.8"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <!-- EVERY TOOLTIP IN THE PROGRAM, at the size everything else is written in. WPF gives a
          tooltip the system's own font - about eleven, and grey - which is the one piece of text a
          man reads BECAUSE he could not work something out, so it is the worst place to be small.
