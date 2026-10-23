@@ -155,12 +155,13 @@ namespace HolyLogger.OptionsUserControls
 
         // The CW decoder's gear lands here: the pitch box, with the CW Decoder frame in view.
         // THE GEAR SHOWS WHERE (his request, 2026-10-23): the CW and RTTY decoders' gears open this page,
-        // and the box they mean is scrolled into view with its frame lit yellow while Options is open, so
-        // he does not have to hunt for it among the others. Only one box lit at a time.
-        internal void ShowCwDecoderBox() { LightBox(CwDecoderBox); }
-        internal void ShowRttyBox() { LightBox(RttySendingBox); }
+        // and the box they mean is scrolled into view with its frame lit while Options is open, so he
+        // does not have to hunt for it among the others. Only one box lit at a time. Each in its mode's
+        // colour on the Radio Control Panel: CW the CW button's red, RTTY yellow (his choice, 2026-10-23).
+        internal void ShowCwDecoderBox() { LightBox(CwDecoderBox, Color.FromRgb(0xD3, 0x2F, 0x2F)); }
+        internal void ShowRttyBox() { LightBox(RttySendingBox, Color.FromRgb(0xFF, 0xD0, 0x00)); }
 
-        void LightBox(GroupBox box)
+        void LightBox(GroupBox box, Color colour)
         {
             try
             {
@@ -172,7 +173,7 @@ namespace HolyLogger.OptionsUserControls
                         other.ClearValue(Control.BorderThicknessProperty);
                     }
                     box.BringIntoView();
-                    box.BorderBrush = new SolidColorBrush(Color.FromRgb(0xFF, 0xD0, 0x00));
+                    box.BorderBrush = new SolidColorBrush(colour);
                     box.BorderThickness = new Thickness(3);
                 }), System.Windows.Threading.DispatcherPriority.Input);
             }
