@@ -2966,6 +2966,18 @@ namespace HolyLogger.Properties {
                 this["ClusterAlertCallsigns"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string ClusterAlertModes {
+            get {
+                return ((string)(this["ClusterAlertModes"]));
+            }
+            set {
+                this["ClusterAlertModes"] = value;
+            }
+        }
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
