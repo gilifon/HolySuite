@@ -137,6 +137,7 @@ namespace HolyLogger
         // when its band or mode is filtered out, because a watch that only works on the band you are
         // already showing is no watch at all.
         HashSet<string> _clusterAlertCalls = null;                 // identity bases, upper case; built on demand
+        HashSet<string> _clusterAlertModes = null;                 // the Mode alert boxes ticked; built on demand
         StackPanel clusterAlertStrip = null;                        // pinned lines above the table (see BuildClusterAlertStrip)
         Button clusterAlertsBtn = null;                            // the bell button on the header canvas
         TextBlock clusterAlertsCountText = null;                   // how many callsigns are on the watch list
@@ -4065,7 +4066,7 @@ namespace HolyLogger
                         IsNeededCountry = IsNeededCountry(dx, workedCountries),
                         IsUnconfirmedCountry = IsUnconfirmedCountry(dx, workedCountries, confirmedEntities),
                         IsLotwUser = LotwUserService.IsLotwUser(dx),
-                        IsAlertCallsign = IsClusterAlertCallsign(dx),
+                        IsAlertCallsign = IsClusterAlertSpot(dx, mode),
                         SpotKey = key
                     };
 
@@ -5026,7 +5027,7 @@ namespace HolyLogger
             // at the far end where nobody looks. It is lifted out and pinned above the table instead
             // (user, 2026-09-03). Newest per callsign+band, and the same "Last N min" window as the table.
             List<ClusterSpotViewItem> stripSpots = null;
-            if (GetClusterAlertCallSet().Count > 0)
+            if (HasClusterAlerts())
             {
                 stripSpots = clusterAllSpots
                     .Where(s => s.IsAlertCallsign)
@@ -5071,7 +5072,7 @@ namespace HolyLogger
             var filtered = collapsed.Take(500).ToList();
             // The 500 is a display cap, not a filter. On a busy evening a watched spot could be pushed
             // past it and disappear exactly when it matters, so any that fall outside are put back.
-            if (collapsed.Count > filtered.Count && GetClusterAlertCallSet().Count > 0)
+            if (collapsed.Count > filtered.Count && HasClusterAlerts())
                 filtered.AddRange(collapsed.Skip(500).Where(s => s.IsAlertCallsign));
 
             // One pass over the log builds an O(1) lookup set; the old per-spot IsClusterCallsignInLog
@@ -5444,11 +5445,74 @@ namespace HolyLogger
             try { Properties.Settings.Default.Save(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
 
             _clusterAlertCalls = null;   // rebuilt on the next match
+            RemarkClusterAlertSpots();
+            UpdateClusterAlertsCount();   // the number on the bell follows the list
+        }
+
+        // ── Alerts: the Mode alert boxes ─────────────────────────────────────────────
+        // The modes ticked under "Mode alert" in the Alerts window. A spot on one of them is treated
+        // exactly like a spot for a watched callsign (user, 2026-10-25): it rings the Alerts sound, is
+        // framed in purple, sorted to the top, and pinned above the table when the table hides it.
+        // Kept as one comma-separated line, in the same words as the cluster's own mode boxes.
+
+        internal HashSet<string> GetClusterAlertModes()
+        {
+            var set = _clusterAlertModes;
+            if (set == null)
+            {
+                set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                string raw = Properties.Settings.Default.ClusterAlertModes ?? string.Empty;
+                foreach (string part in raw.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries))
+                {
+                    string mode = part.Trim().ToUpperInvariant();
+                    if (mode.Length > 0) set.Add(mode);
+                }
+                _clusterAlertModes = set;
+            }
+            return set;
+        }
+
+        internal void SetClusterAlertModes(IEnumerable<string> modes)
+        {
+            var list = (modes ?? Enumerable.Empty<string>())
+                .Select(m => (m ?? string.Empty).Trim().ToUpperInvariant())
+                .Where(m => m.Length > 0)
+                .Distinct()
+                .ToList();
+
+            Properties.Settings.Default.ClusterAlertModes = string.Join(",", list);
+            try { Properties.Settings.Default.Save(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+
+            _clusterAlertModes = null;   // rebuilt on the next match
+            RemarkClusterAlertSpots();
+        }
+
+        private bool IsClusterAlertMode(string mode)
+        {
+            string m = (mode ?? string.Empty).Trim();
+            if (m.Length == 0) return false;
+            return GetClusterAlertModes().Contains(m);
+        }
+
+        // A watched callsign OR a ticked mode. IsAlertCallsign carries both, so everything that
+        // frames, pins and rings for a watched callsign does the same for a ticked mode.
+        private bool IsClusterAlertSpot(string callsign, string mode)
+        {
+            return IsClusterAlertCallsign(callsign) || IsClusterAlertMode(mode);
+        }
+
+        private bool HasClusterAlerts()
+        {
+            return GetClusterAlertCallSet().Count > 0 || GetClusterAlertModes().Count > 0;
+        }
+
+        // The whole spot buffer is re-marked, so a change made now also catches the spots that
+        // arrived before it.
+        private void RemarkClusterAlertSpots()
+        {
             if (clusterAllSpots != null)
                 foreach (var spot in clusterAllSpots)
-                    spot.IsAlertCallsign = IsClusterAlertCallsign(spot.DXCallsign);
-
-            UpdateClusterAlertsCount();   // the number on the bell follows the list
+                    spot.IsAlertCallsign = IsClusterAlertSpot(spot.DXCallsign, spot.Mode);
             RefreshClusterVisibleSpots();
         }
 

@@ -13611,7 +13611,7 @@ namespace HolyLogger
 
             private bool _isAlertCallsign;
             // On the Alerts watch list (the bell under "Latest"): a callsign the operator typed in
-            // himself. Such a spot is sorted to the top of the table, framed in purple, and rings on
+            // himself, or a mode he ticked under "Mode alert". Such a spot is sorted to the top of the table, framed in purple, and rings on
             // arrival — and it is shown even on a band or mode the table is filtering out.
             public bool IsAlertCallsign
             {

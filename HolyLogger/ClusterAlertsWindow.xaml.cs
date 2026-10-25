@@ -14,6 +14,7 @@ namespace HolyLogger
     // hand: every callsign here is one the operator does not want to miss. A spot for it rings the
     // new-country sound and is framed in purple; on a band or mode the table is not showing it is
     // pinned on its own line inside the table instead, which is the whole point of a watch.
+    // Below the table, "Mode alert" does the same for every spot on a ticked mode.
     //
     // There is no OK/Cancel: an edit is saved the moment the cell is left, the same way the cluster's
     // other settings behave. The list lives in Settings.ClusterAlertCallsigns as one comma-separated
@@ -43,6 +44,7 @@ namespace HolyLogger
             finally { _loading = false; }
 
             GRD_Calls.ItemsSource = _calls;
+            BuildModeBoxes();
             // Covers the Delete key and the row the user removes with it; typed edits come through
             // Calls_CellEditEnding, which fires before the item is in the collection. A removal can
             // also take the blank line away, so one is put back.
@@ -295,6 +297,50 @@ namespace HolyLogger
         }
 
         private void BtnClose_Click(object sender, RoutedEventArgs e) => Close();
+
+        // The cluster window's own mode boxes, in its order: the word above, the box below it.
+        private static readonly string[] AlertModes = { "SSB", "CW", "FT8", "DIGI", "RTTY", "FM", "AM" };
+
+        // A tick is saved the moment it is made, like an edit in the callsign table.
+        private void BuildModeBoxes()
+        {
+            var ticked = _main != null ? _main.GetClusterAlertModes()
+                                       : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            PNL_Modes.Columns = AlertModes.Length;
+            foreach (string mode in AlertModes)
+            {
+                var box = new CheckBox
+                {
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    IsChecked = ticked.Contains(mode),
+                    Tag = mode
+                };
+                box.Checked += (a, b) => SaveModes();
+                box.Unchecked += (a, b) => SaveModes();
+
+                var cell = new StackPanel { HorizontalAlignment = HorizontalAlignment.Center };
+                cell.Children.Add(new TextBlock
+                {
+                    Text = mode,
+                    FontSize = 16,
+                    FontWeight = FontWeights.Bold,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    Margin = new Thickness(0, 0, 0, 2)
+                });
+                cell.Children.Add(box);
+                PNL_Modes.Children.Add(cell);
+            }
+        }
+
+        private void SaveModes()
+        {
+            if (_main == null) return;
+            var modes = PNL_Modes.Children.OfType<StackPanel>()
+                .SelectMany(p => p.Children.OfType<CheckBox>())
+                .Where(c => c.IsChecked == true)
+                .Select(c => (string)c.Tag);
+            _main.SetClusterAlertModes(modes);
+        }
 
         // Blank lines are dropped and a callsign typed twice is kept once, so the list the cluster
         // matches against is exactly what the grid shows.
