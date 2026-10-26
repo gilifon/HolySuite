@@ -138,9 +138,13 @@ namespace HolyLogger
         // already showing is no watch at all.
         HashSet<string> _clusterAlertCalls = null;                 // identity bases, upper case; built on demand
         HashSet<string> _clusterAlertModes = null;                 // the Mode alert boxes ticked; built on demand
+        List<ClusterSpotViewItem> clusterHiddenAlertSpots = null;   // alert spots the table's filters leave out
+        List<ClusterSpotViewItem> clusterAlertStripSpots = null;    // the spots on the pinned lines right now
         StackPanel clusterAlertStrip = null;                        // pinned lines above the table (see BuildClusterAlertStrip)
+        ScrollViewer clusterAlertStripScroller = null;              // holds the pinned lines; scrolls when they do not fit
+        bool _clusterAlertStripUpdatePending;
         Button clusterAlertsBtn = null;                            // the bell button on the header canvas
-        TextBlock clusterAlertsCountText = null;                   // how many callsigns are on the watch list
+        TextBlock clusterAlertsCountText = null;                   // how many callsigns and modes are being watched
         ClusterAlertsWindow clusterAlertsWindow = null;            // single instance
         DateTime _lastAlertCallsignAlertUtc = DateTime.MinValue;   // throttles the watch-list alert sound
         FrameworkElement clusterCenterLine = null;    // overlay that hosts the reference line (fills the table area)
@@ -924,6 +928,8 @@ namespace HolyLogger
             clusterAlertsBtn = null;
             clusterAlertsCountText = null;
             clusterAlertStrip = null;
+            clusterAlertStripScroller = null;
+            clusterAlertStripSpots = null;
             clusterBandSpotCountTexts.Clear();
             clusterLastMinutesComboBox = null;
             clusterBandFilterAllBtn = null;
@@ -1124,7 +1130,7 @@ namespace HolyLogger
                 BorderThickness = new Thickness(0),
                 Padding = new Thickness(0),
                 Cursor = Cursors.Hand,
-                ToolTip = "Alerts: the callsigns you are waiting for. A spot for one of them rings, goes to the top row, and is framed in purple.",
+                ToolTip = "Alerts: the callsigns and modes you are waiting for. A spot for one of them rings and is framed in purple.",
                 Content = content
             };
             // Opt out of the app-wide themed Button style, whose padding would squeeze the icon — the
@@ -1142,7 +1148,9 @@ namespace HolyLogger
         {
             if (clusterAlertsCountText == null) return;
 
-            int count = GetClusterAlertCallSet().Count;
+            // Callsigns and ticked modes alike (user, 2026-10-26): a bell reading 0 while CW is ticked
+            // under Mode alert says nothing is watched, which is not so.
+            int count = GetClusterAlertCallSet().Count + GetClusterAlertModes().Count;
             clusterAlertsCountText.Text = count.ToString(CultureInfo.InvariantCulture);
 
             // The bell's body is thirteen pixels across at its widest, so two digits at the one-digit
@@ -1187,11 +1195,21 @@ namespace HolyLogger
                                     <DataGridColumnHeadersPresenter x:Name='PART_ColumnHeadersPresenter' Grid.Column='1'
                                             Visibility='{Binding HeadersVisibility, ConverterParameter={x:Static DataGridHeadersVisibility.Column}, Converter={x:Static DataGrid.HeadersVisibilityConverter}, RelativeSource={RelativeSource AncestorType={x:Type DataGrid}}}'/>
 
-                                    <ContentPresenter Grid.Row='1' Grid.Column='1' ClipToBounds='True'
-                                            Content='{Binding Tag, RelativeSource={RelativeSource AncestorType={x:Type DataGrid}}}'/>
+                                    <!-- Behind the rows: a see-through backdrop so the EMPTY part of the list can
+                                         be pointed at too. Without it, once Live Scale slid the rows away there
+                                         was nothing under the mouse but the grid's frame - plain arrow, and no
+                                         drag could start there. -->
+                                    <Border x:Name='ListBackdrop' Grid.Row='2' Grid.ColumnSpan='2' Background='Transparent'/>
 
                                     <ScrollContentPresenter x:Name='PART_ScrollContentPresenter' Grid.Row='2' Grid.ColumnSpan='2'
                                             CanContentScroll='{TemplateBinding CanContentScroll}'/>
+
+                                    <!-- The Alerts strip. Written AFTER the rows presenter on purpose: the strip
+                                         has a ScrollViewer of its own, and the code that finds the rows viewport
+                                         takes the first ScrollContentPresenter in the tree - which must stay
+                                         the table's. -->
+                                    <ContentPresenter Grid.Row='1' Grid.Column='1' ClipToBounds='True'
+                                            Content='{Binding Tag, RelativeSource={RelativeSource AncestorType={x:Type DataGrid}}}'/>
 
                                     <ScrollBar x:Name='PART_VerticalScrollBar' Grid.Row='2' Grid.Column='2' Orientation='Vertical'
                                             Maximum='{TemplateBinding ScrollableHeight}'
@@ -1561,7 +1579,13 @@ namespace HolyLogger
             // Right-click a spot: the menu that puts it on the Try Again list. PREVIEW, because the
             // DataGrid's own right-button handling selects rows and would otherwise get there first.
             spotsGrid.PreviewMouseRightButtonDown += ClusterSpotsGrid_MouseRightButtonDown;
-            spotsGrid.SizeChanged += (s, e) => RequestClusterHeaderAlignmentRefresh();
+            spotsGrid.SizeChanged += (s, e) =>
+            {
+                RequestClusterHeaderAlignmentRefresh();
+                // The pinned lines may take up to 40% of the table; past that they scroll.
+                if (clusterAlertStripScroller != null)
+                    clusterAlertStripScroller.MaxHeight = Math.Max(60, spotsGrid.ActualHeight * 0.4);
+            };
             spotsGrid.ColumnReordered += (s, e) =>
             {
                 SaveClusterColumnOrder(spotsGrid);   // remember the order the user dragged to
@@ -2564,8 +2588,9 @@ namespace HolyLogger
             // NOT OVER THE DX CALLSIGN. That cell wears the hand, and a wheel that tuned the radio
             // from under a hand would be two different promises in one place. The rest of the row -
             // the spotter's callsign with it - is the wheel's.
+            // (Only while it wears the hand - while the list can be dragged it wears the drag pointer.)
             DataGridCell under = FindVisualParent<DataGridCell>(e.OriginalSource as DependencyObject);
-            if (under != null && under.Column == clusterDxColumn) return;
+            if (under != null && under.Column == clusterDxColumn && !ClusterDragCanStart()) return;
 
             double khz;
             try { khz = (double)Rig.GetRxFrequency() / 1000.0; }
@@ -2595,6 +2620,7 @@ namespace HolyLogger
         // NEAREST ROW WINS. Between two spots there is no station to go to, so the row whose center is
         // closest to the frame is the one taken, and letting go snaps that row into the frame. A drag
         // therefore always lands on a real spot; the wheel remains the fine tuning between them.
+        // Past the first or last spot there is none, and the drag tunes by frequency (see ClusterDragTo).
         //
         // The measurements come from the same three pieces the auto-scroll uses - the spacer pad on the
         // rows panel, the row height, and the MEASURED position of the frame - so the row this puts in
@@ -2648,16 +2674,38 @@ namespace HolyLogger
             int n = clusterSpotsDataGrid.Items.Count;
             if (n <= 0) return;
 
-            // The list does not run away past its own ends: the frame stays between the first and the
-            // last spot, so there is always a station in it to tune to.
-            double lowest = ClusterOffsetForRow(0, pad, rowH, lineY);
-            double highest = ClusterOffsetForRow(n - 1, pad, rowH, lineY);
             double offset = _clusterDragFromOffset - dy;          // pull down -> earlier rows (higher kHz)
-            if (offset < lowest) offset = lowest;
-            if (offset > highest) offset = highest;
             SetClusterScaleOffset(sv, offset);
 
-            int index = (int)Math.Round((offset + lineY - pad) / rowH - 0.5);
+            // PAST AN END THE DRAG IS THE TUNING KNOB (user, 2026-10-26). Beyond the first or last spot
+            // there is no station to land on, so the radio follows the hand by frequency instead, at the
+            // same rate the auto-scroll uses out there (the list's average spacing per row - see
+            // ScrollClusterLiveScale), so when the radio reports back the list stays where the hand left
+            // it. Kept inside the band, as the wheel is. Letting go out there leaves the radio where it is.
+            double rowsY = (offset + lineY - pad) / rowH;         // the frame's position in rows (row i centre = i + 0.5)
+            if (rowsY < 0.5 || rowsY > n - 0.5)
+            {
+                var top = clusterSpotsDataGrid.Items[0] as ClusterSpotViewItem;
+                var bottom = clusterSpotsDataGrid.Items[n - 1] as ClusterSpotViewItem;
+                double topF = top == null ? 0 : top.FreqMhz;
+                double botF = bottom == null ? 0 : bottom.FreqMhz;
+                double avgGap = (n > 1 && topF > botF) ? (topF - botF) / (n - 1) : 0.001;
+                double mhz = rowsY < 0.5
+                    ? topF + (0.5 - rowsY) * avgGap
+                    : botF - (rowsY - (n - 0.5)) * avgGap;
+                double endKhz = (rowsY < 0.5 ? topF : botF) * 1000.0;
+                if (endKhz <= 0) return;
+
+                double khz = Math.Round(mhz * 10000.0) / 10.0;    // 100 Hz steps
+                var band = RadioPanelPresets.BandFor(endKhz);
+                if (band != null) khz = Math.Max(band.LowKhz, Math.Min(band.HighKhz, khz));
+
+                _clusterDragLastIndex = -1;   // coming back into the list tunes to the end spot again
+                QueueWheelTune(khz);
+                return;
+            }
+
+            int index = (int)Math.Round(rowsY - 0.5);
             if (index < 0) index = 0; else if (index > n - 1) index = n - 1;
 
             if (letGo) SetClusterScaleOffset(sv, ClusterOffsetForRow(index, pad, rowH, lineY));
@@ -2683,6 +2731,7 @@ namespace HolyLogger
             {
                 clusterSpotsDataGrid.ReleaseMouseCapture();
             }
+            if (clusterSpotsDataGrid != null) clusterSpotsDataGrid.Cursor = null;   // never on the headings
         }
 
         private double _clusterDragLastDy = 0;
@@ -3244,6 +3293,7 @@ namespace HolyLogger
         private void ClusterSpotsScrollViewer_ScrollChanged(object sender, ScrollChangedEventArgs e)
         {
             UpdateClusterActiveBandIndicatorPosition();
+            RequestClusterAlertStripUpdate();   // an alert row may just have scrolled out of sight
         }
 
         // THE POINTER OVER THE SPOT LIST, where nothing under it is clickable. With Live Scale on the
@@ -3282,6 +3332,11 @@ namespace HolyLogger
             }
             if (clusterSpotsRowsArea != null) clusterSpotsRowsArea.Cursor = cursor;
             if (clusterAlertStrip != null) clusterAlertStrip.Cursor = cursor;
+
+            // The empty part of the list (see ListBackdrop in the grid's template).
+            var sv = clusterSpotsScrollViewer;
+            var backdrop = sv == null || sv.Template == null ? null : sv.Template.FindName("ListBackdrop", sv) as FrameworkElement;
+            if (backdrop != null) backdrop.Cursor = cursor;
         }
 
         // IS THERE A RADIO TO TURN? Manual mode says where the LOG gets its frequency, not whether
@@ -3334,6 +3389,11 @@ namespace HolyLogger
                     {
                         _clusterDragging = true;
                         dataGrid.CaptureMouse();
+                        // THE DRAG POINTER STAYS WHILE THE HAND IS DOWN (user, 2026-10-26). With the mouse
+                        // captured, WPF asks the GRID for the pointer, not the rows under it - and the grid
+                        // has none of its own, so it fell back to the plain arrow the moment the drag began.
+                        // Given the scale's pointer only for the drag; ClusterDragEnd takes it back.
+                        dataGrid.Cursor = Cursors.ScrollNS;
 
                         // This press is a drag, so it is not the click that opens QRZ.
                         if (clusterSingleClickOpenQrzTimer != null) clusterSingleClickOpenQrzTimer.Stop();
@@ -3403,7 +3463,10 @@ namespace HolyLogger
             // included, belongs to the list: it wears the list's pointer and the wheel tunes from it.
             // A single click on the spotter still opens its QRZ page; the wheel and the click do not
             // get in each other's way.
-            bool isInteractiveColumn = cell.Column == clusterDxColumn;
+            //
+            // EXCEPT WHILE THE LIST CAN BE DRAGGED (user, 2026-10-26): then the whole list wears the drag
+            // pointer, the DX callsign included - and the wheel tunes from there too, so the two agree.
+            bool isInteractiveColumn = cell.Column == clusterDxColumn && !ClusterDragCanStart();
             SetClusterListCursor(isInteractiveColumn ? Cursors.Hand : ClusterIdleCursor());
 
             if (cell.Column == clusterDxColumn || cell.Column == clusterSpotterColumn)
@@ -3491,7 +3554,11 @@ namespace HolyLogger
             // A press on a spot may turn out to be a drag of the scale. It is only ARMED here - nothing
             // moves until the pointer has travelled far enough to mean it (see ClusterSpotsGrid_MouseMove),
             // so an ordinary click, and the double-click that sends the radio to a spot, are untouched.
-            if (cell != null && e.ClickCount == 1 && ClusterDragCanStart())
+            //
+            // ANYWHERE IN THE LIST, NOT ONLY ON A ROW (user, 2026-10-26). Once the list has slid away
+            // past its end, what is under the hand is empty space, and a drag that had to start on a row
+            // could not bring it back. The column headings and the scroll bars are not the list.
+            if (e.ClickCount == 1 && ClusterDragCanStart() && IsInClusterListArea(e.OriginalSource as DependencyObject))
             {
                 ScrollViewer sv; double pad, rowH, lineY;
                 if (TryClusterScaleGeometry(out sv, out pad, out rowH, out lineY))
@@ -3549,6 +3616,17 @@ namespace HolyLogger
 
             // Prevent default DataGrid row selection highlight on other columns (UTC/Mode/Comment/Freq single-click).
             e.Handled = true;
+        }
+
+        // The rows, the space around them and the pinned Alerts lines - everything under the column
+        // headings except the scroll bars.
+        private static bool IsInClusterListArea(DependencyObject source)
+        {
+            if (source == null) return false;
+            if (FindVisualParent<System.Windows.Controls.Primitives.DataGridColumnHeader>(source) != null) return false;
+            if (FindVisualParent<System.Windows.Controls.Primitives.DataGridColumnHeadersPresenter>(source) != null) return false;
+            if (FindVisualParent<System.Windows.Controls.Primitives.ScrollBar>(source) != null) return false;
+            return true;
         }
 
         private void ClusterSingleClickOpenQrzTimer_Tick(object sender, EventArgs e)
@@ -4300,7 +4378,14 @@ namespace HolyLogger
 
             var onFreqSig = new System.Text.StringBuilder();     // which spots are on frequency right now
             var onFreqCalls = new System.Text.StringBuilder();   // their callsigns, for the in-place map restyle
-            foreach (var spot in clusterVisibleSpots)
+            // THE PINNED ALERTS LINES COUNT TOO (user, 2026-10-25). They sit above the table, not in it,
+            // so a station double-clicked there was never found on frequency, and the rule below
+            // cleared its callsign the moment the radio arrived.
+            var hiddenAlerts = clusterHiddenAlertSpots;
+            var checkedSpots = hiddenAlerts == null || hiddenAlerts.Count == 0
+                ? (IEnumerable<ClusterSpotViewItem>)clusterVisibleSpots
+                : clusterVisibleSpots.Concat(hiddenAlerts).ToList();
+            foreach (var spot in checkedSpots)
             {
                 string spotFreqText = spot.FreqText?.Trim();
                 if (!string.IsNullOrWhiteSpace(spotFreqText) &&
@@ -5038,10 +5123,9 @@ namespace HolyLogger
                     .GroupBy(s => (s.DXCallsign ?? string.Empty).Trim().ToUpperInvariant() + "|" + NormalizeClusterBandKey(s.BandText))
                     .Select(g => g.OrderByDescending(x => x.UnixTime).First())
                     .OrderByDescending(s => s.UnixTime)
-                    .Take(5)                      // a strip, not a second table
-                    .ToList();
+                    .ToList();   // NO CAP (user, 2026-10-25): every alert is seen; the strip scrolls instead
             }
-            RefreshClusterAlertStrip(stripSpots);
+            clusterHiddenAlertSpots = stripSpots;
 
             List<ClusterSpotViewItem> collapsed;
             if (clusterLatestPerCallsignOn)
@@ -5106,6 +5190,7 @@ namespace HolyLogger
             UpdateClusterBandSpotCounts();
             RequestClusterHeaderAlignmentRefresh();
             UpdateClusterSpotsOnMap();
+            RequestClusterAlertStripUpdate();
         }
 
         // Per-band spot counts shown under each band checkbox. Counts spots on each band within the
@@ -5485,6 +5570,7 @@ namespace HolyLogger
 
             _clusterAlertModes = null;   // rebuilt on the next match
             RemarkClusterAlertSpots();
+            UpdateClusterAlertsCount();   // the number on the bell counts the ticked modes too
         }
 
         private bool IsClusterAlertMode(string mode)
@@ -5521,7 +5607,7 @@ namespace HolyLogger
         // with the table's own columns (each cell follows its column's live width, so the strip stays in
         // step when a column is dragged wider). Empty -> collapsed, and the window looks as it always did.
 
-        private StackPanel BuildClusterAlertStrip()
+        private FrameworkElement BuildClusterAlertStrip()
         {
             clusterAlertStrip = new StackPanel
             {
@@ -5531,11 +5617,80 @@ namespace HolyLogger
             };
             // The table's own text size, so a pinned line reads as one of its rows.
             TextElement.SetFontSize(clusterAlertStrip, 13);
-            return clusterAlertStrip;
+
+            // More pinned lines than fit get a scroll bar of their own, never a cap: an alert that is
+            // not on screen is no alert. MaxHeight follows the table's height (see the grid's SizeChanged).
+            clusterAlertStripScroller = new ScrollViewer
+            {
+                Content = clusterAlertStrip,
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                Focusable = false,
+                MaxHeight = 150
+            };
+            return clusterAlertStripScroller;
+        }
+
+        // EVERY ALERT IN SIGHT, ALWAYS (user, 2026-10-25). The strip holds two kinds of line: alert
+        // spots the table's filters leave out, and alert rows that ARE in the table but have scrolled
+        // out of its window - in Live Scale a row sits at its own frequency, and dragging the list moved
+        // it off the edge. Such a row is pinned until it scrolls back into view.
+        //
+        // Run after layout and coalesced: it is asked on every scroll, and the strip changing height
+        // changes the rows' window and asks again. That settles - a taller strip can only push rows out,
+        // a shorter one only bring them back - and the strip is rebuilt only when its lines change.
+        private void RequestClusterAlertStripUpdate()
+        {
+            if (_clusterAlertStripUpdatePending || clusterAlertStrip == null) return;
+            _clusterAlertStripUpdatePending = true;
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                _clusterAlertStripUpdatePending = false;
+                try { UpdateClusterAlertStrip(); }
+                catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+            }), System.Windows.Threading.DispatcherPriority.Loaded);
+        }
+
+        private void UpdateClusterAlertStrip()
+        {
+            if (clusterAlertStrip == null) return;
+
+            var spots = new List<ClusterSpotViewItem>();
+            if (clusterHiddenAlertSpots != null) spots.AddRange(clusterHiddenAlertSpots);
+            if (clusterVisibleSpots != null && clusterSpotsDataGrid != null)
+                foreach (var spot in clusterVisibleSpots)
+                    if (spot.IsAlertCallsign && !IsClusterRowInView(spot))
+                        spots.Add(spot);
+            spots = spots.OrderByDescending(s => s.UnixTime).ToList();
+
+            var shown = clusterAlertStripSpots ?? new List<ClusterSpotViewItem>();
+            if (shown.SequenceEqual(spots)) return;   // nothing changed: no rebuild, no new layout pass
+            RefreshClusterAlertStrip(spots);
+        }
+
+        // Whole row inside the table's window (a few pixels of slack). A row with no container has been
+        // virtualized away, which means it is nowhere near the window.
+        private bool IsClusterRowInView(ClusterSpotViewItem spot)
+        {
+            var row = clusterSpotsDataGrid.ItemContainerGenerator.ContainerFromItem(spot) as DataGridRow;
+            if (row == null || !row.IsVisible) return false;
+
+            var sv = clusterSpotsScrollViewer;
+            var rowsWindow = sv == null ? null : sv.Template.FindName("PART_ScrollContentPresenter", sv) as FrameworkElement;
+            if (rowsWindow == null) return true;
+
+            try
+            {
+                double top = row.TransformToVisual(rowsWindow).Transform(new Point(0, 0)).Y;
+                const double slack = 3;
+                return top >= -slack && top + row.ActualHeight <= rowsWindow.ActualHeight + slack;
+            }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); return true; }
         }
 
         private void RefreshClusterAlertStrip(List<ClusterSpotViewItem> spots)
         {
+            clusterAlertStripSpots = spots;
             if (clusterAlertStrip == null) return;
 
             clusterAlertStrip.Children.Clear();
@@ -5579,9 +5734,9 @@ namespace HolyLogger
                 Margin = new Thickness(0, 0, 0, 1),
                 HorizontalAlignment = HorizontalAlignment.Left,
                 DataContext = spot,
-                Cursor = System.Windows.Input.Cursors.Hand,
-                ToolTip = "On your Alerts list, spotted on " + (spot.BandText ?? string.Empty) +
-                          " - a band the table is not showing. Double-click to tune to it.",
+                // No pointer of its own: it takes the list's (see SetClusterListCursor), so in Live
+                // Scale it wears the drag pointer like the rest of the list.
+                ToolTip = "An alert, pinned here so you can see it. Double-click to tune to it.",
                 Child = cells
             };
             frame.SetResourceReference(Border.BackgroundProperty, "GridRowBg");
