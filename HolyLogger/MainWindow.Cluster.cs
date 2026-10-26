@@ -138,7 +138,9 @@ namespace HolyLogger
         // already showing is no watch at all.
         HashSet<string> _clusterAlertCalls = null;                 // identity bases, upper case; built on demand
         HashSet<string> _clusterAlertModes = null;                 // the Mode alert boxes ticked; built on demand
-        List<ClusterSpotViewItem> clusterHiddenAlertSpots = null;   // alert spots the table's filters leave out
+        List<ClusterSpotViewItem> clusterHiddenAlertCandidates = null; // alert spots the table's filters leave out (all of them)
+        List<ClusterSpotViewItem> clusterHiddenAlertSpots = null;   // ...of those, the ones pinned above the table
+        string _clusterAlertsInFrameSig = string.Empty;             // which of them the radio is on (see RefreshClusterVisibleSpots)
         List<ClusterSpotViewItem> clusterAlertStripSpots = null;    // the spots on the pinned lines right now
         StackPanel clusterAlertStrip = null;                        // pinned lines above the table (see BuildClusterAlertStrip)
         ScrollViewer clusterAlertStripScroller = null;              // holds the pinned lines; scrolls when they do not fit
@@ -4334,6 +4336,19 @@ namespace HolyLogger
 
             const double toleranceKhz = 0.5; // 0.5 kHz tolerance
 
+            // Has the radio arrived on (or left) a pinned alert spot? Then the table is rebuilt, so that
+            // spot moves into the frame or back out to the pinned lines (see RefreshClusterVisibleSpots).
+            var alertCandidates = clusterHiddenAlertCandidates;
+            if (alertCandidates != null)
+            {
+                string inFrameSig = ClusterSpotKeysSig(alertCandidates.Where(s => IsClusterSpotOnFreq(s, currentFreqMhz)));
+                if (!string.Equals(inFrameSig, _clusterAlertsInFrameSig, StringComparison.Ordinal))
+                {
+                    _clusterAlertsInFrameSig = inFrameSig;   // asked once, not on every pass until it runs
+                    Dispatcher.BeginInvoke(new Action(RefreshClusterVisibleSpots));
+                }
+            }
+
             // A station selected in HolyCluster (received over UDP) is authoritative: while its call is
             // held, the frequency-based auto-fill below neither overwrites nor clears the DX box, so the
             // exact clicked callsign stands even when that spot isn't in HolyLogger's own (filtered) feed.
@@ -5125,7 +5140,18 @@ namespace HolyLogger
                     .OrderByDescending(s => s.UnixTime)
                     .ToList();   // NO CAP (user, 2026-10-25): every alert is seen; the strip scrolls instead
             }
-            clusterHiddenAlertSpots = stripSpots;
+            // THE ONE THE RADIO IS ON GOES IN THE FRAME (user, 2026-10-26). A pinned spot double-clicked
+            // sent the radio to it, but the red frame is in the table and the table had no row there - so
+            // the frame sat on empty space. While the radio is on its frequency it joins the table (and
+            // leaves the pinned lines); when the radio moves off, it goes back. UpdateClusterFrequencyHighlight
+            // calls for this refresh whenever that set changes.
+            clusterHiddenAlertCandidates = stripSpots;
+            var alertsInFrame = new List<ClusterSpotViewItem>();
+            double radioMhz = ClusterRadioFreqMhz();
+            if (stripSpots != null && radioMhz > 0)
+                alertsInFrame = stripSpots.Where(s => IsClusterSpotOnFreq(s, radioMhz)).ToList();
+            _clusterAlertsInFrameSig = ClusterSpotKeysSig(alertsInFrame);
+            clusterHiddenAlertSpots = stripSpots == null ? null : stripSpots.Except(alertsInFrame).ToList();
 
             List<ClusterSpotViewItem> collapsed;
             if (clusterLatestPerCallsignOn)
@@ -5158,6 +5184,7 @@ namespace HolyLogger
             // past it and disappear exactly when it matters, so any that fall outside are put back.
             if (collapsed.Count > filtered.Count && HasClusterAlerts())
                 filtered.AddRange(collapsed.Skip(500).Where(s => s.IsAlertCallsign));
+            filtered.AddRange(alertsInFrame.Where(s => !filtered.Contains(s)));
 
             // One pass over the log builds an O(1) lookup set; the old per-spot IsClusterCallsignInLog
             // scanned the whole log for EVERY spot (500 spots x 11k QSOs per refresh, on the UI thread).
@@ -5585,6 +5612,27 @@ namespace HolyLogger
         private bool IsClusterAlertSpot(string callsign, string mode)
         {
             return IsClusterAlertCallsign(callsign) || IsClusterAlertMode(mode);
+        }
+
+        // The radio's frequency as the log shows it, in MHz; 0 when there is none.
+        private double ClusterRadioFreqMhz()
+        {
+            double mhz = 0;
+            string text = TB_Frequency == null ? null : TB_Frequency.Text;
+            double.TryParse((text ?? string.Empty).Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out mhz);
+            return mhz;
+        }
+
+        // The same half-kHz the on-frequency tint uses.
+        private static bool IsClusterSpotOnFreq(ClusterSpotViewItem spot, double radioMhz)
+        {
+            return spot != null && spot.FreqMhz > 0 && radioMhz > 0
+                   && Math.Abs(spot.FreqMhz - radioMhz) * 1000.0 <= 0.5;
+        }
+
+        private static string ClusterSpotKeysSig(IEnumerable<ClusterSpotViewItem> spots)
+        {
+            return string.Join("|", spots.Select(x => x.SpotKey ?? string.Empty));
         }
 
         private bool HasClusterAlerts()
