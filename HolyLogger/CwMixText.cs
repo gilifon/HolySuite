@@ -10,20 +10,11 @@ namespace HolyLogger
     // MIX: PLAIN AT ONCE, CORRECTED BY THE NETWORK (2026-10-17, his idea, after seeing DeepCW do it).
     //
     // Plain is quick and often right; our network is slower and better on the hard parts. So Plain
-    // types every letter the moment it is read, in ordinary weight, and when the network has read that
-    // stretch (some seconds later - see CwDeepDecoder) each letter is settled:
-    //
-    //   the network read the same letter there        -> it turns bold: confirmed
-    //   the network read a different letter there      -> Plain's is replaced by the network's, bold
-    //   the network read a letter Plain missed         -> it is put in, bold - but only where Plain heard
-    //                                                     something close by (NearPlainSeconds), because
-    //                                                     on an empty band the network invents letters
-    //   the network read nothing there                 -> Plain's turns GREY: probably noise (his choice,
-    //                                                     2026-10-17). Grey, not removed: the network does
-    //                                                     miss real letters - on his IC-7610 recordings it
-    //                                                     found fewer words than Plain (27 of 34 vs 32) - so
-    //                                                     a grey letter is doubtful, not wrong
-    //   not read by the network yet                    -> ordinary black
+    // types every letter the moment it is heard, in ordinary weight, and when the network has read that
+    // stretch (some seconds later - see CwDecodeWindow) the stretch becomes the network's reading - its letters
+    // in bold, its word gaps (see Covered for why the whole reading, not letter-by-letter patching). Plain's
+    // letters the network read nothing near turn GREY: probably noise (his choice, 2026-10-17) - grey, not
+    // removed, as the network can miss real letters.
     //
     // HIDDEN INSTEAD OF GREY, if he ticks it (Options > General > CW Decoder, 2026-10-20): on a QSO with one
     // strong and one very weak station the grey letters were most of the screen - noise read as E and T in the
@@ -49,14 +40,11 @@ namespace HolyLogger
     // the next letter comes from somebody else (another note or speed) or 2 s later; and after a pause of
     // PauseInDits dits when the next letter comes from somebody else. A line break is also a word gap.
     //
-    // THE NETWORK'S WORD GAPS (his choice, 2026-10-17). Plain's spaces split "LY2PX" into "L Y2PX", and Y2PX
-    // was offered as a call. Between two letters the network has settled (bold), its word gaps are taken
-    // instead of Plain's: a space Plain put where the network heard none is taken out, and one the network
-    // heard where Plain had none is put in. Next to a grey letter Plain's spacing stays.
+    // THE NETWORK'S WORD GAPS (his choice, 2026-10-17): Plain's spaces split "LY2PX" into "L Y2PX". Once the
+    // network has read a stretch, its word gaps are the spaces there.
     public sealed class CwMixText
     {
         const double SameLetterSeconds = 0.12;
-        const double NearPlainSeconds = 1.0;
         const int MostLetters = 4000;
         static readonly Brush DoubtInk = Brushes.Gray;
         static readonly Brush DoubtOnPatch = Frozen(Color.FromRgb(0xA8, 0xC8, 0xE8));
@@ -81,6 +69,7 @@ namespace HolyLogger
             public string Judged;                    // on a word's first letter: the word as it read when last judged
             public string SplitSeen;                 // on a word's first letter: the word as it read when last looked at for 5NN, QSB ...
             public LineBreak Break;                  // a new transmission: Text is " " (a word gap), Run is empty
+            public double GapSeconds, GapEnd;        // on the network's word gap: the silence before GapEnd, its next letter
         }
 
         readonly RichTextBox _box;
@@ -259,92 +248,169 @@ namespace HolyLogger
             _netWaiting.Add(new KeyValuePair<string, double>(letter, t));
         }
 
-        /// <summary>The network has finished reading [from, to): settle every letter in it.</summary>
+        /// <summary>The network has finished reading [from, to): that stretch of the text becomes its reading.</summary>
+        // THE NETWORK'S READING REPLACES PLAIN'S, STRETCH BY STRETCH (2026-10-27). Hybrid used to patch Plain's letters
+        // one by one - each network letter matched to a Plain letter within SameLetterSeconds, a missing one put in
+        // only near Plain, Plain's spaces kept next to a grey letter - and lost words the network had read: letters
+        // lost at word ends ("4Z5SL" shown "SL", "10" shown "1"), spaces in words ("SUNSP OT"), words glued
+        // ("LAZYDOG"). Measured (tools/HybridSim.py, his three sessions / W1AW / fist, words read):
+        //     patching (before)                 898 / 1134 / 12     invented on his sessions 509
+        //     the network's reading, whole     1075 / 1146 / 59                              506
+        //     ... only near Plain (1 s)         933 / 1132 / 16                              350
+        // The real window over the same audio (tools/HybridText.exe, line breaks and all, beam 8 bonus 2):
+        //     line break moved to the silence, network word gap after a 3 s silence   1060 / 1145 / 59   536
+        // Keeping only network letters near Plain lost real ones - Plain misses weak signals - and on the
+        // empty-band recordings the network stays as quiet as Hybrid did (session1: 14 letters in 8 minutes vs 13).
+        // Plain's letters the network did not read stay, grey (hidden unless he chose to see them).
         public void Covered(double from, double to)
         {
             var net = new List<KeyValuePair<string, double>>();
             for (int i = _netWaiting.Count - 1; i >= 0; i--)
                 if (_netWaiting[i].Value < to) { net.Add(_netWaiting[i]); _netWaiting.RemoveAt(i); }
             net.Sort((a, b) => a.Value.CompareTo(b.Value));
-
+            var letters = new List<KeyValuePair<string, double>>();
             foreach (var n in net)
-            {
-                if (n.Key == " ") { _netGaps.Add(n.Value); continue; }
-                Entry best = null;
-                double bestGap = SameLetterSeconds;
-                bool plainNear = false;
-                foreach (Entry e in _entries)
-                {
-                    if (double.IsNaN(e.T) || e.FromNet) continue;
-                    double gap = Math.Abs(e.T - n.Value);
-                    if (gap <= NearPlainSeconds) plainNear = true;
-                    if ((!e.Settled || e.Doubted) && gap <= bestGap) { bestGap = gap; best = e; }
-                }
-                if (best != null)
-                {
-                    if (best.Text != n.Key) { best.Text = n.Key; best.Run.Text = n.Key; }
-                    best.Run.FontWeight = FontWeights.Bold;
-                    best.Settled = true;
-                    if (best.Doubted) { best.Doubted = false; best.Run.ClearValue(TextElement.ForegroundProperty); }
-                    if (best.Run.Tag != null) best.Run.Foreground = CwDecodedText.CallsignInk;
-                    _changed = true;
-                }
-                else if (plainNear)
-                    Insert(n.Key, n.Value);
-            }
+                if (n.Key == " ") _netGaps.Add(n.Value); else letters.Add(n);
+            _netGaps.Sort();
+            while (_netGaps.Count > 0 && _netGaps[0] < to - 60) _netGaps.RemoveAt(0);
 
-            // Plain's letters in the stretch that the network did not read: doubtful.
-            foreach (Entry e in _entries)
-            {
-                if (e.Settled || e.FromNet || double.IsNaN(e.T) || e.T < from || e.T >= to) continue;
-                e.Run.Foreground = DoubtInk;
-                e.Doubted = true;
-                e.Settled = true;
-                _changed = true;
-            }
+            // The stretch in the text: everything after the last settled letter, up to Plain's last letter before
+            // `to`. Plain's spaces after that letter stay - the next stretch decides them.
+            int first = 0;
+            for (int k = _entries.Count - 1; k >= 0; k--)
+                if (!double.IsNaN(_entries[k].T) && _entries[k].Settled) { first = k + 1; break; }
+            int last = first - 1;
+            for (int k = first; k < _entries.Count; k++)
+                if (!double.IsNaN(_entries[k].T) && _entries[k].T < to) last = k;
 
-            TakeNetSpacing(from, to);
+            // What leaves it: Plain's letters (kept grey where the network read nothing near) and spaces; a line
+            // break stays, before the first letter at or after the Plain letter it stood in front of.
+            var grey = new List<Entry>();
+            var breaks = new List<KeyValuePair<double, Entry>>();
+            for (int k = first; k <= last; k++)
+            {
+                Entry e = _entries[k];
+                _paragraph.Inlines.Remove(e.Run);
+                if (e.Break != null)
+                {
+                    if (e.Break.Parent != null) _paragraph.Inlines.Remove(e.Break);
+                    double at = to;
+                    for (int j = k + 1; j <= last; j++) if (!double.IsNaN(_entries[j].T)) { at = _entries[j].T; break; }
+                    breaks.Add(new KeyValuePair<double, Entry>(at, e));
+                }
+                else if (!double.IsNaN(e.T) && !letters.Exists(n => Math.Abs(n.Value - e.T) <= SameLetterSeconds))
+                {
+                    e.Run.FontWeight = FontWeights.Normal;
+                    e.Run.Foreground = DoubtInk;
+                    e.Doubted = true;
+                    e.Settled = true;
+                    grey.Add(e);
+                }
+            }
+            if (last >= first) _entries.RemoveRange(first, last - first + 1);
+
+            // What comes in, in time order: the network's letters (bold), the grey ones among them, the line breaks;
+            // a space wherever the network heard a word gap between two of its letters.
+            var items = new List<KeyValuePair<double, Entry>>();
+            foreach (var n in letters)
+                items.Add(new KeyValuePair<double, Entry>(n.Value, new Entry
+                {
+                    Text = n.Key, T = n.Value, Settled = true, FromNet = true,
+                    Run = new Run(n.Key) { FontWeight = FontWeights.Bold }
+                }));
+            foreach (Entry g in grey) items.Add(new KeyValuePair<double, Entry>(g.T, g));
+            foreach (var b in breaks) items.Add(new KeyValuePair<double, Entry>(b.Key - 1e-6, b.Value));
+            items.Sort((a, b) => a.Key.CompareTo(b.Key));
+
+            var fresh = new List<Entry>();
+            double prevNet = double.NaN;
+            bool afterGap = true;
+            for (int k = first - 1; k >= 0; k--)
+            {
+                Entry e = _entries[k];
+                if (e.Text == " ") break;
+                if (!double.IsNaN(e.T) && !e.Doubted) { prevNet = e.T; afterGap = false; break; }
+            }
+            // The network's last letter before the stretch, across spaces: how long the silence before its next is.
+            double lastNet = double.NaN;
+            for (int k = first - 1; k >= 0 && _entries[k].Break == null; k--)
+                if (!double.IsNaN(_entries[k].T) && !_entries[k].Doubted) { lastNet = _entries[k].T; break; }
+
+            // A line break (Plain heard a new station) goes to the long silence just before, where the new over
+            // really began - Plain often knows it only a word later ("PSE K CQ / CQ DE DG8NRI" on his live audio,
+            // 2026-10-27). With no such silence it waits for the network's next word gap: Plain's breaks fell
+            // inside words the network read whole - "RE PORT", "4Z 5SL" - and were all but one of the words Hybrid
+            // lost on his 2nd and 3rd sessions.
+            Entry waiting = null;
+            foreach (var item in items)
+            {
+                Entry e = item.Value;
+                if (e.Break != null)
+                {
+                    if (MoveToSilence(e, item.Key, fresh, first)) continue;
+                    if (afterGap || double.IsNaN(prevNet)) { fresh.Add(e); afterGap = true; prevNet = double.NaN; }
+                    else waiting = e;
+                    continue;
+                }
+                if (e.FromNet)
+                {
+                    if (!afterGap && !double.IsNaN(prevNet) && _netGaps.Exists(g => g > prevNet && g < e.T))
+                    {
+                        if (waiting != null) { fresh.Add(waiting); waiting = null; }
+                        else fresh.Add(new Entry { Text = " ", T = double.NaN, Run = new Run(" "), Settled = true,
+                                                   GapEnd = e.T, GapSeconds = double.IsNaN(lastNet) ? 0 : e.T - lastNet });
+                    }
+                    prevNet = e.T;
+                    lastNet = e.T;
+                    afterGap = false;
+                }
+                fresh.Add(e);
+            }
+            if (waiting != null) fresh.Add(waiting);
+
+            Run anchor = first < _entries.Count ? _entries[first].Run : null;
+            foreach (Entry e in fresh)
+            {
+                if (anchor != null) _paragraph.Inlines.InsertBefore(anchor, e.Run); else _paragraph.Inlines.Add(e.Run);
+                if (e.Break != null) _paragraph.Inlines.InsertAfter(e.Run, e.Break);
+            }
+            _entries.InsertRange(first, fresh);
+            if (fresh.Count > 0 || last >= first) _changed = true;
+
             JudgeWords();
             if (_hide) ApplyHide();
         }
 
-        // Between each two network-settled letters, the second of them in [from, to): a space exactly
-        // where the network heard a word gap.
-        void TakeNetSpacing(double from, double to)
+        const double LongSilence = 2.0;          // seconds: a pause between overs, not between words
+        const double BreakLateBy = 6.0;          // seconds: how far back from Plain's break that pause may be
+
+        // Plain's line break `b`, heard at time t, made of the network's word gap after a long silence a little
+        // earlier - in this stretch's new text or in the text already settled. Dropped (true) when another break
+        // came a moment before with no such silence between: Plain often breaks twice for one new over (a K, then
+        // the new note). False if there is neither.
+        bool MoveToSilence(Entry b, double t, List<Entry> fresh, int first)
         {
-            while (_netGaps.Count > 0 && _netGaps[0] < to - 60) _netGaps.RemoveAt(0);
-            Entry prev = null;
-            int prevAt = -1;
-            for (int i = 0; i < _entries.Count; i++)
+            Entry found = null;
+            bool settled = false;
+            for (int k = fresh.Count - 1; k >= 0 && found == null; k--)
             {
-                Entry e = _entries[i];
-                if (e.Text == " ") continue;
-                if (prev != null && e.T >= from && e.T < to && NetBacked(prev) && NetBacked(e))
-                {
-                    bool netGap = _netGaps.Exists(g => g > prev.T && g < e.T);
-                    int spaces = i - prevAt - 1;                         // Plain's spaces between them
-                    bool lineBreak = false;
-                    for (int k = prevAt + 1; k < i; k++) if (_entries[k].Break != null) lineBreak = true;
-                    if (lineBreak) { }                                  // a new transmission stays one
-                    else if (netGap && spaces == 0)
-                    {
-                        var space = new Entry { Text = " ", T = double.NaN, Run = new Run(" "), Settled = true };
-                        _paragraph.Inlines.InsertBefore(e.Run, space.Run);
-                        _entries.Insert(i, space);
-                        i++;
-                        _changed = true;
-                    }
-                    else if (!netGap && spaces > 0)
-                    {
-                        for (int k = 0; k < spaces; k++) _paragraph.Inlines.Remove(_entries[prevAt + 1 + k].Run);
-                        _entries.RemoveRange(prevAt + 1, spaces);
-                        i -= spaces;
-                        _changed = true;
-                    }
-                }
-                prev = e;
-                prevAt = i;
+                Entry e = fresh[k];
+                if (!double.IsNaN(e.T) && e.T < t - BreakLateBy) return false;
+                if (e.Break != null) return true;
+                if (e.Text == " " && e.GapSeconds >= LongSilence && t - e.GapEnd <= BreakLateBy) found = e;
             }
+            for (int k = first - 1; k >= 0 && found == null; k--)
+            {
+                Entry e = _entries[k];
+                if (!double.IsNaN(e.T) && e.T < t - BreakLateBy) return false;
+                if (e.Break != null) return true;
+                if (e.Text == " " && e.GapSeconds >= LongSilence && t - e.GapEnd <= BreakLateBy) { found = e; settled = true; }
+            }
+            if (found == null) return false;
+            found.Break = b.Break;
+            found.Run.Text = string.Empty;
+            if (settled) _paragraph.Inlines.InsertAfter(found.Run, found.Break);
+            return true;
         }
 
         readonly SeenCalls _seen = new SeenCalls();
@@ -354,11 +420,6 @@ namespace HolyLogger
             double t = double.NaN;
             for (int k = from; k < to; k++) if (!double.IsNaN(_entries[k].T)) t = _entries[k].T;
             return t;
-        }
-
-        static bool NetBacked(Entry e)
-        {
-            return e.Settled && !e.Doubted && !double.IsNaN(e.T);
         }
 
         // THE THREE-LETTER WORDS OF A CW CONTACT STAND ALONE (his rule, 2026-10-21): "5NN5NQSB" is "5NN 5N QSB" -
@@ -627,27 +688,6 @@ namespace HolyLogger
                 QrzCallsignWindow.Open(call, Window.GetWindow(_box));
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
-        }
-
-        // A letter Plain missed, put in by its time among Plain's.
-        void Insert(string letter, double t)
-        {
-            int at = _entries.FindIndex(e => !double.IsNaN(e.T) && e.T > t);
-            var entry = new Entry { Text = letter, T = t, Run = new Run(letter) { FontWeight = FontWeights.Bold }, Settled = true, FromNet = true };
-            if (at < 0)
-            {
-                _paragraph.Inlines.Add(entry.Run);
-                _entries.Add(entry);
-            }
-            else
-            {
-                // Before a space that comes just ahead of the later letter, so it joins the word it belongs to.
-                if (at > 0 && _entries[at - 1].Text == " " && at - 2 >= 0 && !double.IsNaN(_entries[at - 2].T)
-                    && t - _entries[at - 2].T < _entries[at].T - t) at--;
-                _paragraph.Inlines.InsertBefore(_entries[at].Run, entry.Run);
-                _entries.Insert(at, entry);
-            }
-            _changed = true;
         }
 
         /// <summary>Keeps the newest text in sight. On the screen timer.</summary>
