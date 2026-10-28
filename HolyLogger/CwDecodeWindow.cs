@@ -902,7 +902,6 @@ namespace HolyLogger
             decoder.Text += OnPlainText;
             decoder.LetterTimed += OnPlainLetterTimed;
             decoder.WordGapTimed += OnPlainWordGap;
-            _plainStartSamples = _inputSamples;   // (the temporary input save: where this decoder's sample count starts)
             _plainRate = _recorder.ActualSampleRate;
             _decoder = decoder;
 
@@ -1100,7 +1099,6 @@ namespace HolyLogger
         }
 
         long _wfBase;                                   // waterfall sample count when the readers were made
-        long _plainStartSamples;
 
         // EVERY LETTER PLAIN SPELLS OUT, THE MOMENT IT DOES (his rule, 2026-10-21): written under the middle of
         // its marks on the waterfall, and at the same moment into Hybrid's text - not first held back by Plain
@@ -1110,7 +1108,6 @@ namespace HolyLogger
         void OnPlainLetterTimed(string letter, long start, long end)
         {
             if (_strip != null) _strip.AddLetter(letter, _wfBase + (start + end) / 2);
-            if (TxLogOn) _lettersSave.AppendFormat(System.Globalization.CultureInfo.InvariantCulture, "{0}\t{1}\t{2}\n", DateTime.Now.ToString("HH:mm:ss.f"), letter, _plainStartSamples + end);
             if (_plainRate <= 0) return;
             lock (_pendingGate) _pendingPlainTimed.Add(new System.Collections.Generic.KeyValuePair<string, double>(letter, end / (double)_plainRate));
         }
@@ -1189,65 +1186,6 @@ namespace HolyLogger
         }
         double _txLastMs = double.NegativeInfinity;
         short[] _silence = new short[0];
-
-        // TEMPORARY (2026-10-21) - TO SEE WHY PARTS OF HIS SENDING WERE STILL DRAWN AS WHITE BARS: only when
-        // %TEMP%\HolyLogger_cw_tx.on exists, every block of sound goes to %TEMP%\HolyLogger_cw_tx.tsv - the
-        // time, the two transmit flags, the verdict, and the block's loudness. Remove once the cause is found.
-        static readonly bool TxLogOn = TxLogWanted();
-        readonly StringBuilder _txLog = new StringBuilder();
-        double _txLogSaved;
-
-        static bool TxLogWanted()
-        {
-            try { return System.IO.File.Exists(System.IO.Path.Combine(System.IO.Path.GetTempPath(), "HolyLogger_cw_tx.on")); }
-            catch (Exception swallowed) { Log.Swallow(swallowed); return false; }
-        }
-
-        // TEMPORARY, WITH THE TRANSMIT LOG (2026-10-21: a clear CQ read badly live, read well from a recording):
-        // the exact sound Plain is given goes to %TEMP%\HolyLogger_cw_input_<rate>.raw (16-bit, mono) and every
-        // letter it spells, with the sample it ends at, to %TEMP%\HolyLogger_cw_letters.tsv - so the same
-        // stretch can be played through Plain again outside and the two compared. Remove with the log.
-        readonly System.Collections.Generic.List<byte> _inputSave = new System.Collections.Generic.List<byte>();
-        long _inputSamples;
-
-        void SaveInput(short[] samples, int count)
-        {
-            try
-            {
-                for (int i = 0; i < count; i++) { _inputSave.Add((byte)(samples[i] & 0xFF)); _inputSave.Add((byte)((samples[i] >> 8) & 0xFF)); }
-                _inputSamples += count;
-                if (_inputSave.Count >= 2 * _recorder.ActualSampleRate)
-                {
-                    System.IO.File.AppendAllText(System.IO.Path.Combine(System.IO.Path.GetTempPath(), "HolyLogger_cw_letters.tsv"), _lettersSave.ToString());
-                    _lettersSave.Clear();
-                    using (var f = new System.IO.FileStream(System.IO.Path.Combine(System.IO.Path.GetTempPath(), "HolyLogger_cw_input_" + _recorder.ActualSampleRate + ".raw"), System.IO.FileMode.Append))
-                        f.Write(_inputSave.ToArray(), 0, _inputSave.Count);
-                    _inputSave.Clear();
-                }
-            }
-            catch (Exception swallowed) { Log.Swallow(swallowed); }
-        }
-
-        readonly StringBuilder _lettersSave = new StringBuilder();
-
-        void LogTxBlock(short[] samples, int count, bool tx)
-        {
-            try
-            {
-                double sum = 0; int peak = 0;
-                for (int i = 0; i < count; i++) { int v = Math.Abs((int)samples[i]); sum += (double)v * v; if (v > peak) peak = v; }
-                double ms = _txClock.Elapsed.TotalMilliseconds;
-                _txLog.AppendFormat(System.Globalization.CultureInfo.InvariantCulture, "{0:F0}\t{1}\t{2}\t{3}\t{4:F0}\t{5}\n",
-                    ms, KeyerTransmitting ? 1 : 0, RadioTransmitting ? 1 : 0, tx ? 1 : 0, Math.Sqrt(sum / Math.Max(1, count)), peak);
-                if (ms - _txLogSaved > 2000)
-                {
-                    _txLogSaved = ms;
-                    System.IO.File.AppendAllText(System.IO.Path.Combine(System.IO.Path.GetTempPath(), "HolyLogger_cw_tx.tsv"), _txLog.ToString());
-                    _txLog.Clear();
-                }
-            }
-            catch (Exception swallowed) { Log.Swallow(swallowed); }
-        }
 
         // CW HANDED TO THE RADIO BY CAT. The radio's own TX report comes through OmniRig's polling, late and with
         // holes - on his screen the first elements and some in the middle were still drawn as big white bars and
@@ -1355,7 +1293,6 @@ namespace HolyLogger
 
             // A copy for the waterfall, drawn on the screen timer - nothing is worked out here.
             bool tx = TransmittingNow();
-            if (TxLogOn) LogTxBlock(samples, count, tx);
             if (_strip != null) _strip.Feed(samples, count, _recorder.ActualSampleRate, tx);
             if (tx)
             {
@@ -1363,7 +1300,6 @@ namespace HolyLogger
                 samples = _silence;
             }
 
-            if (TxLogOn) SaveInput(samples, count);
             try { decoder.Process(samples, count); }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
             if (_strip != null) _strip.NoteHz = decoder.SignalPresent ? decoder.ToneHz : 0;   // the dotted line on the strip
