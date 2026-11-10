@@ -3595,6 +3595,55 @@ Environment.NewLine +
         // Index that backs every per-log query (load, counts, dup checks, copy-dedupe — the qso table
         // is always filtered by log_id). Without it each of those scans the whole table, which is felt
         // on every log switch once the table holds thousands of QSOs. Idempotent.
+        // ── SYNC IDs: ONE NAME FOR A QSO (OR A LOG) ON EVERY COMPUTER ─────────────────────────────────
+        //
+        // The first step of one log kept on several computers (2026-11-10). A QSO's Id is a local
+        // number - the home computer's QSO 500 and the field laptop's QSO 500 are different contacts -
+        // so the changes one computer passes to another must name a QSO by something that is the same
+        // everywhere. That is sync_id: 128 random bits written as 8-4-4-4-12 hex, made by whichever
+        // computer creates the row, with no one to ask. Two computers drawing the same one is not a
+        // practical risk (about 1 in 3 x 10^38 for any two); the unique index makes this database refuse one
+        // anyway.
+        //
+        // A TRIGGER, NOT A CHANGE TO EVERY INSERT. New QSO, import, copy-to-log, undo-delete and new
+        // log all name their columns, so they leave sync_id empty and the trigger fills it in the same
+        // statement. A copy is its own contact with its own id; an undone delete comes back as a new one.
+        // (SQLite's ALTER TABLE cannot give a column a random DEFAULT, hence the trigger.)
+        //
+        // Existing rows are filled once, the first time this build starts. Any failure here is
+        // recorded and passed over: nothing reads sync_id yet, and HolyLogger must still start.
+        private const string NewSyncIdSql =
+            "lower(hex(randomblob(4)) || '-' || hex(randomblob(2)) || '-' || hex(randomblob(2)) || '-' || " +
+            "hex(randomblob(2)) || '-' || hex(randomblob(6)))";
+
+        private void AddSyncIds()
+        {
+            foreach (string table in new[] { "qso", "logs" })
+            {
+                try
+                {
+                    AddColToTable(table, "sync_id", "nvarchar(36) NULL");
+                    var watch = System.Diagnostics.Stopwatch.StartNew();
+                    int filled;
+                    using (var cmd = new SQLiteCommand(
+                        "UPDATE " + table + " SET sync_id = " + NewSyncIdSql + " WHERE sync_id IS NULL", con))
+                        filled = cmd.ExecuteNonQuery();
+                    using (var cmd = new SQLiteCommand(
+                        "CREATE UNIQUE INDEX IF NOT EXISTS idx_" + table + "_sync_id ON " + table + "(sync_id)", con))
+                        cmd.ExecuteNonQuery();
+                    using (var cmd = new SQLiteCommand(
+                        "CREATE TRIGGER IF NOT EXISTS trg_" + table + "_sync_id AFTER INSERT ON " + table +
+                        " WHEN NEW.sync_id IS NULL BEGIN UPDATE " + table + " SET sync_id = " + NewSyncIdSql +
+                        " WHERE Id = NEW.Id; END", con))
+                        cmd.ExecuteNonQuery();
+                    if (filled > 0)
+                        Log.Warn("Sync ids given to " + filled + " rows of " + table + " in "
+                                 + watch.ElapsedMilliseconds + " ms.");
+                }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
+            }
+        }
+
         private void EnsureLogIdIndex()
         {
             try
@@ -6469,6 +6518,7 @@ Environment.NewLine +
                     fixCopies.ExecuteNonQuery();
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
+            AddSyncIds();
             EnsureEqslAccountsTable();
             EnsureTryAgainTable();
             EnsureEqslIndexes();
