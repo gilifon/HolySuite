@@ -1465,6 +1465,10 @@ namespace HolyLogger
             StartNotesBackfill();
             Log.Step("loaded: entity backfill started");
 
+            // The diary of this computer's log changes (step 2 of one log on several computers):
+            // written every minute from the database's own notes, off the UI thread.
+            SyncDiary.Start();
+
             // The country count, skipped during the start, worked out now the window is up.
             var countries = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
             countries.Tick += (sender2, args2) =>
@@ -11300,6 +11304,9 @@ namespace HolyLogger
             // The keying port is let go first of all: a key left down is a transmitter left on.
             try { ClosePortKeyer(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
             try { CloseRttyKeyer(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }   // and the RTTY one, transmit off
+
+            // The last changes into this computer's sync diary before the program goes.
+            try { SyncDiary.Stop(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
 
             // THE CW DECODER CLOSED BY US, PROPERLY, BEFORE THIS WINDOW GOES: torn down along with it instead, its
             // waterfall's drawing thread could still be hooked in and WPF threw "Index was out of range" (see

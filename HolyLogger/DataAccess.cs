@@ -3644,6 +3644,176 @@ Environment.NewLine +
             }
         }
 
+        // ── THE SYNC JOURNAL: EVERY CHANGE TO A QSO OR A LOG, NOTED AS IT HAPPENS ─────────────────────
+        //
+        // Step 2 of one log on several computers (2026-11-10). Each computer will keep a DIARY of the
+        // changes made on it (SyncDiary.cs), and the diary has to miss nothing. QSOs and logs are written
+        // in some fifty places - a new QSO, an import and its undo, copy-to-log, the Log Fixer, every
+        // confirmation download, deleting, merging - so instead of a call in each one (and the one that
+        // gets forgotten), triggers note every change in sync_journal, whatever wrote it. The diary
+        // writer turns the notes into diary lines and then forgets them.
+        //
+        // A note says only WHICH row changed (its local Id) and whether it was written or deleted; the
+        // writer reads the row as it is when it writes the line. A delete keeps the row's sync_id, as
+        // the row is gone by then. sync_id itself is left out of "did anything change": the insert
+        // trigger that fills it would otherwise note every new QSO twice.
+        //
+        // The triggers are taken away while UpdateSchema runs - its upgrades are done by every computer
+        // for itself, not changes for the diary - and made again at its end, from the columns the table
+        // has then, so a column added by a later version is covered without anyone remembering to.
+        private static readonly string[] SyncTables = { "qso", "logs" };
+
+        private void DropSyncJournalTriggers()
+        {
+            foreach (string t in SyncTables)
+                foreach (string kind in new[] { "ins", "upd", "del" })
+                {
+                    try
+                    {
+                        using (var cmd = new SQLiteCommand("DROP TRIGGER IF EXISTS trg_" + t + "_journal_" + kind, con))
+                            cmd.ExecuteNonQuery();
+                    }
+                    catch (Exception swallowed) { Log.Swallow(swallowed); }
+                }
+        }
+
+        private void EnsureSyncJournal()
+        {
+            try
+            {
+                using (var cmd = new SQLiteCommand(
+                    "CREATE TABLE IF NOT EXISTS [sync_journal] (" +
+                    "[seq] INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                    "[kind] nvarchar(10) NOT NULL, " +
+                    "[row_id] INTEGER NOT NULL, " +
+                    "[op] nvarchar(5) NOT NULL, " +
+                    "[sync_id] nvarchar(36) NULL, " +
+                    "[at_utc] nvarchar(30) NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')))", con))
+                    cmd.ExecuteNonQuery();
+
+                foreach (string t in SyncTables)
+                {
+                    string kind = t == "qso" ? "qso" : "log";
+                    var changed = new List<string>();
+                    using (var cmd = new SQLiteCommand("SELECT name FROM pragma_table_info('" + t + "')", con))
+                    using (var rdr = cmd.ExecuteReader())
+                        while (rdr.Read())
+                        {
+                            string col = rdr.GetString(0);
+                            if (col != "sync_id") changed.Add("OLD.[" + col + "] IS NOT NEW.[" + col + "]");
+                        }
+
+                    string[] sql =
+                    {
+                        "CREATE TRIGGER IF NOT EXISTS trg_" + t + "_journal_ins AFTER INSERT ON " + t +
+                        " BEGIN INSERT INTO sync_journal (kind, row_id, op) VALUES ('" + kind + "', NEW.Id, 'put'); END",
+                        "CREATE TRIGGER IF NOT EXISTS trg_" + t + "_journal_upd AFTER UPDATE ON " + t +
+                        " WHEN " + string.Join(" OR ", changed) +
+                        " BEGIN INSERT INTO sync_journal (kind, row_id, op) VALUES ('" + kind + "', NEW.Id, 'put'); END",
+                        "CREATE TRIGGER IF NOT EXISTS trg_" + t + "_journal_del AFTER DELETE ON " + t +
+                        " BEGIN INSERT INTO sync_journal (kind, row_id, op, sync_id) VALUES ('" + kind + "', OLD.Id, 'del', OLD.sync_id); END",
+                    };
+                    foreach (string s in sql)
+                        using (var cmd = new SQLiteCommand(s, con))
+                            cmd.ExecuteNonQuery();
+                }
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        public sealed class SyncNote
+        {
+            public long Seq, RowId;
+            public string Kind, Op, SyncId, AtUtc;
+        }
+
+        // The oldest notes not yet in the diary, at most `max` of them.
+        public List<SyncNote> ReadSyncJournal(int max)
+        {
+            var list = new List<SyncNote>();
+            lock (_dbLock)
+            {
+                if (con == null || con.State != ConnectionState.Open) return list;
+                using (var cmd = new SQLiteCommand(
+                    "SELECT seq, kind, row_id, op, sync_id, at_utc FROM sync_journal ORDER BY seq LIMIT " + max, con))
+                using (var rdr = cmd.ExecuteReader())
+                    while (rdr.Read())
+                        list.Add(new SyncNote
+                        {
+                            Seq = rdr.GetInt64(0), Kind = rdr.GetString(1), RowId = rdr.GetInt64(2),
+                            Op = rdr.GetString(3), SyncId = rdr.IsDBNull(4) ? null : rdr.GetString(4),
+                            AtUtc = rdr.GetString(5)
+                        });
+            }
+            return list;
+        }
+
+        // Notes up to and including `seq` are in the diary now.
+        public void ForgetSyncJournal(long seq)
+        {
+            lock (_dbLock)
+            {
+                if (con == null || con.State != ConnectionState.Open) return;
+                using (var cmd = new SQLiteCommand("DELETE FROM sync_journal WHERE seq <= @s", con))
+                {
+                    cmd.Parameters.AddWithValue("@s", seq);
+                    cmd.ExecuteNonQuery();
+                }
+            }
+        }
+
+        // Whole rows of qso or logs by local Id, as column -> value (empty values left out).
+        public Dictionary<long, Dictionary<string, object>> ReadRowsForSync(string table, ICollection<long> ids)
+        {
+            var rows = new Dictionary<long, Dictionary<string, object>>();
+            if (ids.Count == 0 || Array.IndexOf(SyncTables, table) < 0) return rows;
+            lock (_dbLock)
+            {
+                if (con == null || con.State != ConnectionState.Open) return rows;
+                var all = new List<long>(ids);
+                for (int i = 0; i < all.Count; i += 500)
+                {
+                    string list = string.Join(",", all.GetRange(i, Math.Min(500, all.Count - i)));
+                    using (var cmd = new SQLiteCommand("SELECT * FROM " + table + " WHERE Id IN (" + list + ")", con))
+                    using (var rdr = cmd.ExecuteReader())
+                        while (rdr.Read())
+                        {
+                            var row = new Dictionary<string, object>();
+                            for (int c = 0; c < rdr.FieldCount; c++)
+                            {
+                                object v = rdr.GetValue(c);
+                                if (v == null || v == DBNull.Value) continue;
+                                if (v is string s && s.Length == 0) continue;
+                                row[rdr.GetName(c)] = v;
+                            }
+                            rows[Convert.ToInt64(rdr["Id"])] = row;
+                        }
+                }
+            }
+            return rows;
+        }
+
+        // The sync_id of each of these local Ids (of qso or logs); an Id with no row is left out.
+        public Dictionary<long, string> SyncIdsOf(string table, ICollection<long> ids)
+        {
+            var map = new Dictionary<long, string>();
+            if (ids.Count == 0 || Array.IndexOf(SyncTables, table) < 0) return map;
+            lock (_dbLock)
+            {
+                if (con == null || con.State != ConnectionState.Open) return map;
+                var all = new List<long>(ids);
+                for (int i = 0; i < all.Count; i += 500)
+                {
+                    string list = string.Join(",", all.GetRange(i, Math.Min(500, all.Count - i)));
+                    using (var cmd = new SQLiteCommand("SELECT Id, sync_id FROM " + table + " WHERE Id IN (" + list + ")", con))
+                    using (var rdr = cmd.ExecuteReader())
+                        while (rdr.Read())
+                            if (!rdr.IsDBNull(1)) map[rdr.GetInt64(0)] = rdr.GetString(1);
+                }
+            }
+            return map;
+        }
+
         private void EnsureLogIdIndex()
         {
             try
@@ -6213,6 +6383,10 @@ Environment.NewLine +
 
         private void UpdateSchema()
         {
+            // The upgrades below may rewrite many QSOs, and every computer runs them for itself - they are
+            // not changes the operator made, so they must not land in the diary. The journal's triggers
+            // are put back at the end (EnsureSyncJournal).
+            DropSyncJournalTriggers();
             string createTable_qso = @"
             CREATE TABLE [qso] (
                 [Id] INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL
@@ -6550,6 +6724,7 @@ Environment.NewLine +
             {
                 command.ExecuteNonQuery();
             }
+            EnsureSyncJournal();   // last: its triggers name every column the steps above may have added
         }
     }
 
