@@ -14481,7 +14481,8 @@ namespace HolyLogger
                 if (!go) return;
 
                 string email = await GoogleDrive.SignInAsync();
-                await Task.Run(() => SyncDiary.FlushSafe());   // the first copy goes up now, not in a minute
+                // the first copy goes up now, not in a minute, and the other computers' changes come down
+                await Task.Run(() => { SyncDiary.FlushSafe(); SyncDiary.PullSafe(); });
                 HolyMessageBox.ShowSuccess("Signed in as " + email + ".\n\nThis computer's log changes now go to your Google Drive.", title, owner());
             }
             catch (Exception ex)
