@@ -308,11 +308,44 @@
             </DataGrid.Columns>
         </DataGrid>
 
-        <TextBlock x:Name="Hint" Grid.Row="2" Margin="0,8,0,0" FontSize="16" Foreground="Black" TextWrapping="Wrap">
-            <Run Text="Select a log, then Open / Rename / Delete / Export.  " />
-            <Run Text="Double-click" FontWeight="Bold" />
-            <Run Text=" to Activate and Open it." />
-        </TextBlock>
+        <!-- The hint on the left; on the right, IS THIS DATABASE SYNCED - asked for "very visible"
+             here, where all the logs that make up the database are listed. Green = synced with
+             Google Drive, red = only on this computer. Pressing it does exactly what File >
+             Google Drive Sync does (MainWindow.ShowGoogleDriveSync). Colour and words set by
+             ShowSyncState. Its own template so the hover does not wash the colour out. -->
+        <DockPanel Grid.Row="2" Margin="0,8,0,0" LastChildFill="True">
+            <Button x:Name="Btn_Sync" DockPanel.Dock="Left" Height="34" Padding="12,0" Margin="0,0,12,0"
+                    FontSize="16" FontWeight="Bold" VerticalAlignment="Center" Cursor="Hand"
+                    Click="Btn_Sync_Click" ToolTipService.ShowDuration="30000"
+                    Background="#C62828" Foreground="White" BorderBrush="#8E1B1B" BorderThickness="1.5">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="&#xE753;" FontFamily="Segoe MDL2 Assets" FontSize="18" FontWeight="Normal"
+                               VerticalAlignment="Center" Margin="0,1,8,0"/>
+                    <TextBlock x:Name="SyncText" Text="Database not synced" VerticalAlignment="Center"/>
+                </StackPanel>
+                <Button.Template>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Face" Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="3"
+                                Padding="{TemplateBinding Padding}" SnapsToDevicePixels="True">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Face" Property="Opacity" Value="0.85"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Face" Property="Opacity" Value="0.7"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Button.Template>
+            </Button>
+            <!-- Only when the list is filtered (a callsign, or contest logs only) does a line show here;
+                 the plain "Select a log..." line was removed at his request. -->
+            <TextBlock x:Name="Hint" FontSize="16" Foreground="Black" TextWrapping="Wrap" VerticalAlignment="Center"/>
+        </DockPanel>
 
         <!-- BUSY, AND SAYING SO. Deleting a big log is not instant: its QSOs are read, their carried
              ADIF fields fetched, the file written, and only then are the rows removed. That work runs

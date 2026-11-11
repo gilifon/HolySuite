@@ -14433,6 +14433,64 @@ namespace HolyLogger
             }
         }
 
+        // GOOGLE DRIVE SYNC (step 3 of one log on several computers): signing in and out, and what is
+        // happening. The work itself is SyncDiary/GoogleDrive; this only asks and tells. Sign-in waits for
+        // the browser off the UI thread, so the window stays alive while the operator is on Google's page.
+        private async void GoogleDriveSyncMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            await ShowGoogleDriveSync(this);
+        }
+
+        // The one place both the File menu item and the Log Manager's sync button come to, so the two
+        // can never act differently. owner = the window that asked; if it was closed while the operator
+        // was on Google's page, the answer is shown over the main window instead.
+        public async Task ShowGoogleDriveSync(Window asker)
+        {
+            const string title = "Google Drive Sync";
+            Func<Window> owner = () => asker != null && PresentationSource.FromVisual(asker) != null ? asker : this;
+            try
+            {
+                if (!GoogleDrive.Registered)
+                {
+                    HolyMessageBox.Show("Google Drive Sync is not available in this copy of HolyLogger.", title, HolyMsgType.Info, owner());
+                    return;
+                }
+                if (GoogleDrive.SignedIn)
+                {
+                    DateTime? sent = GoogleDrive.LastUploadUtc;
+                    string when = sent.HasValue ? sent.Value.ToLocalTime().ToString("d MMM yyyy, HH:mm") : "not yet";
+                    bool signOut = HolyMessageBox.ShowConfirm(
+                        "Google Drive Sync is on.\n\n"
+                        + "Signed in as " + GoogleDrive.Email + ".\n"
+                        + "Last sent to Google Drive: " + when + ".",
+                        title, HolyMsgType.Info, owner(), yesText: "Sign out", noText: "Close");
+                    if (signOut)
+                    {
+                        await Task.Run(() => GoogleDrive.SignOut());
+                        HolyMessageBox.Show("Signed out. This computer no longer sends its log changes to Google Drive.", title, HolyMsgType.Info, owner());
+                    }
+                    return;
+                }
+
+                bool go = HolyMessageBox.ShowConfirm(
+                    "Keep this log the same on all your computers.\n\n"
+                    + "Sign in with Google, and HolyLogger keeps this computer's log changes in your Google Drive, "
+                    + "in a folder called \"" + GoogleDrive.FolderName + "\".\n\n"
+                    + "HolyLogger can see only the files it makes there.",
+                    title, HolyMsgType.Info, owner(), yesText: "Sign in with Google", noText: "Not now");
+                if (!go) return;
+
+                string email = await GoogleDrive.SignInAsync();
+                await Task.Run(() => SyncDiary.FlushSafe());   // the first copy goes up now, not in a minute
+                HolyMessageBox.ShowSuccess("Signed in as " + email + ".\n\nThis computer's log changes now go to your Google Drive.", title, owner());
+            }
+            catch (Exception ex)
+            {
+                Log.Warn("Google Drive Sync: " + ex.Message);
+                HolyMessageBox.ShowError("Could not sign in to Google Drive.\n\n" + ex.Message, title, owner());
+            }
+        }
+
         private void AboutMenuItem_Click(object sender, RoutedEventArgs e)
         {
             if (about != null)
