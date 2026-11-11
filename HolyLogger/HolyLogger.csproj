@@ -253,6 +253,7 @@
     <Compile Include="ClublogKey.cs" />
     <Compile Include="LotwUserService.cs" />
     <Compile Include="DataAccess.cs" />
+    <Compile Include="SyncDiary.cs" />
     <Compile Include="EqslQueueWindow.cs" />
     <Compile Include="LotwUploader.cs" />
     <Compile Include="ClublogService.cs" />
