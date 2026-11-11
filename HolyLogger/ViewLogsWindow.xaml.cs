@@ -74,6 +74,46 @@ namespace HolyLogger
                 Title = "Your contest logs";
 
             LoadLogs();   // sets the hint line, which depends on whether the callsign has any log
+            ShowSyncState();
+        }
+
+        // THE SYNC BUTTON: the whole database is synced or it is not - never per log (his rule, so
+        // nobody has to wonder which logs are shared). Green when signed in to Google Drive, red when
+        // the database lives only on this computer. The tooltip says the same in a sentence or two.
+        private void ShowSyncState()
+        {
+            try
+            {
+                bool on = GoogleDrive.Registered && GoogleDrive.SignedIn;
+                if (on)
+                {
+                    DateTime? sent = GoogleDrive.LastUploadUtc;
+                    string when = sent.HasValue ? sent.Value.ToLocalTime().ToString("d MMM yyyy, HH:mm") : "not yet";
+                    SyncText.Text = "Database synced";
+                    Btn_Sync.Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x2E, 0x7D, 0x32));
+                    Btn_Sync.Foreground = System.Windows.Media.Brushes.White;
+                    Btn_Sync.ToolTip = "This database is kept in your Google Drive (" + GoogleDrive.Email + ").\n"
+                                     + "Last sent: " + when + ".\n"
+                                     + "Click to see more or to sign out.";
+                }
+                else
+                {
+                    SyncText.Text = "Database not synced";
+                    Btn_Sync.Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0xC6, 0x28, 0x28));
+                    Btn_Sync.Foreground = System.Windows.Media.Brushes.White;
+                    Btn_Sync.ToolTip = GoogleDrive.Registered
+                        ? "This database is only on this computer.\nClick to sign in with Google and keep it the same on all your computers."
+                        : "Google Drive Sync is not available in this copy of HolyLogger.";
+                }
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        // Exactly what File > Google Drive Sync does, then the button shows the new state.
+        private async void Btn_Sync_Click(object sender, RoutedEventArgs e)
+        {
+            await _main.ShowGoogleDriveSync(this);
+            ShowSyncState();
         }
 
         // selectId: the log to leave selected (a log just created). 0 = the active log, as before.
@@ -181,7 +221,7 @@ namespace HolyLogger
             {
                 Hint.Text = _contestOnly
                     ? "Only your contest logs are shown. Select one and Activate & Open it."
-                    : "Select a log, then Open / Rename / Delete / Export.  Double-click to Activate and Open it.";
+                    : "";   // the plain line was removed at his request (2026-11-11)
                 return;
             }
 
