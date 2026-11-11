@@ -43,10 +43,18 @@ namespace HolyLogger
     {
         private static readonly object Gate = new object();
         private static Timer _timer;
+        private static int _ticks;
+        private static int _pulling;
 
+        // Every minute this computer's changes go up; at the first tick (soon after start) and then every
+        // five minutes the other computers' changes come down (step 4, Pull).
         public static void Start()
         {
-            _timer = new Timer(_ => FlushSafe(), null, TimeSpan.FromSeconds(10), TimeSpan.FromMinutes(1));
+            _timer = new Timer(_ =>
+            {
+                FlushSafe();
+                if (_ticks++ % 5 == 0) PullSafe();
+            }, null, TimeSpan.FromSeconds(10), TimeSpan.FromMinutes(1));
         }
 
         // At exit the upload gets ten seconds at most: a field laptop closed straight after a contest should
@@ -157,6 +165,15 @@ namespace HolyLogger
                     }
 
                     if (sb.Length > 0) Append(sb.ToString());
+                    // when each row was changed here: the latest change wins when other diaries are read
+                    var times = new Dictionary<string, string>();
+                    foreach (var n in ordered)
+                    {
+                        string sid = n.Op == "del" ? n.SyncId
+                            : (n.Kind == "qso" ? qsos : logs).TryGetValue(n.RowId, out var row) && row.TryGetValue("sync_id", out object s) ? s.ToString() : null;
+                        if (!string.IsNullOrEmpty(sid)) times[sid] = n.AtUtc;
+                    }
+                    dal.NoteSyncTimes(times);
                     dal.ForgetSyncJournal(notes[notes.Count - 1].Seq);
                 }
                 if (written > 0) Log.Warn("Sync diary: " + written + " line(s) written.");
@@ -189,6 +206,97 @@ namespace HolyLogger
                 }
             }
             return f;
+        }
+
+        // ── STEP 4: READING THE OTHER COMPUTERS' DIARIES ─────────────────────────────────────────────
+        //
+        // Each other computer's diary in the Drive folder is read from where this computer stopped last
+        // time (kept in db_state as sync_read_<file>), so only the new lines come down. Only whole lines
+        // are used; a line still being written is read next time. The lines are made here by
+        // DataAccess.ApplySyncLines (latest change wins, no echo), and only then is the place moved on -
+        // if anything fails, the same lines are simply read again later, which does no harm.
+        //
+        // The network part runs outside Gate, so closing HolyLogger never waits for a download.
+        public static void PullSafe()
+        {
+            if (Interlocked.Exchange(ref _pulling, 1) == 1) return;
+            try { Pull(); }
+            catch (Exception ex) { Log.Warn("Google Drive: other computers' changes were not read - " + ex.Message); }
+            finally { Interlocked.Exchange(ref _pulling, 0); }
+        }
+
+        private static void Pull()
+        {
+            if (!GoogleDrive.Registered || !GoogleDrive.SignedIn) return;
+            var dal = DataAccess.GetInstance();
+            if (dal == null) return;
+            string mine = ComputerId() + ".diary";
+            bool touched = false;
+
+            foreach (var file in GoogleDrive.ListFolder(TimeSpan.FromSeconds(60)))
+            {
+                if (!file.Name.EndsWith(".diary", StringComparison.OrdinalIgnoreCase) || file.Name == mine) continue;
+                string readKey = "sync_read_" + file.Name;
+                long.TryParse(dal.GetDbState(readKey), out long offset);
+                if (file.Size < offset) offset = 0;   // shorter than what was read: that diary started again
+                if (file.Size == offset) continue;
+
+                byte[] data = GoogleDrive.Download(file.Id, offset, TimeSpan.FromSeconds(120));
+                int end = Array.LastIndexOf(data, (byte)'\n');
+                if (end < 0) continue;
+                string machine = dal.GetDbState("sync_machine_" + file.Name);
+                var lines = new List<DataAccess.SyncLine>();
+                foreach (string raw in Encoding.UTF8.GetString(data, 0, end + 1).Split('\n'))
+                {
+                    if (raw.Trim().Length == 0) continue;
+                    // DateParseHandling.None: by default Newtonsoft turns any text that looks like a date into a
+                    // DateTime, and "at" came back as "11/11/2026 20:44:57" - which sorts before every real time,
+                    // so a newer edit was thrown away as older (2026-11-11, the first laptop test). Every value
+                    // is taken exactly as it was written.
+                    JObject j;
+                    try
+                    {
+                        using (var jr = new JsonTextReader(new StringReader(raw)) { DateParseHandling = DateParseHandling.None })
+                            j = JObject.Load(jr);
+                    }
+                    catch (Exception) { Log.Warn("Sync: a line of " + file.Name + " could not be read; skipped."); continue; }
+                    if (j["diary"] != null)   // the header: whose diary this is
+                    {
+                        machine = (string)j["machine"];
+                        dal.SetDbState("sync_machine_" + file.Name, machine);
+                        continue;
+                    }
+                    var line = new DataAccess.SyncLine
+                    {
+                        At = (string)j["at"], What = (string)j["what"], Op = (string)j["op"], Id = (string)j["id"],
+                    };
+                    if (j["fields"] is JObject fo)
+                        line.Fields = fo.Properties().ToDictionary(p => p.Name, p => (p.Value as JValue)?.Value);
+                    lines.Add(line);
+                }
+                if (string.IsNullOrEmpty(machine)) machine = Path.GetFileNameWithoutExtension(file.Name);
+
+                DataAccess.SyncApplyResult r;
+                lock (Gate)
+                {
+                    Flush();   // this computer's own latest changes first, so their times are known
+                    r = dal.ApplySyncLines(lines, machine);
+                }
+                dal.SetDbState(readKey, (offset + end + 1).ToString());
+                if (r.ActiveLogTouched) touched = true;
+                Log.Warn("Sync: from " + machine + ": " + r.Applied + " change(s) made, " + r.Older
+                         + " older than what is here, " + r.Skipped + " skipped.");
+            }
+
+            if (touched)
+            {
+                var app = System.Windows.Application.Current;
+                app?.Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    try { (app.MainWindow as MainWindow)?.ReloadActiveLogQsos(); }
+                    catch (Exception swallowed) { Log.Swallow(swallowed); }
+                }));
+            }
         }
 
         // A new diary starts with a line saying whose it is.
@@ -463,6 +571,52 @@ namespace HolyLogger
             st.UploadedUtc = DateTime.UtcNow;
             Save(st);
             Log.Warn("Google Drive: diary sent (" + length + " bytes).");
+        }
+
+        // ── reading the folder (step 4) ─────────────────────────────────────────────────────────────
+        public sealed class DriveFile
+        {
+            public string Id, Name;
+            public long Size;
+        }
+
+        // The files in the HolyLogger Sync folder: every computer's diary (drive.file still shows them,
+        // as HolyLogger made them all, on whichever computer).
+        public static List<DriveFile> ListFolder(TimeSpan limit)
+        {
+            var list = new List<DriveFile>();
+            State st = Load();
+            if (string.IsNullOrEmpty(st.RefreshToken) || !Registered) return list;
+            using (var cts = new CancellationTokenSource(limit))
+            {
+                if (string.IsNullOrEmpty(st.FolderId)) { st.FolderId = FindOrMakeFolder(cts.Token); Save(st); }
+                string q = "'" + st.FolderId + "' in parents and trashed = false";
+                JObject found = Get("https://www.googleapis.com/drive/v3/files?pageSize=1000&fields=files(id,name,size)&q="
+                                    + Uri.EscapeDataString(q), cts.Token).GetAwaiter().GetResult();
+                if (found["files"] is JArray files)
+                    foreach (JToken f in files)
+                    {
+                        long.TryParse((string)f["size"], out long size);
+                        list.Add(new DriveFile { Id = (string)f["id"], Name = (string)f["name"], Size = size });
+                    }
+            }
+            return list;
+        }
+
+        // The file from byte `offset` to its end.
+        public static byte[] Download(string fileId, long offset, TimeSpan limit)
+        {
+            using (var cts = new CancellationTokenSource(limit))
+            {
+                var req = new HttpRequestMessage(HttpMethod.Get, "https://www.googleapis.com/drive/v3/files/" + fileId + "?alt=media");
+                if (offset > 0) req.Headers.Range = new System.Net.Http.Headers.RangeHeaderValue(offset, null);
+                HttpResponseMessage res = Check(Send(req, cts.Token));
+                byte[] data = res.Content.ReadAsByteArrayAsync().GetAwaiter().GetResult();
+                // a server that ignores the range sends the whole file: skip what was already read
+                if (offset > 0 && res.StatusCode == HttpStatusCode.OK)
+                    data = offset >= data.Length ? new byte[0] : data.Skip((int)offset).ToArray();
+                return data;
+            }
         }
 
         private static string FindOrMakeFolder(CancellationToken ct)
