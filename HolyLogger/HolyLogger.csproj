@@ -232,6 +232,14 @@
     <Compile Include="Contests\ContestRadioCommands.cs" />
     <Compile Include="Contests\ContestService.cs" />
     <EmbeddedResource Include="contests.json" />
+    <EmbeddedResource Include="Help\UserManual.md" />
+    <Compile Include="UserManualWindow.xaml.cs">
+      <DependentUpon>UserManualWindow.xaml</DependentUpon>
+    </Compile>
+    <Page Include="UserManualWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
     <!-- Club Log's application API key, compiled in from a file next to the solution that .gitignore
          keeps out of the repository (Club Log asks that the key not be published in source code).
          A checkout without the file still builds; Club Log features then fall back to whatever key
