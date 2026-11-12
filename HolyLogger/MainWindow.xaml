@@ -1154,10 +1154,32 @@
                      sits between the clock and the heartbeat button and never moves, and it still
                      appears when the clock itself is switched off. 48 px clear of the heartbeat button,
                      not 14: closer, the two icons read as one pair of buttons. Since 2026-10-20 the
-                     settings gear is the right-most icon (26 wide, 8 in), the heartbeat 40 in, the dish 88. -->
+                     settings gear is the right-most icon (26 wide, 8 in), the heartbeat 40 in, the dish 88.
+                     Since 2026-11-12 the sync cloud sits just left of the heartbeat (70 in), so the dish
+                     moved to 128. -->
                 <Image x:Name="SatModeIcon" Source="Images/satV.png" Width="26" Height="26"
-                       HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,88,0"
+                       HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,128,0"
                        Cursor="Hand" Visibility="Collapsed" MouseUp="SatModeIcon_MouseUp"/>
+
+                <!-- GOOGLE DRIVE SYNC, AT A GLANCE (his request, 2026-11-12): a filled cloud, its colour
+                     and white mark set by RefreshSyncCloud - green + tick = synced, orange + "!" = signed
+                     in but Google Drive could not be reached (changes wait on this computer), red + X =
+                     not synced. Pinned in from the right, just left of the green heartbeat button (his
+                     request, 2026-11-12: it sat out by the clock, far from the other icons). A click does
+                     what File > Google Drive Sync does. -->
+                <Border x:Name="SyncCloud" Width="34" Height="26" Margin="0,0,70,0" Background="Transparent"
+                        HorizontalAlignment="Right" VerticalAlignment="Center" Cursor="Hand"
+                        ToolTipService.ShowDuration="30000" MouseUp="SyncCloud_MouseUp">
+                    <Viewbox>
+                        <Canvas Width="28" Height="22">
+                            <Path x:Name="SyncCloudShape" Fill="#C62828"
+                                  Data="M6,19 A5,5 0 0 1 6,9 A7,7 0 0 1 19,8 A5.5,5.5 0 0 1 24,19 Z"/>
+                            <Path x:Name="SyncCloudMark" Stroke="White" StrokeThickness="2.2"
+                                  StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
+                                  Data="M11.5,10.5 L17.5,16.5 M17.5,10.5 L11.5,16.5"/>
+                        </Canvas>
+                    </Viewbox>
+                </Border>
 
                 <!-- Heartbeat button, at the top right corner of the window, past the clock. The clock
                      stretches across this same cell but is centred text and not hit-testable, so the two

@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Data.SQLite;
 using System.IO;
+using System.IO.Compression;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
@@ -53,7 +55,11 @@ namespace HolyLogger
             _timer = new Timer(_ =>
             {
                 FlushSafe();
-                if (_ticks++ % 5 == 0) PullSafe();
+                if (_ticks++ % 5 == 0)
+                {
+                    PullSafe();
+                    Task.Run(() => SnapshotIfDueSafe());   // its own thread: it can take minutes
+                }
             }, null, TimeSpan.FromSeconds(10), TimeSpan.FromMinutes(1));
         }
 
@@ -70,8 +76,26 @@ namespace HolyLogger
         {
             try { Flush(); }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
-            try { GoogleDrive.UploadDiary(DiaryPath(), uploadLimit ?? TimeSpan.FromSeconds(60)); }
-            catch (Exception ex) { Log.Warn("Google Drive: the diary was not sent - " + ex.Message); }
+            try { if (GoogleDrive.UploadDiary(DiaryPath(), uploadLimit ?? TimeSpan.FromSeconds(60))) ReportContact(null); }
+            catch (Exception ex)
+            {
+                Log.Warn("Google Drive: the diary was not sent - " + ex.Message);
+                ReportContact(ex.Message);
+            }
+        }
+
+        // WHAT THE CLOUD ON THE MAIN WINDOW SHOWS. Only a real answer from Google Drive counts: a diary
+        // actually sent, or the folder actually read. LastProblem is the last failure, cleared by the
+        // next success; StatusChanged tells the window to look again (sign-in and sign-out too).
+        public static string LastProblem { get; private set; }
+        public static DateTime? LastContactUtc { get; private set; }
+        public static event Action StatusChanged;
+
+        public static void ReportContact(string problem)
+        {
+            LastProblem = problem;
+            if (problem == null) LastContactUtc = DateTime.UtcNow;
+            try { StatusChanged?.Invoke(); } catch (Exception swallowed) { Log.Swallow(swallowed); }
         }
 
         public static string Folder
@@ -220,16 +244,24 @@ namespace HolyLogger
         public static void PullSafe()
         {
             if (Interlocked.Exchange(ref _pulling, 1) == 1) return;
-            try { Pull(); }
-            catch (Exception ex) { Log.Warn("Google Drive: other computers' changes were not read - " + ex.Message); }
+            try
+            {
+                if (Pull()) ReportContact(null);
+            }
+            catch (Exception ex)
+            {
+                Log.Warn("Google Drive: other computers' changes were not read - " + ex.Message);
+                ReportContact(ex.Message);
+            }
             finally { Interlocked.Exchange(ref _pulling, 0); }
         }
 
-        private static void Pull()
+        // true = Google Drive was reached and read
+        private static bool Pull()
         {
-            if (!GoogleDrive.Registered || !GoogleDrive.SignedIn) return;
+            if (!GoogleDrive.Registered || !GoogleDrive.SignedIn) return false;
             var dal = DataAccess.GetInstance();
-            if (dal == null) return;
+            if (dal == null) return false;
             string mine = ComputerId() + ".diary";
             bool touched = false;
 
@@ -297,6 +329,166 @@ namespace HolyLogger
                     catch (Exception swallowed) { Log.Swallow(swallowed); }
                 }));
             }
+            return true;
+        }
+
+        // ── STEP 5: THE WHOLE LOG IN DRIVE, FOR A NEW COMPUTER ───────────────────────────────────────
+        //
+        // The diaries hold only the changes made since sync began, so a brand-new computer could not
+        // be given the operator's whole log from them. Once a week (when the newest copy in Drive, from
+        // any of his computers, is more than seven days old) one computer puts a whole copy of the
+        // database there, gzipped, as <its id>.snapshot - each computer writes only its own, like its
+        // diary.
+        //
+        // The copy says how far it is up to date: in its db_state, where the diaries are read from next
+        // (the maker's own diary at its length when the copy was taken; the others where the maker had
+        // read them). A new computer puts the copy in place of its own log, restarts, and reads the
+        // diaries from those places - so it misses nothing made after the copy. A change made between
+        // the length being taken and the copy is in both, and is simply made twice, which does no harm.
+        //
+        // The copy carries no computer id, so the new computer makes its own; and sync_joined = 1.
+        //
+        // sync_joined in db_state: "1" = this database is the shared one (it may send copies); "keep" =
+        // the operator kept this computer's own, different log (it never sends a copy, or it could
+        // replace everyone's); empty = not decided yet (MainWindow.OfferDriveSnapshot asks).
+        private static int _snapshotting;
+        private static readonly TimeSpan SnapshotEvery = TimeSpan.FromDays(7);
+
+        public static string JoinState
+        {
+            get { return DataAccess.GetInstance()?.GetDbState("sync_joined") ?? string.Empty; }
+            set { DataAccess.GetInstance()?.SetDbState("sync_joined", value); }
+        }
+
+        private static string SnapshotName() { return ComputerId() + ".snapshot"; }
+
+        // The newest whole copy another of the operator's computers put in Drive; null if none.
+        public static GoogleDrive.DriveFile NewestOtherSnapshot()
+        {
+            string mine = SnapshotName();
+            return GoogleDrive.ListFolder(TimeSpan.FromSeconds(60))
+                .Where(f => f.Name.EndsWith(".snapshot", StringComparison.OrdinalIgnoreCase) && f.Name != mine && f.Size > 0)
+                .OrderByDescending(f => f.ModifiedUtc ?? DateTime.MinValue)
+                .FirstOrDefault();
+        }
+
+        public static void SnapshotIfDueSafe()
+        {
+            if (Interlocked.Exchange(ref _snapshotting, 1) == 1) return;
+            try { SnapshotIfDue(); }
+            catch (Exception ex) { Log.Warn("Google Drive: the whole copy of the log was not sent - " + ex.Message); }
+            finally { Interlocked.Exchange(ref _snapshotting, 0); }
+        }
+
+        private static void SnapshotIfDue()
+        {
+            if (!GoogleDrive.Registered || !GoogleDrive.SignedIn) return;
+            var dal = DataAccess.GetInstance();
+            if (dal == null) return;
+            string mine = SnapshotName();
+            var snaps = GoogleDrive.ListFolder(TimeSpan.FromSeconds(60))
+                .Where(f => f.Name.EndsWith(".snapshot", StringComparison.OrdinalIgnoreCase) && f.Size > 0).ToList();
+
+            string join = JoinState;
+            if (join.Length == 0)
+            {
+                // another computer's copy is there: the operator decides first (OfferDriveSnapshot)
+                if (snaps.Any(f => f.Name != mine)) return;
+                JoinState = join = "1";   // the first computer: the others start from this one
+            }
+            if (join != "1") return;
+
+            DateTime? newest = snaps.Max(f => f.ModifiedUtc);
+            if (newest.HasValue && DateTime.UtcNow - newest.Value < SnapshotEvery) return;
+            MakeSnapshot(dal);
+        }
+
+        private static void MakeSnapshot(DataAccess dal)
+        {
+            var watch = System.Diagnostics.Stopwatch.StartNew();
+            Directory.CreateDirectory(Folder);
+            string copy = Path.Combine(Folder, "snapshot.db");
+            string gz = Path.Combine(Folder, "snapshot.db.gz");
+            string myDiary = ComputerId() + ".diary";
+            ThreadPriority was = Thread.CurrentThread.Priority;
+            try
+            {
+                long diaryLength;
+                lock (Gate)   // no diary line is written between the length and the copy
+                {
+                    Flush();
+                    string d = DiaryPath();
+                    diaryLength = File.Exists(d) ? new FileInfo(d).Length : 0;
+                    dal.CopyDatabaseTo(copy);
+                }
+
+                using (var c = new SQLiteConnection("Data Source=" + copy + ";Version=3"))
+                {
+                    c.Open();
+                    foreach (string sql in new[]
+                    {
+                        "DELETE FROM sync_journal",
+                        "DELETE FROM db_state WHERE key IN ('sync_computer_id', 'sync_computer_machine')",
+                        "INSERT OR REPLACE INTO db_state (key, value) VALUES ('sync_joined', '1')",
+                        "INSERT OR REPLACE INTO db_state (key, value) VALUES (@k, @v)",
+                    })
+                        using (var cmd = new SQLiteCommand(sql, c))
+                        {
+                            cmd.Parameters.AddWithValue("@k", "sync_read_" + myDiary);
+                            cmd.Parameters.AddWithValue("@v", diaryLength.ToString());
+                            cmd.ExecuteNonQuery();
+                        }
+                }
+
+                Thread.CurrentThread.Priority = ThreadPriority.BelowNormal;   // the operator is working
+                using (var src = File.OpenRead(copy))
+                using (var dst = File.Create(gz))
+                using (var z = new GZipStream(dst, CompressionLevel.Optimal))
+                    src.CopyTo(z);
+                Thread.CurrentThread.Priority = was;
+
+                long bytes = new FileInfo(gz).Length;
+                GoogleDrive.UploadLarge(gz, SnapshotName(), "application/gzip", TimeSpan.FromHours(3));
+                Log.Warn("Google Drive: whole copy of the log sent (" + (bytes / 1048576.0).ToString("0.0")
+                         + " MB) in " + watch.Elapsed.TotalSeconds.ToString("0") + " s.");
+            }
+            finally
+            {
+                Thread.CurrentThread.Priority = was;
+                try { File.Delete(copy); } catch (Exception swallowed) { Log.Swallow(swallowed); }
+                try { File.Delete(gz); } catch (Exception swallowed) { Log.Swallow(swallowed); }
+            }
+        }
+
+        // Fetches a whole copy and unpacks it beside the diaries; checks it is a sound HolyLogger
+        // database before anyone puts it in place. Returns its path and how many QSOs it holds.
+        public static string DownloadSnapshot(GoogleDrive.DriveFile file, Action<long, long> progress, out long qsos)
+        {
+            Directory.CreateDirectory(Folder);
+            string gz = Path.Combine(Folder, "from-drive.db.gz");
+            string db = Path.Combine(Folder, "from-drive.db");
+            try
+            {
+                GoogleDrive.DownloadToFile(file.Id, gz, progress, TimeSpan.FromHours(3));
+                using (var src = new GZipStream(File.OpenRead(gz), CompressionMode.Decompress))
+                using (var dst = File.Create(db))
+                    src.CopyTo(dst);
+            }
+            finally { try { File.Delete(gz); } catch (Exception swallowed) { Log.Swallow(swallowed); } }
+
+            using (var c = new SQLiteConnection("Data Source=" + db + ";Version=3;Read Only=True"))
+            {
+                c.Open();
+                using (var cmd = new SQLiteCommand("PRAGMA quick_check", c))
+                {
+                    string ok = Convert.ToString(cmd.ExecuteScalar());
+                    if (ok != "ok") throw new Exception("the copy in Google Drive is damaged (" + ok + ")");
+                }
+                using (var cmd = new SQLiteCommand("SELECT count(*) FROM qso", c))
+                    qsos = Convert.ToInt64(cmd.ExecuteScalar());
+            }
+            Log.Warn("Google Drive: whole copy of the log received (" + qsos + " QSOs).");
+            return db;
         }
 
         // A new diary starts with a line saying whose it is.
@@ -513,22 +705,20 @@ namespace HolyLogger
             string email = (string)about["user"]?["emailAddress"];
             Save(new State { RefreshToken = refresh, Email = email });
             Log.Warn("Google Drive: signed in as " + email + ".");
+            SyncDiary.ReportContact(null);
             return email;
         }
 
+        // Signing out forgets the permission on THIS computer only. It used to tell Google to cancel it
+        // too - and Google cancels HolyLogger's permission for the whole account, so signing out on the
+        // home PC (2026-11-11) quietly signed the laptop out as well. Anyone who wants HolyLogger's
+        // permission gone everywhere can remove it in his Google account.
         public static void SignOut()
         {
-            string refresh = Load().RefreshToken;
             Save(new State());
             _access = null;
-            if (string.IsNullOrEmpty(refresh)) return;
-            try   // tell Google too, so the permission does not stay behind in the account
-            {
-                Http.PostAsync("https://oauth2.googleapis.com/revoke?token=" + Uri.EscapeDataString(refresh), null)
-                    .Wait(TimeSpan.FromSeconds(10));
-            }
-            catch (Exception swallowed) { Log.Swallow(swallowed); }
-            Log.Warn("Google Drive: signed out.");
+            Log.Warn("Google Drive: signed out on this computer.");
+            SyncDiary.ReportContact(null);
         }
 
         // ── sending the diary ───────────────────────────────────────────────────────────────────────
@@ -536,12 +726,13 @@ namespace HolyLogger
         // Copies the whole diary to Drive when it has grown since the last copy; does nothing when the
         // operator is not signed in or nothing is new. The file's Drive id and the folder's are kept, so a
         // normal send is one request. Runs on the diary's own timer thread, never the window's.
-        public static void UploadDiary(string path, TimeSpan limit)
+        // true = it was actually sent (Google Drive was reached)
+        public static bool UploadDiary(string path, TimeSpan limit)
         {
             State st = Load();
-            if (string.IsNullOrEmpty(st.RefreshToken) || !Registered || !File.Exists(path)) return;
+            if (string.IsNullOrEmpty(st.RefreshToken) || !Registered || !File.Exists(path)) return false;
             long length = new FileInfo(path).Length;
-            if (length == st.UploadedBytes && st.FileId != null) return;
+            if (length == st.UploadedBytes && st.FileId != null) return false;
 
             using (var cts = new CancellationTokenSource(limit))
             {
@@ -571,6 +762,7 @@ namespace HolyLogger
             st.UploadedUtc = DateTime.UtcNow;
             Save(st);
             Log.Warn("Google Drive: diary sent (" + length + " bytes).");
+            return true;
         }
 
         // ── reading the folder (step 4) ─────────────────────────────────────────────────────────────
@@ -578,6 +770,7 @@ namespace HolyLogger
         {
             public string Id, Name;
             public long Size;
+            public DateTime? ModifiedUtc;
         }
 
         // The files in the HolyLogger Sync folder: every computer's diary (drive.file still shows them,
@@ -591,13 +784,20 @@ namespace HolyLogger
             {
                 if (string.IsNullOrEmpty(st.FolderId)) { st.FolderId = FindOrMakeFolder(cts.Token); Save(st); }
                 string q = "'" + st.FolderId + "' in parents and trashed = false";
-                JObject found = Get("https://www.googleapis.com/drive/v3/files?pageSize=1000&fields=files(id,name,size)&q="
+                JObject found = Get("https://www.googleapis.com/drive/v3/files?pageSize=1000&fields=files(id,name,size,modifiedTime)&q="
                                     + Uri.EscapeDataString(q), cts.Token).GetAwaiter().GetResult();
                 if (found["files"] is JArray files)
                     foreach (JToken f in files)
                     {
                         long.TryParse((string)f["size"], out long size);
-                        list.Add(new DriveFile { Id = (string)f["id"], Name = (string)f["name"], Size = size });
+                        // Newtonsoft may already have made the time a DateTime (see SyncDiary.Pull)
+                        DateTime? modified = null;
+                        JToken m = f["modifiedTime"];
+                        if (m != null && m.Type == JTokenType.Date) modified = m.Value<DateTime>().ToUniversalTime();
+                        else if (m != null && DateTime.TryParse((string)m, System.Globalization.CultureInfo.InvariantCulture,
+                                     System.Globalization.DateTimeStyles.AdjustToUniversal | System.Globalization.DateTimeStyles.AssumeUniversal, out DateTime p))
+                            modified = p;
+                        list.Add(new DriveFile { Id = (string)f["id"], Name = (string)f["name"], Size = size, ModifiedUtc = modified });
                     }
             }
             return list;
@@ -619,6 +819,105 @@ namespace HolyLogger
             }
         }
 
+        // ── big files (step 5: the whole database) ─────────────────────────────────────────────────
+        //
+        // A plain upload is for files up to 5 MB, so the database copy goes up in Google's "resumable"
+        // way: ask for an upload address, then send 8 MB at a time, each piece tried again if the line
+        // drops. Its own HttpClient, which does not follow redirects: Google answers 308 for "piece
+        // received, send the next", and that must reach this code, not be followed.
+        private static readonly HttpClient UploadHttp =
+            new HttpClient(new HttpClientHandler { AllowAutoRedirect = false }) { Timeout = Timeout.InfiniteTimeSpan };
+
+        public static void UploadLarge(string path, string name, string contentType, TimeSpan limit)
+        {
+            State st = Load();
+            if (string.IsNullOrEmpty(st.RefreshToken) || !Registered) return;
+            using (var cts = new CancellationTokenSource(limit))
+            {
+                CancellationToken ct = cts.Token;
+                if (string.IsNullOrEmpty(st.FolderId)) { st.FolderId = FindOrMakeFolder(ct); Save(st); }
+                string fileId = FindOrMakeFile(st.FolderId, name, ct, contentType);
+                long total = new FileInfo(path).Length;
+
+                var init = new HttpRequestMessage(new HttpMethod("PATCH"),
+                    "https://www.googleapis.com/upload/drive/v3/files/" + fileId + "?uploadType=resumable")
+                { Content = new StringContent("{}", Encoding.UTF8, "application/json") };
+                init.Headers.Add("X-Upload-Content-Type", contentType);
+                init.Headers.Add("X-Upload-Content-Length", total.ToString());
+                Uri session = Check(Send(init, ct)).Headers.Location;
+                if (session == null) throw new Exception("Google Drive gave no upload address.");
+
+                const int Piece = 8 * 1024 * 1024;   // a multiple of 256 KB, as Google asks
+                var buf = new byte[Piece];
+                using (var fs = File.OpenRead(path))
+                {
+                    long pos = 0;
+                    int stuck = 0;
+                    while (pos < total)
+                    {
+                        fs.Position = pos;
+                        int n = 0, want = (int)Math.Min(Piece, total - pos);
+                        while (n < want) { int r = fs.Read(buf, n, want - n); if (r <= 0) break; n += r; }
+
+                        HttpResponseMessage res = null;
+                        for (int attempt = 0; ; attempt++)
+                        {
+                            var put = new HttpRequestMessage(HttpMethod.Put, session) { Content = new ByteArrayContent(buf, 0, n) };
+                            put.Content.Headers.ContentRange = new System.Net.Http.Headers.ContentRangeHeaderValue(pos, pos + n - 1, total);
+                            try { res = UploadHttp.SendAsync(put, ct).GetAwaiter().GetResult(); }
+                            catch (Exception) when (attempt < 3 && !ct.IsCancellationRequested) { Thread.Sleep(3000 * (attempt + 1)); continue; }
+                            int code = (int)res.StatusCode;
+                            if (code == 308 || code == 200 || code == 201) break;
+                            if (code >= 500 && attempt < 3) { Thread.Sleep(3000 * (attempt + 1)); continue; }
+                            Check(res);
+                        }
+
+                        if ((int)res.StatusCode != 308) { pos = total; break; }
+                        // "Range: bytes=0-N" = what Google has so far; carry on from there
+                        long had = pos;
+                        if (res.Headers.TryGetValues("Range", out IEnumerable<string> rv))
+                        {
+                            string r = rv.First();
+                            if (long.TryParse(r.Substring(r.LastIndexOf('-') + 1), out long last)) pos = last + 1;
+                        }
+                        stuck = pos == had ? stuck + 1 : 0;
+                        if (stuck >= 3) throw new Exception("Google Drive stopped taking the file.");
+                    }
+                }
+            }
+        }
+
+        // The whole file, written to `path` as it arrives (never all in memory), telling `progress`
+        // how far it has got: (bytes so far, bytes in all - or -1 when Google did not say).
+        public static void DownloadToFile(string fileId, string path, Action<long, long> progress, TimeSpan limit)
+        {
+            using (var cts = new CancellationTokenSource(limit))
+            {
+                CancellationToken ct = cts.Token;
+                var req = new HttpRequestMessage(HttpMethod.Get, "https://www.googleapis.com/drive/v3/files/" + fileId + "?alt=media");
+                req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", AccessToken(ct));
+                using (HttpResponseMessage res = Http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct).GetAwaiter().GetResult())
+                {
+                    Check(res);
+                    long total = res.Content.Headers.ContentLength ?? -1;
+                    using (Stream s = res.Content.ReadAsStreamAsync().GetAwaiter().GetResult())
+                    using (var f = File.Create(path))
+                    {
+                        var buf = new byte[1024 * 1024];
+                        long done = 0;
+                        int n;
+                        while ((n = s.Read(buf, 0, buf.Length)) > 0)
+                        {
+                            ct.ThrowIfCancellationRequested();
+                            f.Write(buf, 0, n);
+                            done += n;
+                            progress?.Invoke(done, total);
+                        }
+                    }
+                }
+            }
+        }
+
         private static string FindOrMakeFolder(CancellationToken ct)
         {
             string q = "name = '" + FolderName + "' and mimeType = 'application/vnd.google-apps.folder' and trashed = false";
@@ -630,14 +929,14 @@ namespace HolyLogger
             return (string)made["id"];
         }
 
-        private static string FindOrMakeFile(string folderId, string name, CancellationToken ct)
+        private static string FindOrMakeFile(string folderId, string name, CancellationToken ct, string mimeType = "text/plain")
         {
             string q = "name = '" + name + "' and '" + folderId + "' in parents and trashed = false";
             JObject found = Get("https://www.googleapis.com/drive/v3/files?fields=files(id)&q=" + Uri.EscapeDataString(q), ct).GetAwaiter().GetResult();
             var files = (JArray)found["files"];
             if (files != null && files.Count > 0) return (string)files[0]["id"];
             JObject made = PostJson("https://www.googleapis.com/drive/v3/files?fields=id",
-                new JObject { ["name"] = name, ["parents"] = new JArray(folderId), ["mimeType"] = "text/plain" }, ct);
+                new JObject { ["name"] = name, ["parents"] = new JArray(folderId), ["mimeType"] = mimeType }, ct);
             return (string)made["id"];
         }
 
