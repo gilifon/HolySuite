@@ -8,8 +8,13 @@ Changes made on one computer reach the others within a few minutes. HolyLogger c
 
 1. Open **File > Google Drive Sync**. You can also click the cloud at the top right of the main window, or the **Database not synced** button in the Log Manager.
 2. Click **Sign in with Google**.
+
+![The first question: click Sign in with Google](sync-sign-in.png)
+
 3. Your web browser opens on Google's page. Choose your Google account and allow HolyLogger to keep its files in your Google Drive.
 4. Back in HolyLogger, a message says **Signed in as** and your email address.
+
+![Signed in: this computer now uses Google Drive Sync](sync-signed-in.png)
 
 ## The cloud at the top
 
@@ -30,9 +35,14 @@ A few minutes after you sign in on your first computer, it puts a whole copy of 
 1. Install HolyLogger on the other computer.
 2. Sign in there with the same Google account, as in "Turning it on".
 3. HolyLogger asks whether to download your log from Google Drive. Click **Download it**.
+
+![On the new computer: click Download it](sync-download.png)
+
 4. HolyLogger restarts with your log on this computer.
 
 If that computer already has QSOs, HolyLogger asks whether to use the Drive log there too:
+
+![A computer that already has QSOs is asked this instead](sync-use-drive-log.png)
 
 - **Use the Drive log:** your log from Google Drive is put on this computer. The log that was there is kept as a backup.
 - **Keep this log:** this computer keeps its own log.

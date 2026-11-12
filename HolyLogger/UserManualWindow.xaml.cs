@@ -137,7 +137,7 @@ namespace HolyLogger
                     continue;
                 }
 
-                Match numbered = Regex.Match(line, @"^\s*\d+\.\s+(.*)$");
+                Match numbered = Regex.Match(line, @"^\s*(\d+)\.\s+(.*)$");
                 Match bullet = Regex.Match(line, @"^\s*[-*]\s+(.*)$");
                 if (numbered.Success || bullet.Success)
                 {
@@ -146,10 +146,15 @@ namespace HolyLogger
                     if (list == null || list.MarkerStyle != style)
                     {
                         list = new List { MarkerStyle = style, Margin = new Thickness(0, 0, 0, 12), Padding = new Thickness(30, 0, 0, 0) };
+                        // Steps carry on from the number written: a picture between step 2 and step 3
+                        // starts a new list, and it must still begin at 3.
+                        int first;
+                        if (numbered.Success && int.TryParse(numbered.Groups[1].Value, out first) && first > 1)
+                            list.StartIndex = first;
                         doc.Blocks.Add(list);
                     }
                     var item = new Paragraph { Margin = new Thickness(0, 0, 0, 4) };
-                    AddInlines(item.Inlines, (numbered.Success ? numbered : bullet).Groups[1].Value);
+                    AddInlines(item.Inlines, numbered.Success ? numbered.Groups[2].Value : bullet.Groups[1].Value);
                     list.ListItems.Add(new ListItem(item));
                     continue;
                 }
