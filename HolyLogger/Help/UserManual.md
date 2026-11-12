@@ -18,7 +18,9 @@ Changes made on one computer reach the others within a few minutes. HolyLogger c
 
 ## The cloud at the top
 
-The cloud at the top right of the main window shows how sync is doing:
+The cloud at the top right of the main window, just left of the green share button, shows how sync is doing:
+
+![Where the cloud is: top right, next to the share button](sync-cloud-place.png)
 
 ![The three colours of the cloud](sync-cloud.png)
 
