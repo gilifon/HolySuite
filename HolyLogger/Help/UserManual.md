@@ -15,6 +15,8 @@ Changes made on one computer reach the others within a few minutes. HolyLogger c
 
 The cloud at the top right of the main window shows how sync is doing:
 
+![The three colours of the cloud](sync-cloud.png)
+
 - **Green with a tick:** synced.
 - **Orange with "!":** signed in, but Google Drive cannot be reached right now. Your changes wait on this computer and are sent when Google Drive is back.
 - **Red with an X:** not synced. The log is only on this computer.
