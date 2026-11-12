@@ -8,19 +8,31 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 
 namespace HolyLogger
 {
     // HELP > USER MANUAL (user, 2026-11-12). The text is Help/UserManual.md, built into the program, in
     // a small piece of Markdown: "# " a subject, "## " a part of it, "1. " numbered steps, "- " a bullet,
-    // **bold**, and a web address becomes a link. Everything else is a paragraph; lines that follow one
-    // another without a blank line between them are one paragraph.
+    // **bold**, and a web address becomes a link. A line of its own like ![caption](file.png) is a
+    // picture from Help/Images, set in the text with its caption under it. Everything else is a
+    // paragraph; lines that follow one another without a blank line between them are one paragraph.
     //
     // The list on the left is made from the headings, so a new subject needs nothing but its heading
     // and its text in the file. Clicking one puts that heading at the top of the text on the right.
+    //
+    // LIKE A WORD PAGE (user, 2026-11-12): white sheet, black text, Word's own heading colour, pictures
+    // in the text - whatever the colour scheme, as a printed page would be.
     public partial class UserManualWindow : Window
     {
         private const string ResourceName = "HolyLogger.Help.UserManual.md";
+        private const string ImageFolder = "pack://application:,,,/HolyLogger;component/Help/Images/";
+
+        // Word's default heading colour and fonts, so the page reads as a Word document.
+        private static readonly Brush HeadingBrush = Frozen(new SolidColorBrush(Color.FromRgb(0x2F, 0x54, 0x96)));
+        private static readonly Brush CaptionBrush = Frozen(new SolidColorBrush(Color.FromRgb(0x59, 0x59, 0x59)));
+        private static readonly FontFamily BodyFont = new FontFamily("Calibri, Segoe UI");
+        private static readonly FontFamily HeadingFont = new FontFamily("Calibri Light, Calibri, Segoe UI");
 
         private readonly List<Paragraph> _headings = new List<Paragraph>();
 
@@ -30,17 +42,24 @@ namespace HolyLogger
             RestoreSize();
             Closing += (s, e) => SaveSize();
 
-            FD_Viewer.Document = BuildDocument(ReadManual());
+            RTB_Text.Document = BuildDocument(ReadManual());
 
             // ROOM BELOW THE LAST SUBJECT. Without it the text ends before a subject near the end can
-            // reach the top, and clicking it only scrolls to the bottom. A window's height of blank
-            // space after the end lets every subject be brought to the top.
-            FD_Viewer.SizeChanged += (s, e) =>
+            // reach the top, and clicking it only scrolls to the bottom. A window's height of desk below
+            // the sheet lets every subject be brought to the top.
+            SV_Desk.SizeChanged += (s, e) =>
+                Paper.Margin = new Thickness(20, 20, 20, Math.Max(20, SV_Desk.ActualHeight - 80));
+
+            // The text box would keep the wheel to itself (it cannot scroll - the desk does), so the
+            // wheel is handed to the desk.
+            RTB_Text.PreviewMouseWheel += (s, e) =>
             {
-                var d = FD_Viewer.Document;
-                if (d != null) d.PagePadding = new Thickness(20, 12, 20, Math.Max(40, FD_Viewer.ActualHeight - 60));
+                SV_Desk.ScrollToVerticalOffset(SV_Desk.VerticalOffset - e.Delta);
+                e.Handled = true;
             };
         }
+
+        private static Brush Frozen(Brush b) { b.Freeze(); return b; }
 
         private static string ReadManual()
         {
@@ -66,12 +85,12 @@ namespace HolyLogger
         {
             var doc = new FlowDocument
             {
-                FontFamily = new FontFamily("Segoe UI"),
-                FontSize = 16,
-                PagePadding = new Thickness(20, 12, 20, 40),
+                FontFamily = BodyFont,
+                FontSize = 17,
+                Foreground = Brushes.Black,
+                Background = Brushes.White,
                 TextAlignment = TextAlignment.Left
             };
-            doc.SetResourceReference(FlowDocument.ForegroundProperty, "TextBrush");
 
             var paragraphLines = new List<string>();
             List list = null;
@@ -79,7 +98,7 @@ namespace HolyLogger
             Action endParagraph = () =>
             {
                 if (paragraphLines.Count == 0) return;
-                var p = new Paragraph { Margin = new Thickness(0, 0, 0, 10) };
+                var p = new Paragraph { Margin = new Thickness(0, 0, 0, 12) };
                 AddInlines(p.Inlines, string.Join(" ", paragraphLines));
                 doc.Blocks.Add(p);
                 paragraphLines.Clear();
@@ -99,14 +118,22 @@ namespace HolyLogger
                     string title = line.TrimStart('#').Trim();
                     var h = new Paragraph(new Run(title))
                     {
-                        FontWeight = FontWeights.Bold,
-                        FontSize = level == 1 ? 26 : 20,
-                        Margin = new Thickness(0, doc.Blocks.Count == 0 ? 0 : (level == 1 ? 28 : 18), 0, 8),
-                        Tag = level
+                        FontFamily = HeadingFont,
+                        FontSize = level == 1 ? 30 : 22,
+                        Foreground = HeadingBrush,
+                        Margin = new Thickness(0, doc.Blocks.Count == 0 ? 0 : (level == 1 ? 32 : 20), 0, 8)
                     };
                     doc.Blocks.Add(h);
                     _headings.Add(h);
                     AddSubject(title, level);
+                    continue;
+                }
+
+                Match picture = Regex.Match(line, @"^\s*!\[(.*?)\]\((.+?)\)\s*$");
+                if (picture.Success)
+                {
+                    endParagraph(); endList();
+                    doc.Blocks.Add(BuildPicture(picture.Groups[2].Value.Trim(), picture.Groups[1].Value.Trim()));
                     continue;
                 }
 
@@ -118,7 +145,7 @@ namespace HolyLogger
                     TextMarkerStyle style = numbered.Success ? TextMarkerStyle.Decimal : TextMarkerStyle.Disc;
                     if (list == null || list.MarkerStyle != style)
                     {
-                        list = new List { MarkerStyle = style, Margin = new Thickness(0, 0, 0, 10), Padding = new Thickness(28, 0, 0, 0) };
+                        list = new List { MarkerStyle = style, Margin = new Thickness(0, 0, 0, 12), Padding = new Thickness(30, 0, 0, 0) };
                         doc.Blocks.Add(list);
                     }
                     var item = new Paragraph { Margin = new Thickness(0, 0, 0, 4) };
@@ -132,6 +159,59 @@ namespace HolyLogger
             }
             endParagraph();
             return doc;
+        }
+
+        // A picture in the text, centred, with a thin frame and its caption under it. Never drawn larger
+        // than it really is - a small screenshot blown up goes soft - and made smaller only when the page
+        // is narrower than the picture.
+        private static Block BuildPicture(string file, string caption)
+        {
+            var panel = new StackPanel { HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 6, 0, 16) };
+            try
+            {
+                var bmp = new BitmapImage();
+                bmp.BeginInit();
+                bmp.UriSource = new Uri(ImageFolder + file);
+                bmp.CacheOption = BitmapCacheOption.OnLoad;
+                bmp.EndInit();
+
+                var image = new Image
+                {
+                    Source = bmp,
+                    Stretch = Stretch.Uniform,
+                    StretchDirection = StretchDirection.DownOnly,
+                    MaxWidth = bmp.PixelWidth,
+                    SnapsToDevicePixels = true
+                };
+                RenderOptions.SetBitmapScalingMode(image, BitmapScalingMode.HighQuality);
+                panel.Children.Add(new Border
+                {
+                    Child = image,
+                    BorderBrush = new SolidColorBrush(Color.FromRgb(0xBF, 0xBF, 0xBF)),
+                    BorderThickness = new Thickness(1),
+                    HorizontalAlignment = HorizontalAlignment.Center
+                });
+            }
+            catch (Exception ex)
+            {
+                Log.Swallow(ex);
+                panel.Children.Add(new TextBlock { Text = "[picture missing: " + file + "]", FontSize = 16, Foreground = Brushes.Gray });
+            }
+
+            if (caption.Length > 0)
+                panel.Children.Add(new TextBlock
+                {
+                    Text = caption,
+                    FontFamily = BodyFont,
+                    FontSize = 16,
+                    FontStyle = FontStyles.Italic,
+                    Foreground = CaptionBrush,
+                    TextAlignment = TextAlignment.Center,
+                    TextWrapping = TextWrapping.Wrap,
+                    Margin = new Thickness(0, 6, 0, 0)
+                });
+
+            return new BlockUIContainer(panel);
         }
 
         // **bold** and web addresses; the rest is plain text.
@@ -183,33 +263,21 @@ namespace HolyLogger
             ScrollHeadingToTop(_headings[i]);
         }
 
-        // BringIntoView only promises "somewhere on screen", which for a heading near the end leaves it at
-        // the bottom with its text out of sight. So the heading's own position is measured and the text
-        // scrolled by exactly that much: the heading lands at the top.
+        // The heading's own position is measured and the desk scrolled by exactly that much, so the
+        // heading lands at the top rather than "somewhere on screen".
         private void ScrollHeadingToTop(Paragraph heading)
         {
             try
             {
-                var sv = FindChild<ScrollViewer>(FD_Viewer);
-                if (sv == null) { heading.BringIntoView(); return; }
+                // The first subject shows the sheet from its top edge, as a document opens.
+                if (_headings.Count > 0 && heading == _headings[0]) { SV_Desk.ScrollToTop(); return; }
 
                 Rect r = heading.ContentStart.GetCharacterRect(LogicalDirection.Forward);
                 if (r.IsEmpty) { heading.BringIntoView(); return; }
-                sv.ScrollToVerticalOffset(Math.Max(0, sv.VerticalOffset + r.Top - 8));
+                Point inDesk = RTB_Text.TranslatePoint(new Point(0, r.Top), SV_Desk);
+                SV_Desk.ScrollToVerticalOffset(Math.Max(0, SV_Desk.VerticalOffset + inDesk.Y - 16));
             }
             catch (Exception ex) { Log.Swallow(ex); }
-        }
-
-        private static T FindChild<T>(DependencyObject parent) where T : DependencyObject
-        {
-            for (int i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++)
-            {
-                var child = VisualTreeHelper.GetChild(parent, i);
-                if (child is T) return (T)child;
-                var deeper = FindChild<T>(child);
-                if (deeper != null) return deeper;
-            }
-            return null;
         }
 
         // ── size (never position: the window opens over HolyLogger, on whichever screen that is) ──

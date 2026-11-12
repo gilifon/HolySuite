@@ -233,6 +233,7 @@
     <Compile Include="Contests\ContestService.cs" />
     <EmbeddedResource Include="contests.json" />
     <EmbeddedResource Include="Help\UserManual.md" />
+    <Resource Include="Help\Images\*.png" />
     <Compile Include="UserManualWindow.xaml.cs">
       <DependentUpon>UserManualWindow.xaml</DependentUpon>
     </Compile>
