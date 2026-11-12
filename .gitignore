@@ -216,3 +216,6 @@ HolyLogger/*_wpftmp.csproj
 
 # Club Log application API key - must never be committed (see ClublogKey.cs)
 clublog.key
+
+# HolyLogger's Google sign-in registration: shipped inside the MSI, never in the public source
+HolyLogger/google_client.json
