@@ -1010,6 +1010,15 @@
                     </MenuItem.Header>
                 </MenuItem>
                 <MenuItem Header="Help" FontSize="16">
+                    <!-- THE USER MANUAL (user, 2026-11-12): subjects on the left, click one to jump to it.
+                         The text is Help/UserManual.md - see UserManualWindow. -->
+                    <MenuItem x:Name="UserManualMenuItem" Header="User Manual"
+                              ToolTip="How to use HolyLogger" Click="UserManualMenuItem_Click">
+                        <MenuItem.Icon>
+                            <Image Source="Images/manual.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    <Separator />
                     <MenuItem x:Name="UpdatesMenuItem" Header="Check for updates" ToolTip="Check for updates" Click="UpdatesMenuItem_Click">
                         <MenuItem.Icon>
                             <Image Source="Images/update.png" Stretch="UniformToFill" Width="16" Height="16"/>

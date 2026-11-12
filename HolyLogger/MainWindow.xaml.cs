@@ -14806,6 +14806,22 @@ namespace HolyLogger
             }
         }
 
+        // Help > User Manual. One window only - asking again brings it forward.
+        private UserManualWindow _userManualWindow;
+
+        private void UserManualMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            if (_userManualWindow != null)
+            {
+                if (_userManualWindow.WindowState == WindowState.Minimized) _userManualWindow.WindowState = WindowState.Normal;
+                _userManualWindow.Activate();
+                return;
+            }
+            _userManualWindow = new UserManualWindow { Owner = this };
+            _userManualWindow.Closed += (s, a) => _userManualWindow = null;
+            _userManualWindow.Show();
+        }
+
         // Help > Which radios can send CW. A reference page, so it opens from Help rather than from
         // the keyer's settings - the keyer only links to it.
         private void CwRadiosMenuItem_Click(object sender, RoutedEventArgs e)
