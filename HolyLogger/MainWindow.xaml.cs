@@ -1468,6 +1468,9 @@ namespace HolyLogger
             // The diary of this computer's log changes (step 2 of one log on several computers):
             // written every minute from the database's own notes, off the UI thread.
             SyncDiary.Start();
+            AskAboutDriveLogSoon();
+            SyncDiary.StatusChanged += () => Dispatcher.BeginInvoke(new Action(RefreshSyncCloud));
+            RefreshSyncCloud();
 
             // The country count, skipped during the start, worked out now the window is up.
             var countries = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
@@ -14441,6 +14444,50 @@ namespace HolyLogger
             await ShowGoogleDriveSync(this);
         }
 
+        private async void SyncCloud_MouseUp(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            await ShowGoogleDriveSync(this);
+        }
+
+        // The cloud on the top bar (see its note in MainWindow.xaml). Red + X: not signed in. Orange + "!":
+        // signed in, but the last try to reach Google Drive failed - changes are kept here and go up when
+        // it answers again. Green + tick: signed in and Google Drive answered last time (or nothing has
+        // been tried yet since the start, which is ten seconds at most).
+        private void RefreshSyncCloud()
+        {
+            try
+            {
+                const string Tick = "M10,14 L13.5,17.2 L19.5,10.5";
+                const string Cross = "M11.5,10.5 L17.5,16.5 M17.5,10.5 L11.5,16.5";
+                const string Bang = "M14.5,9 L14.5,13.8 M14.5,16.8 L14.5,17";
+                string colour, mark, tip;
+                if (!GoogleDrive.Registered || !GoogleDrive.SignedIn)
+                {
+                    colour = "#C62828"; mark = Cross;
+                    tip = GoogleDrive.Registered
+                        ? "Database not synced.\nThe log is only on this computer. Click to sign in with Google."
+                        : "Google Drive Sync is not available in this copy of HolyLogger.";
+                }
+                else if (SyncDiary.LastProblem != null)
+                {
+                    colour = "#EF6C00"; mark = Bang;
+                    tip = "Database synced, but Google Drive cannot be reached now.\n"
+                        + "Your changes are kept on this computer and sent when it is back.";
+                }
+                else
+                {
+                    colour = "#2E7D32"; mark = Tick;
+                    DateTime? c = SyncDiary.LastContactUtc;
+                    tip = "Database synced with Google Drive (" + GoogleDrive.Email + ").\n"
+                        + (c.HasValue ? "Last contact: " + c.Value.ToLocalTime().ToString("HH:mm") + "." : "Checking Google Drive...");
+                }
+                SyncCloudShape.Fill = (System.Windows.Media.Brush)new System.Windows.Media.BrushConverter().ConvertFromString(colour);
+                SyncCloudMark.Data = System.Windows.Media.Geometry.Parse(mark);
+                SyncCloud.ToolTip = new TextBlock { Text = tip, FontSize = 16 };
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
         // The one place both the File menu item and the Log Manager's sync button come to, so the two
         // can never act differently. owner = the window that asked; if it was closed while the operator
         // was on Google's page, the answer is shown over the main window instead.
@@ -14457,6 +14504,8 @@ namespace HolyLogger
                 }
                 if (GoogleDrive.SignedIn)
                 {
+                    // still undecided whether to take the log in Drive ("Not now" last time): ask that first
+                    if (await OfferDriveSnapshot(owner)) return;
                     DateTime? sent = GoogleDrive.LastUploadUtc;
                     string when = sent.HasValue ? sent.Value.ToLocalTime().ToString("d MMM yyyy, HH:mm") : "not yet";
                     bool signOut = HolyMessageBox.ShowConfirm(
@@ -14481,6 +14530,8 @@ namespace HolyLogger
                 if (!go) return;
 
                 string email = await GoogleDrive.SignInAsync();
+                // a log already in Drive from another computer: offered before anything else is sent
+                if (await OfferDriveSnapshot(owner)) return;
                 // the first copy goes up now, not in a minute, and the other computers' changes come down
                 await Task.Run(() => { SyncDiary.FlushSafe(); SyncDiary.PullSafe(); });
                 HolyMessageBox.ShowSuccess("Signed in as " + email + ".\n\nThis computer's log changes now go to your Google Drive.", title, owner());
@@ -14490,6 +14541,124 @@ namespace HolyLogger
                 Log.Warn("Google Drive Sync: " + ex.Message);
                 HolyMessageBox.ShowError("Could not sign in to Google Drive.\n\n" + ex.Message, title, owner());
             }
+            finally { RefreshSyncCloud(); }
+        }
+
+        // STEP 5, AT START. A computer already signed in to Google Drive but not yet decided about the
+        // log another computer put there used to hear nothing until the operator happened to press the
+        // sync button (the laptop, 2026-11-11). Now it is asked once, fifteen seconds after HolyLogger
+        // is up - well after the start, so the question never holds the window back from opening, and
+        // the check itself (one look at the Drive folder) runs off the window's thread.
+        private void AskAboutDriveLogSoon()
+        {
+            Task.Run(async () =>
+            {
+                try
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(15));
+                    if (!GoogleDrive.Registered || !GoogleDrive.SignedIn || SyncDiary.JoinState.Length > 0) return;
+                    if (SyncDiary.NewestOtherSnapshot() == null) return;
+                    await Dispatcher.InvokeAsync(async () =>
+                    {
+                        try { await OfferDriveSnapshot(() => this); }
+                        catch (Exception ex) { Log.Warn("Google Drive: the log in Drive was not offered - " + ex.Message); }
+                    });
+                }
+                catch (Exception ex) { Log.Warn("Google Drive: could not look for a log in Drive - " + ex.Message); }
+            });
+        }
+
+        // STEP 5, ON THE NEW COMPUTER. When this database has not yet been told whether it is the shared
+        // one (SyncDiary.JoinState empty) and another computer has put a whole copy of the log in Drive,
+        // the operator is offered it: on an empty computer simply "download it"; on one that already has
+        // QSOs, "use the Drive log" (this computer's log is kept as a backup, through the same safe swap
+        // as Backups & Restore) or "keep this log" (then this computer never sends a whole copy, so it
+        // cannot replace everyone's log with its own). Returns true when HolyLogger is restarting.
+        private async Task<bool> OfferDriveSnapshot(Func<Window> owner)
+        {
+            const string title = "Google Drive Sync";
+            var dal = DataAccess.GetInstance();
+            if (dal == null || SyncDiary.JoinState.Length > 0) return false;
+
+            GoogleDrive.DriveFile snap = await Task.Run(() => SyncDiary.NewestOtherSnapshot());
+            if (snap == null) { SyncDiary.JoinState = "1"; return false; }   // the first computer
+
+            long here = dal.CountAllQsos();
+            string when = snap.ModifiedUtc.HasValue ? snap.ModifiedUtc.Value.ToLocalTime().ToString("d MMM yyyy") : "";
+            string mb = Math.Max(1, snap.Size / 1048576).ToString("N0");
+            bool take;
+            if (here == 0)
+                take = HolyMessageBox.ShowConfirm(
+                    "Your log is in your Google Drive (saved " + when + ").\n\n"
+                    + "Download it to this computer now? It is " + mb + " MB.\n"
+                    + "HolyLogger restarts when it is done.",
+                    title, HolyMsgType.Info, owner(), yesText: "Download it", noText: "Not now");
+            else
+            {
+                take = HolyMessageBox.ShowConfirm(
+                    "Your Google Drive has the log from your other computer (saved " + when + ").\n\n"
+                    + "Use it on this computer too?\n"
+                    + "The log now on this computer is kept as a backup.",
+                    title, HolyMsgType.Info, owner(), yesText: "Use the Drive log", noText: "Keep this log");
+                if (!take) { SyncDiary.JoinState = "keep"; return false; }
+            }
+            if (!take) return false;   // asked again next time
+
+            // a small window of its own (code only) saying how far the download has got
+            var text = new TextBlock { FontSize = 16, Margin = new Thickness(24), TextWrapping = TextWrapping.Wrap,
+                                       Text = "Getting your log from Google Drive..." };
+            text.SetResourceReference(TextBlock.ForegroundProperty, "TextBrush");
+            var progressWin = new Window
+            {
+                Title = title, Width = 460, SizeToContent = SizeToContent.Height, ResizeMode = ResizeMode.NoResize,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner, Owner = owner(), ShowInTaskbar = false,
+                Content = text,
+            };
+            progressWin.SetResourceReference(Window.BackgroundProperty, "WindowBg");
+            progressWin.Show();
+
+            string db;
+            long qsos;
+            try
+            {
+                Action<long, long> progress = (done, total) => Dispatcher.BeginInvoke(new Action(() =>
+                    text.Text = "Getting your log from Google Drive...\n" + (done / 1048576).ToString("N0")
+                                + (total > 0 ? " of " + (total / 1048576).ToString("N0") : "") + " MB"));
+                long q = 0;
+                db = await Task.Run(() => SyncDiary.DownloadSnapshot(snap, progress, out q));
+                qsos = q;
+            }
+            catch (Exception ex)
+            {
+                progressWin.Close();
+                Log.Warn("Google Drive: the whole copy of the log was not received - " + ex.Message);
+                HolyMessageBox.ShowError("Could not get your log from Google Drive. Nothing was changed on this computer.\n\n"
+                    + ex.Message + "\n\nTry again later with the sync button in the Log Manager.", title, owner());
+                return false;
+            }
+            finally { if (progressWin.IsVisible) progressWin.Close(); }
+
+            string safety = dal.SafetyCopyName("sync");
+            dal.MakeRoomForSafetyCopy(db);
+            DataAccess.RestoreResult result = dal.RestoreFromBackup(db, safety);
+            try { File.Delete(db); } catch (Exception swallowed) { Log.Swallow(swallowed); }
+            if (result == null || !result.Ok)
+                HolyMessageBox.ShowError("The log from Google Drive could not be put in place, and this computer's log was not changed.\n\n"
+                    + (result?.Error ?? "") + "\n\nHolyLogger will now restart.", title, owner());
+            else
+                HolyMessageBox.ShowSuccess("Your log is on this computer now: " + qsos.ToString("N0") + " QSOs.\n\n"
+                    + (here > 0 ? "The old log of this computer was kept as:\n" + result.SafetyCopyPath + "\n\n" : "")
+                    + "HolyLogger will now restart.", title, owner());
+
+            // as Backups & Restore does: every window still holds the old log, so start again
+            try
+            {
+                App.ReleaseSingleInstanceMutex();
+                System.Diagnostics.Process.Start(System.Reflection.Assembly.GetExecutingAssembly().Location);
+            }
+            catch (Exception ex) { Log.Swallow(ex); }
+            finally { Environment.Exit(0); }
+            return true;
         }
 
         private void AboutMenuItem_Click(object sender, RoutedEventArgs e)

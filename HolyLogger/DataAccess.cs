@@ -3868,6 +3868,35 @@ Environment.NewLine +
             }
         }
 
+        // ── STEP 5: A WHOLE COPY OF THE DATABASE, TAKEN WHILE IT IS IN USE ────────────────────────────
+        //
+        // SQLite's own backup, through the connection every write goes through, with _dbLock held - so
+        // the copy is one consistent moment, never a file caught half-written. On this operator's 382 MB
+        // database that is a second or two once a week, on the diary's timer thread.
+        public void CopyDatabaseTo(string path)
+        {
+            lock (_dbLock)
+            {
+                if (con == null || con.State != ConnectionState.Open) throw new Exception("the database is not open");
+                if (File.Exists(path)) File.Delete(path);
+                using (var dest = new SQLiteConnection("Data Source=" + path + ";Version=3"))
+                {
+                    dest.Open();
+                    con.BackupDatabase(dest, "main", "main", -1, null, 0);
+                }
+            }
+        }
+
+        public long CountAllQsos()
+        {
+            lock (_dbLock)
+            {
+                if (con == null || con.State != ConnectionState.Open) return 0;
+                using (var cmd = new SQLiteCommand("SELECT count(*) FROM qso", con))
+                    return Convert.ToInt64(cmd.ExecuteScalar());
+            }
+        }
+
         // ── STEP 4: MAKING ANOTHER COMPUTER'S CHANGES HERE ───────────────────────────────────────────
         //
         // One line of another computer's diary (SyncDiary.cs explains the lines).
