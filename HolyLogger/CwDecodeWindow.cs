@@ -1280,8 +1280,72 @@ namespace HolyLogger
             double now = _txClock.Elapsed.TotalMilliseconds;
             double catUntil;
             lock (_catGate) catUntil = _catUntilMs;
+            if (KeyerTransmitting || now < catUntil) _ourSendLastMs = now;
             if (KeyerTransmitting || RadioTransmitting || now < catUntil) _txLastMs = now;
             return now - _txLastMs <= TxHangMs;
+        }
+
+        // OUR OWN HAND KEYING, READ FROM THE SIDE TONE (his request, 2026-11-13: to see how well his straight-key
+        // sending reads). HolyLogger is told nothing of his key, but with MENU > SET > Connectors > USB AF/IF Output >
+        // AF Beep/Speech... Output ON his IC-7610 sends its side tone down the USB sound: one clean note (645 Hz),
+        // dits and dahs at their true lengths, silence between - Plain read his CQs from a recording of it. Set to
+        // OFF (the default) the sound is silent while transmitting, as before. So while the radio transmits and
+        // HolyLogger is not the one sending, once a block holds one clear note the rest of that transmission goes to
+        // the readers and the waterfall like received sound. Sound loud across the whole band (the wide bars of
+        // 2026-10-21) never holds one clear note, and is still blanked. One block at a time was not enough: on his
+        // recording 8 of 258 blocks with sound (a key click, the tail of a dit) fell short and would have cut letters.
+        //
+        // THE SOUND TELLS IT FIRST (his screen, 2026-11-13: a white block at the start of every transmission). The
+        // radio's TX report comes late through OmniRig's polling, so his first element was drawn as received sound.
+        // But while he transmits the radio sends dead silence between his elements (rms 2), and received sound never
+        // does: in 182 of his recordings, 572 of 3.4 million 10 ms stretches fell under 20, against 47% of them in his
+        // sending. So a clear note with dead silence near it is his sending too, report or not - until a block that
+        // is neither (the band is back) with no TX report.
+        const double SideToneOverMedianDb = 20;   // his side tone: median 37 dB over the band; received sound 11-23
+        const double DeadSilenceRms = 20;         // over 10 ms; receiving, his quietest was about 200
+        const double SilenceRecentMs = 600;       // dead silence this recent still counts: the gap after his first dah
+        double _ourSendLastMs = double.NegativeInfinity, _deadSilenceMs = double.NegativeInfinity, _sideToneHz;
+        bool _sideTone;
+
+        // Some 10 ms of the block dead silent.
+        static bool DeadSilence(short[] samples, int count, int rate)
+        {
+            int n = rate / 100;
+            if (n <= 0) return false;
+            for (int start = 0; start + n <= count; start += n)
+            {
+                double sum = 0;
+                for (int i = start; i < start + n; i++) sum += (double)samples[i] * samples[i];
+                if (Math.Sqrt(sum / n) < DeadSilenceRms) return true;
+            }
+            return false;
+        }
+
+        bool HolyLoggerSending()
+        {
+            return _txClock.Elapsed.TotalMilliseconds - _ourSendLastMs <= TxHangMs;
+        }
+
+        // One clear note between 300 and 1000 Hz (10 Hz steps, Goertzel), standing SideToneOverMedianDb over the
+        // middle of the band. Silence is not a note. hz = that note.
+        static bool OneClearNote(short[] samples, int count, int rate, out double hz)
+        {
+            hz = 0;
+            if (count <= 0 || rate <= 0) return false;
+            double sum = 0;
+            for (int i = 0; i < count; i++) sum += (double)samples[i] * samples[i];
+            if (Math.Sqrt(sum / count) < 50) return false;
+            var power = new double[71];
+            double peak = 0;
+            for (int k = 0; k < power.Length; k++)
+            {
+                double c = 2 * Math.Cos(2 * Math.PI * (300 + 10 * k) / rate), s1 = 0, s2 = 0;
+                for (int i = 0; i < count; i++) { double s0 = samples[i] + c * s1 - s2; s2 = s1; s1 = s0; }
+                power[k] = s1 * s1 + s2 * s2 - c * s1 * s2;
+                if (power[k] > peak) { peak = power[k]; hz = 300 + 10 * k; }
+            }
+            Array.Sort(power);
+            return 10 * Math.Log10((peak + 1) / (power[power.Length / 2] + 1)) >= SideToneOverMedianDb;
         }
 
         // On the capture thread. Hand the block straight to the decoder - it is a few thousand
@@ -1292,9 +1356,23 @@ namespace HolyLogger
             if (decoder == null) return;
 
             // A copy for the waterfall, drawn on the screen timer - nothing is worked out here.
-            bool tx = TransmittingNow();
-            if (_strip != null) _strip.Feed(samples, count, _recorder.ActualSampleRate, tx);
-            if (tx)
+            bool tx = TransmittingNow(), sideTone = false;
+            if (HolyLoggerSending()) _sideTone = false;
+            else
+            {
+                int rate = _recorder.ActualSampleRate;
+                double now = _txClock.Elapsed.TotalMilliseconds;
+                bool dead = DeadSilence(samples, count, rate);
+                if (dead) _deadSilenceMs = now;
+                bool ours = tx || now - _deadSilenceMs <= SilenceRecentMs;
+                double hz = 0;
+                bool note = ours && OneClearNote(samples, count, rate, out hz);
+                if (!ours || (!tx && !dead && !note)) _sideTone = false;
+                else if (!_sideTone && note) { _sideTone = true; _sideToneHz = hz; }
+                sideTone = _sideTone;   // his own hand keying: the readers get it like received sound
+            }
+            if (_strip != null) _strip.Feed(samples, count, _recorder.ActualSampleRate, tx, sideTone, _sideToneHz);
+            if (tx && !sideTone)
             {
                 if (_silence.Length < count) _silence = new short[count];
                 samples = _silence;
@@ -1620,6 +1698,18 @@ namespace HolyLogger
         double[] _rowFloor;
         long _read;                                         // the sample the next column starts at
         long _columnsMade;
+
+        // REDRAWN AS HIS SENDING (see Feed): the last KeptColumns columns' levels and where each started, so those
+        // made before his sending was recognised can be drawn again as his marks. _redrawFrom (under _gate): -1, or
+        // the sample from which they are to be.
+        const double RedrawMs = 600;
+        const int KeptColumns = 64;                         // 0.64 s, a little more than RedrawMs
+        readonly double[][] _keptDb = new double[KeptColumns][];
+        readonly long[] _keptRead = new long[KeptColumns];
+        readonly double[][] _keptFloor = new double[KeptColumns][];   // each row's quiet level before that column
+        volatile float _sideToneHz;                                   // his side tone's note (Feed)
+        long _redrawFrom = -1;
+        bool _fedSideTone;
         double _shownAt = double.NaN;                       // the column at the right edge, fractional
         double _lastFrameMs;
         readonly System.Collections.Generic.List<Letter> _letters = new System.Collections.Generic.List<Letter>();
@@ -1678,9 +1768,11 @@ namespace HolyLogger
         bool _closed;
         VisualTarget _target;
 
-        /// <summary>A block of sound, on the capture thread; tx = we were transmitting.</summary>
-        public void Feed(short[] samples, int count, int rate, bool tx)
+        /// <summary>A block of sound, on the capture thread; tx = we were transmitting; sideTone = and the sound is
+        /// his own hand keying's side tone (see CwDecodeWindow.OneClearNote).</summary>
+        public void Feed(short[] samples, int count, int rate, bool tx, bool sideTone, double sideToneHz)
         {
+            if (sideTone) _sideToneHz = (float)sideToneHz;
             // On the window's transmit clock: the moments looked up in _keyAt are stamped on it.
             double endMs = CwDecodeWindow.TxClockMs;           // the block's last sample has just arrived
             lock (_gate)
@@ -1695,13 +1787,27 @@ namespace HolyLogger
                     else _soundStartMs += 0.002 * (start - _soundStartMs);
                     _rate = rate;
                 }
+                // His sending has just been recognised: the sound before it, back RedrawMs, was his first element
+                // (see CwDecodeWindow.DeadSilence) - marked so, and the columns already made from it redrawn.
+                if (sideTone && !_fedSideTone && rate > 0)
+                {
+                    long from = Math.Max(0, _written - (long)(rate * RedrawMs / 1000));
+                    for (long k = from; k < _written; k += 1 << SlotShift)
+                    {
+                        int slot = (int)((k >> SlotShift) & (_tx.Length - 1));
+                        _tx[slot] = true;
+                        _key[slot] = KeySideTone;
+                    }
+                    _redrawFrom = from;
+                }
+                _fedSideTone = sideTone;
                 for (int i = 0; i < count; i++)
                 {
                     if (i == 0 || (_written & ((1 << SlotShift) - 1)) == 0)
                     {
                         int slot = (int)((_written >> SlotShift) & (_tx.Length - 1));
-                        _tx[slot] = tx;
-                        _key[slot] = tx && rate > 0 ? _keyAt(_soundStartMs + _written * 1000.0 / rate) : (byte)0;
+                        _tx[slot] = tx || sideTone;
+                        _key[slot] = sideTone ? KeySideTone : tx && rate > 0 ? _keyAt(_soundStartMs + _written * 1000.0 / rate) : (byte)0;
                     }
                     _ring[(int)(_written++ & (_ring.Length - 1))] = samples[i];
                 }
@@ -1765,6 +1871,9 @@ namespace HolyLogger
                     _columnsMade = columns;
                     _shownAt = double.NaN;
                 }
+                long redraw;
+                lock (_gate) { redraw = _redrawFrom; _redrawFrom = -1; }
+                if (redraw >= 0) RedrawAsSideTone(redraw);
                 int made = 0;
                 while (written - _read >= window && made < 40) { MakeColumn(rate, hop, window); made++; }
 
@@ -1874,9 +1983,16 @@ namespace HolyLogger
                 db[y] = 20 * Math.Log10(m0 + (m1 - m0) * w + 1);
             }
 
+            int kept = (int)(_columnsMade % KeptColumns);
+            if (_keptDb[kept] == null) _keptDb[kept] = new double[Rows];
+            Array.Copy(db, _keptDb[kept], Rows);
+            _keptRead[kept] = _read - hop + window / 2;         // the middle of its sound
+
             // EACH NOTE ITS OWN QUIET LEVEL. Each row's level drops at once to anything quieter and creeps up
             // slowly, so it settles on that note's noise, and only a station stands out above it.
             if (_rowFloor == null) _rowFloor = (double[])db.Clone();
+            if (_keptFloor[kept] == null) _keptFloor[kept] = new double[Rows];
+            Array.Copy(_rowFloor, _keptFloor[kept], Rows);
             // (Not "any column loud across the whole strip is ours", tried before: a received station's key clicks
             // span the strip for a moment too, and its marks got cyan edges. Our sending is known without it - from
             // the keyer, the CAT text laid out, and the radio's TX report.)
@@ -1902,6 +2018,26 @@ namespace HolyLogger
             _columnsMade++;
         }
 
+        // The columns already made from the sample `from` on, drawn again as his side tone (see Feed).
+        void RedrawAsSideTone(long from)
+        {
+            if (_rowFloor == null || _column == null) return;
+            bool first = true;
+            for (long c = Math.Max(0, _columnsMade - KeptColumns); c < _columnsMade; c++)
+            {
+                int kept = (int)(c % KeptColumns);
+                if (_keptDb[kept] == null || _keptRead[kept] < from) continue;
+                // The quiet levels as they were before his sending: the silence between his first elements had
+                // pulled them down to nothing, and the band came back after it white (his screen, 2026-11-13).
+                if (first && _keptFloor[kept] != null) Array.Copy(_keptFloor[kept], _rowFloor, Rows);
+                first = false;
+                TxColumn(_keptDb[kept], KeySideTone);
+                int x = (int)(c % RingColumns);
+                _bitmap.WritePixels(new Int32Rect(x, 0, 1, Rows), _column, 4, 0);
+                _bitmap.WritePixels(new Int32Rect(x + RingColumns, 0, 1, Rows), _column, 4, 0);
+            }
+        }
+
         double[] _re, _im, _db, _over;
 
         // OUR OWN KEYING, DRAWN CLEAN (his design): a cyan mark of fixed height at his pitch while the key is
@@ -1920,9 +2056,25 @@ namespace HolyLogger
             return over[Rows / 2] >= TxKeyDownDb;
         }
 
+        // HIS SIDE TONE (key 3, see CwDecodeWindow.OneClearNote). Drawn as sound, its 644 Hz note at 5000 against
+        // about 1000 receiving lit the whole strip white (his screen, 2026-11-13): the gaps between his elements are
+        // silent, so every row's quiet level fell to nothing. So it gets our clean marks too, key down while his
+        // note's rows stand TxKeyDownDb over their receiving level - on his recording dits 10 columns, dahs 24.
+        // Only his note's rows: with any row, the band in the 0.6 s redrawn before his first element, and after
+        // his last, drew one long mark (his screen, 2026-11-13).
+        const byte KeySideTone = 3;
+
+        bool SideToneDown(double[] db)
+        {
+            int row = (int)Math.Round((HighHz - _sideToneHz) / (HighHz - LowHz) * (Rows - 1));
+            for (int y = Math.Max(0, row - 2); y <= Math.Min(Rows - 1, row + 2); y++)
+                if (db[y] - _rowFloor[y] >= TxKeyDownDb) return true;
+            return false;
+        }
+
         void TxColumn(double[] db, byte key)
         {
-            bool down = key != 0 ? key == 2 : WholeStripLoud(db);
+            bool down = key == KeySideTone ? SideToneDown(db) : key != 0 ? key == 2 : WholeStripLoud(db);
             int hz = Math.Max(CwDecodeWindow.LowestPitchHz, Math.Min(CwDecodeWindow.HighestPitchHz, PitchHz));
             int mid = (int)Math.Round((HighHz - hz) / (HighHz - LowHz) * (Rows - 1));
             for (int y = 0; y < Rows; y++)
