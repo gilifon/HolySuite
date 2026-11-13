@@ -638,6 +638,139 @@ namespace HolyLogger
             return go;
         }
 
+        // SHOULD THE IMPORTED QSOs BE SENT TO THE LOGGING SERVICES?
+        //
+        // A file from another program, or an old HolyLogger export, often does not say whether its QSOs
+        // were ever uploaded to LoTW, eQSL, QRZ or Club Log. They used to go in as "already sent", so
+        // HolyLogger could never tell the operator which of them really were. Where the file says it
+        // clearly (see QSO.FileLotwSent) the file is followed; for the rest the operator is asked, one
+        // tick box per service, with how many QSOs each covers. Boxes start unticked: pressing Import
+        // straight away imports them as already sent, the old behaviour, and never floods a queue.
+        //
+        // eQSL only counts QSOs whose station callsign has an eQSL account here - the eQSL queue only
+        // ever holds those, so offering the rest would promise an upload that never happens.
+        //
+        // Called on the worker thread. Returns LoTW, eQSL, QRZ, Club Log ticks; null for Cancel.
+        // No window at all when the file says everything.
+        private bool[] AskImportUploadQueues(System.Collections.Generic.List<QSO> qsos, string fileName,
+                                             out System.Collections.Generic.HashSet<string> eqslCalls)
+        {
+            eqslCalls = new System.Collections.Generic.HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var calls = qsos.Select(q => (q.MyCall ?? string.Empty).Trim())
+                            .Where(c => c.Length > 0)
+                            .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            lock (_syncLock)
+            {
+                foreach (var c in calls)
+                    if (dal.IsCallsignInEqslTable(c)) eqslCalls.Add(c);
+            }
+
+            var eq = eqslCalls;
+            int[] silent =
+            {
+                qsos.Count(q => q.FileLotwSent == null),
+                qsos.Count(q => q.FileEqslSent == null && eq.Contains((q.MyCall ?? string.Empty).Trim())),
+                qsos.Count(q => q.FileQrzSent == null),
+                qsos.Count(q => q.FileClublogSent == null),
+            };
+            var ticks = new bool[4];
+            if (silent.All(n => n == 0)) return ticks;
+
+            Log.Warn(string.Format(CultureInfo.InvariantCulture,
+                "IMPORT: {0} does not say if sent - LoTW {1:N0}, eQSL {2:N0}, QRZ {3:N0}, Club Log {4:N0}",
+                fileName, silent[0], silent[1], silent[2], silent[3]));
+
+            bool go = false;
+            this.Dispatcher.Invoke(() =>
+            {
+                var dialog = new Window
+                {
+                    Title = "Import " + fileName,
+                    SizeToContent = SizeToContent.WidthAndHeight,
+                    ResizeMode = ResizeMode.NoResize,
+                    WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                    Owner = this,
+                    ShowInTaskbar = false
+                };
+                var root = new StackPanel { Margin = new Thickness(18, 14, 18, 16) };
+                // The file's name in the window itself, not only in the title bar, so the operator sees
+                // once more which file he is importing before answering.
+                root.Children.Add(new TextBlock
+                {
+                    Text = "File: " + fileName,
+                    TextWrapping = TextWrapping.Wrap, FontSize = 16, MaxWidth = 440,
+                    FontWeight = FontWeights.Bold, Margin = new Thickness(0, 0, 0, 12)
+                });
+                root.Children.Add(new TextBlock
+                {
+                    Text = "For these QSOs, the file does not say if they were sent.",
+                    TextWrapping = TextWrapping.Wrap, FontSize = 16, MaxWidth = 440,
+                    FontWeight = FontWeights.Bold, Margin = new Thickness(0, 0, 0, 12)
+                });
+
+                string[] names = { "LoTW", "eQSL", "QRZ Logbook", "Club Log" };
+                var boxes = new CheckBox[4];
+                for (int k = 0; k < 4; k++)
+                {
+                    if (silent[k] == 0) continue;
+                    boxes[k] = new CheckBox
+                    {
+                        Content = names[k] + "  (" + silent[k].ToString("N0") + (silent[k] == 1 ? " QSO)" : " QSOs)"),
+                        FontSize = 16, IsChecked = false, Margin = new Thickness(4, 0, 0, 8),
+                        VerticalContentAlignment = VerticalAlignment.Center
+                    };
+                    root.Children.Add(boxes[k]);
+                }
+                root.Children.Add(new TextBlock
+                {
+                    Text = "Ticked: HolyLogger will upload them when you use Upload Queue.",
+                    TextWrapping = TextWrapping.Wrap, FontSize = 16, MaxWidth = 440,
+                    Margin = new Thickness(0, 8, 0, 6)
+                });
+                root.Children.Add(new TextBlock
+                {
+                    Text = "Not ticked: HolyLogger will mark them as sent and never upload them.",
+                    TextWrapping = TextWrapping.Wrap, FontSize = 16, MaxWidth = 440,
+                    Margin = new Thickness(0, 0, 0, 18)
+                });
+
+                var buttonRow = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center };
+                var okBtn = new Button { Content = "Import", MinWidth = 100, Margin = new Thickness(6, 0, 6, 0), Padding = new Thickness(12, 5, 12, 5), FontSize = 16, IsDefault = true };
+                var cancelBtn = new Button { Content = "Cancel", MinWidth = 100, Margin = new Thickness(6, 0, 6, 0), Padding = new Thickness(12, 5, 12, 5), FontSize = 16, IsCancel = true };
+                okBtn.Click += (s, e) => { go = true; dialog.Close(); };
+                cancelBtn.Click += (s, e) => { go = false; dialog.Close(); };
+                buttonRow.Children.Add(okBtn);
+                buttonRow.Children.Add(cancelBtn);
+                root.Children.Add(buttonRow);
+
+                dialog.Content = root;
+                dialog.ShowDialog();
+
+                for (int k = 0; k < 4; k++)
+                    ticks[k] = boxes[k] != null && boxes[k].IsChecked == true;
+            });
+
+            Log.Warn("IMPORT: upload queues " + (go
+                ? "chosen - LoTW " + ticks[0] + ", eQSL " + ticks[1] + ", QRZ " + ticks[2] + ", Club Log " + ticks[3]
+                : "question cancelled; the import stops"));
+            return go ? ticks : null;
+        }
+
+        // Writes the upload state of every QSO about to be inserted: what the file said where it said
+        // it, otherwise 0 (queued) for a ticked service and 1 (treated as already sent) for the rest.
+        private static void ApplyImportUploadStates(System.Collections.Generic.List<QSO> qsos, bool[] sendTo,
+                                                    System.Collections.Generic.HashSet<string> eqslCalls)
+        {
+            foreach (var q in qsos)
+            {
+                bool hasEqsl = eqslCalls.Contains((q.MyCall ?? string.Empty).Trim());
+                q.LotwStatus    = q.FileLotwSent    ?? (sendTo[0] ? 0 : 1);
+                q.EqslStatus    = q.FileEqslSent    ?? (sendTo[1] && hasEqsl ? 0 : 1);
+                q.QrzStatus     = q.FileQrzSent     ?? (sendTo[2] ? 0 : 1);
+                q.ClublogStatus = q.FileClublogSent ?? (sendTo[3] ? 0 : 1);
+            }
+        }
+
         // WHAT STANDS UNDER THE MERGING SENTENCE: the callsigns the file was made under - one is a word,
         // several are a list to open - and, when the file holds records naming no callsign at all, the
         // choice about those as well.
@@ -1809,6 +1942,16 @@ namespace HolyLogger
                     ambiguousQso += ambiguousThisFile;
                     count = rawQSOList.Count;   // what is left is what actually gets inserted
 
+                    // WHICH UPLOAD QUEUES THE NEW QSOs GO INTO. Asked here - after the file is read and
+                    // matched against the log, before anything is inserted - so the counts are exactly
+                    // the QSOs about to be added. Cancel abandons the import like Stop does.
+                    if (count > 0)
+                    {
+                        bool[] sendTo = AskImportUploadQueues(rawQSOList, shortName, out var eqslCalls);
+                        if (sendTo == null) { stopped = true; break; }
+                        ApplyImportUploadStates(rawQSOList, sendTo, eqslCalls);
+                    }
+
                     for (int i = 0; i < count; i += importBatchSize)
                     {
                         // BETWEEN BATCHES, never inside one. A batch is one transaction; stopping in
@@ -1834,7 +1977,7 @@ namespace HolyLogger
                                     lastReportedPercent = percent;
                                     AdifHandlerWorker.ReportProgress(percent, $"Saving to log {savePercent}%");
                                 }
-                            }, refused);
+                            }, refused, statusesFromQso: true);
                         }
 
                         // A QSO the database itself refused. It parsed fine, so its record is rebuilt
