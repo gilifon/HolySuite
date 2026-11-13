@@ -106,12 +106,46 @@ namespace HolyLogger
                 cwDecodeWindow.OpenSettings = OpenOptionsOnCwDecoder;
                 cwDecodeWindow.Show();
                 RememberCwDecodeOpen(true);
+                TurnOnSideToneToPc();
             }
             catch (Exception ex)
             {
                 Log.Swallow(ex);
                 cwDecodeWindow = null;
             }
+        }
+
+        // HIS SIDE TONE TO THE PC (his request, 2026-11-13). The CW window reads his own straight-key sending from
+        // the radio's side tone (see CwDecodeWindow.OneClearNote), which the radio sends down the USB sound only with
+        // its "AF Beep/Speech... Output" menu item ON - OFF from the factory. So opening the window turns it on, for
+        // the radios whose maker's own CI-V table names the item (read 2026-11-13):
+        //   IC-7610 - CI-V Reference Guide (IC-7610_ENG_CI-V_4): 1A 05 00 84, "Connectors > USB AF/IF Output >
+        //             AF Beep/Speech... Output (00=OFF, 01=ON)". Tried on his radio: the side tone comes through.
+        //   IC-7300 - Full Manual (IC-7300_ENG_FM_12b) p. 19-4: 1A 05 00 62, "beep and speech output setting to
+        //             ACC/USB (00=OFF, 01=ON)". Not tried on a radio: the manual says beep and speech, not side tone.
+        // The IC-7300MK2 has a CI-V guide of its own, not read, so it is left out. Yaesu's manuals (FTDX10, FTDX101,
+        // FT-991A, FT-710) name no such item. Left ON when the window closes: it only adds the radio's beeps and
+        // voice announcements to the PC sound.
+        static readonly string[,] SideToneToPc = { { "IC7610", "1A 05 00 84 01" }, { "IC7300", "1A 05 00 62 01" } };
+
+        void TurnOnSideToneToPc()
+        {
+            try
+            {
+                if (!IsCatLive()) return;
+                string rigType = NormalizeRigType(Rig.RigType);
+                string key = VoiceModelKey(rigType);
+                if (key.StartsWith("IC7300MK2", StringComparison.Ordinal)) return;
+                string address = GetIcomCivAddress(rigType);
+                if (address == null) return;
+                for (int i = 0; i < SideToneToPc.GetLength(0); i++)
+                    if (key.StartsWith(SideToneToPc[i, 0], StringComparison.Ordinal))
+                    {
+                        TrySendOmniRigCustomCommand("FE FE " + address + " E0 " + SideToneToPc[i, 1] + " FD");
+                        return;
+                    }
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
         }
 
         static void RememberCwDecodeOpen(bool open)
