@@ -1182,7 +1182,7 @@
                     <Viewbox>
                         <Canvas Width="28" Height="22">
                             <Path x:Name="SyncCloudShape" Fill="#C62828"
-                                  Data="M6,19 A5,5 0 0 1 6,9 A7,7 0 0 1 19,8 A5.5,5.5 0 0 1 24,19 Z"/>
+                                  Data="F1 M3,15 A5,5 0 1 1 13,15 A5,5 0 1 1 3,15 Z M7,11 A7,7 0 1 1 21,11 A7,7 0 1 1 7,11 Z M15.5,14.5 A5.5,5.5 0 1 1 26.5,14.5 A5.5,5.5 0 1 1 15.5,14.5 Z M8,12 L21,12 L21,20 L8,20 Z"/>
                             <Path x:Name="SyncCloudMark" Stroke="White" StrokeThickness="2.2"
                                   StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
                                   Data="M11.5,10.5 L17.5,16.5 M17.5,10.5 L11.5,16.5"/>

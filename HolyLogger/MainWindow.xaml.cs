@@ -14457,9 +14457,9 @@ namespace HolyLogger
         {
             try
             {
-                const string Tick = "M10,14 L13.5,17.2 L19.5,10.5";
-                const string Cross = "M11.5,10.5 L17.5,16.5 M17.5,10.5 L11.5,16.5";
-                const string Bang = "M14.5,9 L14.5,13.8 M14.5,16.8 L14.5,17";
+                const string Tick = "M10,14.5 L13.5,17.6 L19.5,11";
+                const string Cross = "M11.5,11.5 L17.5,17.5 M17.5,11.5 L11.5,17.5";
+                const string Bang = "M14.5,10 L14.5,14.8 M14.5,17.6 L14.5,17.8";
                 string colour, mark, tip;
                 if (!GoogleDrive.Registered || !GoogleDrive.SignedIn)
                 {
