@@ -123,10 +123,15 @@ namespace HolyLogger
         //             AF Beep/Speech... Output (00=OFF, 01=ON)". Tried on his radio: the side tone comes through.
         //   IC-7300 - Full Manual (IC-7300_ENG_FM_12b) p. 19-4: 1A 05 00 62, "beep and speech output setting to
         //             ACC/USB (00=OFF, 01=ON)". Not tried on a radio: the manual says beep and speech, not side tone.
-        // The IC-7300MK2 has a CI-V guide of its own, not read, so it is left out. Yaesu's manuals (FTDX10, FTDX101,
-        // FT-991A, FT-710) name no such item. Left ON when the window closes: it only adds the radio's beeps and
-        // voice announcements to the PC sound.
-        static readonly string[,] SideToneToPc = { { "IC7610", "1A 05 00 84 01" }, { "IC7300", "1A 05 00 62 01" } };
+        //   IC-7300MK2 - CI-V Reference Guide (IC-7300MK2_ENG_CI-V_0): 1A 05 00 72, "SET > Connectors > USB AF/IF
+        //             Output", AF Beep/Speech... Output (00=OFF, 01=ON); 00 77 is the same item for ACC. Not tried on
+        //             a radio. A different number from the IC-7300's, so it comes first: "IC7300" matches it too.
+        // Yaesu's manuals (FTDX10, FTDX101, FT-991A, FT-710) name no such item. Left ON when the window closes: it
+        // only adds the radio's beeps and voice announcements to the PC sound.
+        static readonly string[,] SideToneToPc =
+        {
+            { "IC7610", "1A 05 00 84 01" }, { "IC7300MK2", "1A 05 00 72 01" }, { "IC7300", "1A 05 00 62 01" }
+        };
 
         void TurnOnSideToneToPc()
         {
@@ -135,7 +140,6 @@ namespace HolyLogger
                 if (!IsCatLive()) return;
                 string rigType = NormalizeRigType(Rig.RigType);
                 string key = VoiceModelKey(rigType);
-                if (key.StartsWith("IC7300MK2", StringComparison.Ordinal)) return;
                 string address = GetIcomCivAddress(rigType);
                 if (address == null) return;
                 for (int i = 0; i < SideToneToPc.GetLength(0); i++)
