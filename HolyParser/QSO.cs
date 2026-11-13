@@ -217,6 +217,24 @@ namespace HolyParser
         // 2 = permanently rejected. Not serialized to the contest server.
         public int ClublogStatus { get; set; }
 
+        // WHAT AN IMPORTED ADIF FILE SAID ABOUT EACH SERVICE, in the same 0/1/2 as the statuses above,
+        // or null when the file says nothing clear. Read from the official fields only: LOTW_QSL_SENT,
+        // EQSL_QSL_SENT, QRZCOM_QSO_UPLOAD_STATUS, CLUBLOG_QSO_UPLOAD_STATUS.
+        //
+        //   Y        -> 1  uploaded and accepted
+        //   Q or R   -> 0  waiting to be uploaded (queued / requested)
+        //   I        -> 2  ignore or invalid
+        //   N, M, absent -> null. N is "do not upload" in the ADIF spec but many programs write it to
+        //   mean "not uploaded yet" - and the spec makes N the default of the two QSL_SENT fields, so a
+        //   missing field reads as N too. M (modified since upload) leaves the same question open.
+        //   Where the file cannot be trusted to know, the import ASKS the operator instead.
+        //
+        // Used only by the ADIF import, between reading the file and writing the log. Never stored.
+        [JsonIgnore] public int? FileLotwSent { get; set; }
+        [JsonIgnore] public int? FileEqslSent { get; set; }
+        [JsonIgnore] public int? FileQrzSent { get; set; }
+        [JsonIgnore] public int? FileClublogSent { get; set; }
+
         // WHAT THE LOG FIXER HAS ALREADY DONE ABOUT THIS CONTACT.
         //
         //   0 - never reviewed. The Fixer reports it whenever it finds something.

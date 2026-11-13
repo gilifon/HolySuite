@@ -823,6 +823,12 @@ namespace HolyParser
                 qso_row.LotwStatus = val.Trim().Equals("Y", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
             }
 
+            // What the file says about each upload service, for the import's question (see QSO.FileLotwSent).
+            qso_row.FileLotwSent    = SentStatusFromFile(AdifValue(row, "lotw_qsl_sent"));
+            qso_row.FileEqslSent    = SentStatusFromFile(AdifValue(row, "eqsl_qsl_sent"));
+            qso_row.FileQrzSent     = SentStatusFromFile(AdifValue(row, "qrzcom_qso_upload_status"));
+            qso_row.FileClublogSent = SentStatusFromFile(AdifValue(row, "clublog_qso_upload_status"));
+
             // Confirmation status from a HolyLogger export, so a re-import (even on another computer)
             // restores every tick. LoTW uses the standard ADIF fields; QRZ uses app fields. Absent on
             // logs from other programs, so these simply stay 0 there.
@@ -962,6 +968,24 @@ namespace HolyParser
             if (start >= row.Length) return string.Empty;
             if (start + len > row.Length) len = row.Length - start;
             return row.Substring(start, len);
+        }
+
+        // An official ADIF sent / upload-status value as an upload state: Y = 1 (uploaded), Q or R = 0
+        // (waiting), I = 2 (ignore). N, M or no field = null: the file does not clearly say, so the
+        // import asks. See QSO.FileLotwSent for why N is not taken at its word.
+        private static int? SentStatusFromFile(string v)
+        {
+            if (v == null) return null;
+            v = v.Trim();
+            if (v.Length == 0) return null;
+            switch (char.ToUpperInvariant(v[0]))
+            {
+                case 'Y': return 1;
+                case 'Q':
+                case 'R': return 0;
+                case 'I': return 2;
+                default:  return null;
+            }
         }
 
         // 1 when the ADIF field is present and its value starts with Y, else 0.

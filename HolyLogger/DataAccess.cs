@@ -1284,8 +1284,14 @@ Environment.NewLine +
         // failed, when supplied, receives every QSO the database refused ALONG WITH what it said. The
         // count on its own told the operator that contacts had been lost without telling them which,
         // and a number is not something anyone can act on.
+        //
+        // statusesFromQso: the ADIF import has already decided, QSO by QSO, which upload queues each one
+        // goes into (from what the file says, and from the operator's answer where it says nothing), so
+        // all four upload states come from the QSO. Without it eQSL, QRZ and Club Log are written as
+        // "already sent" (1) and only LoTW is taken from the QSO - what the LoTW restore has always done.
         public int InsertBatch(IEnumerable<QSO> qsos, Action<int> progressCallback = null,
-                               List<KeyValuePair<QSO, string>> failed = null)
+                               List<KeyValuePair<QSO, string>> failed = null,
+                               bool statusesFromQso = false)
         {
             BumpContentVersion();   // this write can change who is in the log or what they are called
             lock (_dbLock)
@@ -1297,7 +1303,7 @@ Environment.NewLine +
             int processedQso = 0;
 
             using (SQLiteTransaction transaction = con.BeginTransaction())
-            using (SQLiteCommand insertSQL = new SQLiteCommand("INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,prop_mode,sat_name,soapbox,cq_zone,itu_zone,eqsl_status,qrz_status,lotw_status,clublog_status,lotw_qsl_rcvd,lotw_qsl_rdate,lotw_deleted_entity,qrz_qsl_rcvd,qrz_qsl_rdate,qrz_deleted_entity,eqsl_qsl_rcvd,eqsl_qsl_rdate,eqsl_deleted_entity,clublog_qsl_rcvd,clublog_qsl_rdate,clublog_deleted_entity,paper_qsl_rcvd,state,iota,sota_ref,pota_ref,wwff_ref,sig,sig_info,credit_granted,cnty,qsl_via,qsl_rdate,qsl_sent,contest_id,time_off,date_off,extra_adif,qth,dxcc,notes,my_wwff_ref,log_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,1,?,1,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?," + ActiveLogId + ")", con, transaction))
+            using (SQLiteCommand insertSQL = new SQLiteCommand("INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,prop_mode,sat_name,soapbox,cq_zone,itu_zone,lotw_status,lotw_qsl_rcvd,lotw_qsl_rdate,lotw_deleted_entity,qrz_qsl_rcvd,qrz_qsl_rdate,qrz_deleted_entity,eqsl_qsl_rcvd,eqsl_qsl_rdate,eqsl_deleted_entity,clublog_qsl_rcvd,clublog_qsl_rdate,clublog_deleted_entity,paper_qsl_rcvd,state,iota,sota_ref,pota_ref,wwff_ref,sig,sig_info,credit_granted,cnty,qsl_via,qsl_rdate,qsl_sent,contest_id,time_off,date_off,extra_adif,qth,dxcc,notes,my_wwff_ref,eqsl_status,qrz_status,clublog_status,log_id) VALUES (" + string.Join(",", Enumerable.Repeat("?", 61)) + "," + ActiveLogId + ")", con, transaction))
             {
                 insertSQL.Parameters.Add(new SQLiteParameter("my_callsign"));
                 insertSQL.Parameters.Add(new SQLiteParameter("operator"));
@@ -1370,6 +1376,10 @@ Environment.NewLine +
                 insertSQL.Parameters.Add(new SQLiteParameter("notes"));
                 // ADIF MY_WWFF_REF, last for the same reason.
                 insertSQL.Parameters.Add(new SQLiteParameter("my_wwff_ref"));
+                // The eQSL, QRZ and Club Log upload states, last for the same reason (see statusesFromQso).
+                insertSQL.Parameters.Add(new SQLiteParameter("eqsl_status"));
+                insertSQL.Parameters.Add(new SQLiteParameter("qrz_status"));
+                insertSQL.Parameters.Add(new SQLiteParameter("clublog_status"));
 
                 foreach (var qso in qsos)
                 {
@@ -1432,6 +1442,9 @@ Environment.NewLine +
                     insertSQL.Parameters[55].Value = qso.DxccCode > 0 ? (object)qso.DxccCode : DBNull.Value;
                     insertSQL.Parameters[56].Value = Blank(qso.Notes);
                     insertSQL.Parameters[57].Value = Blank(qso.MyWwffRef);
+                    insertSQL.Parameters[58].Value = statusesFromQso ? qso.EqslStatus : 1;
+                    insertSQL.Parameters[59].Value = statusesFromQso ? qso.QrzStatus : 1;
+                    insertSQL.Parameters[60].Value = statusesFromQso ? qso.ClublogStatus : 1;
 
                     try
                     {
