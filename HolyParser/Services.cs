@@ -236,8 +236,26 @@ namespace HolyParser
                 // operator's own commentary.
                 string soapbox = QSO.SoapboxText(qso.SOAPBOX);
                 if (!string.IsNullOrWhiteSpace(soapbox)) adif.AppendFormat("<soapbox:{0}>{1}", soapbox.Length, soapbox);
-                // LoTW sent status, so the upload queue survives an export/re-import round trip.
-                adif.AppendFormat("<lotw_qsl_sent:1>{0}", qso.LotwStatus == 1 ? "Y" : "N");
+                // UPLOAD STATUS FOR ALL FOUR SERVICES, in their official ADIF fields, so another program -
+                // or HolyLogger itself on re-import - can tell what was sent where. Written only into a
+                // file for the operator (includeImportedFields); a service upload keeps its one old LoTW
+                // field as before. Written here, before the carried fields, so HolyLogger's own record
+                // wins over a stale value the QSO arrived with (AppendImportedFields skips repeats).
+                //
+                //   LOTW_QSL_SENT / EQSL_QSL_SENT:  1 sent -> Y,  0 waiting -> Q (queued),  2 -> I
+                //   QRZCOM_ / CLUBLOG_QSO_UPLOAD_STATUS (only Y, N, M exist):
+                //                                   1 sent -> Y,  2 -> N (do not upload),  0 -> left out
+                // The import reads Y, Q and I back the same way (HolyLogParser.SentStatusFromFile).
+                if (includeImportedFields)
+                {
+                    AppendSentField(adif, "lotw_qsl_sent", qso.LotwStatus == 1 ? "Y" : qso.LotwStatus == 0 ? "Q" : "I");
+                    AppendSentField(adif, "eqsl_qsl_sent", qso.EqslStatus == 1 ? "Y" : qso.EqslStatus == 0 ? "Q" : "I");
+                    AppendSentField(adif, "qrzcom_qso_upload_status", qso.QrzStatus == 1 ? "Y" : qso.QrzStatus == 2 ? "N" : null);
+                    AppendSentField(adif, "clublog_qso_upload_status", qso.ClublogStatus == 1 ? "Y" : qso.ClublogStatus == 2 ? "N" : null);
+                }
+                else
+                    // LoTW sent status, so the upload queue survives an export/re-import round trip.
+                    adif.AppendFormat("<lotw_qsl_sent:1>{0}", qso.LotwStatus == 1 ? "Y" : "N");
 
                 // Confirmation status, using ONLY official ADIF fields so any logger reads the file and it
                 // stays standards-compliant (no HolyLogger-private APP_ fields). ADIF defines received-
@@ -324,6 +342,13 @@ namespace HolyParser
                 if (string.Equals(m.Groups[1].Value, field, StringComparison.OrdinalIgnoreCase))
                     return true;
             return false;
+        }
+
+        // One upload-status field; nothing at all when value is null.
+        private static void AppendSentField(StringBuilder adif, string field, string value)
+        {
+            if (value == null) return;
+            adif.AppendFormat("<{0}:{1}>{2}", field, value.Length, value);
         }
 
         // Writes the imported-but-unmodelled fields into the record just built, skipping any field the
