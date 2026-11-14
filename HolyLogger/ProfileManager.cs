@@ -72,6 +72,24 @@ namespace HolyLogger
             // the program behaves.
             "ClusterLastMinutesFilter", "EqslLastSelectedCallsign", "LastActivityProgram",
 
+            // MORE OF THE SAME, found in a full review of every setting (2026-11-14). Each of these is
+            // written by the program as he works, so each one made the profile look changed for
+            // nothing - and, worse, was put back to the profile's old value on the next start.
+            //
+            // Mode: the main window's Mode box is bound to it, and CAT sets that box from the radio -
+            // the same reason Frequency is out. Comment: bound to the Comment box, so it holds whatever
+            // happened to be typed when he closed. LastMyCastleRef: the castle he last typed, like
+            // LastActivityProgram. LastExportFolder: where the last export went.
+            "Mode", "Comment", "LastMyCastleRef", "LastExportFolder",
+
+            // Layout and window state, the same class as window positions: the RTTY waterfall's height
+            // (dragging the divider) and whether the cluster and radio panel were minimized.
+            "RttyWaterfallHeight", "ClusterWindowMinimized", "RadioPanelMinimized",
+
+            // "The extra backup folder was already offered" - a one-time flag. In a profile, an old
+            // profile or Restore Factory Defaults set it back to false and the offer came up again.
+            "ExtraBackupPrompted",
+
             // NOT EXCLUDED, deliberately: SignBoardWindowIsOpen, MatrixWindowIsOpen, TimerWindowIsOpen
             // and HasClosedClusterWindow. Those say which windows were open, and a profile is expected
             // to bring back the set of windows it was saved with.
