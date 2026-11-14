@@ -1831,7 +1831,7 @@ namespace HolyLogger
         /// The one way the panel and the LED move the radio: a frequency in kHz, and the mode it
         /// should be in - or null for "leave the mode alone", which is what the wheel asks for.
         /// </summary>
-        internal async void TuneRadioToKhz(double khz, string mode)
+        internal async void TuneRadioToKhz(double khz, string mode, string widthColumn = null)
         {
             if (khz <= 0) return;
 
@@ -1851,7 +1851,7 @@ namespace HolyLogger
             int? rigMode = MapClusterModeToRigMode(wanted, frequencyHz / 1000000.0);
             // No mode asked for ("leave the mode alone") is not HolyLogger changing the mode, so no width.
             await TryTuneRigFrequencyAsync(frequencyHz, (OmniRig.RigParamX)(rigMode ?? PM_SSB_U),
-                                           sendSpectrumWidth: !string.IsNullOrWhiteSpace(mode));
+                                           sendSpectrumWidth: !string.IsNullOrWhiteSpace(mode), widthColumn: widthColumn);
 
             UpdateRadioPanel();
         }

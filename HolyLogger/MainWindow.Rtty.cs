@@ -552,7 +552,7 @@ namespace HolyLogger
                 double khz = Rig.GetRxFrequency() / 1000.0;
                 if (khz <= 0) return;
                 bool afsk = RttyByAfsk();
-                if (afsk && mode == PM_DIG_L) { _rttyViaMovedAt = DateTime.Now; TuneRadioToKhz(khz + 2.125, "LSB"); }
+                if (afsk && mode == PM_DIG_L) { _rttyViaMovedAt = DateTime.Now; TuneRadioToKhz(khz + 2.125, "LSB", "RTTY"); }
                 else if (!afsk && mode == PM_SSB_L) { _rttyViaMovedAt = DateTime.Now; TuneRadioToKhz(khz - 2.125, "RTTY"); }
                 else if (!afsk && mode == PM_SSB_U) { _rttyViaMovedAt = DateTime.Now; TuneRadioToKhz(khz + 2.125, "RTTY"); }
                 else UpdateRadioPanel();
