@@ -57,6 +57,12 @@ namespace HolyLogger
             // see. Within one install the choice is remembered as usual (it lives in user.config, and
             // Settings.Upgrade carries it from version to version).
             "isManualMode",
+            // WHICH PROFILE IS IN USE IS NOT CARRIED EITHER (his report, 2026-11-14). Two copies of
+            // HolyLogger on one PC share this file: the installed one had "my regular" in use, the
+            // mirror handed that name to the VS copy, and at its next start the profile - saved by the
+            // other copy - was applied over all of this copy's own settings. Within one install the
+            // choice is remembered as usual (Settings.Upgrade carries it).
+            "ActiveProfile",
         };
 
         private static string FilePath

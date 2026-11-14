@@ -661,14 +661,16 @@ namespace HolyLogger
             // AFSK (his request, 2026-10-23): the tones come from the sound card, so the radio goes to LSB,
             // not its RTTY mode. The dial 2.125 kHz above the band's RTTY frequency, so a station there
             // sits on the 2125 Hz line - the same place the RTTY mode would show it.
-            string sendMode = mode;
+            // And the RTTY span on the radio's scope, as with FSK - not the SSB one LSB would bring.
+            string sendMode = mode, widthColumn = null;
             if (string.Equals(mode, "RTTY", StringComparison.OrdinalIgnoreCase) && MainWindow.RttyByAfsk())
             {
                 sendMode = "LSB";
+                widthColumn = "RTTY";
                 if (_currentBand != null) khz += 2.125;
             }
 
-            _main.TuneRadioToKhz(khz, sendMode);
+            _main.TuneRadioToKhz(khz, sendMode, widthColumn);
         }
 
         // The gear beside the frequency box. What a band button sends the radio to is set on the

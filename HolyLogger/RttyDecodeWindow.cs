@@ -118,7 +118,7 @@ namespace HolyLogger
             // 2 x 291 + 141 = 723, plus 6 for the window's edge; a little over that so the groups never touch.
             MinWidth = 740;
             // The bar, the ruler and the lowest the waterfall goes, plus a framed paper with one line of text.
-            MinHeight = 32 + RulerHeight + LowestWaterfall + 2 + SplitterHeight + 52 + SendRowHeight;
+            MinHeight = 32 + RulerHeight + LowestWaterfall + 2 + SplitterHeight + LowestText + SendRowHeight;
             ResizeMode = ResizeMode.CanResize;
             ShowInTaskbar = false;
             WindowStartupLocation = WindowStartupLocation.CenterOwner;
@@ -205,6 +205,9 @@ namespace HolyLogger
         // it is shown as there is room for.
         const int LowestWaterfall = 60;
         const int SplitterHeight = 7;
+        // THREE LINES OF TEXT AT THE LEAST (his request, 2026-11-14): three of the paper's 24-point lines,
+        // plus its page padding (2 + 2), its frame (1 + 1), its margin (2 + 4) and 2 to spare.
+        const int LowestText = 3 * (int)CwStripes.LineHeight + 14;
         double _waterfallHeight = 160;
         RowDefinition _waterfallRow;
 
@@ -294,7 +297,7 @@ namespace HolyLogger
             };
             body.RowDefinitions.Add(_waterfallRow);
             body.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            body.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star), MinHeight = 52 });
+            body.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star), MinHeight = LowestText });
             body.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             Grid.SetRow(bar, 0);
             Grid.SetRow(waterfall, 1);

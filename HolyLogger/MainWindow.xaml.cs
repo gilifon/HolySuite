@@ -14138,7 +14138,8 @@ namespace HolyLogger
             }
         }
 
-        private async Task TryTuneRigFrequencyAsync(int frequencyHz, OmniRig.RigParamX mode, bool sendSpectrumWidth = true)
+        private async Task TryTuneRigFrequencyAsync(int frequencyHz, OmniRig.RigParamX mode, bool sendSpectrumWidth = true,
+                                                    string widthColumn = null)
         {
             if (Rig == null || Rig.Status != OmniRig.RigStatusX.ST_ONLINE)
             {
@@ -14193,7 +14194,7 @@ namespace HolyLogger
             // AFTER the frequency, not between the mode and it: the radio is where it is going by now,
             // so nothing that follows the band change can put the old width back.
             if (modeSent && sendSpectrumWidth)
-                SendSpectrumWidthForMode(mode);
+                SendSpectrumWidthForMode(mode, widthColumn);
         }
 
         // ── SPECTRUM WIDTH, SENT WITH THE MODE ──────────────────────────────────────────────────
@@ -14203,11 +14204,15 @@ namespace HolyLogger
         // Options > Radio Control Panel > Spectrum width manager, per radio model and per mode; an
         // empty cell, or a radio not on that list, sends nothing. What each radio accepts is in
         // SpectrumWidths (RadioPanelPresets.cs), all of it from the makers' own documents.
-        private void SendSpectrumWidthForMode(OmniRig.RigParamX mode)
+        // widthColumn: the column to use instead of the mode's own - "RTTY" for AFSK RTTY, which the radio
+        // works on LSB but wants the RTTY span (his report, 2026-11-14). Only the RTTY button and the switch
+        // to AFSK ask for it: SSB itself keeps the SSB span, decoder open or not.
+        private void SendSpectrumWidthForMode(OmniRig.RigParamX mode, string widthColumn = null)
         {
             try
             {
-                string column;
+                string column = widthColumn;
+                if (column == null)
                 switch ((int)mode)
                 {
                     case PM_SSB_U: case PM_SSB_L: column = "SSB"; break;
@@ -14221,14 +14226,25 @@ namespace HolyLogger
                 string rigName = ConnectedRigName();
                 SpectrumRadio radio = SpectrumWidths.RadioFor(rigName);
                 SpectrumWidthChoice width = SpectrumWidths.ChosenFor(radio, column);
-                if (width == null) return;
+                // Every way out is written down (his report, 2026-11-14: the span stayed at 5k whatever
+                // the mode, with nothing in the log to say why).
+                if (width == null)
+                {
+                    Log.Warn("Spectrum width: nothing set for " + rigName + " " + column
+                             + (radio == null ? " (radio not in the list)" : string.Empty));
+                    return;
+                }
 
                 string command;
                 if (radio.Kind == SpectrumCommandKind.IcomCiv)
                 {
                     // The address is read from OmniRig's own rig file, as for CW and voice messages.
                     string address = GetIcomCivAddress(rigName);
-                    if (address == null) return;
+                    if (address == null)
+                    {
+                        Log.Warn("Spectrum width: no CI-V address for " + rigName);
+                        return;
+                    }
                     command = "FE FE " + address + " E0 " + radio.Command(width.Code) + " FD";
                 }
                 else
@@ -14238,6 +14254,8 @@ namespace HolyLogger
 
                 if (!TrySendOmniRigCustomCommand(command))
                     Log.Warn("Spectrum width not sent to " + rigName + ": " + command);
+                else
+                    Log.Warn("Spectrum width " + column + " = " + width.Code + " sent to " + rigName + ": " + command);
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
         }
