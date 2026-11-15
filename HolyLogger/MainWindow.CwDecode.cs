@@ -146,11 +146,11 @@ namespace HolyLogger
         };
 
         // The row for this radio, and its address, or -1.
-        int PcSoundRow(out string address)
+        int PcSoundRow(OmniRig.RigX rig, out string address)
         {
             address = null;
-            if (!IsCatLive()) return -1;
-            string rigType = NormalizeRigType(Rig.RigType);
+            if (!Properties.Settings.Default.EnableOmniRigCAT || rig == null || rig.Status != OmniRig.RigStatusX.ST_ONLINE) return -1;
+            string rigType = NormalizeRigType(rig.RigType);
             string key = VoiceModelKey(rigType);
             for (int i = 0; i < PcSoundItems.GetLength(0); i++)
                 if (key.StartsWith(PcSoundItems[i, 0], StringComparison.Ordinal))
@@ -161,9 +161,40 @@ namespace HolyLogger
             return -1;
         }
 
-        bool SetPcSoundItem(string address, string item, string value)
+        // A command to this rig - TrySendOmniRigCustomCommand's way, but to the rig named rather than the one in use.
+        // replyLength 0 = an order: wait for the radio's OK (plus its echo, when it echoes), as that method does.
+        bool SendToRig(OmniRig.RigX rig, string command, int replyLength)
         {
-            return TrySendOmniRigCustomCommand("FE FE " + address + " E0 1A 05 " + item + " " + value + " FD");
+            try
+            {
+                byte[] raw = ParseCustomCommand(command);
+                if (replyLength == 0)
+                {
+                    bool? echo = IcomEchoesCommands(NormalizeRigType(rig.RigType));
+                    if (echo.HasValue) replyLength = (echo.Value ? raw.Length : 0) + 6;
+                }
+                rig.SendCustomCommand(raw, replyLength, string.Empty);
+                return true;
+            }
+            catch (Exception swallowed)
+            {
+                Log.Swallow(swallowed);
+                return false;
+            }
+        }
+
+        bool SetPcSoundItem(OmniRig.RigX rig, string address, string item, string value)
+        {
+            return SendToRig(rig, "FE FE " + address + " E0 1A 05 " + item + " " + value + " FD", 0);
+        }
+
+        // THE RIG TICKED IN OPTIONS, not the one in use (his screen, 2026-11-15): "2: ID-5100A" was ticked and the
+        // window spoke to the IC-7610 on Rig 1, because a new choice of rig only takes effect when Options closes.
+        // The window is opened from Options, so it means the rig Options shows.
+        OmniRig.RigX OptionsRig()
+        {
+            if (OmniRigEngine == null) return null;
+            return Properties.Settings.Default.SelectedOmniRig2 ? OmniRigEngine.Rig2 : OmniRigEngine.Rig1;
         }
 
         void TurnOnSideToneToPc()
@@ -171,8 +202,8 @@ namespace HolyLogger
             try
             {
                 string address;
-                int row = PcSoundRow(out address);
-                if (row >= 0) SetPcSoundItem(address, PcSoundItems[row, 3], "01");
+                int row = PcSoundRow(Rig, out address);
+                if (row >= 0) SetPcSoundItem(Rig, address, PcSoundItems[row, 3], "01");
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
         }
@@ -193,7 +224,10 @@ namespace HolyLogger
             public string Command;     // the whole set command, shown to him
         }
 
-        /// <summary>The settings for the radio connected now - or null, with why in plain words.</summary>
+        // The rig the window is working on - Options' choice when it opened (see OptionsRig).
+        OmniRig.RigX _pcSoundRig;
+
+        /// <summary>The settings for the radio ticked in Options - or null, with why in plain words.</summary>
         internal System.Collections.Generic.List<PcSoundSetting> PcSoundPlan(out string address, out string radio, out string why)
         {
             address = null;
@@ -201,9 +235,17 @@ namespace HolyLogger
             why = null;
             try
             {
-                if (!IsCatLive()) { why = "HolyLogger is not connected to the radio."; return null; }
-                radio = Rig.RigType;
-                int row = PcSoundRow(out address);
+                _pcSoundRig = OptionsRig();
+                if (!Properties.Settings.Default.EnableOmniRigCAT || _pcSoundRig == null
+                    || _pcSoundRig.Status != OmniRig.RigStatusX.ST_ONLINE)
+                {
+                    why = _pcSoundRig != null && Properties.Settings.Default.EnableOmniRigCAT
+                        ? "Rig " + (Properties.Settings.Default.SelectedOmniRig2 ? "2" : "1") + " (" + _pcSoundRig.RigType + ") is not connected."
+                        : "HolyLogger is not connected to the radio.";
+                    return null;
+                }
+                radio = _pcSoundRig.RigType;
+                int row = PcSoundRow(_pcSoundRig, out address);
                 // THE LIST ONLY WHEN IT HELPS (his choice, 2026-11-15): a supported radio's owner never sees it.
                 if (row < 0)
                 {
@@ -234,7 +276,7 @@ namespace HolyLogger
 
         internal bool WritePcSoundSetting(string address, PcSoundSetting s)
         {
-            return SetPcSoundItem(address, s.Item, s.Wanted.ToString("X2"));
+            return _pcSoundRig != null && SetPcSoundItem(_pcSoundRig, address, s.Item, s.Wanted.ToString("X2"));
         }
 
         // The window waiting for one answer from the radio; OmniRigEngine_CustomReply hands every reply to it.
@@ -268,9 +310,11 @@ namespace HolyLogger
             try
             {
                 // Nine bytes of question, echoed back when this radio echoes, then the ten of the answer.
-                bool? echo = IcomEchoesCommands(NormalizeRigType(Rig.RigType));
+                var rig = _pcSoundRig;
+                if (rig == null) return -1;
+                bool? echo = IcomEchoesCommands(NormalizeRigType(rig.RigType));
                 string ask = "FE FE " + address + " E0 1A 05 " + s.Item + " FD";
-                if (!TrySendOmniRigCustomCommand(ask, (echo == false ? 0 : 9) + 10, string.Empty)) return -1;
+                if (!SendToRig(rig, ask, (echo == false ? 0 : 9) + 10)) return -1;
                 var first = await System.Threading.Tasks.Task.WhenAny(done.Task, System.Threading.Tasks.Task.Delay(2000));
                 return first == done.Task ? done.Task.Result : -1;
             }

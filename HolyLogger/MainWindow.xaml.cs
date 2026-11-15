@@ -19623,6 +19623,7 @@ namespace HolyLogger
                 OmniRigEngine.StatusChange += OmniRigEngine_StatusChange;
                 OmniRigEngine.ParamsChange += OmniRigEngine_ParamsChange;
                 OmniRigEngine.CustomReply += OmniRigEngine_CustomReply;
+                OmniRigEngine.RigTypeChange += OmniRigEngine_RigTypeChange;
             }
         }
         private void UnsubscribeFromEvents()
@@ -19633,7 +19634,29 @@ namespace HolyLogger
                 OmniRigEngine.StatusChange -= OmniRigEngine_StatusChange;
                 OmniRigEngine.ParamsChange -= OmniRigEngine_ParamsChange;
                 OmniRigEngine.CustomReply -= OmniRigEngine_CustomReply;
+                OmniRigEngine.RigTypeChange -= OmniRigEngine_RigTypeChange;
             }
+        }
+
+        // A NEW RADIO TYPE CHOSEN IN OMNIRIG (his screen, 2026-11-15): Rig 1 was changed from IC-7610 to IC-765 and
+        // OK pressed, and Options still said "1: IC-7610" - the names were read once, when CAT started. OmniRig says
+        // so itself, so they are read again here, and an Options window that is open shows them at once.
+        private void OmniRigEngine_RigTypeChange(int RigNumber)
+        {
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                try
+                {
+                    GetRigTypes();
+                    ForgetWriteableParams();   // another radio, another set of writeable parameters
+                    if (options != null)
+                    {
+                        options.GeneralSettingsControlControlInstance.Rig1 = Rig1;
+                        options.GeneralSettingsControlControlInstance.Rig2 = Rig2;
+                    }
+                }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
+            }));
         }
 
         // Shows "RIG1" or "RIG2" next to the LED, reflecting the rig chosen in Options → General.
