@@ -43,6 +43,7 @@ namespace HolyLogger
             Closing += (s, e) => SaveSize();
 
             RTB_Text.Document = BuildDocument(ReadManual());
+            ShowList();
 
             // ROOM BELOW THE LAST SUBJECT. Without it the text ends before a subject near the end can
             // reach the top, and clicking it only scrolls to the bottom. A window's height of desk below
@@ -125,9 +126,12 @@ namespace HolyLogger
                     };
                     doc.Blocks.Add(h);
                     _headings.Add(h);
-                    AddSubject(title, level);
+                    AddSubject(title, level, h);
                     continue;
                 }
+
+                // Everything under a heading is what Search looks through for it.
+                if (_subjects.Count > 0) _subjects[_subjects.Count - 1].Text.Append(line).Append(' ');
 
                 Match picture = Regex.Match(line, @"^\s*!\[(.*?)\]\((.+?)\)\s*$");
                 if (picture.Success)
@@ -247,25 +251,123 @@ namespace HolyLogger
 
         // ── the subject list ────────────────────────────────────────────────────────────
 
-        private void AddSubject(string title, int level)
+        // ONLY THE SUBJECTS, AND A SEARCH (user, 2026-11-15): every heading was a line of the list, so the CW
+        // Decoder alone, with a part per radio, made it long. Now the list shows the subjects ("# "); clicking one
+        // opens its parts ("## ") under it and closes the one open before. Typing in Search shows every subject and
+        // part whose heading or text has the words, each part under its subject.
+        private sealed class Subject
         {
-            var text = new TextBlock
-            {
-                Text = title,
-                FontSize = 16,
-                FontWeight = level == 1 ? FontWeights.Bold : FontWeights.Normal,
-                Margin = new Thickness(level == 1 ? 2 : 20, level == 1 ? 6 : 2, 4, 2),
-                TextWrapping = TextWrapping.Wrap
-            };
-            text.SetResourceReference(TextBlock.ForegroundProperty, "TextBrush");
-            LB_Subjects.Items.Add(new ListBoxItem { Content = text, Cursor = System.Windows.Input.Cursors.Hand });
+            public string Title;
+            public int Level;                          // 1 a subject, 2 a part of one
+            public int Parent;                         // the index of its subject - its own, for a subject
+            public Paragraph Heading;
+            public readonly StringBuilder Text = new StringBuilder();
         }
 
+        private readonly List<Subject> _subjects = new List<Subject>();
+        private int _open = -1;                        // the subject whose parts are shown
+        private bool _filling;
+
+        private void AddSubject(string title, int level, Paragraph heading)
+        {
+            int parent = level == 1 || _subjects.Count == 0 ? _subjects.Count : _subjects[_subjects.Count - 1].Parent;
+            _subjects.Add(new Subject { Title = title, Level = level, Parent = parent, Heading = heading });
+        }
+
+        private static bool Has(Subject s, string words)
+        {
+            return s.Title.IndexOf(words, StringComparison.OrdinalIgnoreCase) >= 0
+                || s.Text.ToString().IndexOf(words, StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private void ShowList()
+        {
+            _filling = true;
+            try
+            {
+                LB_Subjects.Items.Clear();
+                string words = (TB_Search.Text ?? string.Empty).Trim();
+                for (int i = 0; i < _subjects.Count; i++)
+                {
+                    Subject s = _subjects[i];
+                    bool show;
+                    if (words.Length == 0) show = s.Level == 1 || s.Parent == _open;
+                    else show = Has(s, words) || (s.Level == 1 && _subjects.Exists(p => p.Level == 2 && p.Parent == i && Has(p, words)));
+                    if (!show) continue;
+
+                    string mark = s.Level == 1 && words.Length == 0 ? (i == _open ? "▾ " : "▸ ") : string.Empty;
+                    var text = new TextBlock
+                    {
+                        Text = mark + s.Title,
+                        FontSize = 16,
+                        FontWeight = s.Level == 1 ? FontWeights.Bold : FontWeights.Normal,
+                        Margin = new Thickness(s.Level == 1 ? 2 : 20, s.Level == 1 ? 6 : 2, 4, 2),
+                        TextWrapping = TextWrapping.Wrap
+                    };
+                    text.SetResourceReference(TextBlock.ForegroundProperty, "TextBrush");
+                    LB_Subjects.Items.Add(new ListBoxItem { Content = text, Tag = i, Cursor = System.Windows.Input.Cursors.Hand });
+                }
+
+                if (words.Length > 0 && LB_Subjects.Items.Count == 0)
+                {
+                    var none = new TextBlock { Text = "Nothing found.", FontSize = 16, Margin = new Thickness(2, 6, 4, 2) };
+                    none.SetResourceReference(TextBlock.ForegroundProperty, "TextBrush");
+                    LB_Subjects.Items.Add(new ListBoxItem { Content = none, IsEnabled = false });
+                }
+            }
+            finally { _filling = false; }
+        }
+
+        // A choice in the list (mouse or arrow keys) brings its heading to the top. Opening and closing a subject
+        // is the click's alone - see Subjects_Click.
         private void Subjects_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            int i = LB_Subjects.SelectedIndex;
-            if (i < 0 || i >= _headings.Count) return;
-            ScrollHeadingToTop(_headings[i]);
+            if (_filling) return;
+            var item = LB_Subjects.SelectedItem as ListBoxItem;
+            if (item == null || !(item.Tag is int)) return;
+            ScrollHeadingToTop(_subjects[(int)item.Tag].Heading);
+        }
+
+        // A CLICK ON A SUBJECT OPENS ITS PARTS, AND A CLICK ON THE OPEN ONE CLOSES THEM (user, 2026-11-15: clicking
+        // the open subject did not close it). That second click chooses nothing new, so the list never says it
+        // happened - the click itself is listened to instead.
+        private void Subjects_Click(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            var item = ItemsControl.ContainerFromElement(LB_Subjects, e.OriginalSource as DependencyObject) as ListBoxItem;
+            if (item == null || !(item.Tag is int)) return;
+            int i = (int)item.Tag;
+            ScrollHeadingToTop(_subjects[i].Heading);
+
+            if (_subjects[i].Level == 1 && (TB_Search.Text ?? string.Empty).Trim().Length == 0)
+            {
+                _open = _open == i ? -1 : i;
+                // Not while the list is still handling this click: rebuilt afterwards, with the subject still chosen.
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    ShowList();
+                    _filling = true;
+                    try
+                    {
+                        foreach (ListBoxItem it in LB_Subjects.Items)
+                            if (it.Tag is int && (int)it.Tag == i) { LB_Subjects.SelectedItem = it; break; }
+                    }
+                    finally { _filling = false; }
+                }));
+            }
+        }
+
+        private void Search_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            ShowList();
+        }
+
+        private void Search_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+        {
+            if (e.Key == System.Windows.Input.Key.Escape && TB_Search.Text.Length > 0)
+            {
+                TB_Search.Text = string.Empty;
+                e.Handled = true;
+            }
         }
 
         // The heading's own position is measured and the desk scrolled by exactly that much, so the

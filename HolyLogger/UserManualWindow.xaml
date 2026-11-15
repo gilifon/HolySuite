@@ -17,11 +17,21 @@
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
 
-        <ListBox x:Name="LB_Subjects" Grid.Column="0" FontSize="16"
-                 Background="{DynamicResource GridRowBg}" Foreground="{DynamicResource TextBrush}"
-                 BorderBrush="#1565C0" BorderThickness="2"
-                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                 SelectionChanged="Subjects_SelectionChanged"/>
+        <!-- ONLY THE SUBJECTS, AND A SEARCH (user, 2026-11-15): with every part of every subject listed, the
+             list grew long and a subject was hard to find. The list shows the subjects; a click opens that
+             subject's parts under it. Typing in Search shows only what has the words in it. -->
+        <DockPanel Grid.Column="0">
+            <TextBlock DockPanel.Dock="Top" Text="Search:" FontSize="16" Margin="2,0,0,4"/>
+            <TextBox x:Name="TB_Search" DockPanel.Dock="Top" FontSize="16" Margin="0,0,0,8" Padding="2"
+                     TextChanged="Search_TextChanged" KeyDown="Search_KeyDown"
+                     ToolTip="Type a word, for example 7300 or level. Esc clears it."/>
+            <ListBox x:Name="LB_Subjects" FontSize="16"
+                     Background="{DynamicResource GridRowBg}" Foreground="{DynamicResource TextBrush}"
+                     BorderBrush="#1565C0" BorderThickness="2"
+                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                     SelectionChanged="Subjects_SelectionChanged"
+                     PreviewMouseLeftButtonUp="Subjects_Click"/>
+        </DockPanel>
 
         <GridSplitter Grid.Column="1" Width="8" HorizontalAlignment="Center" VerticalAlignment="Stretch"
                       Background="Transparent" ResizeBehavior="PreviousAndNext"/>
