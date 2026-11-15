@@ -68,3 +68,71 @@ Google Drive Sync works only with Google Drive. Dropbox, OneDrive and other serv
 ## Turning it off
 
 Open **File > Google Drive Sync** and click **Sign out**. This computer stops sending its changes to Google Drive. Your log stays on this computer.
+
+# CW Decoder
+
+The CW Decoder listens to the sound your radio sends the computer over the USB cable, and writes what it hears. For it to work, three things must be right: the radio must send the sound, Windows must record it loudly enough, and HolyLogger must listen to the right device.
+
+## Checking the sound in HolyLogger
+
+Open **Options > General** and look at the **Input Device** box.
+
+- **Listen to:** choose the radio's sound device. It is usually called "USB Audio CODEC".
+- The bar and the word beside it show the sound arriving now: **Good**, **Too weak**, **Too loud** or **No sound**.
+- **Windows recording level** opens Windows' recording devices. Choose the radio's device, then **Properties**, then **Levels**, and raise or lower the level until the word says **Good**.
+- **Set the radio for CW decoding** sets the radio's own sound settings for you (IC-7610, IC-7300 and IC-7300MK2). A window shows what will be changed. Nothing is sent before you press **OK**, and afterwards it shows whether the radio took each setting.
+
+To see your own sending in the decoder, the radio must also send its side tone to the computer. HolyLogger turns this on by itself on the IC-7610, IC-7300 and IC-7300MK2 when the CW Decoder opens.
+
+## Radio settings for the sound
+
+These are the radio's own menu items for the sound it sends the computer, with the names your radio's manual uses.
+
+### Icom IC-7610
+
+**MENU > SET > Connectors > USB AF/IF Output**
+
+- **Output Select:** AF. On IF the radio sends a signal the decoder cannot read.
+- **AF Output Level:** the level of the sound to the computer (50% from the factory).
+- **AF SQL:** OFF (Open). When ON, the sound stops whenever the squelch is closed.
+- **AF Beep/Speech... Output:** ON, to see your own sending. It adds the radio's beeps and voice to the sound too.
+
+### Icom IC-7300
+
+**MENU > SET > Connectors**
+
+- **ACC/USB Output Select:** AF.
+- **ACC/USB AF Output Level:** the level of the sound to the computer (50% from the factory).
+- **ACC/USB AF SQL:** OFF (OPEN).
+- **ACC/USB AF Beep/Speech... Output:** ON. The manual says it adds beeps and speech; it does not say whether it adds the side tone.
+
+### Icom IC-7300MK2
+
+**MENU > SET > Connectors > USB AF/IF Output**
+
+- **Output Select:** AF.
+- **AF Output Level:** the level of the sound to the computer.
+- **AF SQL:** OFF (Open).
+- **AF Beep/Speech... Output:** ON.
+
+### Kenwood TS-590SG
+
+- **Menu 72, Audio level of USB output for data communications:** the level of the sound to the computer (0 to 9, 4 from the factory).
+- **Menu 75, Mixing beep tones for ACC2/USB audio output:** ON, to see your own sending. It adds the beeps, the side tone and the voice guide to the sound.
+
+### Kenwood TS-590S
+
+- **Menu 65, USB audio output level:** the level of the sound to the computer.
+- **Menu 68, External AF output beep mix:** ON, to add the beeps to the sound.
+
+### Kenwood TS-890S
+
+- **Menu [7-08], USB: Audio Output Level:** the level of the sound to the computer (100 from the factory).
+- **Menu [7-11], Audio Output Type (Rear Connectors):** All (the factory setting). All adds the beeps, the voice guidance and the side tone to the sound, so you can see your own sending.
+
+### Yaesu FTdx10, FTdx101, FT-991A
+
+- **CW OUT LEVEL:** the manual says it sets the level of the CW signal from the RTTY/DATA jack (50 from the factory). On the FT-991A it is menu 054.
+- **CW OUT SELECT** (FTdx101 only): which receiver, MAIN or SUB, is sent out in CW (MAIN from the factory).
+
+The Yaesu manuals have no setting that sends the side tone to the computer.
