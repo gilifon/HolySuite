@@ -201,8 +201,10 @@
                                VerticalAlignment="Center"/>
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                    <!-- Green left, blue right (user, 2026-11-15), the coloured keys used elsewhere in Options. -->
                     <Button x:Name="BTN_WindowsRecordingLevel" Content="Windows recording level" HorizontalAlignment="Left"
-                            Padding="8,2" FontSize="16" Cursor="Hand" Click="BTN_WindowsRecordingLevel_Click">
+                            Style="{StaticResource GoActionButtonStyle}" Height="32" Width="224"
+                            FontSize="16" Click="BTN_WindowsRecordingLevel_Click">
                         <Button.ToolTip>
                             <ToolTip>
                                 <TextBlock MaxWidth="330" TextWrapping="Wrap" FontSize="16"
@@ -212,7 +214,8 @@
                     </Button>
                     <!-- Opens RadioPcSoundWindow (MainWindow.CwDecode.cs): the radio's own menu items for the sound it sends. -->
                     <Button x:Name="BTN_SetRadioForCwDecoding" Content="Set the radio for CW decoding" Margin="10,0,0,0"
-                            Padding="8,2" FontSize="16" Cursor="Hand" Click="BTN_SetRadioForCwDecoding_Click">
+                            Style="{StaticResource BlueActionButtonStyle}" Height="32" Width="272"
+                            FontSize="16" Click="BTN_SetRadioForCwDecoding_Click">
                         <Button.ToolTip>
                             <ToolTip>
                                 <TextBlock MaxWidth="330" TextWrapping="Wrap" FontSize="16"
