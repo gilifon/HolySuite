@@ -135,14 +135,31 @@ namespace HolyLogger
         // documents, the same menu (IC-7300: Full Manual p. 19-5, 1A 05 00 59 "AF/IF signal output to ACC/USB
         // (00=AF, 01=IF)" and 00 61 "squelch function for the AF signal output to ACC/USB (00=OFF (Open), 01=ON)").
         // The AF Output Level is left alone on purpose: no one value is right, and other programs (WSJT-X) share it.
-        // Columns: model, Output Select, AF SQL, AF Beep/Speech... Output - each the item after 1A 05 - and the
-        // words the radio's own menu puts before the item names, so the window shows the names he will find there -
-        // and the radio's name as people write it, for the list an unsupported radio is shown.
+        // Columns: model; Output Select, AF SQL, AF Beep/Speech... Output - each the item after 1A 05, or null when the
+        // radio has no such item; the three items' names as the radio's own menu writes them, so the window shows the
+        // names he will find there; and the radio's name as people write it, for the list an unsupported radio is shown.
+        //
+        // MORE ICOMS (his request, 2026-11-15: "the most common CW radios"), each from Icom's own document:
+        //   IC-705 (CI-V guide IC-705_ENG_CI-V_6), IC-9700 (IC-9700_ENG_CI-V_4), IC-7760 (IC-7760_ENG_CI-V_2):
+        //     SET > Connectors > USB AF/IF Output > Output Select / AF SQL / AF Beep/Speech... Output.
+        //   IC-7100 (Full Manual IC-7100_ENG_FM_5): 0084 "ACC and USB output setting (00=AF, 01=IF)", 0083 "USB audio
+        //     squelch setting (00=OFF (OPEN), 01=ON)"; no beep item.
+        //   IC-7410 (IC-7410_ENG_01) 0036, IC-9100 (IC-9100_ENG_2a) 0053, IC-7600 (IC-7600_ENG_4) 0028: "USB Audio SQL"
+        //     only - their manuals say "the beep tones and the voice synthesizer announcements are not sent".
+        //   IC-7850/7851 have no USB sound (ACC and S/PDIF only), so they are not here.
+        // Order matters where one name starts another: IC7300MK2 before IC7300.
         static readonly string[,] PcSoundItems =
         {
-            { "IC7610", "00 80", "00 83", "00 84", "USB AF/IF Output > ", "IC-7610" },
-            { "IC7300MK2", "00 69", "00 71", "00 72", "USB AF/IF Output > ", "IC-7300MK2" },
-            { "IC7300", "00 59", "00 61", "00 62", "ACC/USB ", "IC-7300" },
+            { "IC7610", "00 80", "00 83", "00 84", "USB AF/IF Output > Output Select", "USB AF/IF Output > AF SQL", "USB AF/IF Output > AF Beep/Speech... Output", "IC-7610" },
+            { "IC7300MK2", "00 69", "00 71", "00 72", "USB AF/IF Output > Output Select", "USB AF/IF Output > AF SQL", "USB AF/IF Output > AF Beep/Speech... Output", "IC-7300MK2" },
+            { "IC7300", "00 59", "00 61", "00 62", "ACC/USB Output Select", "ACC/USB AF SQL", "ACC/USB AF Beep/Speech... Output", "IC-7300" },
+            { "IC705", "01 09", "01 11", "01 12", "USB AF/IF Output > Output Select", "USB AF/IF Output > AF SQL", "USB AF/IF Output > AF Beep/Speech... Output", "IC-705" },
+            { "IC9700", "01 05", "01 07", "01 08", "USB AF/IF Output > Output Select", "USB AF/IF Output > AF SQL", "USB AF/IF Output > AF Beep/Speech... Output", "IC-9700" },
+            { "IC7760", "01 03", "01 06", "01 07", "USB AF/IF Output > Output Select", "USB AF/IF Output > AF SQL", "USB AF/IF Output > AF Beep/Speech... Output", "IC-7760" },
+            { "IC7100", "00 84", "00 83", null, "ACC/USB Output Select", "USB Audio SQL", null, "IC-7100" },
+            { "IC7410", null, "00 36", null, null, "USB Audio SQL", null, "IC-7410" },
+            { "IC9100", null, "00 53", null, null, "USB Audio SQL", null, "IC-9100" },
+            { "IC7600", null, "00 28", null, null, "USB Audio SQL", null, "IC-7600" },
         };
 
         // The row for this radio, and its address, or -1.
@@ -203,7 +220,7 @@ namespace HolyLogger
             {
                 string address;
                 int row = PcSoundRow(Rig, out address);
-                if (row >= 0) SetPcSoundItem(Rig, address, PcSoundItems[row, 3], "01");
+                if (row >= 0 && PcSoundItems[row, 3] != null) SetPcSoundItem(Rig, address, PcSoundItems[row, 3], "01");
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
         }
@@ -276,7 +293,7 @@ namespace HolyLogger
 
                 // THE LIST ONLY WHEN IT HELPS (his choice, 2026-11-15): a supported radio's owner never sees it.
                 var names = new System.Collections.Generic.List<string>();
-                for (int i = 0; i < PcSoundItems.GetLength(0); i++) names.Add(PcSoundItems[i, 5]);
+                for (int i = 0; i < PcSoundItems.GetLength(0); i++) names.Add(PcSoundItems[i, 7]);
                 names.Add("TS-590S");
                 names.Add("TS-590SG");
                 result.Why = "Your " + rig.RigType + " is not supported yet. Supported: " + string.Join(", ", names) + ".";
@@ -293,19 +310,18 @@ namespace HolyLogger
 
         System.Collections.Generic.List<PcSoundSetting> IcomPcSoundPlan(OmniRig.RigX rig, int row, string address)
         {
-            string menu = PcSoundItems[row, 4];
             // Nine bytes of question, echoed back when this radio echoes, then the ten of the answer.
             bool? echo = IcomEchoesCommands(NormalizeRigType(rig.RigType));
             var plan = new System.Collections.Generic.List<PcSoundSetting>();
-            string[] names = { "Output Select", "AF SQL", "AF Beep/Speech... Output" };
             string[][] values = { new[] { "AF", "IF" }, new[] { "OFF (Open)", "ON" }, new[] { "OFF", "ON" } };
             int[] wanted = { 0, 0, 1 };
             for (int k = 0; k < 3; k++)
             {
                 string item = PcSoundItems[row, k + 1];
+                if (item == null) continue;            // this radio has no such item
                 plan.Add(new PcSoundSetting
                 {
-                    Name = menu + names[k],
+                    Name = PcSoundItems[row, k + 4],
                     Wanted = wanted[k],
                     Values = values[k],
                     Command = "FE FE " + address + " E0 1A 05 " + item + " " + wanted[k].ToString("X2") + " FD",

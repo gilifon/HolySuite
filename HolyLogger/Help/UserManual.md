@@ -80,9 +80,9 @@ Open **Options > General** and look at the **Input Device** box.
 - **Listen to:** choose the radio's sound device. It is usually called "USB Audio CODEC".
 - The bar and the word beside it show the sound arriving now: **Good**, **Too weak**, **Too loud** or **No sound**.
 - **Windows recording level** opens Windows' recording devices. Choose the radio's device, then **Properties**, then **Levels**, and raise or lower the level until the word says **Good**.
-- **Set the radio for CW decoding** sets the radio's own sound settings for you (IC-7610, IC-7300, IC-7300MK2, TS-590S and TS-590SG). A window shows what will be changed. Nothing is sent before you press **OK**, and afterwards it shows whether the radio took each setting.
+- **Set the radio for CW decoding** sets the radio's own sound settings for you, on every radio below except the TS-890S and the Yaesu radios. A window shows what will be changed. Nothing is sent before you press **OK**, and afterwards it shows whether the radio took each setting.
 
-To see your own sending in the decoder, the radio must also send its side tone to the computer. HolyLogger turns this on by itself on the IC-7610, IC-7300 and IC-7300MK2 when the CW Decoder opens.
+To see your own sending in the decoder, the radio must also send its side tone to the computer. HolyLogger turns this on by itself on the IC-7610, IC-7300, IC-7300MK2, IC-705, IC-9700 and IC-7760 when the CW Decoder opens.
 
 ## Radio settings for the sound
 
@@ -114,6 +114,31 @@ These are the radio's own menu items for the sound it sends the computer, with t
 - **AF Output Level:** the level of the sound to the computer.
 - **AF SQL:** OFF (Open).
 - **AF Beep/Speech... Output:** ON.
+
+### Icom IC-705, IC-9700, IC-7760
+
+**MENU > SET > Connectors > USB AF/IF Output**
+
+- **Output Select:** AF.
+- **AF Output Level:** the level of the sound to the computer.
+- **AF SQL:** OFF (Open).
+- **AF Beep/Speech... Output:** ON.
+
+### Icom IC-7100
+
+**MENU > SET > Connectors**
+
+- **ACC/USB Output Select:** AF.
+- **ACC/USB AF Level:** the level of the sound to the computer (50% from the factory).
+- **USB Audio SQL:** OFF (OPEN).
+
+The IC-7100 has no setting that sends its beeps or side tone to the computer.
+
+### Icom IC-7410, IC-9100, IC-7600
+
+- **USB Audio SQL:** OFF (OPEN), in the radio's Set mode. When ON, the sound stops whenever the squelch is closed.
+
+Their manuals say the beep tones and voice announcements are not sent to the computer.
 
 ### Kenwood TS-590SG
 
