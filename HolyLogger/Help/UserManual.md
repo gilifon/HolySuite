@@ -80,7 +80,7 @@ Open **Options > General** and look at the **Input Device** box.
 - **Listen to:** choose the radio's sound device. It is usually called "USB Audio CODEC".
 - The bar and the word beside it show the sound arriving now: **Good**, **Too weak**, **Too loud** or **No sound**.
 - **Windows recording level** opens Windows' recording devices. Choose the radio's device, then **Properties**, then **Levels**, and raise or lower the level until the word says **Good**.
-- **Set the radio for CW decoding** sets the radio's own sound settings for you, on every radio below except the TS-890S and the Yaesu radios. A window shows what will be changed. Nothing is sent before you press **OK**, and afterwards it shows whether the radio took each setting.
+- **Set the radio for CW decoding** sets the radio's own sound settings for you, on every Icom and Kenwood radio below. A window shows what will be changed. Nothing is sent before you press **OK**, and afterwards it shows whether the radio took each setting.
 
 To see your own sending in the decoder, the radio must also send its side tone to the computer. HolyLogger turns this on by itself on the IC-7610, IC-7300, IC-7300MK2, IC-705, IC-9700 and IC-7760 when the CW Decoder opens.
 
@@ -161,3 +161,14 @@ Their manuals say the beep tones and voice announcements are not sent to the com
 - **CW OUT SELECT** (FTdx101 only): which receiver, MAIN or SUB, is sent out in CW (MAIN from the factory).
 
 The Yaesu manuals have no setting that sends the side tone to the computer.
+
+### Elecraft K4
+
+- **MAIN RX > LINE OUT:** the level of the sound to the computer. The USB sound carries the same as the LINE OUT jack.
+- **MENU: TX Monitor Level, Line Out:** =MON (the factory setting) sends your side tone to LINE OUT and to the USB sound, at the MON level, so you can see your own sending. OFF sends none.
+
+### Elecraft K3S
+
+- **CONFIG:LIN OUT:** the level of LINE OUT. The manual says settings above 10 are usually not needed. The USB port can carry the same line-level sound instead of the LINE OUT jack.
+
+The K3S manual does not say whether the side tone is sent to the computer.
