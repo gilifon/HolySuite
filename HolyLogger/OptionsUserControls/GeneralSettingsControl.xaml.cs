@@ -143,6 +143,8 @@ namespace HolyLogger.OptionsUserControls
             Loaded += (sender, args) => ListenForPorts(true);
             Unloaded += (sender, args) => ListenForPorts(false);
             InitCwDecodeDevicePicker();
+            Loaded += (sender, args) => ListenForCwInputLevel(true);
+            Unloaded += (sender, args) => ListenForCwInputLevel(false);
             _loadingCwPitch = true;
             TB_CwPitch.Text = Properties.Settings.Default.CwPitchHz.ToString(System.Globalization.CultureInfo.InvariantCulture);
             _loadingCwPitch = false;
@@ -638,6 +640,90 @@ namespace HolyLogger.OptionsUserControls
             // A decode window already open and listening moves to the new device at once, rather
             // than going on listening to the old one until it is closed and opened again.
             CwDecodeWindow.RaiseInputDeviceChanged();
+            if (IsLoaded) ListenForCwInputLevel(true);
+        }
+
+        // ── THE CHOSEN DEVICE'S LEVEL, LIVE (his request, 2026-11-15) ────────────────
+        //
+        // A friend's IC-7300 gave the decoder nothing: Windows had that device's recording level far down. The
+        // decode window's lamp was grey, and neither of them noticed it. So while this page is open the chosen
+        // device is listened to here, and the bar and the words say whether the radio's sound arrives strongly
+        // enough, with the button to Windows' own level right under them.
+        //
+        // THE LIMITS, from his IC-7610 receiving: its sound peaks at about 0.1 of the most a sample can hold.
+        // Under 0.01 is the decode window's grey ("no sound"); under 0.02 - a fifth of his - is too weak; over
+        // 0.92 is the window's red. Judged on the loudest moment of the last 2 s, so a quiet gap between two
+        // signals does not make it flicker. The bar is in dB, 60 dB across, so his 0.1 fills two thirds of it.
+        const double LevelNoSound = 0.01, LevelTooWeak = 0.02, LevelTooLoud = 0.92;
+        WaveInRecorder _levelRecorder;
+        System.Windows.Threading.DispatcherTimer _levelTimer;
+        double _levelShown, _levelHeld;
+        DateTime _levelHeldAt;
+
+        void ListenForCwInputLevel(bool on)
+        {
+            try
+            {
+                if (_levelTimer != null) _levelTimer.Stop();
+                if (_levelRecorder != null) { _levelRecorder.Stop(); _levelRecorder = null; }
+                CwInputLevelBar.Width = 0;
+                CwInputLevelWords.Text = string.Empty;
+                if (!on) return;
+
+                var recorder = new WaveInRecorder();
+                string error;
+                if (!recorder.Start(Properties.Settings.Default.CwDecodeInputDevice, out error))
+                {
+                    CwInputLevelWords.Text = string.IsNullOrEmpty(error) ? "This device cannot be opened." : error;
+                    CwInputLevelWords.Foreground = Brushes.Firebrick;
+                    return;
+                }
+                _levelRecorder = recorder;
+                _levelShown = 0;
+                _levelHeld = 0;
+                _levelHeldAt = DateTime.UtcNow;
+                if (_levelTimer == null)
+                {
+                    _levelTimer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
+                    _levelTimer.Tick += (sender, args) => ShowCwInputLevel();
+                }
+                _levelTimer.Start();
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        static readonly Brush LevelGood = Freeze(new SolidColorBrush(Color.FromRgb(0x2E, 0x9E, 0x44)));
+        static readonly Brush LevelWeak = Freeze(new SolidColorBrush(Color.FromRgb(0xE0, 0x8A, 0x00)));
+        static Brush Freeze(Brush b) { b.Freeze(); return b; }
+
+        void ShowCwInputLevel()
+        {
+            var recorder = _levelRecorder;
+            if (recorder == null) return;
+
+            double peak = recorder.Level;
+            _levelShown = peak > _levelShown ? peak : _levelShown * 0.82;
+            DateTime now = DateTime.UtcNow;
+            if (peak >= _levelHeld || (now - _levelHeldAt).TotalSeconds > 2) { _levelHeld = peak; _levelHeldAt = now; }
+
+            double db = 20 * Math.Log10(Math.Max(_levelShown, 1e-6));
+            CwInputLevelBar.Width = Math.Max(0, Math.Min(1, (db + 60) / 60)) * 178;
+
+            string words; Brush ink;
+            if (_levelHeld < LevelNoSound) { words = "No sound from this device"; ink = Brushes.Firebrick; }
+            else if (_levelHeld < LevelTooWeak) { words = "Too weak - raise the recording level"; ink = LevelWeak; }
+            else if (_levelHeld > LevelTooLoud) { words = "Too loud - lower the recording level"; ink = Brushes.Firebrick; }
+            else { words = "Good"; ink = LevelGood; }
+            CwInputLevelWords.Text = words;
+            CwInputLevelWords.Foreground = ink;
+            CwInputLevelBar.Fill = ink;
+        }
+
+        // Windows' own Sound window, on its Recording tab - the same on Windows 10 and 11.
+        private void BTN_WindowsRecordingLevel_Click(object sender, RoutedEventArgs e)
+        {
+            try { Process.Start("control.exe", "mmsys.cpl,,1"); }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
         }
 
         // The saved device string for a picker: empty for "System default", else the device name.

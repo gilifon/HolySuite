@@ -188,6 +188,27 @@
                             ToolTip="Look for devices again - use it after switching the radio on"
                             Click="BTN_RefreshCwDecodeDevices_Click"/>
                 </StackPanel>
+                <!-- THE LEVEL, LIVE (his request, 2026-11-15): a friend's IC-7300 gave the decoder nothing because
+                     Windows had the device's recording level far down, and the decode window's small lamp said
+                     so in grey that neither of them noticed. So while this page is open the chosen device is
+                     listened to, and the bar and the words beside it say whether the radio's sound arrives
+                     strong enough - see ShowCwInputLevel. -->
+                <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                    <Border Width="180" Height="16" BorderThickness="1" BorderBrush="Gray" VerticalAlignment="Center">
+                        <Rectangle x:Name="CwInputLevelBar" HorizontalAlignment="Left" Width="0" Fill="Gray"/>
+                    </Border>
+                    <TextBlock x:Name="CwInputLevelWords" Margin="10,0,0,0" FontSize="16" FontWeight="SemiBold" MaxWidth="380" TextWrapping="Wrap"
+                               VerticalAlignment="Center"/>
+                </StackPanel>
+                <Button x:Name="BTN_WindowsRecordingLevel" Content="Windows recording level" HorizontalAlignment="Left"
+                        Margin="0,8,0,0" Padding="8,2" FontSize="16" Cursor="Hand" Click="BTN_WindowsRecordingLevel_Click">
+                    <Button.ToolTip>
+                        <ToolTip>
+                            <TextBlock MaxWidth="330" TextWrapping="Wrap" FontSize="16"
+                                       Text="Opens Windows' recording devices. Choose the radio's device, then Properties, then Levels."/>
+                        </ToolTip>
+                    </Button.ToolTip>
+                </Button>
                 <TextBlock TextWrapping="Wrap" Margin="0,6,0,0" FontSize="16" Foreground="Gray"
                            Text="The device in your computer that listens to the audio coming from the radio."/>
             </StackPanel>
