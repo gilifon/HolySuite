@@ -291,11 +291,43 @@ namespace HolyLogger
                     return result;
                 }
 
+                // THE KENWOOD TS-890S (2026-11-15). Its PC Control Command Reference Guide (ts890_pc_command_en_rev1):
+                // EX P1 (0) P2 (07) P3 (11) P4 (space) P5 (3 digits); menu 0-07-11 "Audio Output Type (Rear Connectors)",
+                // 000 = All, 001 = Received Audio Only. Its manual (16-7): "All: Enables output of beep tone, voice
+                // guidance, audio of voice message memory and recorded audio or sidetone" to the USB-B connector - and
+                // All is the factory setting. Asked first like the TS-590 (ID; answers ID024;), since OmniRig has no
+                // file of its own for it and a file made for another Kenwood could carry the name.
+                if (VoiceModelKey(NormalizeRigType(rig.RigType)).StartsWith("TS890", StringComparison.Ordinal))
+                {
+                    int id = await AskRig(rig, "ID;", 0, ";", AsciiNumberAfter("ID"));
+                    if (id == 24)
+                    {
+                        result.Radio = "TS-890S";
+                        result.Settings = new System.Collections.Generic.List<PcSoundSetting>
+                        {
+                            new PcSoundSetting
+                            {
+                                Name = "Menu 7-11, Audio Output Type (Rear Connectors)",
+                                Wanted = 0,
+                                Values = new[] { "All", "Received Audio Only" },
+                                Command = "EX00711 000;",
+                                Ask = "EX00711;",
+                                AskLength = 0,
+                                AskEnd = ";",
+                                ValueIn = AsciiNumberAfter("EX00711 "),
+                            },
+                        };
+                    }
+                    else result.Why = "The radio did not say it is a TS-890S, so nothing will be sent.";
+                    return result;
+                }
+
                 // THE LIST ONLY WHEN IT HELPS (his choice, 2026-11-15): a supported radio's owner never sees it.
                 var names = new System.Collections.Generic.List<string>();
                 for (int i = 0; i < PcSoundItems.GetLength(0); i++) names.Add(PcSoundItems[i, 7]);
                 names.Add("TS-590S");
                 names.Add("TS-590SG");
+                names.Add("TS-890S");
                 result.Why = "Your " + rig.RigType + " is not supported yet. Supported: " + string.Join(", ", names) + ".";
                 return result;
             }
