@@ -80,7 +80,7 @@ Open **Options > General** and look at the **Input Device** box.
 - **Listen to:** choose the radio's sound device. It is usually called "USB Audio CODEC".
 - The bar and the word beside it show the sound arriving now: **Good**, **Too weak**, **Too loud** or **No sound**.
 - **Windows recording level** opens Windows' recording devices. Choose the radio's device, then **Properties**, then **Levels**, and raise or lower the level until the word says **Good**.
-- **Set the radio for CW decoding** sets the radio's own sound settings for you (IC-7610, IC-7300 and IC-7300MK2). A window shows what will be changed. Nothing is sent before you press **OK**, and afterwards it shows whether the radio took each setting.
+- **Set the radio for CW decoding** sets the radio's own sound settings for you (IC-7610, IC-7300, IC-7300MK2, TS-590S and TS-590SG). A window shows what will be changed. Nothing is sent before you press **OK**, and afterwards it shows whether the radio took each setting.
 
 To see your own sending in the decoder, the radio must also send its side tone to the computer. HolyLogger turns this on by itself on the IC-7610, IC-7300 and IC-7300MK2 when the CW Decoder opens.
 
