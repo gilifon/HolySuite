@@ -719,6 +719,16 @@ namespace HolyLogger.OptionsUserControls
             CwInputLevelBar.Fill = ink;
         }
 
+        private void BTN_SetRadioForCwDecoding_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var main = Application.Current != null ? Application.Current.MainWindow as MainWindow : null;
+                if (main != null) new RadioPcSoundWindow(Window.GetWindow(this), main).ShowDialog();
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
         // Windows' own Sound window, on its Recording tab - the same on Windows 10 and 11.
         private void BTN_WindowsRecordingLevel_Click(object sender, RoutedEventArgs e)
         {
