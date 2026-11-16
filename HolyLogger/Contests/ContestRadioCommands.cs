@@ -615,6 +615,26 @@ namespace HolyLogger.Contests
             }
         }
 
+        // The file as it is, for a profile exported to carry to another computer (see ProfileManager's
+        // move kit). Null when there is no file - the defaults are then what the other computer gets too.
+        internal static string ReadFileText()
+        {
+            try { return File.Exists(FilePath) ? File.ReadAllText(FilePath) : null; }
+            catch (Exception swallowed) { Log.Swallow(swallowed); return null; }
+        }
+
+        // And the other end: the file from the main computer put in place on this one.
+        internal static void WriteFileText(string text)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(text)) return;
+                Directory.CreateDirectory(Path.GetDirectoryName(FilePath));
+                File.WriteAllText(FilePath, text);
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
         public static void Save(string contestId, string lastRadio, IEnumerable<RadioCommandSet> sets)
         {
             try

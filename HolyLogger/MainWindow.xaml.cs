@@ -667,6 +667,10 @@ namespace HolyLogger
                 return;
             }
 
+            // A profile brought from another computer: its eQSL accounts go into the database now that
+            // it is open (the rest of what it carried was applied at startup - see ProfileManager).
+            ProfileManager.FinishMoveKit();
+
             // Resolve the active Log (first run forces creating the Main Log). Must happen before the
             // QSO list is loaded below, since the table shows only the active log's QSOs.
             if (!EnsureActiveLog())

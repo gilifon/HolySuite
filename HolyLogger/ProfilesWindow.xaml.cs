@@ -172,7 +172,10 @@ namespace HolyLogger
                                             "Profiles", HolyMsgType.Warning, this))
                 return;
 
-            if (ProfileManager.ImportFrom(dlg.FileName, name)) Refresh();
+            // Straight on to "Switch to it?": on a second computer, loading the profile is the whole
+            // point of importing it, and the switch is what puts its settings (and the eQSL accounts,
+            // windows and the rest it carries from the main computer) in place.
+            if (ProfileManager.ImportFrom(dlg.FileName, name)) { Refresh(); SwitchTo(name); }
             else ProfileFailed("That file could not be imported.",
                     "A profile file is one HolyLogger exported.");
         }
