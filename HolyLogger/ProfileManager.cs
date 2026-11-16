@@ -242,8 +242,24 @@ namespace HolyLogger
             if (!IsValidName(name)) return Failed("\"" + name + "\" is not a name a file can have.");
             try
             {
+                var values = CaptureCurrent();
+
+                // A move kit not applied yet (an imported profile, before the start that applies it)
+                // stays in the file: a save on the way out of the profile switch must not throw away
+                // the eQSL accounts and the rest brought from the main computer.
+                try
+                {
+                    if (File.Exists(PathFor(name)))
+                    {
+                        var old = JsonConvert.DeserializeObject<Dictionary<string, string>>(File.ReadAllText(PathFor(name)));
+                        if (old != null && old.TryGetValue(MoveKitKey, out string kit) && !string.IsNullOrWhiteSpace(kit))
+                            values[MoveKitKey] = kit;
+                    }
+                }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
+
                 File.WriteAllText(PathFor(name),
-                    JsonConvert.SerializeObject(CaptureCurrent(), Formatting.Indented));
+                    JsonConvert.SerializeObject(values, Formatting.Indented));
                 return true;
             }
             catch (Exception ex) { return Failed(ex); }
@@ -299,7 +315,20 @@ namespace HolyLogger
                 return name;
             }
 
+            // A profile carrying a move kit was just switched to, and the switch STARTS THIS COPY BEFORE
+            // THE OLD ONE HAS FINISHED CLOSING (RestartApplication). The old copy writes user.config as
+            // it goes - its own window places among it - so anything applied here could be written over
+            // a moment later. Only on this once-only start: wait for the old copy to be gone, read the
+            // settings again from what it left, and only then apply.
+            if (HasMoveKit(name))
+            {
+                WaitForOtherCopyToClose();
+                try { Properties.Settings.Default.Reload(); }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
+            }
+
             Apply(name);
+            ApplyMoveKitSettings(name);
             return null;
         }
 
@@ -506,12 +535,258 @@ namespace HolyLogger
             catch (Exception ex) { return Failed(ex); }
         }
 
+        // The exported file is the profile PLUS the move kit (below), so loading it on a second computer
+        // gives him the whole setup he is used to, not only the part a profile switch carries.
         public static bool ExportTo(string name, string targetFile)
         {
             LastError = null;
             if (!Exists(name)) return Failed("The profile file is not in the Profiles folder any more.");
-            try { File.Copy(PathFor(name), targetFile, true); return true; }
+            try
+            {
+                var values = JsonConvert.DeserializeObject<Dictionary<string, string>>(
+                    File.ReadAllText(PathFor(name))) ?? new Dictionary<string, string>();
+                values[MoveKitKey] = JsonConvert.SerializeObject(BuildMoveKit());
+                File.WriteAllText(targetFile, JsonConvert.SerializeObject(values, Formatting.Indented));
+                return true;
+            }
             catch (Exception ex) { return Failed(ex); }
+        }
+
+        // ── THE MOVE KIT: EVERYTHING ELSE HE NEEDS ON A SECOND COMPUTER ─────────────────────────
+        //
+        // The operator's rule (2026-11-16): export the profile on the main computer, load it on the
+        // second one, and have exactly the setup he is used to. A profile on its own does not do that,
+        // for two reasons:
+        //
+        //  1. Some of his setup is not in Properties.Settings at all: the eQSL account table (station
+        //     callsign, username, password per row) is in the log database, Contest Radio Setup is its
+        //     own file, and a Club Log key of his own is a file beside the database. (LoTW, QRZ and Club
+        //     Log logins ARE settings and travel in the profile as they always did.)
+        //  2. Some settings are left out of a profile on purpose - window positions, column widths, the
+        //     CW speed - because a profile is re-applied on EVERY start, and carrying them would put the
+        //     windows back where the profile was saved each time instead of where he left them.
+        //
+        // So the exported FILE carries them in one extra entry, and they are applied ONCE: at the start
+        // after he switches to the imported profile. Then the entry is taken out of the profile file,
+        // so from that start on the second computer remembers its own windows like the first one does.
+        //
+        // Never carried: the log itself, which log is active, the Google Drive sign-in, downloaded
+        // caches, and the bookkeeping flags - see Excluded.
+        private const string MoveKitKey = "~MoveKit";
+
+        // Settings left out of profiles that DO belong to his setup, so they travel to a new computer.
+        // Window and column layout is matched by IsWindowLayoutSetting on top of these.
+        private static readonly HashSet<string> CarriedOnMove = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "CwKeyerWpm", "ClusterLastMinutesFilter", "LastActivityProgram", "LastMyCastleRef",
+            "LastExportFolder", "RttyWaterfallHeight", "ClusterWindowMinimized", "RadioPanelMinimized",
+        };
+
+        private sealed class MoveKit
+        {
+            public Dictionary<string, string> Settings { get; set; }
+            public List<EqslAccount> EqslAccounts { get; set; }
+            public string ContestRadioCommands { get; set; }
+            public string ClublogUserKey { get; set; }
+        }
+
+        private static MoveKit BuildMoveKit()
+        {
+            var kit = new MoveKit { Settings = new Dictionary<string, string>() };
+            foreach (System.Configuration.SettingsPropertyValue v in Properties.Settings.Default.PropertyValues)
+            {
+                if (IsWindowLayoutSetting(v.Name) || CarriedOnMove.Contains(v.Name))
+                    kit.Settings[v.Name] = v.SerializedValue?.ToString() ?? string.Empty;
+            }
+
+            try { kit.EqslAccounts = DataAccess.GetInstance().GetEqslAccounts(); }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+            kit.ContestRadioCommands = Contests.ContestRadioCommands.ReadFileText();
+
+            try
+            {
+                if (File.Exists(ClublogKey.UserKeyPath))
+                    kit.ClublogUserKey = File.ReadAllText(ClublogKey.UserKeyPath);
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+            return kit;
+        }
+
+        // The profile whose move kit was applied at this start, and its eQSL accounts: those go into the
+        // database, which is not open yet this early, so MainWindow finishes the job (FinishMoveKit).
+        private static string _moveKitProfile;
+        private static List<EqslAccount> _moveKitEqsl;
+
+        private static MoveKit ReadMoveKit(string name, out Dictionary<string, string> values)
+        {
+            values = JsonConvert.DeserializeObject<Dictionary<string, string>>(File.ReadAllText(PathFor(name)));
+            if (values == null || !values.TryGetValue(MoveKitKey, out string json) || string.IsNullOrWhiteSpace(json))
+                return null;
+            return JsonConvert.DeserializeObject<MoveKit>(json);
+        }
+
+        private static bool HasMoveKit(string name)
+        {
+            try { return ReadMoveKit(name, out _) != null; }
+            catch (Exception swallowed) { Log.Swallow(swallowed); return false; }
+        }
+
+        // Up to 30 seconds - an upload-on-exit can keep the old copy busy for a while. If it is still
+        // there after that (a real second copy, not a restart), carry on; the single-instance guard
+        // further on in startup deals with that case as it always has.
+        private static void WaitForOtherCopyToClose()
+        {
+            try
+            {
+                var me = System.Diagnostics.Process.GetCurrentProcess();
+                foreach (var p in System.Diagnostics.Process.GetProcessesByName(me.ProcessName))
+                {
+                    try { if (p.Id != me.Id) p.WaitForExit(30000); }
+                    catch (Exception swallowed) { Log.Swallow(swallowed); }
+                    finally { p.Dispose(); }
+                }
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        // At startup, straight after the profile itself: the settings and files of the move kit. Runs
+        // before any window is built, so the windows open where they were on the main computer.
+        private static void ApplyMoveKitSettings(string name)
+        {
+            try
+            {
+                MoveKit kit = ReadMoveKit(name, out _);
+                if (kit == null) return;
+
+                var s = Properties.Settings.Default;
+                var settings = kit.Settings ?? new Dictionary<string, string>();
+                DropPlacesNotOnThisComputer(settings);
+                foreach (var kv in settings)
+                {
+                    try
+                    {
+                        var prop = s.Properties[kv.Key];
+                        if (prop == null) continue;
+                        s[kv.Key] = System.ComponentModel.TypeDescriptor
+                            .GetConverter(prop.PropertyType)
+                            .ConvertFromInvariantString(kv.Value);
+                    }
+                    catch (Exception swallowed) { Log.Swallow(swallowed); }
+                }
+                s.Save();
+
+                Contests.ContestRadioCommands.WriteFileText(kit.ContestRadioCommands);
+
+                if (!string.IsNullOrWhiteSpace(kit.ClublogUserKey))
+                {
+                    try
+                    {
+                        Directory.CreateDirectory(Path.GetDirectoryName(ClublogKey.UserKeyPath));
+                        File.WriteAllText(ClublogKey.UserKeyPath, kit.ClublogUserKey);
+                    }
+                    catch (Exception swallowed) { Log.Swallow(swallowed); }
+                }
+
+                _moveKitProfile = name;
+                _moveKitEqsl = kit.EqslAccounts ?? new List<EqslAccount>();
+                Log.Warn("Profile \"" + name + "\": settings from another computer applied ("
+                         + settings.Count + " settings, " + _moveKitEqsl.Count + " eQSL accounts to add)");
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        // Called by MainWindow once the log database is open: the eQSL accounts, then the move kit is
+        // taken out of the profile file so it is never applied again. An account already in this
+        // computer's table (same station callsign) gets the main computer's username and password; one
+        // that is only here is left alone.
+        public static void FinishMoveKit()
+        {
+            string name = _moveKitProfile;
+            if (string.IsNullOrEmpty(name)) return;
+            _moveKitProfile = null;
+            try
+            {
+                var da = DataAccess.GetInstance();
+                foreach (EqslAccount a in _moveKitEqsl ?? new List<EqslAccount>())
+                {
+                    if (a == null || string.IsNullOrWhiteSpace(a.Callsign)) continue;
+                    EqslAccount here = da.GetEqslAccount(a.Callsign);
+                    var row = new EqslAccount
+                    {
+                        Id = here?.Id ?? 0,
+                        Callsign = a.Callsign,
+                        Username = a.Username,
+                        Password = a.Password,
+                    };
+                    if (!da.SaveEqslAccount(row, out string error))
+                        Log.Warn("eQSL account " + a.Callsign + " not added: " + error);
+                }
+
+                ReadMoveKit(name, out Dictionary<string, string> values);
+                if (values != null && values.Remove(MoveKitKey))
+                    File.WriteAllText(PathFor(name), JsonConvert.SerializeObject(values, Formatting.Indented));
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+            finally { _moveKitEqsl = null; }
+        }
+
+        // The second computer may have other screens. A window place from the main computer is kept
+        // only when the window's title bar would land on one of THIS computer's screens; otherwise that
+        // window's Left/Top are dropped (its size is kept) and it opens where it would on a fresh
+        // install. Nothing is moved - a place is either taken as it was or not taken at all.
+        // (Windows kept in WindowBoundsJson need none of this: WindowBounds already brings a restored
+        // window wholly onto a screen.)
+        private static void DropPlacesNotOnThisComputer(Dictionary<string, string> settings)
+        {
+            var c = System.Globalization.CultureInfo.InvariantCulture;
+            foreach (string leftKey in settings.Keys.Where(k => k.EndsWith("WindowLeft", StringComparison.OrdinalIgnoreCase)).ToList())
+            {
+                string topKey = leftKey.Substring(0, leftKey.Length - "Left".Length) + "Top";
+                if (!settings.TryGetValue(topKey, out string topText)) continue;
+                if (double.TryParse(settings[leftKey], System.Globalization.NumberStyles.Float, c, out double l)
+                    && double.TryParse(topText, System.Globalization.NumberStyles.Float, c, out double t)
+                    && TitleBarIsOnThisComputer(l, t))
+                    continue;
+                settings.Remove(leftKey);
+                settings.Remove(topKey);
+            }
+
+            // The QSO editor keeps its place as one "left,top" setting.
+            if (settings.TryGetValue("QsoEditWindowPos", out string pos))
+            {
+                string[] parts = (pos ?? string.Empty).Split(',');
+                bool keep = parts.Length == 2
+                    && double.TryParse(parts[0], System.Globalization.NumberStyles.Float, c, out double l)
+                    && double.TryParse(parts[1], System.Globalization.NumberStyles.Float, c, out double t)
+                    && TitleBarIsOnThisComputer(l, t);
+                if (!keep) settings.Remove("QsoEditWindowPos");
+            }
+        }
+
+        // Window places are in WPF units, the screens in pixels; with no window yet, the primary
+        // screen's two sizes give the scale between them.
+        private static bool TitleBarIsOnThisComputer(double left, double top)
+        {
+            try
+            {
+                double scale = 1.0;
+                var primary = System.Windows.Forms.Screen.PrimaryScreen;
+                if (primary != null && System.Windows.SystemParameters.PrimaryScreenWidth > 0)
+                    scale = primary.Bounds.Width / System.Windows.SystemParameters.PrimaryScreenWidth;
+                if (scale <= 0) scale = 1.0;
+
+                var spot = new System.Windows.Point(left + 40, top + 15);
+                foreach (var screen in System.Windows.Forms.Screen.AllScreens)
+                {
+                    var wa = screen.WorkingArea;
+                    var r = new System.Windows.Rect(wa.Left / scale, wa.Top / scale, wa.Width / scale, wa.Height / scale);
+                    if (r.Contains(spot)) return true;
+                }
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+            return false;
         }
 
         // Relaunch so every window is rebuilt from the newly applied settings.
