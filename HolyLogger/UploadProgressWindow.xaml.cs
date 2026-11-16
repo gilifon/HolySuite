@@ -17,6 +17,14 @@ namespace HolyLogger
             InitializeComponent();
         }
 
+        // The same window serves the Tools-menu queue uploads and the upload when HolyLogger closes.
+        // It says plain "Uploading…" by default; the closing upload calls this to say "on Exit".
+        public void ShowAsExitUpload()
+        {
+            Title = "Uploading on Exit";
+            TitleText.Text = "Uploading on Exit…";
+        }
+
         // Adds a service section header before the QSO rows for that service.
         public void StartService(string name, int count)
         {
