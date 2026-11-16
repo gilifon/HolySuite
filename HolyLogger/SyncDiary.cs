@@ -362,12 +362,51 @@ namespace HolyLogger
 
         private static string SnapshotName() { return ComputerId() + ".snapshot"; }
 
-        // The newest whole copy another of the operator's computers put in Drive; null if none.
+        // AN EMPTY LOG IS NEVER THE SHARED ONE (2026-11-16, a friend's new computer far from home).
+        // It signed in before his home computer had put a copy in Drive, found none, called itself the
+        // first computer and sent a copy of its EMPTY log - which the home computer would then have
+        // offered as "the log from your other computer", ready to replace 11,000 QSOs with none. So:
+        //  - a computer becomes the shared one (sync_joined = 1) only once its log has a QSO;
+        //  - it never sends a whole copy of a log with no QSOs;
+        //  - a copy in Drive with no QSOs is treated as no copy at all - never offered, and never
+        //    counted as "a recent copy" that would stop the real one being sent.
+        // Each copy says, in its Drive appProperties, which computer made it and how many QSOs it holds.
+        // Copies from 9.1.0 do not say: a small one (under 5 MB) is fetched once to count; a bigger one
+        // is taken to hold QSOs.
+        private static readonly Dictionary<string, long> CountedCopies = new Dictionary<string, long>();
+
+        public static long? SnapshotQsos(GoogleDrive.DriveFile f)
+        {
+            if (f.Qsos.HasValue) return f.Qsos;
+            if (f.Size >= 5L * 1024 * 1024) return null;
+            string key = f.Id + "|" + f.ModifiedUtc?.Ticks;
+            lock (CountedCopies) if (CountedCopies.TryGetValue(key, out long known)) return known;
+            try
+            {
+                string db = DownloadSnapshot(f, null, out long qsos, "count");
+                try { File.Delete(db); } catch (Exception swallowed) { Log.Swallow(swallowed); }
+                lock (CountedCopies) CountedCopies[key] = qsos;
+                return qsos;
+            }
+            catch (Exception ex) { Log.Warn("Google Drive: could not count the copy " + f.Name + " - " + ex.Message); return null; }
+        }
+
+        private static bool HasQsos(GoogleDrive.DriveFile f) { return (SnapshotQsos(f) ?? 1) > 0; }
+
+        private static List<GoogleDrive.DriveFile> UsefulSnapshots()
+        {
+            return GoogleDrive.ListFolder(TimeSpan.FromSeconds(60))
+                .Where(f => f.Name.EndsWith(".snapshot", StringComparison.OrdinalIgnoreCase) && f.Size > 0 && HasQsos(f))
+                .ToList();
+        }
+
+        // The newest whole copy, holding QSOs, that another of the operator's computers put in Drive;
+        // null if none.
         public static GoogleDrive.DriveFile NewestOtherSnapshot()
         {
             string mine = SnapshotName();
-            return GoogleDrive.ListFolder(TimeSpan.FromSeconds(60))
-                .Where(f => f.Name.EndsWith(".snapshot", StringComparison.OrdinalIgnoreCase) && f.Name != mine && f.Size > 0)
+            return UsefulSnapshots()
+                .Where(f => f.Name != mine)
                 .OrderByDescending(f => f.ModifiedUtc ?? DateTime.MinValue)
                 .FirstOrDefault();
         }
@@ -385,9 +424,9 @@ namespace HolyLogger
             if (!GoogleDrive.Registered || !GoogleDrive.SignedIn) return;
             var dal = DataAccess.GetInstance();
             if (dal == null) return;
+            if (dal.CountAllQsos() == 0) return;   // nothing worth copying, and never the shared log
             string mine = SnapshotName();
-            var snaps = GoogleDrive.ListFolder(TimeSpan.FromSeconds(60))
-                .Where(f => f.Name.EndsWith(".snapshot", StringComparison.OrdinalIgnoreCase) && f.Size > 0).ToList();
+            var snaps = UsefulSnapshots();
 
             string join = JoinState;
             if (join.Length == 0)
@@ -413,7 +452,7 @@ namespace HolyLogger
             ThreadPriority was = Thread.CurrentThread.Priority;
             try
             {
-                long diaryLength;
+                long diaryLength, qsos;
                 lock (Gate)   // no diary line is written between the length and the copy
                 {
                     Flush();
@@ -438,7 +477,10 @@ namespace HolyLogger
                             cmd.Parameters.AddWithValue("@v", diaryLength.ToString());
                             cmd.ExecuteNonQuery();
                         }
+                    using (var cmd = new SQLiteCommand("SELECT count(*) FROM qso", c))
+                        qsos = Convert.ToInt64(cmd.ExecuteScalar());
                 }
+                if (qsos == 0) return;   // never a copy of an empty log (see SnapshotQsos)
 
                 Thread.CurrentThread.Priority = ThreadPriority.BelowNormal;   // the operator is working
                 using (var src = File.OpenRead(copy))
@@ -448,7 +490,8 @@ namespace HolyLogger
                 Thread.CurrentThread.Priority = was;
 
                 long bytes = new FileInfo(gz).Length;
-                GoogleDrive.UploadLarge(gz, SnapshotName(), "application/gzip", TimeSpan.FromHours(3));
+                GoogleDrive.UploadLarge(gz, SnapshotName(), "application/gzip", TimeSpan.FromHours(3),
+                    new JObject { ["machine"] = Environment.MachineName, ["qsos"] = qsos.ToString() });
                 Log.Warn("Google Drive: whole copy of the log sent (" + (bytes / 1048576.0).ToString("0.0")
                          + " MB) in " + watch.Elapsed.TotalSeconds.ToString("0") + " s.");
             }
@@ -462,11 +505,11 @@ namespace HolyLogger
 
         // Fetches a whole copy and unpacks it beside the diaries; checks it is a sound HolyLogger
         // database before anyone puts it in place. Returns its path and how many QSOs it holds.
-        public static string DownloadSnapshot(GoogleDrive.DriveFile file, Action<long, long> progress, out long qsos)
+        public static string DownloadSnapshot(GoogleDrive.DriveFile file, Action<long, long> progress, out long qsos, string tag = "from-drive")
         {
             Directory.CreateDirectory(Folder);
-            string gz = Path.Combine(Folder, "from-drive.db.gz");
-            string db = Path.Combine(Folder, "from-drive.db");
+            string gz = Path.Combine(Folder, tag + ".db.gz");
+            string db = Path.Combine(Folder, tag + ".db");
             try
             {
                 GoogleDrive.DownloadToFile(file.Id, gz, progress, TimeSpan.FromHours(3));
@@ -771,6 +814,8 @@ namespace HolyLogger
             public string Id, Name;
             public long Size;
             public DateTime? ModifiedUtc;
+            public string Machine;   // a whole copy: the computer that made it (appProperties)
+            public long? Qsos;       // and how many QSOs it holds; null = not said (copies from 9.1.0)
         }
 
         // The files in the HolyLogger Sync folder: every computer's diary (drive.file still shows them,
@@ -784,7 +829,7 @@ namespace HolyLogger
             {
                 if (string.IsNullOrEmpty(st.FolderId)) { st.FolderId = FindOrMakeFolder(cts.Token); Save(st); }
                 string q = "'" + st.FolderId + "' in parents and trashed = false";
-                JObject found = Get("https://www.googleapis.com/drive/v3/files?pageSize=1000&fields=files(id,name,size,modifiedTime)&q="
+                JObject found = Get("https://www.googleapis.com/drive/v3/files?pageSize=1000&fields=files(id,name,size,modifiedTime,appProperties)&q="
                                     + Uri.EscapeDataString(q), cts.Token).GetAwaiter().GetResult();
                 if (found["files"] is JArray files)
                     foreach (JToken f in files)
@@ -797,7 +842,13 @@ namespace HolyLogger
                         else if (m != null && DateTime.TryParse((string)m, System.Globalization.CultureInfo.InvariantCulture,
                                      System.Globalization.DateTimeStyles.AdjustToUniversal | System.Globalization.DateTimeStyles.AssumeUniversal, out DateTime p))
                             modified = p;
-                        list.Add(new DriveFile { Id = (string)f["id"], Name = (string)f["name"], Size = size, ModifiedUtc = modified });
+                        var df = new DriveFile { Id = (string)f["id"], Name = (string)f["name"], Size = size, ModifiedUtc = modified };
+                        if (f["appProperties"] is JObject ap)
+                        {
+                            df.Machine = (string)ap["machine"];
+                            if (long.TryParse((string)ap["qsos"], out long qn)) df.Qsos = qn;
+                        }
+                        list.Add(df);
                     }
             }
             return list;
@@ -828,7 +879,9 @@ namespace HolyLogger
         private static readonly HttpClient UploadHttp =
             new HttpClient(new HttpClientHandler { AllowAutoRedirect = false }) { Timeout = Timeout.InfiniteTimeSpan };
 
-        public static void UploadLarge(string path, string name, string contentType, TimeSpan limit)
+        // appProperties: small labels kept on the Drive file itself (a whole copy says which computer
+        // made it and how many QSOs it holds), readable in the folder listing without downloading it.
+        public static void UploadLarge(string path, string name, string contentType, TimeSpan limit, JObject appProperties = null)
         {
             State st = Load();
             if (string.IsNullOrEmpty(st.RefreshToken) || !Registered) return;
@@ -841,7 +894,11 @@ namespace HolyLogger
 
                 var init = new HttpRequestMessage(new HttpMethod("PATCH"),
                     "https://www.googleapis.com/upload/drive/v3/files/" + fileId + "?uploadType=resumable")
-                { Content = new StringContent("{}", Encoding.UTF8, "application/json") };
+                {
+                    Content = new StringContent(
+                        (appProperties == null ? new JObject() : new JObject { ["appProperties"] = appProperties }).ToString(Formatting.None),
+                        Encoding.UTF8, "application/json")
+                };
                 init.Headers.Add("X-Upload-Content-Type", contentType);
                 init.Headers.Add("X-Upload-Content-Length", total.ToString());
                 Uri session = Check(Send(init, ct)).Headers.Location;

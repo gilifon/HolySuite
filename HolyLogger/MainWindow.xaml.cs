@@ -14660,7 +14660,8 @@ namespace HolyLogger
                 try
                 {
                     await Task.Delay(TimeSpan.FromSeconds(15));
-                    if (!GoogleDrive.Registered || !GoogleDrive.SignedIn || SyncDiary.JoinState.Length > 0) return;
+                    if (!GoogleDrive.Registered || !GoogleDrive.SignedIn) return;
+                    if (SyncDiary.JoinState.Length > 0 && DataAccess.GetInstance()?.CountAllQsos() > 0) return;
                     if (SyncDiary.NewestOtherSnapshot() == null) return;
                     await Dispatcher.InvokeAsync(async () =>
                     {
@@ -14682,26 +14683,52 @@ namespace HolyLogger
         {
             const string title = "Google Drive Sync";
             var dal = DataAccess.GetInstance();
-            if (dal == null || SyncDiary.JoinState.Length > 0) return false;
+            if (dal == null) return false;
+            long here = dal.CountAllQsos();
+            // Decided already - unless this computer's log is still EMPTY: then a real copy that has
+            // reached Drive since is offered after all (the friend's new computer, 2026-11-16, which
+            // had called itself the first computer before his home one had sent anything).
+            if (SyncDiary.JoinState.Length > 0 && here > 0) return false;
 
             GoogleDrive.DriveFile snap = await Task.Run(() => SyncDiary.NewestOtherSnapshot());
-            if (snap == null) { SyncDiary.JoinState = "1"; return false; }   // the first computer
+            if (snap == null)
+            {
+                // the first computer - but only once its log has a QSO (see SyncDiary.SnapshotQsos)
+                if (here > 0) SyncDiary.JoinState = "1";
+                return false;
+            }
 
-            long here = dal.CountAllQsos();
+            long? there = await Task.Run(() => SyncDiary.SnapshotQsos(snap));
+            string from = string.IsNullOrEmpty(snap.Machine) ? "your other computer" : snap.Machine;
             string when = snap.ModifiedUtc.HasValue ? snap.ModifiedUtc.Value.ToLocalTime().ToString("d MMM yyyy") : "";
             string mb = Math.Max(1, snap.Size / 1048576).ToString("N0");
+            string driveLine = "Google Drive: " + (there.HasValue ? there.Value.ToString("N0") + " QSOs, " : "")
+                               + "from " + from + ", saved " + when + ".";
             bool take;
             if (here == 0)
                 take = HolyMessageBox.ShowConfirm(
-                    "Your log is in your Google Drive (saved " + when + ").\n\n"
+                    "Your log is in your Google Drive.\n\n" + driveLine + "\n\n"
                     + "Download it to this computer now? It is " + mb + " MB.\n"
                     + "HolyLogger restarts when it is done.",
                     title, HolyMsgType.Info, owner(), yesText: "Download it", noText: "Not now");
+            else if (there.HasValue && there.Value < here)
+            {
+                take = HolyMessageBox.ShowConfirm(
+                    "Careful: the log in your Google Drive has FEWER QSOs than this computer.\n\n"
+                    + driveLine + "\n"
+                    + "This computer: " + here.ToString("N0") + " QSOs.\n\n"
+                    + "Use the Drive log anyway?\n"
+                    + "The log now on this computer is kept as a backup.",
+                    title, HolyMsgType.Warning, owner(), yesText: "Use the Drive log", noText: "Keep this log");
+                if (!take) { SyncDiary.JoinState = "keep"; return false; }
+            }
             else
             {
                 take = HolyMessageBox.ShowConfirm(
-                    "Your Google Drive has the log from your other computer (saved " + when + ").\n\n"
-                    + "Use it on this computer too?\n"
+                    "Your Google Drive has the log from your other computer.\n\n"
+                    + driveLine + "\n"
+                    + "This computer: " + here.ToString("N0") + " QSOs.\n\n"
+                    + "Use the Drive log on this computer too?\n"
                     + "The log now on this computer is kept as a backup.",
                     title, HolyMsgType.Info, owner(), yesText: "Use the Drive log", noText: "Keep this log");
                 if (!take) { SyncDiary.JoinState = "keep"; return false; }
