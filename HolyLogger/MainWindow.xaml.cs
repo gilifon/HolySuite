@@ -7778,9 +7778,15 @@ namespace HolyLogger
             }
         }
 
-        // Drains the Club Log pending queue (status 0), pushing each QSO in real-time order. Networks
-        // errors stop the pass (the rest stays pending); definitive rejections are marked 2; a 403
-        // suspends Club Log for the session. Mirrors PumpQrzQueue.
+        // Drains the Club Log pending queue (status 0). ONE waiting QSO goes through realtime.php like a
+        // just-logged one. TWO OR MORE go as a batch: one ADIF file per station callsign through
+        // putlogs.php. Club Log's own rules (knowledge base, Legacy API, checked 2026-11-16) say
+        // realtime.php "must not be used for batch uploads" - a throttle exists and the user's IP can
+        // be firewalled - and that catching up after a few days is what putlogs.php is for. Sending the
+        // queue one QSO at a time through realtime.php, as this used to, broke that rule.
+        // Network errors stop the pass (the rest stays pending); a 403 suspends Club Log for the
+        // session; any other non-200 on a batch also stops the pass, because Club Log asks callers to
+        // stop sending after an error. Only a confirmed upload clears a QSO from the queue.
         private async System.Threading.Tasks.Task PumpClublogQueue(bool force = false, UploadProgressWindow progressWindow = null)
         {
             try
@@ -7805,6 +7811,12 @@ namespace HolyLogger
                             progressWindow.StartService("Club Log", pending.Count);
                         else
                             progressWindow.SkipService("Club Log", "nothing to upload — queue is empty");
+                    }
+
+                    if (pending.Count >= 2)
+                    {
+                        await SendClublogQueueAsBatch(pending, s.ClublogEmail, s.ClublogPassword, progressWindow);
+                        pending.Clear();   // the batch path handled every QSO; skip the one-by-one loop
                     }
 
                     foreach (var qso in pending)
@@ -7841,6 +7853,60 @@ namespace HolyLogger
             catch
             {
                 // Best effort; anything not confirmed sent simply stays pending.
+            }
+        }
+
+        // The batch half of PumpClublogQueue: one putlogs.php upload per station callsign (Club Log
+        // files a log under one callsign per upload, and one account can hold several of them).
+        // Caller holds _clublogPumpLock. A 200 means Club Log put the file on its upload queue - it is
+        // added 5 to 60 seconds later - so the QSOs are marked uploaded then, the same way a LoTW
+        // batch is. Any failure stops the pass and leaves the rest of the queue as it was.
+        private async System.Threading.Tasks.Task SendClublogQueueAsBatch(
+            System.Collections.Generic.List<QSO> pending, string email, string password, UploadProgressWindow progressWindow)
+        {
+            var groups = pending
+                .GroupBy(q => (q.MyCall ?? string.Empty).Trim().ToUpperInvariant())
+                .ToList();
+
+            foreach (var group in groups)
+            {
+                var qsos = group.ToList();
+                string call = group.Key;
+
+                if (call.Length == 0)
+                {
+                    // No station callsign -> Club Log cannot file them. Nothing is sent, so this does
+                    // not count as an error from Club Log; the QSOs stay in the queue.
+                    progressWindow?.ReportBatchResult(qsos.Count + " QSO(s) have no station callsign — not sent", false, 0, qsos.Count);
+                    continue;
+                }
+
+                string adif = Services.GenerateAdif(qsos);
+                ClublogResult r = await ClublogService.UploadFullLogAsync(email, password, call, adif);
+
+                if (r.NetworkError)
+                {
+                    progressWindow?.ReportBatchResult(call + ": no answer from Club Log — " + qsos.Count + " QSO(s) stay in the queue", false, 0, qsos.Count);
+                    break;   // offline -> stop; the rest stays pending for next time
+                }
+
+                if (r.Ok)
+                {
+                    foreach (var q in qsos)
+                        dal.SetClublogStatus(q.id, 1);
+                    progressWindow?.ReportBatchResult(call + ": " + qsos.Count + " QSO(s) sent in one file", true, qsos.Count, 0);
+                    continue;
+                }
+
+                string reply = (r.Message ?? string.Empty).Trim();
+                if (reply.Length > 300) reply = reply.Substring(0, 300) + "…";
+                Log.Warn("Club Log batch upload for " + call + " failed (HTTP " + r.StatusCode + "). Response: " + reply);
+                progressWindow?.ReportBatchResult(call + ": Club Log said no (" + r.StatusCode + ") — " + qsos.Count + " QSO(s) stay in the queue", false, 0, qsos.Count);
+                if (reply.Length > 0) progressWindow?.AddNote(reply);
+
+                if (r.StatusCode == 403)
+                    _clublogAuthBlockedThisSession = true;   // Club Log: stop at once on a 403
+                break;   // Club Log asks callers to stop sending after any error
             }
         }
 
