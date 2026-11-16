@@ -7,6 +7,11 @@ New
 - Import a profile and HolyLogger offers to switch to it at once.
 - The file holds your passwords: keep it safe.
 - The LoTW certificate stays in TQSL: move it with TQSL's own backup.
+- The title bar shows the profile in use, after the log name.
+- Profile Manager: Stop using current profile. Your settings stay, and the profile is kept.
+
+Fixed
+- Profile Manager: the Export button was cut off at the bottom.
 
 == 9.1.2 ==
 

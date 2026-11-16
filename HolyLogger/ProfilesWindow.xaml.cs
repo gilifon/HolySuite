@@ -31,6 +31,10 @@ namespace HolyLogger
             // nothing selected left every action button greyed out, which read as "the window is dead".
             LB_Profiles.SelectedItem = previouslySelected ?? (string.IsNullOrWhiteSpace(active) ? null : active);
             UpdateButtons();
+
+            // The main title bar follows at once (stop, save as, rename, delete), not only when this
+            // window closes - he looks at the title while the window is still open.
+            (Owner as MainWindow)?.UpdateProfileTitle();
         }
 
         private void UpdateButtons()
@@ -41,6 +45,30 @@ namespace HolyLogger
             BTN_Rename.IsEnabled = any;
             BTN_Delete.IsEnabled = any;
             BTN_Export.IsEnabled = any;
+
+            // Acts on the profile IN USE, not the selected one, so it follows the active profile.
+            BTN_StopUsing.IsEnabled = !string.IsNullOrWhiteSpace(ProfileManager.ActiveProfile);
+        }
+
+        private void BTN_StopUsing_Click(object sender, RoutedEventArgs e)
+        {
+            string name = ProfileManager.ActiveProfile;
+            if (string.IsNullOrWhiteSpace(name)) return;
+            if (!HolyMessageBox.ShowConfirm(
+                    $"Stop using the profile \"{name}\"?\n\n" +
+                    "All your settings stay as they are, and the profile is kept.",
+                    "Profiles", HolyMsgType.Info, this))
+                return;
+
+            // Nothing is selected afterwards: a blue row would still look like the profile in use.
+            if (ProfileManager.StopUsing())
+            {
+                Refresh();
+                LB_Profiles.SelectedItem = null;
+                UpdateButtons();
+            }
+            else ProfileFailed("The profile could not be stopped.",
+                    $"\"{name}\" is still in use.");
         }
 
         private void LB_Profiles_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)

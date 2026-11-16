@@ -209,6 +209,10 @@ These do not move with the profile:
 - **Google Drive Sync.** Sign in again on the other computer.
 - **Your LoTW certificate.** It is kept by TQSL, not by HolyLogger. Use TQSL's own backup to move it.
 
+## Working with no profile
+
+Click **Stop using current profile**. All your settings stay as they are, and the profile stays in the list for later. HolyLogger then simply remembers your changes as you make them, and the title bar shows **Profile:** ----.
+
 ## Deleting a profile
 
 Select the profile and click **Delete**. Only the profile file is deleted.

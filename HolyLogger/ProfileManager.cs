@@ -493,6 +493,25 @@ namespace HolyLogger
             catch (Exception ex) { return Failed(ex); }
         }
 
+        // ── STOP USING THE PROFILE, KEEP EVERYTHING ─────────────────────────────────────────────
+        //
+        // Asked for 2026-11-16: the only ways out of a profile were Delete (lose the profile) and
+        // Restore factory defaults (lose every setting). This one changes NO setting and keeps the
+        // profile file; it only stops the program starting from the profile and asking about it on
+        // close. From then on changes are simply remembered, as with no profile. No restart needed:
+        // nothing about how the program looks or behaves changes.
+        public static bool StopUsing()
+        {
+            LastError = null;
+            try
+            {
+                Properties.Settings.Default.ActiveProfile = string.Empty;
+                Properties.Settings.Default.Save();
+                return true;
+            }
+            catch (Exception ex) { return Failed(ex); }
+        }
+
         public static bool Delete(string name)
         {
             LastError = null;
