@@ -172,3 +172,45 @@ The Yaesu manuals have no setting that sends the side tone to the computer.
 - **CONFIG:LIN OUT:** the level of LINE OUT. The manual says settings above 10 are usually not needed. The USB port can carry the same line-level sound instead of the LINE OUT jack.
 
 The K3S manual does not say whether the side tone is sent to the computer.
+
+# Profile
+
+A profile is your whole HolyLogger setup saved under a name: your station callsign and locator, the logins for LoTW, eQSL, QRZ and Club Log, the colours, the cluster, the radio and every other choice in Options. Your logs and QSOs are not part of a profile.
+
+Open **File > Profile Manager**.
+
+## Saving a profile
+
+1. Set HolyLogger up the way you want it.
+2. Click **Save current setup as...** and give the profile a name.
+
+To save later changes into the same profile, select it and click **Update from current**.
+
+## Switching profile
+
+Select a profile and click **Switch to this profile**. HolyLogger closes and opens again with that setup. The log you are working in does not change, and your windows stay where they are.
+
+While a profile is in use, HolyLogger starts with what the profile holds. If you changed something and did not save it into the profile, HolyLogger asks about it when you close.
+
+## Moving your setup to another computer
+
+1. On your main computer, open **File > Profile Manager**, select the profile and click **Export...**. Save the file where the other computer can reach it, for example on a USB stick.
+2. Install HolyLogger on the other computer.
+3. Open **File > Profile Manager**, click **Import...** and choose the file.
+4. HolyLogger asks whether to switch to the profile. Click **Yes**. HolyLogger closes and opens again.
+
+The other computer now has everything you are used to: all the settings, the eQSL accounts, Contest Radio Setup, the window places, the column widths and the CW speed. A window that does not fit the other computer's screens opens where it would on a new install.
+
+The file holds your passwords. Keep it safe.
+
+These do not move with the profile:
+
+- **Your log.** To have the same log on both computers, use Google Drive Sync.
+- **Google Drive Sync.** Sign in again on the other computer.
+- **Your LoTW certificate.** It is kept by TQSL, not by HolyLogger. Use TQSL's own backup to move it.
+
+## Deleting a profile
+
+Select the profile and click **Delete**. Only the profile file is deleted.
+
+Everything the profile brought stays as it is: all the settings, the eQSL accounts, Contest Radio Setup and the rest. From then on HolyLogger simply remembers your changes as you make them, with no profile to save them into and no question when you close.

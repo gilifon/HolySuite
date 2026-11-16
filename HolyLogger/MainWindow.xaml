@@ -554,7 +554,7 @@
                     <Image Source="Images/crown.png" Width="16" Height="16" Margin="10,0,6,0" VerticalAlignment="Center" DockPanel.Dock="Left"/>
                     <TextBlock DockPanel.Dock="Left" VerticalAlignment="Center" FontSize="16" Foreground="{DynamicResource TextBrush}"
                                DataContext="{Binding RelativeSource={RelativeSource AncestorType=Window}}">
-                        <Run Text="{Binding TitlePrefix, Mode=OneWay}"/><Run Text="{Binding TitleLogLabel, Mode=OneWay}" FontWeight="Bold"/><Run Text="{Binding TitleLogName, Mode=OneWay}"/>
+                        <Run Text="{Binding TitlePrefix, Mode=OneWay}"/><Run Text="{Binding TitleLogLabel, Mode=OneWay}" FontWeight="Bold"/><Run Text="{Binding TitleLogName, Mode=OneWay}"/><Run Text="{Binding TitleProfileSeparator, Mode=OneWay}"/><Run Text="{Binding TitleProfileLabel, Mode=OneWay}" FontWeight="Bold"/><Run Text="{Binding TitleProfileName, Mode=OneWay}"/>
                     </TextBlock>
                     <!-- "Copying is live" indicator: shown right after the log name when the active log copies
                          its new QSOs into another log. Click to stop. -->

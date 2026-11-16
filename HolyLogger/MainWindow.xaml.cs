@@ -2827,6 +2827,46 @@ namespace HolyLogger
                 TitleLogLabel = "Log: ";
                 TitleLogName = name;
             }
+
+            UpdateProfileTitle();
+        }
+
+        // ── AND WHICH PROFILE ───────────────────────────────────────────────────────────────────
+        //
+        // While a profile is in use, every start begins from what it holds, and closing asks about
+        // changes to it - so which one it is matters as much as which log. Shown after the log, in the
+        // same way: "Profile:" bold, the name plain; "----" when no profile is in use.
+        private string _titleProfileSeparator = string.Empty;
+        public string TitleProfileSeparator { get => _titleProfileSeparator; private set { _titleProfileSeparator = value; OnPropertyChanged("TitleProfileSeparator"); } }
+        private string _titleProfileLabel = string.Empty;
+        public string TitleProfileLabel { get => _titleProfileLabel; private set { _titleProfileLabel = value; OnPropertyChanged("TitleProfileLabel"); } }
+        private string _titleProfileName = string.Empty;
+        public string TitleProfileName { get => _titleProfileName; private set { _titleProfileName = value; OnPropertyChanged("TitleProfileName"); } }
+
+        public void UpdateProfileTitle()
+        {
+            string profile = null;
+            try
+            {
+                string active = ProfileManager.ActiveProfile;
+                if (!string.IsNullOrWhiteSpace(active) && ProfileManager.Exists(active)) profile = active;
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+            // Window.Title (the taskbar) gets it too; strip an old profile part first, since this runs
+            // again after the Profile Manager closes without the log title being rebuilt.
+            string plain = this.Title ?? string.Empty;
+            int at = plain.IndexOf("     Profile: ", StringComparison.Ordinal);
+            if (at >= 0) plain = plain.Substring(0, at);
+
+            // No profile in use: "Profile: ----", so the operator sees there is none rather than
+            // wondering whether the title simply does not show it (his choice, 2026-11-16).
+            string shown = profile ?? "----";
+            // Only a gap before it, no dash: the dash stays between the program name and the log.
+            this.Title = plain + "     Profile: " + shown;
+            TitleProfileSeparator = "     ";
+            TitleProfileLabel = "Profile: ";
+            TitleProfileName = shown;
         }
 
         // Makes the given log the active one: reloads the log table, refreshes counts/title and sets
@@ -13136,6 +13176,9 @@ namespace HolyLogger
             // Owner, not just a constructor argument: the XAML asks for CenterOwner, and without an
             // Owner WPF quietly falls back to centring on the PRIMARY screen.
             new ProfilesWindow(this) { Owner = this }.ShowDialog();
+
+            // Saved as a new profile, renamed or deleted without a restart: the title follows.
+            UpdateProfileTitle();
         }
 
         private void GridSquareMenuItem_Click(object sender, RoutedEventArgs e)
