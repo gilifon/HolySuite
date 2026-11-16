@@ -1295,31 +1295,15 @@ namespace HolyLogger
         // 2026-10-21) never holds one clear note, and is still blanked. One block at a time was not enough: on his
         // recording 8 of 258 blocks with sound (a key click, the tail of a dit) fell short and would have cut letters.
         //
-        // THE SOUND TELLS IT FIRST (his screen, 2026-11-13: a white block at the start of every transmission). The
-        // radio's TX report comes late through OmniRig's polling, so his first element was drawn as received sound.
-        // But while he transmits the radio sends dead silence between his elements (rms 2), and received sound never
-        // does: in 182 of his recordings, 572 of 3.4 million 10 ms stretches fell under 20, against 47% of them in his
-        // sending. So a clear note with dead silence near it is his sending too, report or not - until a block that
-        // is neither (the band is back) with no TX report.
+        // ONLY THE RADIO'S OWN TX REPORT SAYS IT IS HIS SENDING (his screen, 2026-11-16). For a while (2026-11-13) dead
+        // silence between the elements counted too - the radio sends rms 2 there while he transmits, and his
+        // receiving never went under 20 - so his first element would not wait for OmniRig's late report. But with the
+        // Windows recording level turned down to 13, a station he was RECEIVING had gaps that quiet, and it was drawn
+        // as his own sending, in cyan. So the report alone decides, and the first element, drawn as sound before the
+        // report came, is redrawn as his when it does (see CwWaterfallStrip.Feed, RedrawMs).
         const double SideToneOverMedianDb = 20;   // his side tone: median 37 dB over the band; received sound 11-23
-        const double DeadSilenceRms = 20;         // over 10 ms; receiving, his quietest was about 200
-        const double SilenceRecentMs = 600;       // dead silence this recent still counts: the gap after his first dah
-        double _ourSendLastMs = double.NegativeInfinity, _deadSilenceMs = double.NegativeInfinity, _sideToneHz;
+        double _ourSendLastMs = double.NegativeInfinity, _sideToneHz;
         bool _sideTone;
-
-        // Some 10 ms of the block dead silent.
-        static bool DeadSilence(short[] samples, int count, int rate)
-        {
-            int n = rate / 100;
-            if (n <= 0) return false;
-            for (int start = 0; start + n <= count; start += n)
-            {
-                double sum = 0;
-                for (int i = start; i < start + n; i++) sum += (double)samples[i] * samples[i];
-                if (Math.Sqrt(sum / n) < DeadSilenceRms) return true;
-            }
-            return false;
-        }
 
         bool HolyLoggerSending()
         {
@@ -1357,18 +1341,11 @@ namespace HolyLogger
 
             // A copy for the waterfall, drawn on the screen timer - nothing is worked out here.
             bool tx = TransmittingNow(), sideTone = false;
-            if (HolyLoggerSending()) _sideTone = false;
+            if (HolyLoggerSending() || !tx) _sideTone = false;
             else
             {
-                int rate = _recorder.ActualSampleRate;
-                double now = _txClock.Elapsed.TotalMilliseconds;
-                bool dead = DeadSilence(samples, count, rate);
-                if (dead) _deadSilenceMs = now;
-                bool ours = tx || now - _deadSilenceMs <= SilenceRecentMs;
-                double hz = 0;
-                bool note = ours && OneClearNote(samples, count, rate, out hz);
-                if (!ours || (!tx && !dead && !note)) _sideTone = false;
-                else if (!_sideTone && note) { _sideTone = true; _sideToneHz = hz; }
+                double hz;
+                if (!_sideTone && OneClearNote(samples, count, _recorder.ActualSampleRate, out hz)) { _sideTone = true; _sideToneHz = hz; }
                 sideTone = _sideTone;   // his own hand keying: the readers get it like received sound
             }
             if (_strip != null) _strip.Feed(samples, count, _recorder.ActualSampleRate, tx, sideTone, _sideToneHz);
@@ -1702,8 +1679,10 @@ namespace HolyLogger
         // REDRAWN AS HIS SENDING (see Feed): the last KeptColumns columns' levels and where each started, so those
         // made before his sending was recognised can be drawn again as his marks. _redrawFrom (under _gate): -1, or
         // the sample from which they are to be.
-        const double RedrawMs = 600;
-        const int KeptColumns = 64;                         // 0.64 s, a little more than RedrawMs
+        // Long enough for the radio's TX report, which now alone says it is his sending: OmniRig asks every 500 ms
+        // (his setting, and the most Options advises), so the report can come that long after his first element.
+        const double RedrawMs = 1200;
+        const int KeptColumns = 128;                        // 1.28 s, a little more than RedrawMs
         readonly double[][] _keptDb = new double[KeptColumns][];
         readonly long[] _keptRead = new long[KeptColumns];
         readonly double[][] _keptFloor = new double[KeptColumns][];   // each row's quiet level before that column
@@ -1788,7 +1767,7 @@ namespace HolyLogger
                     _rate = rate;
                 }
                 // His sending has just been recognised: the sound before it, back RedrawMs, was his first element
-                // (see CwDecodeWindow.DeadSilence) - marked so, and the columns already made from it redrawn.
+                // (the radio's TX report comes late) - marked so, and the columns already made from it redrawn.
                 if (sideTone && !_fedSideTone && rate > 0)
                 {
                     long from = Math.Max(0, _written - (long)(rate * RedrawMs / 1000));
