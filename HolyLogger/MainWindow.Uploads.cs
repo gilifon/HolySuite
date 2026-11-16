@@ -442,9 +442,20 @@ namespace HolyLogger
                             progressWindow.SkipService("QRZ Logbook", "nothing to upload — queue is empty");
                     }
 
+                    // The main window is usable during a queue upload, so the database itself could be
+                    // swapped under us (a Restore, another database file). Then "mark as sent" would land
+                    // nowhere or on the wrong QSO, so stop; whatever was not sent stays in the queue.
+                    string dbAtStart = dal.DbPath;
+
                     foreach (var qso in pending)
                     {
+                        if (dal == null || !string.Equals(dal.DbPath, dbAtStart, StringComparison.OrdinalIgnoreCase))
+                            break;
+
                         QrzLogbookResult r = await QrzLogbookService.InsertAsync(key, BuildQrzAdif(qso));
+
+                        if (dal == null || !string.Equals(dal.DbPath, dbAtStart, StringComparison.OrdinalIgnoreCase))
+                            break;   // sent, but the database changed while it was on the way: leave it
 
                         if (r.NetworkError)
                         {
@@ -620,8 +631,14 @@ namespace HolyLogger
                 return;
             }
 
+            // THE MAIN WINDOW STAYS USABLE WHILE THE QUEUE GOES UP. QRZ takes one QSO per call (measured
+            // 2026-11-16: an INSERT carrying 2 records saved only the last one and still said COUNT=1),
+            // so a big queue is many calls, and the whole window used to be locked until the last one
+            // came back. The calls already run off the UI thread; only this menu item stays off so the
+            // same queue cannot be started twice. Logging, switching logs and the rest go on as normal:
+            // each QSO is marked sent by its own Id, which is unique across every log in the database.
             UploadQueueToQrzMenuItem.IsEnabled = false;
-            this.IsEnabled = false;   // block the main window while the upload runs (owned progress window stays live)
+            _qrzQueueUploadRunning = true;
             var progressWindow = new UploadProgressWindow { Owner = this };
             progressWindow.Show();
             try
@@ -630,6 +647,7 @@ namespace HolyLogger
                 // checkbox is off (QrzPushEnabled == false). Without force the pump silently no-ops.
                 // The progress window shows a ✓/✗ row per QSO as each one is sent.
                 await PumpQrzQueue(force: true, progressWindow);
+                _qrzQueueUploadRunning = false;   // sending is over; only the OK click is left
 
                 // Per-QSO rows only show ✓/✗, so add QRZ's reason as a note when something failed.
                 if (_lastQrzHadNetworkError)
@@ -644,7 +662,7 @@ namespace HolyLogger
             }
             finally
             {
-                this.IsEnabled = true;
+                _qrzQueueUploadRunning = false;
                 UploadQueueToQrzMenuItem.IsEnabled = true;
             }
         }
