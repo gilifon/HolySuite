@@ -1227,6 +1227,7 @@ namespace HolyLogger
             try { online = await Helper.CheckForInternetConnectionAsync(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
 
             var progressWindow = new UploadProgressWindow { Owner = this };
+            progressWindow.ShowAsExitUpload();
             progressWindow.Show();
 
             if (lotwPending != null)
