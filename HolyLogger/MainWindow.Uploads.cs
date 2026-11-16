@@ -161,7 +161,22 @@ namespace HolyLogger
                 foreach (var a in dal.GetEqslAccounts())
                     if (!string.IsNullOrWhiteSpace(a.Callsign)) accounts[a.Callsign.Trim()] = a;
 
-                foreach (var qso in pending)
+                // TWO OR MORE waiting -> send them as one ADIF file per eQSL account (FORM POST of
+                // ImportADIF.cfm; eQSL's own document says a URL upload "should normally be limited to
+                // a single QSO"). ONE waiting QSO still goes on its own below, the same way the
+                // "upload each QSO as it is saved" option sends it. A batch whose reply does not
+                // account for every QSO is handed to the one-by-one loop, so each of those QSOs gets
+                // a clear answer of its own and nothing is marked sent that eQSL did not take.
+                System.Collections.Generic.List<QSO> oneByOne = pending;
+                if (pending.Count >= 2)
+                {
+                    var batch = await SendEqslQueueAsBatches(pending, accounts, progressWindow);
+                    sentCount += batch.Sent;
+                    oneByOne = batch.StoppedByNetwork ? new System.Collections.Generic.List<QSO>() : batch.Unresolved;
+                    UpdateEqslQueueIndicator();
+                }
+
+                foreach (var qso in oneByOne)
                 {
                     EqslAccount acct = null;
                     string myCall = (qso.MyCall ?? string.Empty).Trim();
@@ -218,6 +233,139 @@ namespace HolyLogger
             {
                 _eqslPumpLock.Release();
             }
+        }
+
+        // The FORM POST body for eQSL's ImportADIF.cfm. NOT the plain MultipartFormDataContent.Add(...)
+        // form: .NET writes those part names without quotes (name=EQSL_USER) and puts the boundary in
+        // quotes, and eQSL answers that with an EMPTY page - nothing added, no error. Measured
+        // 2026-11-16 against eQSL's public TEST-SWL account: the default form got 0 characters back;
+        // this one, quoted names and a plain boundary as a browser sends it, got "3 out of 3 records
+        // added". The file name needs an extension - eQSL refuses one without.
+        private static System.Net.Http.MultipartFormDataContent BuildEqslUploadForm(string user, string pwd, string adif)
+        {
+            string boundary = "----HolyLogger" + Guid.NewGuid().ToString("N");
+            var form = new System.Net.Http.MultipartFormDataContent(boundary);
+            form.Headers.ContentType.Parameters.Clear();
+            form.Headers.ContentType.Parameters.Add(new System.Net.Http.Headers.NameValueHeaderValue("boundary", boundary));
+
+            System.Net.Http.HttpContent Part(System.Net.Http.HttpContent c, string name, string fileName)
+            {
+                var cd = new System.Net.Http.Headers.ContentDispositionHeaderValue("form-data") { Name = "\"" + name + "\"" };
+                if (fileName != null) cd.FileName = "\"" + fileName + "\"";
+                c.Headers.ContentDisposition = cd;
+                return c;
+            }
+
+            var u = new System.Net.Http.StringContent(user); u.Headers.ContentType = null;
+            var p = new System.Net.Http.StringContent(pwd);  p.Headers.ContentType = null;
+            var file = new System.Net.Http.ByteArrayContent(Encoding.UTF8.GetBytes(adif));
+            file.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream");
+
+            form.Add(Part(u, "EQSL_USER", null));
+            form.Add(Part(p, "EQSL_PSWD", null));
+            form.Add(Part(file, "Filename", "holylogger.adi"));
+            return form;
+        }
+
+        private class EqslBatchOutcome
+        {
+            public int Sent;
+            public bool StoppedByNetwork;
+            // QSOs the batch did not settle; the caller sends these one by one.
+            public System.Collections.Generic.List<QSO> Unresolved = new System.Collections.Generic.List<QSO>();
+        }
+
+        // The batch half of PumpEqslQueue: one FORM POST of ImportADIF.cfm per eQSL account, the whole
+        // group in one ADIF file. Caller holds _eqslPumpLock.
+        //
+        // eQSL answers a batch with "Result: x out of y records added" plus one "Warning:" line per
+        // record it did not add. A duplicate is already on eQSL, so it counts as done. When added +
+        // duplicates == the number of QSOs sent, every QSO is on eQSL and all are marked sent. When
+        // they don't add up, the reply cannot say WHICH QSO failed (a warning gives only the date and
+        // "may" give the call), so that group goes back to the caller to be sent one by one - the ones
+        // already added come back as duplicates, the bad one is named. A reply with no Result line at
+        // all (eQSL down, wrong password) leaves the group in the queue untouched.
+        private async System.Threading.Tasks.Task<EqslBatchOutcome> SendEqslQueueAsBatches(
+            System.Collections.Generic.List<QSO> pending,
+            System.Collections.Generic.Dictionary<string, EqslAccount> accounts,
+            UploadProgressWindow progressWindow)
+        {
+            var outcome = new EqslBatchOutcome();
+            var groups = pending
+                .GroupBy(q => (q.MyCall ?? string.Empty).Trim(), StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            foreach (var group in groups)
+            {
+                var qsos = group.ToList();
+                EqslAccount acct = null;
+                if (group.Key.Length > 0) accounts.TryGetValue(group.Key, out acct);
+                if (acct == null || string.IsNullOrWhiteSpace(acct.Username) || string.IsNullOrWhiteSpace(acct.Password))
+                    continue;   // shouldn't happen (the queue is filtered to calls with an account)
+
+                string body;
+                try
+                {
+                    string adif = Services.GenerateAdif(qsos);
+                    using (var form = BuildEqslUploadForm(acct.Username, acct.Password, adif))
+                    {
+
+                        // Task.Run around the START - see the note in SendOneQsoToEqsl.
+                        using (var resp = await Task.Run(() => _eqslHttp.PostAsync("https://www.eQSL.cc/qslcard/ImportADIF.cfm", form)))
+                        {
+                            body = await resp.Content.ReadAsStringAsync();
+                            if (!resp.IsSuccessStatusCode)
+                            {
+                                Log.Warn("eQSL batch upload for " + group.Key + " got HTTP " + (int)resp.StatusCode + "; the QSOs stay in the queue.");
+                                progressWindow?.ReportBatchResult(group.Key + ": eQSL did not answer properly (" + (int)resp.StatusCode + ") — " + qsos.Count + " QSO(s) stay in the queue", false, 0, qsos.Count);
+                                continue;
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Log.Warn("eQSL batch upload for " + group.Key + " stopped: " + ex.GetType().Name + ": " + ex.Message);
+                    progressWindow?.ReportBatchResult(group.Key + ": no answer from eQSL — " + qsos.Count + " QSO(s) stay in the queue", false, 0, qsos.Count);
+                    outcome.StoppedByNetwork = true;
+                    break;   // offline -> stop; everything else stays pending for next time
+                }
+
+                string text = (body ?? string.Empty).ToLowerInvariant();
+                var m = Regex.Match(text, @"(\d+)\s+out\s+of\s+(\d+)\s+record");
+                if (!m.Success)
+                {
+                    // No Result line: eQSL is down, the login failed, or something else went wrong.
+                    // Leave the whole group in the queue and say what eQSL said.
+                    string err = Regex.Match(body ?? string.Empty, @"Error:[^<\r\n]*", RegexOptions.IgnoreCase).Value.Trim();
+                    Log.Warn("eQSL batch upload for " + group.Key + " was not accepted: " + (err.Length > 0 ? err : "no result in the reply"));
+                    progressWindow?.ReportBatchResult(group.Key + ": eQSL did not take the file — " + qsos.Count + " QSO(s) stay in the queue", false, 0, qsos.Count);
+                    if (err.Length > 0) progressWindow?.AddNote(err);
+                    continue;
+                }
+
+                int added = 0;
+                int.TryParse(m.Groups[1].Value, out added);
+                int duplicates = Regex.Matches(text, @"warning:[^<\r\n]*duplicate").Count;
+
+                if (added + duplicates == qsos.Count)
+                {
+                    foreach (var q in qsos)
+                        dal.SetEqslStatus(q.id, 1);
+                    outcome.Sent += qsos.Count;
+                    string line = group.Key + ": " + qsos.Count + " QSO(s) sent in one file";
+                    if (duplicates > 0) line += " (" + duplicates + " were already on eQSL)";
+                    progressWindow?.ReportBatchResult(line, true, qsos.Count, 0);
+                }
+                else
+                {
+                    // Some QSO was refused and the reply does not say which: send this group one by one.
+                    Log.Warn("eQSL batch for " + group.Key + ": " + added + " added, " + duplicates + " duplicate(s), "
+                             + qsos.Count + " sent; sending them one by one to find the refused QSO(s).");
+                    outcome.Unresolved.AddRange(qsos);
+                }
+            }
+            return outcome;
         }
 
         // Interprets eQSL's ImportADIF reply. Deliberately conservative: only an explicit success is

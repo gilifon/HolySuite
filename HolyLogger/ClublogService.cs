@@ -124,8 +124,9 @@ namespace HolyLogger
 
         // Bulk-uploads a whole log as ONE ADIF file (Club Log's putlogs.php). Club Log MERGES and
         // de-duplicates, so re-running is safe. clear is always 0 here — we never flush the account's
-        // existing log. This is for the whole-log backlog; per-QSO live sends use UploadAsync instead
-        // (Club Log explicitly asks callers not to abuse putlogs.php with tiny repeated uploads).
+        // existing log. Used when two or more QSOs wait in the queue (see PumpClublogQueue); a single
+        // just-logged QSO uses UploadAsync instead. Club Log's rules: realtime.php must not be used
+        // for batches, and putlogs.php must not be called repeatedly and rapidly with tiny files.
         // Authenticated by the user's e-mail + password + HolyLogger's application API key. Never throws.
         public static async Task<ClublogResult> UploadFullLogAsync(string email, string password, string callsign, string adif)
         {
