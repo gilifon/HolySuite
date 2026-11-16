@@ -1,4 +1,364 @@
-﻿== 8.9.7 ==
+== 9.1.3 ==
+
+New
+- Profiles: an exported profile now moves your whole setup to a second computer.
+- It brings the eQSL accounts, Contest Radio Setup, window places, column widths and CW speed.
+- LoTW, QRZ and Club Log logins and the station callsign were already in it.
+- Import a profile and HolyLogger offers to switch to it at once.
+- The file holds your passwords: keep it safe.
+- The LoTW certificate stays in TQSL: move it with TQSL's own backup.
+
+== 9.1.2 ==
+
+New
+- Set the radio for CW decoding: IC-705, IC-9700, IC-7760, IC-7100, IC-7410, IC-9100, IC-7600 and TS-890S.
+- User Manual: CW Decoder settings for these radios, and for Elecraft K4 and K3S.
+- Options: the recording level button is green, Set the radio is blue.
+
+Fixed
+- Club Log and eQSL: a queue of QSOs goes up as one file, not one by one.
+
+== 9.1.1 ==
+
+New
+- Options: a live bar shows if the radio's USB sound is strong enough.
+- Options: a button opens the Windows recording level.
+- Options: "Set the radio for CW decoding" sets the radio's USB sound for the PC.
+- It shows what will change, sends only after OK, and checks the radio took it.
+- Works with IC-7610, IC-7300, IC-7300MK2, TS-590S and TS-590SG.
+- User Manual: new subject, CW Decoder, with the USB sound settings for each radio.
+- User Manual: the list shows only subjects; click one to open its parts.
+- User Manual: a Search box.
+
+Fixed
+- Options shows the new radio name at once after a change in OmniRig.
+- Profiles no longer look changed for nothing or bring back old values.
+- RTTY (AFSK): the RTTY button sets the RTTY span; SSB keeps its own.
+- RTTY Decoder: always shows at least three lines of text.
+
+== 9.1.0 ==
+
+New
+- Google Drive Sync: one log on all your computers.
+- Sign in with Google once on each computer, from File or the Log Manager.
+- Every change goes to your Google Drive and comes in on your other computers.
+- No internet: you log as usual; changes go up when you are back online.
+- A new computer gets your whole log from Google Drive.
+- When a QSO was changed on two computers, the latest change wins.
+- The cloud on the top bar: green = synced, orange = waiting, red = off.
+- Log Manager: a big button shows if the database is synced.
+- Help > User Manual, starting with Google Drive Sync.
+- ADIF import: asks which services to queue the new QSOs for.
+- ADIF export: writes the upload status of LoTW, eQSL, QRZ and Club Log.
+- CW Decoder: reads your own straight-key sending (IC-7610, IC-7300, IC-7300MK2).
+- CW Decoder: turns on the radio's side tone to the PC when it opens.
+- CW Decoder: reads more words correctly.
+- Cluster alerts: tick a mode, and every spot in that mode alerts.
+- Cluster alerts: every alert stays in sight; ones scrolled away are pinned at the top.
+- Cluster: a pinned alert moves into the red frame while the radio is on it.
+- Live Scale: dragging tunes past the ends of the list.
+
+== 9.0.0 ==
+
+New
+- RTTY: HolyLogger now receives and sends RTTY.
+- RTTY Decoder: opens from View, from the panel's RTTY button, or when the radio goes to RTTY.
+- RTTY Decoder: click a station on the waterfall, or drag the two lines, to read it.
+- RTTY Decoder: Snap puts the lines on the nearest station; Rev swaps the tones.
+- RTTY Decoder: callsigns are checked on QRZ; double-click one to put it in the DX box.
+- RTTY sending: FSK (the radio makes the tones) or AFSK (the sound card does), in Options > General.
+- RTTY: type in the send line; Enter sends, Esc stops.
+- RTTY: the Msg buttons send RTTY text, in yellow. Right-click to edit.
+- RTTY with FSK: clicking a station moves the radio onto it.
+- RTTY with AFSK: the RTTY button puts the radio on LSB and lights RTTY and SSB together.
+- RTTY: closing the decoder puts the radio back on its mode from before.
+- RTTY: the QSO is logged as RTTY, on the station's frequency.
+- The gear on the CW and RTTY decoders opens Options at their own settings, framed in colour.
+- New installs: RTTY frequencies on 30m, 20m, 17m and 12m are off FT8/FT4.
+
+Fixed
+- CW Decoder and Keyer close when the radio leaves CW for RTTY.
+
+== 8.9.25 ==
+
+New
+- CW Decoder: while you transmit, your own letters show in cyan under your marks.
+
+Fixed
+- CW Keyer: once you close it, it stays closed until you open it again.
+- CW Keyer: shows at start unless you closed it last time.
+
+== 8.9.24 ==
+
+New
+- CW Decoder: always Hybrid; the reader choice on its bar is gone.
+- CW Decoder: every letter appears in the text the moment it is heard.
+- CW Decoder: letters the network does not confirm then disappear (the default).
+- CW Decoder: to keep them, grey, untick it in Options > General > CW Decoder.
+- CW Decoder: while you transmit, the waterfall shows your sending as clean cyan marks.
+- CW Decoder: your own sending is no longer decoded as letters.
+- CW Decoder: smoother waterfall.
+- CW Decoder: 5NN, 599, TNX, Q-codes and CQ DE stand as words of their own.
+- CW Decoder: new text always comes into view, even after scrolling up.
+- CW Decoder: opens and closes on its own, not with the CW Keyer.
+- CW Decoder: comes back at start if it was open.
+
+Fixed
+- CW sent through a COM port no longer breaks up while the decoder is open.
+- No error message when closing HolyLogger with the CW Decoder open.
+- CW Decoder: the = sign is no longer replaced by <BT>.
+
+== 8.9.23 ==
+
+New
+- CW Decoder: Hybrid hides the letters the network did not confirm, from the start.
+- To see them grey, untick it in Options > General > CW Decoder.
+
+== 8.9.22 ==
+
+New
+- CW Decoder: Hybrid shows Plain at once, then each letter the network confirms turns bold.
+- CW Decoder: the network corrects Plain's letters, and doubtful ones turn grey.
+- CW Decoder: on a crowded band it reads only the station you are listening to.
+- CW Decoder: choose Plain or Hybrid on its bar.
+- CW Decoder: Tune moves the radio so the station is heard at your pitch.
+- CW Decoder: each transmission starts on a new line, in striped rows.
+- CW Decoder: a callsign sent twice with no gap is still found.
+- CW Decoder: a gear opens its settings.
+- Options > General > CW Decoder: set your CW pitch; it is marked on the waterfall.
+- Options > General > CW Decoder: hide the letters the network did not confirm.
+- A gear at the right end of the top bar opens Options.
+- RTTY in the Mode box.
+- Signboard: shows My Locator, and remembers its size, place and if it was open.
+
+Fixed
+- Cluster: tuning away from a cluster station no longer sends the CW keyer's F9 message.
+- CW Keyer key editor: the General button ID is saved.
+- 64-bit install: the castle list is found.
+
+== 8.9.21 ==
+
+New
+- COTA (Castles on the Air): choose it in Activity and the Radio Control Panel goes to the COTA frequencies.
+- Options > Radio Control Panel has a COTA folder, with its own frequencies and Select per band.
+- WWFF and COTA start with only the bands their official pages name selected.
+- My Castle: your own castle number, kept like My Fauna, and Add asks if it is empty.
+- Castle numbers are suggested as you type, from the World Castles Award list of 71,380 castles.
+
+== 8.9.20 ==
+
+New
+- CW Decoder: reads the station you are listening to, from the radio's sound.
+- CW Decoder: opens with the CW Keyer; choose the sound device in Options > General.
+- CW Decoder: a waterfall shows the signal, with each letter under its dits and dahs.
+- CW Decoder: double-click a callsign to put it in the DX box.
+- Every QSO keeps the distance in km between the two stations (ADIF DISTANCE).
+- A Km column at the far right of the log.
+- Sukkot: the score frame shows the total km.
+- The frequency display reads MHz.kHz.Hz (145.275.000), in bigger digits.
+- Edit QSO draws the QSO's line on the map.
+- The Radio Control Panel and the Cluster remember being minimized.
+- Contest Radio Setup opens on the radio that is on CAT.
+
+Fixed
+- IC-910: FM mode is set correctly.
+- Icom commands sent one after another no longer get lost.
+- Cluster Live Scale no longer makes the screen slow.
+- Sukkot: the DX grid and km come only from the received Grid Locator.
+- Edit QSO: the Holyland Square box no longer stays yellow.
+- The frequency display's tooltip no longer hides the frequency.
+
+== 8.9.19 ==
+
+New
+- Contest Info: edit a contest log's information any time, from the Log Manager.
+- The Contest Information window is in two columns and fits the screen.
+- Choosing WWFF moves the radio to the WWFF frequency of its band.
+- Leaving WWFF returns the radio to the band's regular frequency.
+- Sukkot: a link to IARC's page of uploaded logs, after upload and in the Links menu.
+- Send Log asks which log to send, and fills its boxes from that log only.
+
+Fixed
+- In a contest the sent Grid Locator is your My Locator; Add refuses an empty or wrong one.
+- A contest that is not CW closes the CW Keyer.
+- A contest log ends a WWFF activation.
+- WWFF could not be chosen again after a contest.
+- Updates download from the version's GitHub release, with the old place as a backup.
+
+== 8.9.18 ==
+
+New
+- Sukkot: a Holyland Square box; the square is added to the Comment.
+- Sukkot channels: new channel table, VHF rows blue, UHF rows red.
+- A Sukkot log opens the 4X map by itself.
+- New 4X map of Israel, with grid squares and city names.
+- The map's corner button switches Flat, Polar and 4X.
+- A grid typed in the DX Locator box moves the map.
+- WWFF activation: choose WWFF in the Activity list.
+- My Fauna: the box for your own park, saved with every contact.
+- During a WWFF activation the Radio Control Panel's band buttons go to the WWFF frequencies.
+- Park suggestions from the official WWFF list while you type a park.
+- A park that is not on the WWFF list turns the box orange.
+- Help > About shows how many parks the list holds and when it was updated.
+- Contest Radio Setup: commands for the IC-820, IC-821, IC-706, IC-706MKII, IC-706MKIIG, IC-9100, FT-817, FT-847 and FT-100D.
+- Activity list: the top line now says Regular, in green.
+
+Fixed
+- Sukkot: an empty received Grid Locator is refused.
+- The Cluster window can be minimized, and has its own taskbar button.
+- The Activity list opens at its top line, so Regular is always in sight.
+- Contest Radio Setup lists only radios with commands from their maker.
+- Polar Auto Zoom shows the whole world until the first spots arrive.
+
+== 8.9.17 ==
+
+New
+- CW via (Options > General): HolyLogger can key the radio itself through a COM port.
+- The COM port list follows your USB plugs; a port just plugged in turns green and is chosen.
+- A contact already in the log (same station, band and mode, within 10 minutes) asks before it is saved again.
+- Contest Radio Setup: commands for the TS-2000, IC-9700, IC-7000 and IC-705.
+- Contest Radio Setup opens on the radio you looked at last.
+- Options > General is laid out in two columns.
+
+Fixed
+- Tools > Options brings an Options window that is already open to the front.
+- Log Fixer: listener calls like UA3-15132 are no longer reported as bad.
+
+== 8.9.16 ==
+
+Fixed
+- HolyLogger would not start at all if the Sign Board, the Matrix or the Timer was open when it was
+  last closed. It could not be cured by installing again; this version can simply be installed over it.
+- Cluster: the spotter's callsign behaves like the rest of the row - the wheel tunes from it, and a
+  click still opens its QRZ page.
+
+== 8.9.15 ==
+
+New
+- Contest Radio Setup: the radio is set for a simplex FM contest by itself when the contest log opens.
+- Ready commands for the ID-5100, IC-7100, IC-910, FT-991, FT-897 and FT-857.
+- "Send now" tries the commands on the radio.
+- Always on top, one tick each: main window, Cluster, Control Panel, My Favorite Channels, CW keyer, QRZ photo.
+- The QRZ photo opens in its own window while the map is pinned.
+- Contest Information: Sukkot gets the band category 2M & 70CM.
+- Power now says what it means: HIGH (More than 100W), LOW (Not more than 100W), QRP (Not more than 5W PEP).
+- Support mail: write in any language, add a picture, and a subject alone is enough.
+
+Fixed
+- Send Log to IARC follows the open log instead of the log sent last.
+- The Channel box shows a channel only within 100 Hz, not 500 Hz.
+- QRZ logs in again when its session ends; lookups no longer stay dead until a restart.
+- A map left maximized opens again instead of failing.
+- Station callsign and operator survive a Windows shutdown.
+- 2m gets its cluster colour in the Radio Control Panel, and a 2m spot is no longer dropped.
+- Changing a band colour now repaints the Radio Control Panel.
+- Flat map: the radius stops at 15000 km, and the red circle is hidden past a pole.
+- An OmniRig start-up failure is written once and names the cause.
+- FT-857: the simplex command was wrong.
+
+== 8.9.14 ==
+
+New
+- The map has its own window: pin it onto the main window, or let it float.
+- The pin is in the map's top right corner.
+- View > Map opens and closes the map.
+- Options > User Interface: "Show the map window".
+- Sukkot Contest: pick one of the 17 FM channels and the radio is tuned to it.
+- Sukkot Contest: a radio that cannot be tuned by CAT switches to Manual.
+- Import: when the log already has a contact with a different comment, you choose which comment to keep.
+- Undo import also puts the old comments back.
+- Remove Duplicates: a "Merge all" button.
+- A repeated contact from UDP or a watched ADIF file adds its comment to the stored one.
+
+Fixed
+- Flat map: the scale stays right when the map changes size.
+- Radio Control Panel is greyed out in Manual.
+- Status bar: the Time toggle reads Auto | Manual, like Freq & Mode.
+
+Faster
+- Flat map: the day/night shading draws much faster.
+
+== 8.9.13 ==
+
+New
+- Satellite mode: a dish beside the UTC clock shows when it is on.
+- Radio Control Panel: 2m, 70cm and the microwave bands (23cm to 3cm).
+- Radio Control Panel: in satellite mode only the satellite bands are shown.
+- Radio Control Panel: 30m always asks for CW; SSB, AM and FM are off there.
+- Options > Personal Info: your own callsign, locator and Holyland square, kept apart from the main window.
+- They fill a main-window box only when it is empty.
+- "Personal Info" is marked red in Options while your name or e-mail is missing.
+
+Fixed
+- Send Log: the operator callsign is yours, not someone who once used this PC.
+- Loading a club log no longer changes your personal details.
+- Band box: a frequency on no ham band is always marked, with a tooltip that says what to do.
+- Band box: microwave frequencies show the right band.
+- Radio Control Panel: some band frequencies corrected (40m, 6m, 23cm).
+- CW keyer: a long pasted text stays in sight as it goes out, and slides smoothly.
+- CW keyer: Esc stops sending from anywhere in the window.
+- Import Complete: the OK button stays on screen.
+- Support mail: the window can be made shorter.
+- Options: Test Connection and Browse show their whole text.
+- Personal Info: Country and Club are no longer cut off.
+
+== 8.9.12 ==
+
+New
+- Spectrum width manager: choose the scope width for each radio and mode.
+- HolyLogger sets that width when it changes the radio's mode.
+- Radio Control Panel settings: a changed frequency is shown in light red.
+- CW on Icom: a warning when BK-IN is off, so CW would not go on the air.
+
+Fixed
+- Radio Control Panel: the band button no longer goes dark and the mode buttons work again.
+
+== 8.9.11 ==
+
+New
+- ADIF Monitor: HolyLogger can watch the ADIF file another program writes, like WSJT-X.
+- It asks before adding new contacts, and tells you how many and which log.
+
+Fixed
+- Radio Control Panel: a frequency outside its band is not accepted.
+- Radio Control Panel: the RTTY column title is no longer cut off.
+
+== 8.9.10 ==
+
+New
+- Export one QSO to ADIF from the right-click menu, in the log table and in the Log Workshop.
+- Log Fixer: export the QSOs on screen, or only the selected rows, to ADIF.
+- Cabrillo export: you can now save it as a .txt file.
+
+Fixed
+- Contest Mode now follows the log you open; a normal log no longer opens in contest mode.
+- Cabrillo export: wrong dates and frequency units, and columns that did not line up.
+- QRZ photo: a picture from the biography was sometimes shown instead of the station photo.
+
+== 8.9.9 ==
+
+New
+- Try Again: right-click the frequency box to keep a station you cannot name yet.
+- Log Workshop: a field you search by now gets its own column in the results.
+
+Fixed
+- Import: the Station Callsign box now fills in with the imported log's callsign.
+- Contest: Tab from the callsign goes straight to the exchange.
+- Import Duplicates is now set in the import window only.
+
+Faster
+- Saving a QSO with F1 is much faster.
+- After F1 you can type the next callsign right away.
+
+== 8.9.8 ==
+
+Fixed
+- CW keyer: fixed a bug that could leave it locked out even though the radio could send.
+
+New
+- Radio Control Panel: each band button now shows its own colour in the corner.
+
+== 8.9.7 ==
 
 New
 - A log you delete is kept: its QSOs are written to an ADIF file first, so it can be brought back.
