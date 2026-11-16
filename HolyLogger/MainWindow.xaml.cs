@@ -7646,6 +7646,8 @@ namespace HolyLogger
         // Only one QRZ upload runs at a time so the on-save push and the silent retry pass can never
         // double-send the same QSO.
         private readonly System.Threading.SemaphoreSlim _qrzPumpLock = new System.Threading.SemaphoreSlim(1, 1);
+        // True while Tools > Upload Queue to QRZ is sending (the main window stays usable meanwhile).
+        private bool _qrzQueueUploadRunning;
 
         // The distinct rejection reasons QRZ gave during the last manual queue upload, so a failed run
         // can tell the user WHY (duplicate, wrong callsign for the logbook, no subscription, ...) instead
@@ -11188,6 +11190,18 @@ namespace HolyLogger
             if (_uploadInFlight)
             {
                 e.Cancel = true;
+                return;
+            }
+
+            // The QRZ queue upload no longer locks the main window, so closing can now be asked for in
+            // the middle of it. Closing then would tear down its progress window (it is owned by this
+            // one) and cut the queue off half-sent. Nothing would be lost - unsent QSOs stay queued -
+            // but say so plainly instead and let it finish. Not during Windows logoff/shutdown.
+            if (_qrzQueueUploadRunning && !App.IsWindowsSessionEnding)
+            {
+                e.Cancel = true;
+                HolyMessageBox.Show("The QRZ upload is still running.\nClose HolyLogger when it is done.",
+                    "QRZ Logbook", HolyMsgType.Info, this);
                 return;
             }
 
