@@ -1471,9 +1471,15 @@ namespace HolyLogger
 
             // The diary of this computer's log changes (step 2 of one log on several computers):
             // written every minute from the database's own notes, off the UI thread.
-            SyncDiary.Start();
-            AskAboutDriveLogSoon();
+            // A whole copy of the log from another computer, found by the diary reader (at its first read,
+            // ten seconds after the start, and every minute): the operator is asked about it then.
+            SyncDiary.CopyInDrive += () => Dispatcher.BeginInvoke(new Action(async () =>
+            {
+                try { await OfferDriveSnapshot(() => this); }
+                catch (Exception ex) { Log.Warn("Google Drive: the log in Drive was not offered - " + ex.Message); }
+            }));
             SyncDiary.StatusChanged += () => Dispatcher.BeginInvoke(new Action(RefreshSyncCloud));
+            SyncDiary.Start();
             RefreshSyncCloud();
 
             // The country count, skipped during the start, worked out now the window is up.
@@ -14680,8 +14686,11 @@ namespace HolyLogger
                 // a log already in Drive from another computer: offered before anything else is sent
                 if (await OfferDriveSnapshot(owner)) return;
                 // the first copy goes up now, not in a minute, and the other computers' changes come down
-                await Task.Run(() => { SyncDiary.FlushSafe(); SyncDiary.PullSafe(); });
+                await Task.Run(() => SyncDiary.FlushSafe());
                 HolyMessageBox.ShowSuccess("Signed in as " + email + ".\n\nThis computer's log changes now go to your Google Drive.", title, owner());
+                // all of this computer's logs once, then the other computers' - in the background, as a
+                // big log takes a while (SyncDiary.MakeDump)
+                _ = Task.Run(() => { SyncDiary.DumpIfDueSafe(); SyncDiary.PullSafe(); });
             }
             catch (Exception ex)
             {
@@ -14691,92 +14700,45 @@ namespace HolyLogger
             finally { RefreshSyncCloud(); }
         }
 
-        // STEP 5, AT START. A computer already signed in to Google Drive but not yet decided about the
-        // log another computer put there used to hear nothing until the operator happened to press the
-        // sync button (the laptop, 2026-11-11). Now it is asked once, fifteen seconds after HolyLogger
-        // is up - well after the start, so the question never holds the window back from opening, and
-        // the check itself (one look at the Drive folder) runs off the window's thread.
-        private void AskAboutDriveLogSoon()
+        // STEP 5, ON A NEW, EMPTY COMPUTER. When this computer's log is empty and another computer has
+        // put a whole copy of the log in Drive, that copy is put in place of this computer's database -
+        // which is kept as a backup, through the same safe swap as Backups & Restore. It is only a faster
+        // start: a computer that already has QSOs is never asked, its logs are JOINED with the others'
+        // (SyncDiary: "everything once" files and diaries). One question only, OK or Cancel (2026-11-17,
+        // his choice); Cancel signs out again and changes nothing. Asked from the sign-in, and whenever the
+        // diary reader finds such a copy (SyncDiary.CopyInDrive).
+        // Returns true when the caller must stop: HolyLogger is restarting, or the operator signed out.
+        private bool _offeringDriveLog;
+
+        private async Task<bool> OfferDriveSnapshot(Func<Window> owner)
         {
-            Task.Run(async () =>
-            {
-                try
-                {
-                    await Task.Delay(TimeSpan.FromSeconds(15));
-                    if (!GoogleDrive.Registered || !GoogleDrive.SignedIn) return;
-                    if (SyncDiary.JoinState.Length > 0 && DataAccess.GetInstance()?.CountAllQsos() > 0) return;
-                    if (SyncDiary.NewestOtherSnapshot() == null) return;
-                    await Dispatcher.InvokeAsync(async () =>
-                    {
-                        try { await OfferDriveSnapshot(() => this); }
-                        catch (Exception ex) { Log.Warn("Google Drive: the log in Drive was not offered - " + ex.Message); }
-                    });
-                }
-                catch (Exception ex) { Log.Warn("Google Drive: could not look for a log in Drive - " + ex.Message); }
-            });
+            if (_offeringDriveLog) return true;
+            _offeringDriveLog = true;
+            try { return await OfferDriveSnapshotNow(owner); }
+            finally { _offeringDriveLog = false; }
         }
 
-        // STEP 5, ON THE NEW COMPUTER. When this database has not yet been told whether it is the shared
-        // one (SyncDiary.JoinState empty) and another computer has put a whole copy of the log in Drive,
-        // the operator is offered it: on an empty computer simply "download it"; on one that already has
-        // QSOs, "use the Drive log" (this computer's log is kept as a backup, through the same safe swap
-        // as Backups & Restore) or "keep this log" (then this computer never sends a whole copy, so it
-        // cannot replace everyone's log with its own). Returns true when HolyLogger is restarting.
-        private async Task<bool> OfferDriveSnapshot(Func<Window> owner)
+        private async Task<bool> OfferDriveSnapshotNow(Func<Window> owner)
         {
             const string title = "Google Drive Sync";
             var dal = DataAccess.GetInstance();
-            if (dal == null) return false;
+            if (dal == null || !GoogleDrive.SignedIn) return false;
             long here = dal.CountAllQsos();
-            // Decided already - unless this computer's log is still EMPTY: then a real copy that has
-            // reached Drive since is offered after all (the friend's new computer, 2026-11-16, which
-            // had called itself the first computer before his home one had sent anything).
-            if (SyncDiary.JoinState.Length > 0 && here > 0) return false;
+            if (here > 0) return false;   // its logs are joined with the others' instead
 
             GoogleDrive.DriveFile snap = await Task.Run(() => SyncDiary.NewestOtherSnapshot());
-            if (snap == null)
-            {
-                // the first computer - but only once its log has a QSO (see SyncDiary.SnapshotQsos)
-                if (here > 0) SyncDiary.JoinState = "1";
-                return false;
-            }
+            if (snap == null) return false;
 
-            long? there = await Task.Run(() => SyncDiary.SnapshotQsos(snap));
-            string from = string.IsNullOrEmpty(snap.Machine) ? "your other computer" : snap.Machine;
-            string when = snap.ModifiedUtc.HasValue ? snap.ModifiedUtc.Value.ToLocalTime().ToString("d MMM yyyy") : "";
-            string mb = Math.Max(1, snap.Size / 1048576).ToString("N0");
-            string driveLine = "Google Drive: " + (there.HasValue ? there.Value.ToString("N0") + " QSOs, " : "")
-                               + "from " + from + ", saved " + when + ".";
-            bool take;
-            if (here == 0)
-                take = HolyMessageBox.ShowConfirm(
-                    "Your log is in your Google Drive.\n\n" + driveLine + "\n\n"
-                    + "Download it to this computer now? It is " + mb + " MB.\n"
-                    + "HolyLogger restarts when it is done.",
-                    title, HolyMsgType.Info, owner(), yesText: "Download it", noText: "Not now");
-            else if (there.HasValue && there.Value < here)
+            bool take = HolyMessageBox.ShowConfirm(
+                "Your log from Google Drive will now be put on this computer.\n"
+                + "The log on this computer is kept as a backup.",
+                title, HolyMsgType.Info, owner(), yesText: "OK", noText: "Cancel");
+            if (!take)
             {
-                take = HolyMessageBox.ShowConfirm(
-                    "Careful: the log in your Google Drive has FEWER QSOs than this computer.\n\n"
-                    + driveLine + "\n"
-                    + "This computer: " + here.ToString("N0") + " QSOs.\n\n"
-                    + "Use the Drive log anyway?\n"
-                    + "The log now on this computer is kept as a backup.",
-                    title, HolyMsgType.Warning, owner(), yesText: "Use the Drive log", noText: "Keep this log");
-                if (!take) { SyncDiary.JoinState = "keep"; return false; }
+                await Task.Run(() => GoogleDrive.SignOut());
+                HolyMessageBox.Show("Signed out. Nothing was changed on this computer.", title, HolyMsgType.Info, owner());
+                return true;
             }
-            else
-            {
-                take = HolyMessageBox.ShowConfirm(
-                    "Your Google Drive has the log from your other computer.\n\n"
-                    + driveLine + "\n"
-                    + "This computer: " + here.ToString("N0") + " QSOs.\n\n"
-                    + "Use the Drive log on this computer too?\n"
-                    + "The log now on this computer is kept as a backup.",
-                    title, HolyMsgType.Info, owner(), yesText: "Use the Drive log", noText: "Keep this log");
-                if (!take) { SyncDiary.JoinState = "keep"; return false; }
-            }
-            if (!take) return false;   // asked again next time
 
             // a small window of its own (code only) saying how far the download has got
             var text = new TextBlock { FontSize = 16, Margin = new Thickness(24), TextWrapping = TextWrapping.Wrap,

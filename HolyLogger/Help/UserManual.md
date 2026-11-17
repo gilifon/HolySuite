@@ -32,22 +32,15 @@ Hold the mouse over the cloud to read more. Click it to open Google Drive Sync.
 
 ## Adding another computer
 
-A few minutes after you sign in on your first computer, it puts a whole copy of your log in your Google Drive. It sends a fresh copy once a week.
-
 1. Install HolyLogger on the other computer.
 2. Sign in there with the same Google account, as in "Turning it on".
-3. HolyLogger asks whether to download your log from Google Drive. Click **Download it**.
 
-![On the new computer: click Download it](sync-download.png)
+Each computer sends all its logs to Google Drive once, and reads the logs of all your other computers. After a few minutes every computer has the same logs and QSOs.
 
-4. HolyLogger restarts with your log on this computer.
+- **Logs with the same name become one log.** "Main Log" on one computer and "Main Log" on another are joined.
+- **A QSO that is on both computers is kept once:** same callsign, date, band, mode and minute.
 
-If that computer already has QSOs, HolyLogger asks whether to use the Drive log there too:
-
-![A computer that already has QSOs is asked this instead](sync-use-drive-log.png)
-
-- **Use the Drive log:** your log from Google Drive is put on this computer. The log that was there is kept as a backup.
-- **Keep this log:** this computer keeps its own log.
+If the new computer has no QSOs yet, HolyLogger says: **Your log from Google Drive will now be put on this computer. The log on this computer is kept as a backup.** Click **OK**, and HolyLogger restarts with your log. This is faster than reading all the logs one by one. **Cancel** signs this computer out again, and nothing is changed on it.
 
 ## If you have no Gmail address
 

@@ -48,18 +48,19 @@ namespace HolyLogger
         private static int _ticks;
         private static int _pulling;
 
-        // Every minute this computer's changes go up; at the first tick (soon after start) and then every
-        // five minutes the other computers' changes come down (step 4, Pull).
+        // Every minute (the first time soon after start) this computer's changes go up and the other
+        // computers' changes come down (step 4, Pull) - every five minutes until 2026-11-17, when he asked
+        // why so slow: a read with nothing new is one folder listing, on this timer's thread, never the
+        // window's. Whether a whole copy is due is still looked at every five minutes.
         public static void Start()
         {
             _timer = new Timer(_ =>
             {
                 FlushSafe();
+                DumpIfDueSafe();
+                PullSafe();
                 if (_ticks++ % 5 == 0)
-                {
-                    PullSafe();
                     Task.Run(() => SnapshotIfDueSafe());   // its own thread: it can take minutes
-                }
             }, null, TimeSpan.FromSeconds(10), TimeSpan.FromMinutes(1));
         }
 
@@ -144,65 +145,70 @@ namespace HolyLogger
                     foreach (var n in notes) last[n.Kind + "|" + n.RowId] = n;
                     var ordered = last.Values.OrderBy(n => n.Seq).ToList();
 
-                    var qsoIds = ordered.Where(n => n.Kind == "qso" && n.Op == "put").Select(n => n.RowId).ToList();
-                    var logIds = ordered.Where(n => n.Kind == "log" && n.Op == "put").Select(n => n.RowId).ToList();
-                    var qsos = dal.ReadRowsForSync("qso", qsoIds);
-                    var logs = dal.ReadRowsForSync("logs", logIds);
-
-                    // the local numbers inside the rows, as sync ids
-                    var logRefs = new HashSet<long>();
-                    var qsoRefs = new HashSet<long>();
-                    foreach (var r in qsos.Values)
-                    {
-                        if (r.TryGetValue("log_id", out object l)) logRefs.Add(Convert.ToInt64(l));
-                        if (r.TryGetValue("source_qso_id", out object s)) qsoRefs.Add(Convert.ToInt64(s));
-                    }
-                    foreach (var r in logs.Values)
-                        if (r.TryGetValue("copy_target_log_id", out object c)) logRefs.Add(Convert.ToInt64(c));
-                    var logSync = dal.SyncIdsOf("logs", logRefs);
-                    var qsoSync = dal.SyncIdsOf("qso", qsoRefs);
-
                     var sb = new StringBuilder();
-                    foreach (var n in ordered)
-                    {
-                        var line = new JObject
-                        {
-                            ["at"] = n.AtUtc,
-                            ["what"] = n.Kind,
-                            ["op"] = n.Op,
-                        };
-                        if (n.Op == "del")
-                        {
-                            if (string.IsNullOrEmpty(n.SyncId)) continue;   // never given an id: nothing to name
-                            line["id"] = n.SyncId;
-                        }
-                        else
-                        {
-                            var rows = n.Kind == "qso" ? qsos : logs;
-                            if (!rows.TryGetValue(n.RowId, out var row)) continue;   // gone already; its del follows
-                            if (!row.TryGetValue("sync_id", out object sid)) continue;
-                            line["id"] = sid.ToString();
-                            line["fields"] = Fields(row, logSync, qsoSync);
-                        }
-                        sb.Append(line.ToString(Formatting.None)).Append('\n');
-                        written++;
-                    }
-
+                    var times = new Dictionary<string, string>();
+                    written += MakeLines(dal, ordered, sb, times);
                     if (sb.Length > 0) Append(sb.ToString());
                     // when each row was changed here: the latest change wins when other diaries are read
-                    var times = new Dictionary<string, string>();
-                    foreach (var n in ordered)
-                    {
-                        string sid = n.Op == "del" ? n.SyncId
-                            : (n.Kind == "qso" ? qsos : logs).TryGetValue(n.RowId, out var row) && row.TryGetValue("sync_id", out object s) ? s.ToString() : null;
-                        if (!string.IsNullOrEmpty(sid)) times[sid] = n.AtUtc;
-                    }
                     dal.NoteSyncTimes(times);
                     dal.ForgetSyncJournal(notes[notes.Count - 1].Seq);
                 }
                 if (written > 0) Log.Warn("Sync diary: " + written + " line(s) written.");
                 return written;
             }
+        }
+
+        // The diary lines for these notes, into sb; times gets when each row was changed. Returns how many.
+        private static int MakeLines(DataAccess dal, List<DataAccess.SyncNote> ordered, StringBuilder sb, Dictionary<string, string> times)
+        {
+            int written = 0;
+            var qsoIds = ordered.Where(n => n.Kind == "qso" && n.Op == "put").Select(n => n.RowId).ToList();
+            var logIds = ordered.Where(n => n.Kind == "log" && n.Op == "put").Select(n => n.RowId).ToList();
+            var qsos = dal.ReadRowsForSync("qso", qsoIds);
+            var logs = dal.ReadRowsForSync("logs", logIds);
+
+            // the local numbers inside the rows, as sync ids
+            var logRefs = new HashSet<long>();
+            var qsoRefs = new HashSet<long>();
+            foreach (var r in qsos.Values)
+            {
+                if (r.TryGetValue("log_id", out object l)) logRefs.Add(Convert.ToInt64(l));
+                if (r.TryGetValue("source_qso_id", out object s)) qsoRefs.Add(Convert.ToInt64(s));
+            }
+            foreach (var r in logs.Values)
+                if (r.TryGetValue("copy_target_log_id", out object c)) logRefs.Add(Convert.ToInt64(c));
+            var logSync = dal.SyncIdsOf("logs", logRefs);
+            var qsoSync = dal.SyncIdsOf("qso", qsoRefs);
+
+            foreach (var n in ordered)
+            {
+                var line = new JObject
+                {
+                    ["at"] = n.AtUtc,
+                    ["what"] = n.Kind,
+                    ["op"] = n.Op,
+                };
+                string sid;
+                if (n.Op == "del")
+                {
+                    if (string.IsNullOrEmpty(n.SyncId)) continue;   // never given an id: nothing to name
+                    sid = n.SyncId;
+                    line["id"] = sid;
+                }
+                else
+                {
+                    var rows = n.Kind == "qso" ? qsos : logs;
+                    if (!rows.TryGetValue(n.RowId, out var row)) continue;   // gone already; its del follows
+                    if (!row.TryGetValue("sync_id", out object id)) continue;
+                    sid = id.ToString();
+                    line["id"] = sid;
+                    line["fields"] = Fields(row, logSync, qsoSync);
+                }
+                sb.Append(line.ToString(Formatting.None)).Append('\n');
+                times[sid] = n.AtUtc;
+                written++;
+            }
+            return written;
         }
 
         private static JObject Fields(Dictionary<string, object> row, Dictionary<long, string> logSync, Dictionary<long, string> qsoSync)
@@ -256,55 +262,188 @@ namespace HolyLogger
             finally { Interlocked.Exchange(ref _pulling, 0); }
         }
 
+        // ── EVERYTHING ONCE: THE LOGS A COMPUTER HAD BEFORE SYNC ─────────────────────────────────────
+        //
+        // 2026-11-17, a friend's laptop: it read his home computer's diary and threw away 598 QSOs,
+        // because they named a log that existed at home from before sync - a diary holds only the
+        // changes made since sync began, so that log was in no diary at all. His rule: every computer
+        // reads every other one's logs and in the end all databases are the same, with no computer
+        // chosen as "the main one".
+        //
+        // So once, when a computer is first signed in to a Google account, it sends ALL its logs and
+        // QSOs, as diary lines, in a file of their own: <its id>.dump, gzipped (the diary itself stays
+        // small, as it goes up whole every minute). Each line carries the last change known for its row,
+        // or 1970 when it was never changed since sync began - so any real change made on any computer
+        // is newer and wins. The other computers read that file once, before its diary, and join what
+        // they already have (DataAccess.ApplySyncLines: same log name = one log, same QSO by the
+        // duplicate rule = one QSO).
+        //
+        // sync_dumped = the Google account it was sent to (another account gets it again);
+        // sync_times_set = this computer's own rows have their times noted, which must be so before
+        // anything is joined with them; sync_dump_read_<file> = "done" once another's file was read.
+        private static int _dumping;
+
+        public static void DumpIfDueSafe()
+        {
+            if (Interlocked.Exchange(ref _dumping, 1) == 1) return;
+            try { DumpIfDue(); }
+            catch (Exception ex) { Log.Warn("Google Drive: this computer's logs were not sent - " + ex.Message); }
+            finally { Interlocked.Exchange(ref _dumping, 0); }
+        }
+
+        private static void DumpIfDue()
+        {
+            if (!GoogleDrive.Registered || !GoogleDrive.SignedIn) return;
+            var dal = DataAccess.GetInstance();
+            if (dal == null) return;
+            string account = GoogleDrive.Email ?? "";
+            if (dal.GetDbState("sync_dumped") == account) return;
+            MakeDump(dal, account);
+        }
+
+        private static void MakeDump(DataAccess dal, string account)
+        {
+            var watch = System.Diagnostics.Stopwatch.StartNew();
+            Directory.CreateDirectory(Folder);
+            string gz = Path.Combine(Folder, "dump.gz");
+            int lines = 0;
+            ThreadPriority was = Thread.CurrentThread.Priority;
+            try
+            {
+                Thread.CurrentThread.Priority = ThreadPriority.BelowNormal;   // the operator is working
+                lock (Gate)   // no diary line between: every change after this is newer than these lines
+                {
+                    Flush();
+                    using (var fs = File.Create(gz))
+                    using (var z = new GZipStream(fs, CompressionLevel.Optimal))
+                    using (var w = new StreamWriter(z, new UTF8Encoding(false)))
+                    {
+                        foreach (string table in new[] { "logs", "qso" })   // logs first: a QSO names its log
+                        {
+                            long after = 0;
+                            while (true)
+                            {
+                                List<DataAccess.SyncNote> notes = dal.AllRowsAsNotes(table, after, 2000);
+                                if (notes.Count == 0) break;
+                                after = notes[notes.Count - 1].RowId;
+                                var sb = new StringBuilder();
+                                var times = new Dictionary<string, string>();
+                                lines += MakeLines(dal, notes, sb, times);
+                                w.Write(sb.ToString());
+                                dal.NoteSyncTimes(times);
+                            }
+                        }
+                    }
+                    dal.SetDbState("sync_times_set", "1");
+                }
+                Thread.CurrentThread.Priority = was;
+
+                long bytes = new FileInfo(gz).Length;
+                GoogleDrive.UploadLarge(gz, ComputerId() + ".dump", "application/gzip", TimeSpan.FromHours(3),
+                    new JObject { ["machine"] = Environment.MachineName });
+                dal.SetDbState("sync_dumped", account);
+                Log.Warn("Google Drive: all of this computer's logs and QSOs sent once (" + lines + " lines, "
+                         + (bytes / 1048576.0).ToString("0.0") + " MB) in " + watch.Elapsed.TotalSeconds.ToString("0") + " s.");
+            }
+            finally
+            {
+                Thread.CurrentThread.Priority = was;
+                try { File.Delete(gz); } catch (Exception swallowed) { Log.Swallow(swallowed); }
+            }
+        }
+
+        // ── STEP 4: READING THE OTHER COMPUTERS' DIARIES ─────────────────────────────────────────────
+        //
+        // A whole copy from another computer is in Drive and this computer's log is EMPTY: the window
+        // asks the operator (MainWindow.OfferDriveSnapshot) - a faster start than reading everything -
+        // and nothing is read before he has answered.
+        public static event Action CopyInDrive;
+
+        private static DataAccess.SyncLine ParseLine(string raw, string fileName, ref string machine, DataAccess dal)
+        {
+            // DateParseHandling.None: by default Newtonsoft turns any text that looks like a date into a
+            // DateTime, and "at" came back as "11/11/2026 20:44:57" - which sorts before every real time,
+            // so a newer edit was thrown away as older (2026-11-11, the first laptop test). Every value
+            // is taken exactly as it was written.
+            JObject j;
+            try
+            {
+                using (var jr = new JsonTextReader(new StringReader(raw)) { DateParseHandling = DateParseHandling.None })
+                    j = JObject.Load(jr);
+            }
+            catch (Exception) { Log.Warn("Sync: a line of " + fileName + " could not be read; skipped."); return null; }
+            if (j["diary"] != null)   // the header: whose diary this is
+            {
+                machine = (string)j["machine"];
+                dal.SetDbState("sync_machine_" + fileName, machine);
+                return null;
+            }
+            var line = new DataAccess.SyncLine
+            {
+                At = (string)j["at"], What = (string)j["what"], Op = (string)j["op"], Id = (string)j["id"], Raw = raw,
+            };
+            if (j["fields"] is JObject fo)
+                line.Fields = fo.Properties().ToDictionary(p => p.Name, p => (p.Value as JValue)?.Value);
+            return line;
+        }
+
         // true = Google Drive was reached and read
         private static bool Pull()
         {
             if (!GoogleDrive.Registered || !GoogleDrive.SignedIn) return false;
             var dal = DataAccess.GetInstance();
             if (dal == null) return false;
+            // this computer's own rows must have their times before anything is joined with them
+            if (dal.GetDbState("sync_times_set") != "1") return false;
             string mine = ComputerId() + ".diary";
             bool touched = false;
 
-            foreach (var file in GoogleDrive.ListFolder(TimeSpan.FromSeconds(60)))
+            List<GoogleDrive.DriveFile> files = GoogleDrive.ListFolder(TimeSpan.FromSeconds(60));
+            if (dal.CountAllQsos() == 0 && NewestOtherSnapshot(files) != null)
+            {
+                try { CopyInDrive?.Invoke(); } catch (Exception swallowed) { Log.Swallow(swallowed); }
+                return true;
+            }
+
+            // the other computers' "everything once" files first, then their diaries
+            foreach (var file in files)
+            {
+                if (!file.Name.EndsWith(".dump", StringComparison.OrdinalIgnoreCase) || file.Name == ComputerId() + ".dump") continue;
+                if (dal.GetDbState("sync_dump_read_" + file.Name) == "done") continue;
+                if (ReadDump(dal, file, mine)) touched = true;
+            }
+
+            foreach (var file in files)
             {
                 if (!file.Name.EndsWith(".diary", StringComparison.OrdinalIgnoreCase) || file.Name == mine) continue;
                 string readKey = "sync_read_" + file.Name;
                 long.TryParse(dal.GetDbState(readKey), out long offset);
                 if (file.Size < offset) offset = 0;   // shorter than what was read: that diary started again
-                if (file.Size == offset) continue;
+                List<string> waiting = dal.ReadWaitingSyncLines(file.Name);
+                if (file.Size == offset && waiting.Count == 0) continue;
 
-                byte[] data = GoogleDrive.Download(file.Id, offset, TimeSpan.FromSeconds(120));
-                int end = Array.LastIndexOf(data, (byte)'\n');
-                if (end < 0) continue;
+                // the lines still waiting for their log first, then what is new in the diary
+                var raws = new List<string>(waiting);
+                long next = offset;
+                if (file.Size > offset)
+                {
+                    byte[] data = GoogleDrive.Download(file.Id, offset, TimeSpan.FromSeconds(120));
+                    int end = Array.LastIndexOf(data, (byte)'\n');
+                    if (end >= 0)
+                    {
+                        raws.AddRange(Encoding.UTF8.GetString(data, 0, end + 1).Split('\n'));
+                        next = offset + end + 1;
+                    }
+                }
+                if (next == offset && waiting.Count == 0) continue;
                 string machine = dal.GetDbState("sync_machine_" + file.Name);
                 var lines = new List<DataAccess.SyncLine>();
-                foreach (string raw in Encoding.UTF8.GetString(data, 0, end + 1).Split('\n'))
+                foreach (string rawLine in raws)
                 {
-                    if (raw.Trim().Length == 0) continue;
-                    // DateParseHandling.None: by default Newtonsoft turns any text that looks like a date into a
-                    // DateTime, and "at" came back as "11/11/2026 20:44:57" - which sorts before every real time,
-                    // so a newer edit was thrown away as older (2026-11-11, the first laptop test). Every value
-                    // is taken exactly as it was written.
-                    JObject j;
-                    try
-                    {
-                        using (var jr = new JsonTextReader(new StringReader(raw)) { DateParseHandling = DateParseHandling.None })
-                            j = JObject.Load(jr);
-                    }
-                    catch (Exception) { Log.Warn("Sync: a line of " + file.Name + " could not be read; skipped."); continue; }
-                    if (j["diary"] != null)   // the header: whose diary this is
-                    {
-                        machine = (string)j["machine"];
-                        dal.SetDbState("sync_machine_" + file.Name, machine);
-                        continue;
-                    }
-                    var line = new DataAccess.SyncLine
-                    {
-                        At = (string)j["at"], What = (string)j["what"], Op = (string)j["op"], Id = (string)j["id"],
-                    };
-                    if (j["fields"] is JObject fo)
-                        line.Fields = fo.Properties().ToDictionary(p => p.Name, p => (p.Value as JValue)?.Value);
-                    lines.Add(line);
+                    string raw = rawLine.Trim();
+                    if (raw.Length == 0) continue;
+                    DataAccess.SyncLine line = ParseLine(raw, file.Name, ref machine, dal);
+                    if (line != null) lines.Add(line);
                 }
                 if (string.IsNullOrEmpty(machine)) machine = Path.GetFileNameWithoutExtension(file.Name);
 
@@ -312,12 +451,16 @@ namespace HolyLogger
                 lock (Gate)
                 {
                     Flush();   // this computer's own latest changes first, so their times are known
-                    r = dal.ApplySyncLines(lines, machine);
+                    r = dal.ApplySyncLines(lines, machine, TheyWinTies(file.Name, mine));
                 }
-                dal.SetDbState(readKey, (offset + end + 1).ToString());
+                dal.SetWaitingSyncLines(file.Name, r.NoLog.Select(l => l.Raw));
+                dal.SetDbState(readKey, next.ToString());
                 if (r.ActiveLogTouched) touched = true;
-                Log.Warn("Sync: from " + machine + ": " + r.Applied + " change(s) made, " + r.Older
-                         + " older than what is here, " + r.Skipped + " skipped.");
+                // the same waiting lines tried again every minute are not told each time
+                if (next != offset || r.Applied > 0)
+                    Log.Warn("Sync: from " + machine + ": " + r.Applied + " change(s) made, " + r.Older
+                             + " older than what is here, " + (r.Skipped - r.NoLog.Count) + " skipped"
+                             + (r.NoLog.Count > 0 ? ", " + r.NoLog.Count + " QSO(s) waiting for their log" : "") + ".");
             }
 
             if (touched)
@@ -332,13 +475,77 @@ namespace HolyLogger
             return true;
         }
 
+        // A tie (the same time on both sides) goes to the computer whose diary name sorts first, on
+        // both computers alike (DataAccess.ApplySyncLines).
+        private static bool TheyWinTies(string theirDiary, string myDiary)
+        {
+            return string.CompareOrdinal(theirDiary, myDiary) < 0;
+        }
+
+        // Reads another computer's "everything once" file, 2,000 lines at a time, never all in memory.
+        // A QSO whose log is not here waits with that computer's diary lines. true = the open log changed.
+        private static bool ReadDump(DataAccess dal, GoogleDrive.DriveFile file, string mine)
+        {
+            string diary = Path.GetFileNameWithoutExtension(file.Name) + ".diary";
+            string machine = !string.IsNullOrEmpty(file.Machine) ? file.Machine : dal.GetDbState("sync_machine_" + diary);
+            if (string.IsNullOrEmpty(machine)) machine = Path.GetFileNameWithoutExtension(file.Name);
+            bool theyWin = TheyWinTies(diary, mine);
+            string gz = Path.Combine(Folder, "read.dump.gz");
+            Directory.CreateDirectory(Folder);
+            int applied = 0, older = 0, skipped = 0;
+            bool touched = false;
+            var waiting = dal.ReadWaitingSyncLines(diary);
+            int waitingBefore = waiting.Count;
+            try
+            {
+                GoogleDrive.DownloadToFile(file.Id, gz, null, TimeSpan.FromHours(3));
+                var batch = new List<DataAccess.SyncLine>();
+                Action apply = () =>
+                {
+                    if (batch.Count == 0) return;
+                    DataAccess.SyncApplyResult r;
+                    lock (Gate)
+                    {
+                        Flush();
+                        r = dal.ApplySyncLines(batch, machine, theyWin);
+                    }
+                    applied += r.Applied; older += r.Older; skipped += r.Skipped - r.NoLog.Count;
+                    waiting.AddRange(r.NoLog.Select(l => l.Raw));
+                    if (r.ActiveLogTouched) touched = true;
+                    batch.Clear();
+                };
+                using (var z = new GZipStream(File.OpenRead(gz), CompressionMode.Decompress))
+                using (var rd = new StreamReader(z, Encoding.UTF8))
+                {
+                    string m = machine, raw;
+                    while ((raw = rd.ReadLine()) != null)
+                    {
+                        raw = raw.Trim();
+                        if (raw.Length == 0) continue;
+                        DataAccess.SyncLine line = ParseLine(raw, file.Name, ref m, dal);
+                        if (line != null) batch.Add(line);
+                        if (batch.Count >= 2000) apply();
+                    }
+                }
+                apply();
+            }
+            finally { try { File.Delete(gz); } catch (Exception swallowed) { Log.Swallow(swallowed); } }
+
+            dal.SetWaitingSyncLines(diary, waiting);
+            dal.SetDbState("sync_dump_read_" + file.Name, "done");
+            Log.Warn("Sync: all logs and QSOs of " + machine + " read: " + applied + " change(s) made, " + older
+                     + " already here, " + skipped + " skipped"
+                     + (waiting.Count > waitingBefore ? ", " + (waiting.Count - waitingBefore) + " QSO(s) waiting for their log" : "") + ".");
+            return touched;
+        }
+
         // ── STEP 5: THE WHOLE LOG IN DRIVE, FOR A NEW COMPUTER ───────────────────────────────────────
         //
-        // The diaries hold only the changes made since sync began, so a brand-new computer could not
-        // be given the operator's whole log from them. Once a week (when the newest copy in Drive, from
-        // any of his computers, is more than seven days old) one computer puts a whole copy of the
-        // database there, gzipped, as <its id>.snapshot - each computer writes only its own, like its
-        // diary.
+        // A faster start for a new, EMPTY computer than reading every other computer's logs line by line
+        // (everything else comes through the "everything once" files and the diaries). Once a week (when
+        // the newest copy in Drive, from any of his computers, is more than seven days old) a computer
+        // with QSOs puts a whole copy of its database there, gzipped, as <its id>.snapshot - each
+        // computer writes only its own, like its diary.
         //
         // The copy says how far it is up to date: in its db_state, where the diaries are read from next
         // (the maker's own diary at its length when the copy was taken; the others where the maker had
@@ -346,28 +553,18 @@ namespace HolyLogger
         // diaries from those places - so it misses nothing made after the copy. A change made between
         // the length being taken and the copy is in both, and is simply made twice, which does no harm.
         //
-        // The copy carries no computer id, so the new computer makes its own; and sync_joined = 1.
-        //
-        // sync_joined in db_state: "1" = this database is the shared one (it may send copies); "keep" =
-        // the operator kept this computer's own, different log (it never sends a copy, or it could
-        // replace everyone's); empty = not decided yet (MainWindow.OfferDriveSnapshot asks).
+        // The copy carries no computer id, so the new computer makes its own. Its maker's "everything
+        // once" file counts as read, as every row in it is in the copy already. (sync_joined = 1 in it is
+        // from before 9.1.4, when one computer was "the shared one"; nothing reads it now.)
         private static int _snapshotting;
         private static readonly TimeSpan SnapshotEvery = TimeSpan.FromDays(7);
 
-        public static string JoinState
-        {
-            get { return DataAccess.GetInstance()?.GetDbState("sync_joined") ?? string.Empty; }
-            set { DataAccess.GetInstance()?.SetDbState("sync_joined", value); }
-        }
-
         private static string SnapshotName() { return ComputerId() + ".snapshot"; }
 
-        // AN EMPTY LOG IS NEVER THE SHARED ONE (2026-11-16, a friend's new computer far from home).
-        // It signed in before his home computer had put a copy in Drive, found none, called itself the
-        // first computer and sent a copy of its EMPTY log - which the home computer would then have
-        // offered as "the log from your other computer", ready to replace 11,000 QSOs with none. So:
-        //  - a computer becomes the shared one (sync_joined = 1) only once its log has a QSO;
-        //  - it never sends a whole copy of a log with no QSOs;
+        // AN EMPTY LOG IS NEVER COPIED (2026-11-16, a friend's new computer far from home). It sent a
+        // copy of its EMPTY log - which would then have been offered to his home computer as "the log
+        // from your other computer". So:
+        //  - a computer never sends a whole copy of a log with no QSOs;
         //  - a copy in Drive with no QSOs is treated as no copy at all - never offered, and never
         //    counted as "a recent copy" that would stop the real one being sent.
         // Each copy says, in its Drive appProperties, which computer made it and how many QSOs it holds.
@@ -393,9 +590,9 @@ namespace HolyLogger
 
         private static bool HasQsos(GoogleDrive.DriveFile f) { return (SnapshotQsos(f) ?? 1) > 0; }
 
-        private static List<GoogleDrive.DriveFile> UsefulSnapshots()
+        private static List<GoogleDrive.DriveFile> UsefulSnapshots(List<GoogleDrive.DriveFile> files)
         {
-            return GoogleDrive.ListFolder(TimeSpan.FromSeconds(60))
+            return files
                 .Where(f => f.Name.EndsWith(".snapshot", StringComparison.OrdinalIgnoreCase) && f.Size > 0 && HasQsos(f))
                 .ToList();
         }
@@ -404,8 +601,13 @@ namespace HolyLogger
         // null if none.
         public static GoogleDrive.DriveFile NewestOtherSnapshot()
         {
+            return NewestOtherSnapshot(GoogleDrive.ListFolder(TimeSpan.FromSeconds(60)));
+        }
+
+        private static GoogleDrive.DriveFile NewestOtherSnapshot(List<GoogleDrive.DriveFile> files)
+        {
             string mine = SnapshotName();
-            return UsefulSnapshots()
+            return UsefulSnapshots(files)
                 .Where(f => f.Name != mine)
                 .OrderByDescending(f => f.ModifiedUtc ?? DateTime.MinValue)
                 .FirstOrDefault();
@@ -419,24 +621,16 @@ namespace HolyLogger
             finally { Interlocked.Exchange(ref _snapshotting, 0); }
         }
 
+        // A whole copy is only a faster start for a new, empty computer - the logs themselves come through
+        // the "everything once" files and the diaries - so any computer with QSOs may send it, whenever
+        // the newest copy in Drive (from any of them) is more than a week old.
         private static void SnapshotIfDue()
         {
             if (!GoogleDrive.Registered || !GoogleDrive.SignedIn) return;
             var dal = DataAccess.GetInstance();
             if (dal == null) return;
-            if (dal.CountAllQsos() == 0) return;   // nothing worth copying, and never the shared log
-            string mine = SnapshotName();
-            var snaps = UsefulSnapshots();
-
-            string join = JoinState;
-            if (join.Length == 0)
-            {
-                // another computer's copy is there: the operator decides first (OfferDriveSnapshot)
-                if (snaps.Any(f => f.Name != mine)) return;
-                JoinState = join = "1";   // the first computer: the others start from this one
-            }
-            if (join != "1") return;
-
+            if (dal.CountAllQsos() == 0) return;   // never a copy of an empty log
+            var snaps = UsefulSnapshots(GoogleDrive.ListFolder(TimeSpan.FromSeconds(60)));
             DateTime? newest = snaps.Max(f => f.ModifiedUtc);
             if (newest.HasValue && DateTime.UtcNow - newest.Value < SnapshotEvery) return;
             MakeSnapshot(dal);
@@ -469,11 +663,13 @@ namespace HolyLogger
                         "DELETE FROM sync_journal",
                         "DELETE FROM db_state WHERE key IN ('sync_computer_id', 'sync_computer_machine')",
                         "INSERT OR REPLACE INTO db_state (key, value) VALUES ('sync_joined', '1')",
+                        "INSERT OR REPLACE INTO db_state (key, value) VALUES ('sync_dump_read_' || @me || '.dump', 'done')",
                         "INSERT OR REPLACE INTO db_state (key, value) VALUES (@k, @v)",
                     })
                         using (var cmd = new SQLiteCommand(sql, c))
                         {
                             cmd.Parameters.AddWithValue("@k", "sync_read_" + myDiary);
+                            cmd.Parameters.AddWithValue("@me", ComputerId());
                             cmd.Parameters.AddWithValue("@v", diaryLength.ToString());
                             cmd.ExecuteNonQuery();
                         }
@@ -814,8 +1010,8 @@ namespace HolyLogger
             public string Id, Name;
             public long Size;
             public DateTime? ModifiedUtc;
-            public string Machine;   // a whole copy: the computer that made it (appProperties)
-            public long? Qsos;       // and how many QSOs it holds; null = not said (copies from 9.1.0)
+            public string Machine;   // the computer that made it (appProperties; diaries from 9.1.4)
+            public long? Qsos;       // a whole copy: the QSOs in it; a diary: the QSOs on its computer; null = not said
         }
 
         // The files in the HolyLogger Sync folder: every computer's diary (drive.file still shows them,
