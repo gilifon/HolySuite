@@ -1956,12 +1956,12 @@
              contest is active this replaces the single Exchange box; otherwise it's hidden. -->
         <StackPanel x:Name="ContestRxPanel" Orientation="Horizontal" HorizontalAlignment="Left"
                     VerticalAlignment="Top" Margin="101,122,0,0" Grid.Row="1" Visibility="Collapsed"/>
-        <TextBlock x:Name="L_RstSLabel" HorizontalAlignment="Left" Margin="228,124,0,0" VerticalAlignment="Top" Grid.Row="1" Width="40" TextAlignment="Center" FontSize="16" LineHeight="13" LineStackingStrategy="BlockLineHeight"><Run Text="RST"/><LineBreak/><Run Text="S" FontWeight="Bold"/></TextBlock>
+        <TextBlock x:Name="L_RstSLabel" HorizontalAlignment="Left" Margin="226,124,0,0" VerticalAlignment="Top" Grid.Row="1" Width="40" TextAlignment="Center" FontSize="14" LineHeight="13" LineStackingStrategy="BlockLineHeight"><Run Text="RST"/><LineBreak/><Run Text="S" FontWeight="Bold"/></TextBlock>
         <!-- RST S / RST R. On voice these are drop-downs you can also type in, offering 59 down to 51;
              on CW and the data modes the report is always 599, so ResetRstForMode swaps in the plain
              typing template instead. The names still start with TB_ because every reference in the code
              does. -->
-        <ComboBox x:Name="TB_RSTSent" HorizontalAlignment="Left" Height="24" Margin="262,125,0,0" VerticalAlignment="Top" Width="36" Text="59" Grid.Row="1"
+        <ComboBox x:Name="TB_RSTSent" HorizontalAlignment="Left" Height="24" Margin="258,125,0,0" VerticalAlignment="Top" Width="42" Text="59" Grid.Row="1"
                   IsEditable="True" IsTextSearchEnabled="False" StaysOpenOnEdit="True"
                   Template="{StaticResource FlatEditableComboTemplate}"
                   Background="{DynamicResource ControlBg}" Foreground="{DynamicResource TextBrush}" BorderBrush="{DynamicResource InputBorder}" BorderThickness="1"
@@ -1977,13 +1977,20 @@
              so the RST R label, the RST R box and the whole QTH group each moved left by what was freed,
              and all of it went into TB_QTH: 108 wide before, 149 now. It starts on x=411, the left edge
              of the Country box on the row below, and still ends on 560 - so the QTH row is now squared
-             off against the row above it AND the row beneath it. -->
-        <TextBlock x:Name="L_RstRLabel" HorizontalAlignment="Left" Margin="298,124,0,0" VerticalAlignment="Top" Grid.Row="1" Width="40" TextAlignment="Center" FontSize="16" LineHeight="13" LineStackingStrategy="BlockLineHeight"><Run Text="RST"/><LineBreak/><Run Text="R" FontWeight="Bold"/></TextBlock>
-        <ComboBox x:Name="TB_RSTRcvd" HorizontalAlignment="Left" Height="24" Margin="332,125,0,0" VerticalAlignment="Top" Width="36" Text="59" Grid.Row="1"
+             off against the row above it AND the row beneath it.
+             2026-11-17: the two "RST" labels went 16 -> 14 (an exception to the size-16 rule the user
+             chose) to make room for over-S9 reports. "RST" is 26.5px at 16 and 23.1px at 14, and the
+             ~7px freed went into the boxes: 36 -> 39 each. Then the ~7px of air after each box (before
+             the RST R text, before the QTH text) was cut to ~4px and given to the boxes too: 42 each,
+             S at 258-300, R label text from ~303, R at 327-369, QTH label still at 369. In a 42px box
+             bold "+30" fits at size 15 (measured, 27.9 of 28px). -->
+
+        <TextBlock x:Name="L_RstRLabel" HorizontalAlignment="Left" Margin="295,124,0,0" VerticalAlignment="Top" Grid.Row="1" Width="40" TextAlignment="Center" FontSize="14" LineHeight="13" LineStackingStrategy="BlockLineHeight"><Run Text="RST"/><LineBreak/><Run Text="R" FontWeight="Bold"/></TextBlock>
+        <ComboBox x:Name="TB_RSTRcvd" HorizontalAlignment="Left" Height="24" Margin="327,125,0,0" VerticalAlignment="Top" Width="42" Text="59" Grid.Row="1"
                   IsEditable="True" IsTextSearchEnabled="False" StaysOpenOnEdit="True"
                   Template="{StaticResource FlatEditableComboTemplate}"
                   Background="{DynamicResource ControlBg}" Foreground="{DynamicResource TextBrush}" BorderBrush="{DynamicResource InputBorder}" BorderThickness="1"
-                  GotFocus="RST_GotFocus" DropDownClosed="RST_DropDownClosed" DropDownOpened="RST_DropDownOpened" PreviewTextInput="RST_PreviewTextInput" PreviewMouseLeftButtonUp="RST_PreviewMouseLeftButtonUp" FontSize="16" TabIndex="11"/>
+                  GotFocus="RST_GotFocus" DropDownClosed="RST_DropDownClosed" DropDownOpened="RST_DropDownOpened" PreviewTextInput="RST_PreviewTextInput" PreviewMouseLeftButtonUp="RST_PreviewMouseLeftButtonUp" FontSize="16" TabIndex="11" TextBoxBase.TextChanged="RST_TextChanged"/>
         <!-- The DX station's town. Filled from the QRZ.com lookup (its addr2 line is the city) and
              editable, like Name and Country. Hidden in contest mode, where the contest exchange frame
              owns this strip - see ApplyContestExchangeUI. -->

@@ -2252,8 +2252,8 @@ namespace HolyLogger
                 qso.MyLocator = TB_MyLocator.Text;
                 qso.DXLocator = DxLocatorForLog();   // Sukkot: the received Grid Locator
                 ActivityToQso(qso);                 // IOTA / SOTA / POTA / WWFF and the Other pair
-                qso.RST_RCVD = TB_RSTRcvd.Text;
-                qso.RST_SENT = TB_RSTSent.Text;
+                qso.RST_RCVD = RstForLog(TB_RSTRcvd);
+                qso.RST_SENT = RstForLog(TB_RSTSent);
                 DateTime date = TP_Date.Value.Value;
                 qso.Date = date.Year.ToString("D4") + date.Month.ToString("D2") + date.Day.ToString("D2");
                 DateTime time = TP_Time.Value.Value;
@@ -2389,8 +2389,8 @@ namespace HolyLogger
                 // Workshop editor instead.
                 QsoToUpdate.DXLocator = DxLocatorForLog();   // Sukkot: the received Grid Locator
                 ActivityToQso(QsoToUpdate);         // IOTA / SOTA / POTA / WWFF and the Other pair
-                QsoToUpdate.RST_RCVD = TB_RSTRcvd.Text;
-                QsoToUpdate.RST_SENT = TB_RSTSent.Text;
+                QsoToUpdate.RST_RCVD = RstForLog(TB_RSTRcvd);
+                QsoToUpdate.RST_SENT = RstForLog(TB_RSTSent);
                 DateTime date = TP_Date.Value.Value;
                 QsoToUpdate.Date = date.Year.ToString("D4") + date.Month.ToString("D2") + date.Day.ToString("D2");
                 DateTime time = TP_Time.Value.Value;
@@ -4443,7 +4443,7 @@ namespace HolyLogger
         // the reason a message copied from there reads "{SENTRST} {EXCH}" rather than "5NN".
         private string SentRstForMacro()
         {
-            return TB_RSTSent != null ? (TB_RSTSent.Text ?? string.Empty).Trim() : string.Empty;
+            return RstForLog(TB_RSTSent);
         }
 
         // {GRID} - your own square, from My Locator. N1MM takes it from Station Info; here it is the
@@ -9532,9 +9532,14 @@ namespace HolyLogger
                 if (look != null && !ReferenceEquals(box.Template, look)) box.Template = look;
 
                 box.Items.Clear();
-                // Best at the top, worst at the bottom: the strength digit counts down from 9 to 1 while
-                // readability stays 5 - below R5 you are not completing the contact.
-                if (voice) for (int s = 9; s >= 1; s--) box.Items.Add("5" + s);
+                // Best at the top, worst at the bottom: first the over-S9 reports, strongest first, then
+                // the strength digit counting down from 9 to 1 while readability stays 5 - below R5 you
+                // are not completing the contact.
+                if (voice)
+                {
+                    foreach (string over in RstOverS9) box.Items.Add(over);
+                    for (int s = 9; s >= 1; s--) box.Items.Add("5" + s);
+                }
                 box.Text = best;
 
                 TextBox editor = RstEditor(box);
@@ -9641,10 +9646,59 @@ namespace HolyLogger
             }), System.Windows.Threading.DispatcherPriority.Input);
         }
 
+        // OVER-S9 REPORTS. The list offers 59+5 ... 59+30, but the box is 42px wide and "59+30" needs
+        // 45px at size 16, so the box shows only the "+30" part and the log gets the whole "59+30" back
+        // from RstForLog. Even "+30" needs a smaller font, and the user wants it bold: measured in a
+        // 42px box with this template and the left gap cut from 3px to 0, the text has 28px, and bold
+        // "+30" is 27.9px at size 15. The size-16 minimum is waived for these values only, by the
+        // user's explicit choice (2026-11-17); 59 down to 51 stay at 16, normal weight, 3px gap.
+        private static readonly string[] RstOverS9 = { "59+30", "59+20", "59+15", "59+10", "59+5" };
+        private const double RstOverS9FontSize = 15;
+
+        // What an RST box holds as it goes into the log: "+10" in the box is "59+10" in the log.
+        private static string RstForLog(ComboBox box)
+        {
+            string text = box == null ? "" : (box.Text ?? "").Trim();
+            return text.StartsWith("+") ? "59" + text : text;
+        }
+
+        // Fires for both RST boxes. A picked (or loaded) "59+10" is cut down to "+10", and the font
+        // follows what the box holds: small for an over-S9 report, the usual 16 for anything else.
+        // The cut is queued, not done here, because the ComboBox is still settling its own Text when
+        // this event is raised.
+        private void RST_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            ComboBox box = sender as ComboBox;
+            if (box == null) return;
+            string text = box.Text ?? "";
+
+            if (text.StartsWith("59+") && text.Length > 3)
+            {
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    if ((box.Text ?? "").StartsWith("59+") && box.Text.Length > 3)
+                    {
+                        box.Text = box.Text.Substring(2);
+                        ClearRstSelection(box);
+                    }
+                }), System.Windows.Threading.DispatcherPriority.Input);
+            }
+
+            TextBox editor = RstEditor(box);
+            if (editor == null) return;
+            bool over = text.StartsWith("+") || text.StartsWith("59+");
+            editor.FontSize = over ? RstOverS9FontSize : 16;
+            editor.FontWeight = over ? FontWeights.Bold : FontWeights.Normal;
+            editor.Padding = new Thickness(over ? 0 : 3, 0, 0, 0);
+        }
+
         private void TB_RSTSent_TextChanged(object sender, TextChangedEventArgs e)
         {
+            RST_TextChanged(sender, e);
             if (SMeter == null) return;
-            if (TB_RSTSent.Text.Length >= 2 && int.TryParse(TB_RSTSent.Text[1].ToString(), out int s))
+            if (TB_RSTSent.Text.StartsWith("+"))
+                SMeter.SetSValue(9);
+            else if (TB_RSTSent.Text.Length >= 2 && int.TryParse(TB_RSTSent.Text[1].ToString(), out int s))
                 SMeter.SetSValue(s);
             else
                 SMeter.SetSValue(0);
@@ -10408,8 +10462,8 @@ namespace HolyLogger
             // My Locator and Holyland Square are not held: the edit does not touch those boxes, so
             // there is nothing to put back when it ends.
             QsoPreUpdate.DXLocator = TB_DXLocator.Text;
-            QsoPreUpdate.RST_RCVD = TB_RSTRcvd.Text;
-            QsoPreUpdate.RST_SENT = TB_RSTSent.Text;
+            QsoPreUpdate.RST_RCVD = RstForLog(TB_RSTRcvd);
+            QsoPreUpdate.RST_SENT = RstForLog(TB_RSTSent);
             QsoPreUpdate.Name = TB_DX_Name.Text;
             QsoPreUpdate.Mode = CB_Mode.Text;
         }
