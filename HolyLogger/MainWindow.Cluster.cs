@@ -523,6 +523,9 @@ namespace HolyLogger
             GenerateNewClusterWindow();
         }
 
+        // The cluster window is a plain Window built in code, so App.MayMinimise knows it by this name.
+        internal const string ClusterWindowName = "HolyLoggerClusterWindow";
+
         private async void GenerateNewClusterWindow()
         {
             Log.Warn("STARTUP " + Log.SinceLaunch() + "  cluster window: building");
@@ -662,9 +665,15 @@ namespace HolyLogger
                 Top = Properties.Settings.Default.ClusterWindowTop,
                 Content = clusterFrame
             };
-            // NO OWNER, OWN TASKBAR BUTTON. App.RemoveMinimiseFromTaskbarlessWindows switches minimise
-            // off for any owned window (Windows gives it no button, so it would just vanish), which is
-            // why this window's minimise did nothing. Unowned + ShowInTaskbar keeps it minimisable.
+            // OWNED BY THE MAIN WINDOW, AND ITS OWN TASKBAR BUTTON - the same pair as the Radio Control
+            // Panel. Owned, Windows never lets it go behind the log. Unowned it could, and after a new
+            // install - when it can open somewhere other than where it was left - users found it
+            // buried behind the main window and thought it was missing (2026-11-17). An owned window
+            // with ShowInTaskbar still gets its own button, so App.MayMinimise lets it keep its
+            // minimise (it names this window, by ClusterWindowName, as it names the panel).
+            // It goes down with the main window when that is minimised, as the panel does.
+            clusterWindow.Name = ClusterWindowName;
+            try { clusterWindow.Owner = this; } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
             clusterWindow.ShowInTaskbar = true;
             // Resource reference, not a brush snapshot, so the body follows live scheme switches.
             clusterWindow.SetResourceReference(Window.BackgroundProperty, "WindowBg");

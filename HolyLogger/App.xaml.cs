@@ -112,8 +112,11 @@ namespace HolyLogger
         // The Radio Control Panel is owned by the main window but asks for its own taskbar button
         // (ShowInTaskbar="True"), and it does get one: a throwaway owned window set the same way showed
         // its own taskbar button when minimised (tested 2026-10-01). So it keeps its minimise button.
+        // The cluster window is set up the same way since 2026-11-17 (owned, so it never hides behind
+        // the main window) and keeps its minimise button for the same reason.
         private static bool MayMinimise(Window w)
-            => w.ShowInTaskbar && (w.Owner == null || w is RadioControlPanelWindow);
+            => w.ShowInTaskbar && (w.Owner == null || w is RadioControlPanelWindow
+                                   || w.Name == global::HolyLogger.MainWindow.ClusterWindowName);
 
         private static void RemoveMinimiseFromTaskbarlessWindows()
         {
