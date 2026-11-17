@@ -201,6 +201,7 @@ These do not move with the profile:
 - **Your log.** To have the same log on both computers, use Google Drive Sync.
 - **Google Drive Sync.** Sign in again on the other computer.
 - **Your LoTW certificate.** It is kept by TQSL, not by HolyLogger. Use TQSL's own backup to move it.
+- **Your radio's setup in OmniRig.** OmniRig keeps the radio model and the COM port, not HolyLogger. On the other computer, install OmniRig (**Links > Omni-Rig web page**), then open it with **Tools > Open OmniRig** and choose your radio and its COM port.
 
 ## Working with no profile
 
