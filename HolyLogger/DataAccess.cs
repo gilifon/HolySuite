@@ -3162,11 +3162,32 @@ Environment.NewLine +
                     df.Parameters.Add(new SQLiteParameter(null, id));
                     df.ExecuteNonQuery();
                 }
+                long seqBefore = 0;
+                try
+                {
+                    using (var cmd = new SQLiteCommand("SELECT ifnull(max(seq), 0) FROM sync_journal", con))
+                        seqBefore = Convert.ToInt64(cmd.ExecuteScalar());
+                }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
                 using (var dq = new SQLiteCommand("DELETE FROM qso WHERE log_id = ?", con))
                 {
                     dq.Parameters.Add(new SQLiteParameter(null, id));
                     dq.ExecuteNonQuery();
                 }
+                // ONE DIARY LINE FOR THE WHOLE LOG (2026-11-17). Deleting his unused logs wrote a line for
+                // each of their 108,644 QSOs, and the diary - sent whole to Google Drive after every
+                // change - grew to 28 MB. The other computers delete a log's QSOs with the log anyway
+                // (ApplySyncLines -> DeleteLogRows), so the QSOs' own notes are taken out again; _dbLock
+                // is held, so the diary writer cannot have read them meanwhile.
+                try
+                {
+                    using (var cmd = new SQLiteCommand("DELETE FROM sync_journal WHERE seq > @s AND kind = 'qso' AND op = 'del'", con))
+                    {
+                        cmd.Parameters.AddWithValue("@s", seqBefore);
+                        cmd.ExecuteNonQuery();
+                    }
+                }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
                 using (var dl = new SQLiteCommand("DELETE FROM logs WHERE Id = ?", con))
                 {
                     dl.Parameters.Add(new SQLiteParameter(null, id));
@@ -3712,6 +3733,29 @@ Environment.NewLine +
                     "[at_utc] nvarchar(30) NOT NULL) WITHOUT ROWID", con))
                     cmd.ExecuteNonQuery();
 
+                // Lines of other computers' diaries that could not be made yet - a QSO whose log is not on
+                // this computer - kept as they were written, and tried again at every read (SyncDiary.Pull).
+                using (var cmd = new SQLiteCommand(
+                    "CREATE TABLE IF NOT EXISTS [sync_waiting] (" +
+                    "[seq] INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                    "[diary] nvarchar(80) NOT NULL, " +
+                    "[line] TEXT NOT NULL)", con))
+                    cmd.ExecuteNonQuery();
+
+                // Another computer's id for a row here, when the two were joined as one (same log name,
+                // same QSO by the duplicate rule - ApplySyncLines). Gone with the row.
+                using (var cmd = new SQLiteCommand(
+                    "CREATE TABLE IF NOT EXISTS [sync_alias] (" +
+                    "[sync_id] nvarchar(36) PRIMARY KEY NOT NULL, " +
+                    "[kind] nvarchar(10) NOT NULL, " +
+                    "[row_id] INTEGER NOT NULL) WITHOUT ROWID", con))
+                    cmd.ExecuteNonQuery();
+                foreach (string t in SyncTables)
+                    using (var cmd = new SQLiteCommand(
+                        "CREATE TRIGGER IF NOT EXISTS trg_" + t + "_alias_del AFTER DELETE ON " + t +
+                        " BEGIN DELETE FROM sync_alias WHERE kind = '" + t + "' AND row_id = OLD.Id; END", con))
+                        cmd.ExecuteNonQuery();
+
                 // Times stored by the first build of step 4 in the wrong form ("11/11/2026 20:41:18", see
                 // SyncDiary.Pull) are thrown away, and every other computer's diary is read again from the
                 // start - a change judged "older" because of them comes in this time. Reading a line twice
@@ -3900,6 +3944,78 @@ Environment.NewLine +
             }
         }
 
+        // ALL rows of a table, a piece at a time (Id above afterId), as notes for SyncDiary.MakeDump. Each
+        // carries the last change known for the row, or 1970 when it was never in a diary - so any real
+        // change made anywhere is newer and wins over this "everything once" line.
+        public const string NeverChanged = "1970-01-01T00:00:00.000Z";
+
+        public List<SyncNote> AllRowsAsNotes(string table, long afterId, int max)
+        {
+            var list = new List<SyncNote>();
+            string kind = table == "qso" ? "qso" : "log";
+            lock (_dbLock)
+            {
+                if (con == null || con.State != ConnectionState.Open) return list;
+                using (var cmd = new SQLiteCommand(
+                    "SELECT t.Id, t.sync_id, ifnull(r.at_utc, @never) FROM " + table + " t LEFT JOIN sync_row_at r ON r.sync_id = t.sync_id " +
+                    "WHERE t.Id > @a ORDER BY t.Id LIMIT " + max, con))
+                {
+                    cmd.Parameters.AddWithValue("@never", NeverChanged);
+                    cmd.Parameters.AddWithValue("@a", afterId);
+                    using (var rdr = cmd.ExecuteReader())
+                        while (rdr.Read())
+                            list.Add(new SyncNote
+                            {
+                                RowId = rdr.GetInt64(0), Kind = kind, Op = "put",
+                                SyncId = rdr.IsDBNull(1) ? null : rdr.GetString(1), AtUtc = rdr.GetString(2)
+                            });
+                }
+            }
+            return list;
+        }
+
+        // The waiting lines of one diary (see sync_waiting), oldest first.
+        public List<string> ReadWaitingSyncLines(string diary)
+        {
+            var list = new List<string>();
+            lock (_dbLock)
+            {
+                if (con == null || con.State != ConnectionState.Open) return list;
+                using (var cmd = new SQLiteCommand("SELECT line FROM sync_waiting WHERE diary = @d ORDER BY seq", con))
+                {
+                    cmd.Parameters.AddWithValue("@d", diary);
+                    using (var rdr = cmd.ExecuteReader())
+                        while (rdr.Read()) list.Add(rdr.GetString(0));
+                }
+            }
+            return list;
+        }
+
+        // Puts these lines in place of the diary's waiting lines.
+        public void SetWaitingSyncLines(string diary, IEnumerable<string> lines)
+        {
+            lock (_dbLock)
+            {
+                if (con == null || con.State != ConnectionState.Open) return;
+                using (var tx = con.BeginTransaction())
+                {
+                    using (var cmd = new SQLiteCommand("DELETE FROM sync_waiting WHERE diary = @d", con, tx))
+                    {
+                        cmd.Parameters.AddWithValue("@d", diary);
+                        cmd.ExecuteNonQuery();
+                    }
+                    foreach (string l in lines)
+                        using (var cmd = new SQLiteCommand("INSERT INTO sync_waiting (diary, line) VALUES (@d, @l)", con, tx))
+                        {
+                            cmd.Parameters.AddWithValue("@d", diary);
+                            cmd.Parameters.AddWithValue("@l", l);
+                            cmd.ExecuteNonQuery();
+                        }
+                    tx.Commit();
+                }
+            }
+        }
+
         public long CountAllQsos()
         {
             lock (_dbLock)
@@ -3917,12 +4033,16 @@ Environment.NewLine +
         {
             public string At, What, Op, Id;
             public Dictionary<string, object> Fields;
+            public string Raw;   // the line as it was in the diary, kept if it has to wait (NoLog)
         }
 
         public sealed class SyncApplyResult
         {
             public int Applied, Older, Skipped;
             public bool ActiveLogTouched;
+            // QSOs whose log is not on this computer (yet): kept and tried again at every read, never
+            // thrown away (2026-11-17, a friend's laptop lost 598 QSOs this way). Counted in Skipped too.
+            public List<SyncLine> NoLog = new List<SyncLine>();
         }
 
         // Makes the changes in these lines in this database, in one transaction.
@@ -3939,7 +4059,19 @@ Environment.NewLine +
         // Logs first (a QSO names its log), deleted logs last. Two different logs may not share a name in
         // one database, so a log arriving with a name a different log has here is given the other
         // computer's name after it. The log open here is never deleted from under the operator.
-        public SyncApplyResult ApplySyncLines(IList<SyncLine> lines, string fromMachine)
+        //
+        // JOINED, NOT DOUBLED (2026-11-17, his rule). Two computers that had logs before sync began each
+        // send all of them once (SyncDiary.MakeDump), so the same log or QSO can arrive under another
+        // computer's id. A log with the name of a log here IS that log; a QSO that the duplicate rule
+        // (MatchKey: call, date, band, mode, minute) finds in the same log here IS that QSO. The other
+        // computer's id is then kept in sync_alias as a second name for the row here, so its later
+        // changes and deletes find it. Each row here can be the match for one QSO only.
+        //
+        // A TIE - the same time on both sides, as two of these "everything once" lines carry when the
+        // row was not changed since - is settled the same way on both computers, so they end up
+        // identical: a field empty on one side takes the other's value, and where both have a value
+        // the computer whose diary name sorts first wins (theyWinTies = the line's computer is that one).
+        public SyncApplyResult ApplySyncLines(IList<SyncLine> lines, string fromMachine, bool theyWinTies = false)
         {
             var r = new SyncApplyResult();
             if (lines == null || lines.Count == 0) return r;
@@ -3968,8 +4100,17 @@ Environment.NewLine +
                             if (table == null) { r.Skipped++; continue; }
 
                             long? localId = LocalIdOfSync(table, l.Id, tx);
-                            string localAt = LocalSyncTime(l.What, l.Id, localId, seqBefore, tx);
-                            if (localAt != null && string.CompareOrdinal(l.At, localAt) <= 0) { r.Older++; continue; }
+                            if (!localId.HasValue && l.Op == "put" && l.Fields != null)
+                            {
+                                localId = table == "logs" ? SameNamedLog(l.Fields, tx) : SameQsoHere(l.Fields, tx);
+                                if (localId.HasValue) AddSyncAlias(l.Id, table, localId.Value, tx);
+                            }
+                            // a row joined with one here keeps the times of the row here
+                            string timeId = localId.HasValue ? (SyncIdOfRow(table, localId.Value, tx) ?? l.Id) : l.Id;
+                            string localAt = LocalSyncTime(l.What, timeId, localId, seqBefore, tx);
+                            int newer = localAt == null ? 1 : string.CompareOrdinal(l.At, localAt);
+                            bool tie = newer == 0 && l.Op == "put" && localId.HasValue;
+                            if (newer < 0 || (newer == 0 && !tie)) { r.Older++; continue; }
 
                             if (l.Op == "del")
                             {
@@ -3992,7 +4133,7 @@ Environment.NewLine +
                                         Exec("DELETE FROM qso WHERE Id = @id", tx, localId.Value);
                                     }
                                 }
-                                NoteSyncTime(l.Id, l.At, tx);
+                                NoteSyncTime(timeId, l.At, tx);
                                 r.Applied++;
                                 continue;
                             }
@@ -4023,13 +4164,33 @@ Environment.NewLine +
                             }
                             if (values == null)
                             {
-                                Log.Warn("Sync: a QSO from " + fromMachine + " names a log that is not here; skipped.");
+                                r.NoLog.Add(l);   // its log is not here yet: it waits (SyncDiary.Pull)
                                 r.Skipped++;
                                 continue;
                             }
 
                             if (table == "logs" && values.TryGetValue("name", out object nm))
-                                values["name"] = FreeLogName(Convert.ToString(nm), l.Id, fromMachine, tx);
+                                values["name"] = FreeLogName(Convert.ToString(nm), timeId, fromMachine, tx);
+
+                            if (tie)
+                            {
+                                // the same time on both sides: settled field by field, the same way on both computers
+                                Dictionary<string, object> mineNow = RowValues(table, localId.Value, tx);
+                                bool differs = false;
+                                foreach (string k in values.Keys.ToList())
+                                {
+                                    if (k == "log_id" || k == "source_qso_id" || k == "copy_target_log_id") { values.Remove(k); continue; }
+                                    mineNow.TryGetValue(k, out object have);
+                                    object got = values[k];
+                                    object pick = theyWinTies ? (IsEmptySyncValue(got) ? have : got) : (IsEmptySyncValue(have) ? got : have);
+                                    if (!SameSyncValue(pick, have)) differs = true;
+                                    values[k] = pick ?? DBNull.Value;
+                                }
+                                // a joined log keeps the copy target it has here
+                                if (table == "logs" && copyTargets.Count > 0 && copyTargets[copyTargets.Count - 1].Key == -1)
+                                    copyTargets.RemoveAt(copyTargets.Count - 1);
+                                if (!differs) { r.Older++; continue; }
+                            }
 
                             long rowId;
                             if (localId.HasValue)
@@ -4058,10 +4219,10 @@ Environment.NewLine +
                                     rowId = Convert.ToInt64(cmd.ExecuteScalar());
                                 }
                             }
-                            if (table == "qso" && Convert.ToInt64(values["log_id"]) == ActiveLogId) r.ActiveLogTouched = true;
+                            if (table == "qso" && values.TryGetValue("log_id", out object lidNow) && Convert.ToInt64(lidNow) == ActiveLogId) r.ActiveLogTouched = true;
                             if (table == "logs" && copyTargets.Count > 0 && copyTargets[copyTargets.Count - 1].Key == -1)
                                 copyTargets[copyTargets.Count - 1] = new KeyValuePair<long, string>(rowId, copyTargets[copyTargets.Count - 1].Value);
-                            NoteSyncTime(l.Id, l.At, tx);
+                            NoteSyncTime(timeId, l.At, tx);
                             r.Applied++;
                         }
                         catch (Exception ex)
@@ -4124,6 +4285,7 @@ Environment.NewLine +
             return cols;
         }
 
+        // The row here with this sync id - its own, or another computer's id for it (sync_alias).
         private long? LocalIdOfSync(string table, string syncId, SQLiteTransaction tx)
         {
             if (string.IsNullOrEmpty(syncId)) return null;
@@ -4131,8 +4293,103 @@ Environment.NewLine +
             {
                 cmd.Parameters.AddWithValue("@s", syncId);
                 object o = cmd.ExecuteScalar();
+                if (o != null && o != DBNull.Value) return Convert.ToInt64(o);
+            }
+            using (var cmd = new SQLiteCommand(
+                "SELECT a.row_id FROM sync_alias a JOIN " + table + " t ON t.Id = a.row_id WHERE a.sync_id = @s AND a.kind = @k", con, tx))
+            {
+                cmd.Parameters.AddWithValue("@s", syncId);
+                cmd.Parameters.AddWithValue("@k", table);
+                object o = cmd.ExecuteScalar();
                 return o == null || o == DBNull.Value ? (long?)null : Convert.ToInt64(o);
             }
+        }
+
+        private string SyncIdOfRow(string table, long id, SQLiteTransaction tx)
+        {
+            using (var cmd = new SQLiteCommand("SELECT sync_id FROM " + table + " WHERE Id = @i", con, tx))
+            {
+                cmd.Parameters.AddWithValue("@i", id);
+                object o = cmd.ExecuteScalar();
+                return o == null || o == DBNull.Value ? null : o.ToString();
+            }
+        }
+
+        private void AddSyncAlias(string syncId, string table, long rowId, SQLiteTransaction tx)
+        {
+            using (var cmd = new SQLiteCommand("INSERT OR REPLACE INTO sync_alias (sync_id, kind, row_id) VALUES (@s, @k, @r)", con, tx))
+            {
+                cmd.Parameters.AddWithValue("@s", syncId);
+                cmd.Parameters.AddWithValue("@k", table);
+                cmd.Parameters.AddWithValue("@r", rowId);
+                cmd.ExecuteNonQuery();
+            }
+        }
+
+        // A log here with the name the arriving log has: the same log (see ApplySyncLines).
+        private long? SameNamedLog(Dictionary<string, object> fields, SQLiteTransaction tx)
+        {
+            if (!fields.TryGetValue("name", out object n) || n == null) return null;
+            string name = Convert.ToString(n).Trim();
+            if (name.Length == 0) return null;
+            using (var cmd = new SQLiteCommand("SELECT Id FROM logs WHERE trim(name) = @n COLLATE NOCASE ORDER BY Id LIMIT 1", con, tx))
+            {
+                cmd.Parameters.AddWithValue("@n", name);
+                object o = cmd.ExecuteScalar();
+                return o == null || o == DBNull.Value ? (long?)null : Convert.ToInt64(o);
+            }
+        }
+
+        // A QSO in the same log here that the duplicate rule calls the same as the arriving one, and that
+        // is not already the match for another computer's QSO; null if none.
+        private long? SameQsoHere(Dictionary<string, object> fields, SQLiteTransaction tx)
+        {
+            long? lid = fields.TryGetValue("log", out object ls) ? LocalIdOfSync("logs", Convert.ToString(ls), tx) : null;
+            if (!lid.HasValue) return null;
+            Func<string, string> F = k => fields.TryGetValue(k, out object v) && v != null ? Convert.ToString(v) : "";
+            string want = MatchKey(new QSO { DXCall = F("dx_callsign"), Date = F("date"), Time = F("time"), Band = F("band"), Mode = F("mode") });
+            if (want == null) return null;
+            using (var cmd = new SQLiteCommand(
+                "SELECT Id, dx_callsign, date, time, band, mode FROM qso WHERE log_id = @l AND trim(dx_callsign) = @c COLLATE NOCASE " +
+                "AND Id NOT IN (SELECT row_id FROM sync_alias WHERE kind = 'qso') ORDER BY Id", con, tx))
+            {
+                cmd.Parameters.AddWithValue("@l", lid.Value);
+                cmd.Parameters.AddWithValue("@c", F("dx_callsign").Trim());
+                using (var rdr = cmd.ExecuteReader())
+                    while (rdr.Read())
+                    {
+                        Func<int, string> T = i => rdr.IsDBNull(i) ? "" : Convert.ToString(rdr.GetValue(i));
+                        var q = new QSO { DXCall = T(1), Date = T(2), Time = T(3), Band = T(4), Mode = T(5) };
+                        if (MatchKey(q) == want) return rdr.GetInt64(0);
+                    }
+            }
+            return null;
+        }
+
+        private Dictionary<string, object> RowValues(string table, long id, SQLiteTransaction tx)
+        {
+            var d = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+            using (var cmd = new SQLiteCommand("SELECT * FROM " + table + " WHERE Id = @i", con, tx))
+            {
+                cmd.Parameters.AddWithValue("@i", id);
+                using (var rdr = cmd.ExecuteReader())
+                    if (rdr.Read())
+                        for (int i = 0; i < rdr.FieldCount; i++) d[rdr.GetName(i)] = rdr.IsDBNull(i) ? null : rdr.GetValue(i);
+            }
+            return d;
+        }
+
+        private static bool IsEmptySyncValue(object v)
+        {
+            return v == null || v == DBNull.Value || (v is string s && s.Trim().Length == 0);
+        }
+
+        private static bool SameSyncValue(object a, object b)
+        {
+            if (IsEmptySyncValue(a) && IsEmptySyncValue(b)) return true;
+            if (IsEmptySyncValue(a) || IsEmptySyncValue(b)) return false;
+            return Convert.ToString(a, System.Globalization.CultureInfo.InvariantCulture)
+                == Convert.ToString(b, System.Globalization.CultureInfo.InvariantCulture);
         }
 
         private long LogIdOfQso(long qsoId, SQLiteTransaction tx)
