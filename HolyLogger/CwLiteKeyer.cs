@@ -78,6 +78,16 @@ namespace HolyLogger
         private readonly Border _wpmBox;
         private readonly Border _wpmNumberBox;
         private readonly Border _frame;
+
+        // The typing box's frame, so the main window can line its right edge up with F8 below it.
+        internal FrameworkElement TypingFrame { get { return _frame; } }
+
+        // FROM THE STRIP'S LEFT EDGE TO THE FRAME'S RIGHT EDGE, before the strip exists: the key icon's
+        // margin 10 and width 18, the frame's margin 4, its border 2 + 2, padding 5 + 5 and the box's 190.
+        // The main window places CQ / ANS with it while the program is still loading, so nothing jumps
+        // when the strip arrives. Change any of those numbers below and change this with them.
+        internal const double LeftToFrameRight = 10 + 18 + 4 + 2 + 2 + 5 + 5 + 190;
+
         private readonly DispatcherTimer _pump;
 
         // How far ahead of the radio the text is handed over, so the keying never runs dry between

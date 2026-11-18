@@ -857,6 +857,15 @@
     <Setting Name="VoiceMsgLabelsJson" Type="System.String" Scope="User">
       <Value Profile="(Default)" />
     </Setting>
+    <Setting Name="CwMsgAnswerSet" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">False</Value>
+    </Setting>
+    <Setting Name="CwMsgAnsTextsJson" Type="System.String" Scope="User">
+      <Value Profile="(Default)" />
+    </Setting>
+    <Setting Name="CwMsgAnsLabelsJson" Type="System.String" Scope="User">
+      <Value Profile="(Default)" />
+    </Setting>
     <Setting Name="CwKeyerButtonsOffJson" Type="System.String" Scope="User">
       <Value Profile="(Default)" />
     </Setting>

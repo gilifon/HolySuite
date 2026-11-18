@@ -86,6 +86,12 @@ namespace HolyLogger
             // take quite different room in the two.
             public double FaceFontSize;
             public string FaceFontFamily;
+
+            // THE MAIN WINDOW'S FOUR WRITE IN BOLD, and have the key's width less 10 to write in (its
+            // 1 + 1 border and 4 + 4 margin). Measured in normal weight against width less 8, "My call"
+            // was let through and then cut off on the key (his screenshot, 2026-11-18).
+            public bool FaceBold;
+            public double FaceRoom;
         }
 
         // Aborts whatever the radio is keying.
@@ -2224,6 +2230,15 @@ namespace HolyLogger
                             if (IsShippedMsgText(b + 1)) labels[b] = StandardMsgLabels[b];
                     }
 
+                    // THE ANSWER SET, BY THE SAME RULE: its standard name only over its standard text.
+                    else if (settingName == AnsMsgLabelsSetting)
+                    {
+                        string[] texts = LoadAnsMsgTexts();
+                        for (int b = 0; b < count && b < StandardAnsMsgLabels.Length; b++)
+                            if (string.Equals(texts[b].Trim(), StandardAnsMsgTexts[b], StringComparison.OrdinalIgnoreCase))
+                                labels[b] = StandardAnsMsgLabels[b];
+                    }
+
                     // Voice needs no such test. What a voice button plays is the radio's own memory of
                     // that number, whatever the operator recorded into it, so naming it after that
                     // memory is true on every radio and cannot go stale.
@@ -2273,15 +2288,94 @@ namespace HolyLogger
         // installation and never over a name the operator has saved. They are the operator's own words
         // for the four texts CwMsgText1..4 ship with: the CQ, what he sends back, the TU, and his call.
         //
-        // ALL FOUR ARE MEASURED, not judged by eye. These keycaps are 44 wide and write at 11 in the
-        // system font, which leaves 36 for the word; the longest of these, Mycall, takes 31.2 - a shade
-        // wider than the "Msg1" the XAML has always printed on the same face at 27.0. Anything longer
-        // wants measuring the same way before it goes here.
+        // ALL FOUR ARE MEASURED, not judged by eye. These keycaps are 48 wide (44 until 2026-11-18) and
+        // write BOLD at 11 in the system font, which leaves 38 for the word; the longest of these, Mycall,
+        // takes 33.8 bold ("My call" 36.9). Anything longer wants measuring the same way before it goes here.
         internal static readonly string[] StandardMsgLabels = { "CQ", "DE", "TU", "Mycall" };
 
         // Voice keeps the name these four buttons have always worn - it is what the keycaps said before
         // any of them could be named at all, and it fits: the XAML shipped "Msg1" on a 44-wide face.
         internal static readonly string[] StandardVoiceMsgLabels = { "Msg1", "Msg2", "Msg3", "Msg4" };
+
+        // -- THE FOUR MSG BUTTONS HAVE TWO SETS IN CW (his request, 2026-11-18) -----------------
+        //
+        // One for when he calls CQ (CwMsgText1..4 and CwMsgLabelsJson - the set that was always
+        // there) and one for when he has found somebody else calling CQ and answers him. The CQ / ANS
+        // button on the top bar says which set the four send. Only CW: voice plays the radio's own
+        // memories and RTTY has texts of its own.
+        //
+        // In the Answer set button 1 is NOT the CQ, so the QRL? question never takes it over.
+        internal const string AnsMsgLabelsSetting = "CwMsgAnsLabelsJson";
+
+        internal static readonly string[] StandardAnsMsgTexts =
+        {
+            "{CALL} DE {MYCALL} {MYCALL} K",
+            "{CALL} DE {MYCALL} R TNX UR {SENTRST} {SENTRST} BK",
+            "TU 73 {CALL} DE {MYCALL} SK {LOG}",
+            "PSE AGN"
+        };
+
+        // Measured like the CQ set's names: each is shorter than "Mycall", which fits the 36 the
+        // keycap leaves at eleven point.
+        internal static readonly string[] StandardAnsMsgLabels = { "Call", "RST", "TU", "AGN" };
+
+        internal static bool MsgAnswerSetOn
+        {
+            get
+            {
+                try { return Properties.Settings.Default.CwMsgAnswerSet; }
+                catch (Exception swallowed) { Log.Swallow(swallowed); return false; }
+            }
+            set
+            {
+                try
+                {
+                    Properties.Settings.Default.CwMsgAnswerSet = value;
+                    Properties.Settings.Default.Save();
+                }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
+            }
+        }
+
+        internal static string MsgLabelsSettingFor(bool answerSet)
+        {
+            return answerSet ? AnsMsgLabelsSetting : MsgLabelsSetting;
+        }
+
+        // The Answer set's four texts. Nothing saved yet means the standard four.
+        internal static string[] LoadAnsMsgTexts()
+        {
+            var texts = new string[4];
+            for (int i = 0; i < 4; i++) texts[i] = StandardAnsMsgTexts[i];
+
+            try
+            {
+                string json = Properties.Settings.Default.CwMsgAnsTextsJson;
+                if (string.IsNullOrWhiteSpace(json)) return texts;
+
+                var saved = JsonConvert.DeserializeObject<string[]>(json);
+                if (saved == null) return texts;
+
+                for (int i = 0; i < 4; i++) texts[i] = i < saved.Length ? (saved[i] ?? string.Empty) : string.Empty;
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+            return texts;
+        }
+
+        internal static void SaveAnsMsgTexts(string[] texts)
+        {
+            var own = new string[4];
+            for (int i = 0; i < 4; i++)
+                own[i] = texts != null && i < texts.Length ? (texts[i] ?? string.Empty).Trim() : string.Empty;
+
+            try
+            {
+                Properties.Settings.Default.CwMsgAnsTextsJson = JsonConvert.SerializeObject(own);
+                Properties.Settings.Default.Save();
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
 
         // Is this Msg button's CW text still the one the program shipped? A keycap name only fits the
         // macro under it, so a standard name goes out only where the standard text is still there.
@@ -2854,7 +2948,7 @@ namespace HolyLogger
         // for its margins and its padding - so this is what is left for the writing on the face.
         internal const double KeycapRoom = 77;
 
-        internal static double TextWidth(string word, string family, double size, Visual dpiFrom)
+        internal static double TextWidth(string word, string family, double size, Visual dpiFrom, bool bold = false)
         {
             if (string.IsNullOrEmpty(word)) return 0;
 
@@ -2862,7 +2956,7 @@ namespace HolyLogger
             {
                 var typeface = new Typeface(
                     string.IsNullOrEmpty(family) ? SystemFonts.MessageFontFamily : new FontFamily(family),
-                    FontStyles.Normal, FontWeights.Normal, FontStretches.Normal);
+                    FontStyles.Normal, bold ? FontWeights.Bold : FontWeights.Normal, FontStretches.Normal);
 
                 return new FormattedText(word, System.Globalization.CultureInfo.CurrentCulture,
                                          FlowDirection.LeftToRight, typeface, size, Brushes.Black,
@@ -2873,7 +2967,8 @@ namespace HolyLogger
 
         // REFUSED, NOT TRIMMED AFTERWARDS. The last thing that fitted is put back and the caret with
         // it, so a letter too many simply does not appear.
-        internal static void HoldToKeycap(TextBox box, double room, string family, double size, Visual dpiFrom)
+        internal static void HoldToKeycap(TextBox box, double room, string family, double size, Visual dpiFrom,
+                                          bool bold = false)
         {
             if (box == null) return;
 
@@ -2884,7 +2979,7 @@ namespace HolyLogger
             {
                 if (restoring) return;
 
-                if (TextWidth(box.Text ?? string.Empty, family, size, dpiFrom) <= room)
+                if (TextWidth(box.Text ?? string.Empty, family, size, dpiFrom, bold) <= room)
                 {
                     lastThatFits = box.Text;
                     return;

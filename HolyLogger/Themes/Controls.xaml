@@ -678,8 +678,8 @@
                                 <ContentPresenter x:Name="Icon" ContentSource="Icon" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                                 <TextBlock x:Name="Check" Text="&#x2713;" FontWeight="Bold" VerticalAlignment="Center" HorizontalAlignment="Center" Visibility="Collapsed" Foreground="{TemplateBinding Foreground}"/>
                             </Grid>
-                            <ContentPresenter Grid.Column="1" ContentSource="Header" RecognizesAccessKey="True" Margin="6,4,8,4" VerticalAlignment="Center"/>
-                            <TextBlock Grid.Column="2" Text="{TemplateBinding InputGestureText}" Margin="8,0,12,0" VerticalAlignment="Center" Opacity="0.65"/>
+                            <ContentPresenter x:Name="HeaderHost" Grid.Column="1" ContentSource="Header" RecognizesAccessKey="True" Margin="6,4,8,4" VerticalAlignment="Center"/>
+                            <TextBlock x:Name="GestureText" Grid.Column="2" Text="{TemplateBinding InputGestureText}" Margin="8,0,12,0" VerticalAlignment="Center" Opacity="0.65"/>
                             <Path x:Name="Arrow" Grid.Column="3" Margin="2,0,8,0" VerticalAlignment="Center" Data="M0,0 L0,7 L4,3.5 Z" Fill="{TemplateBinding Foreground}" Visibility="Collapsed"/>
                             <Popup x:Name="PART_Popup" AllowsTransparency="True" Focusable="False" PopupAnimation="Fade"
                                    IsOpen="{Binding IsSubmenuOpen, RelativeSource={RelativeSource TemplatedParent}}" Placement="Bottom">
@@ -701,11 +701,22 @@
                             <Setter TargetName="Arrow" Property="Visibility" Value="Visible"/>
                             <Setter TargetName="PART_Popup" Property="Placement" Value="Right"/>
                         </Trigger>
+                        <!-- THE TOP BAR'S WORDS SIT CLOSER TOGETHER (his request, 2026-11-18), which gave
+                             the main window's bar room for the CQ / ANS button. MEASURED: each word had
+                             20 empty points after it - the shortcut-text slot below, empty on the bar
+                             but still keeping its 8 + 12 margin - so the lock stood well clear of Help.
+                             The slot is gone from the bar and each word has 8 a side. Only the bar - the
+                             drop-down lists keep their spacing. The main window's is the only menu bar
+                             in the program. -->
                         <Trigger Property="Role" Value="TopLevelItem">
                             <Setter TargetName="IconCol" Property="Visibility" Value="Collapsed"/>
+                            <Setter TargetName="GestureText" Property="Visibility" Value="Collapsed"/>
+                            <Setter TargetName="HeaderHost" Property="Margin" Value="8,4,8,4"/>
                         </Trigger>
                         <Trigger Property="Role" Value="TopLevelHeader">
                             <Setter TargetName="IconCol" Property="Visibility" Value="Collapsed"/>
+                            <Setter TargetName="GestureText" Property="Visibility" Value="Collapsed"/>
+                            <Setter TargetName="HeaderHost" Property="Margin" Value="8,4,8,4"/>
                         </Trigger>
                         <Trigger Property="IsChecked" Value="True">
                             <Setter TargetName="Check" Property="Visibility" Value="Visible"/>

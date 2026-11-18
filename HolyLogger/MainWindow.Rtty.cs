@@ -190,7 +190,9 @@ namespace HolyLogger
                 Label = RttyMsgButtonLabel(messageNumber),
                 BoxWidth = button != null ? button.ActualWidth : 0,
                 FaceFontSize = 11,
-                FaceFontFamily = null
+                FaceFontFamily = null,
+                FaceBold = true,
+                FaceRoom = MsgKeyFaceRoom(messageNumber)
             };
             string updated = ShowCwTextEditDialog("Edit RTTY Text " + messageNumber + " (F" + (messageNumber + 4) + ")",
                                                   GetRttyMessageText(messageNumber), name);

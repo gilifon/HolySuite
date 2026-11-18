@@ -3424,6 +3424,42 @@ namespace HolyLogger.Properties {
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool CwMsgAnswerSet {
+            get {
+                return ((bool)(this["CwMsgAnswerSet"]));
+            }
+            set {
+                this["CwMsgAnswerSet"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string CwMsgAnsTextsJson {
+            get {
+                return ((string)(this["CwMsgAnsTextsJson"]));
+            }
+            set {
+                this["CwMsgAnsTextsJson"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string CwMsgAnsLabelsJson {
+            get {
+                return ((string)(this["CwMsgAnsLabelsJson"]));
+            }
+            set {
+                this["CwMsgAnsLabelsJson"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("")]
         public string CwKeyerButtonsOffJson {
             get {
