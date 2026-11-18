@@ -482,6 +482,44 @@ namespace HolyLogger
             }
         }
 
+        // Every db_state value whose key starts with `prefix`, for the support mail's sync section.
+        public List<KeyValuePair<string, string>> GetDbStatesStartingWith(string prefix)
+        {
+            var list = new List<KeyValuePair<string, string>>();
+            lock (_dbLock)
+            {
+                if (con == null || con.State != System.Data.ConnectionState.Open) return list;
+                try
+                {
+                    using (var cmd = new SQLiteCommand("SELECT key, value FROM db_state WHERE key LIKE @p ORDER BY key", con))
+                    {
+                        cmd.Parameters.AddWithValue("@p", prefix.Replace("_", "\\_") + "%");
+                        cmd.CommandText = "SELECT key, value FROM db_state WHERE key LIKE @p ESCAPE '\\' ORDER BY key";
+                        using (var rdr = cmd.ExecuteReader())
+                            while (rdr.Read())
+                                list.Add(new KeyValuePair<string, string>(rdr.GetString(0), rdr.IsDBNull(1) ? "" : Convert.ToString(rdr.GetValue(1))));
+                    }
+                }
+                catch (Exception ex) { Log.Swallow(ex); }
+            }
+            return list;
+        }
+
+        // How many changes made here are still waiting to be written into this computer's diary.
+        public long SyncJournalCount()
+        {
+            lock (_dbLock)
+            {
+                if (con == null || con.State != System.Data.ConnectionState.Open) return -1;
+                try
+                {
+                    using (var cmd = new SQLiteCommand("SELECT count(*) FROM sync_journal", con))
+                        return Convert.ToInt64(cmd.ExecuteScalar());
+                }
+                catch (Exception ex) { Log.Swallow(ex); return -1; }
+            }
+        }
+
         // The folder holding logDB.db (and the Backups subfolder).
         public string DataFolder => Path.GetDirectoryName(dbPath);
 
