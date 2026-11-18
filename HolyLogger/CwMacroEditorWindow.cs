@@ -46,6 +46,10 @@ namespace HolyLogger
         private readonly TextBox[] _msgLabels = new TextBox[MsgButtons];
         private readonly TextBox[] _msgTexts = new TextBox[MsgButtons];
 
+        // The same four keys' Answer set - see BuildMsgTable.
+        private readonly TextBox[] _ansLabels = new TextBox[MsgButtons];
+        private readonly TextBox[] _ansTexts = new TextBox[MsgButtons];
+
         private TextBox _qrlText;
         private TextBox _qrlMinutes;
 
@@ -461,99 +465,111 @@ namespace HolyLogger
 
         // The keyer's keycaps write at sixteen point in Consolas and hold about this much; the typing
         // stops where they do - see CwKeyboardWindow.HoldToKeycap, which both editors use.
-        // What the main window's four Msg keys have room for: 44 points wide, less their own padding.
-        private const double MsgKeycapRoom = 36;
+        // What the main window's four Msg keys have room for: 48 points wide, less their own border and margin.
+        // 48 wide since 2026-11-18, less 1 + 1 border and 4 + 4 margin - and the names are BOLD there.
+        private const double MsgKeycapRoom = 38;
 
         private void HoldNameToTheKeycap(TextBox box)
         {
             CwKeyboardWindow.HoldToKeycap(box, CwKeyboardWindow.KeycapRoom, "Consolas", 16, this);
         }
 
+        // -- THE FOUR MSG BUTTONS: TWO SETS SIDE BY SIDE (his request, 2026-11-18) ---------------
+        //
+        // The same four keys hold one set for calling CQ and one for answering somebody else's CQ;
+        // the CQ / ANS button on the main window's top bar picks which one they send. Laid out like
+        // the keyer's table above: the key column on the left, then one blue frame per set. The QRL
+        // question belongs to the CQ set and sits under the two frames.
         private UIElement BuildMsgTable()
         {
-            string[] labels = CwKeyboardWindow.ReadLabels(CwKeyboardWindow.MsgLabelsSetting, MsgButtons);
+            string[] cqLabels = CwKeyboardWindow.ReadLabels(CwKeyboardWindow.MsgLabelsSetting, MsgButtons);
+            string[] ansLabels = CwKeyboardWindow.ReadLabels(CwKeyboardWindow.AnsMsgLabelsSetting, MsgButtons);
+            string[] ansTexts = CwKeyboardWindow.LoadAnsMsgTexts();
 
-            var grid = new Grid();
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            var keys = new Grid { Margin = new Thickness(0, FrameContentTop, 0, 0) };
+            keys.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            for (int r = 0; r <= MsgButtons; r++) keys.RowDefinitions.Add(new RowDefinition { Height = new GridLength(RowHeight) });
+            keys.RowDefinitions[0].Height = GridLength.Auto;
+            keys.Children.Add(Heading("Key", 0, 0));
 
-            // THE SAME NAME BOX AS THE TWELVE ABOVE, to the pixel - the keycap's own width, not a
-            // guess. 150 left MyCall sitting in the left third of a box built for a much longer name.
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(NameBoxWidth) });
-
-            // THE SAME MACRO BOX AS THE TWELVE ABOVE, to the pixel. It was a share of the window and
-            // came out a different length from the boxes over it, which said the four take something
-            // longer than the twelve - they do not: the same text goes to the same radio.
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(MacroBoxWidth) });
-
-            for (int r = 0; r <= MsgButtons; r++) grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-
-            grid.Children.Add(Heading("Key", 0, 0));
-            grid.Children.Add(Heading("Button text", 1, 0));
-            grid.Children.Add(Heading("Macro", 2, 0));
+            Grid cqGrid = NewMsgSetGrid();
+            Grid ansGrid = NewMsgSetGrid();
 
             for (int i = 0; i < MsgButtons; i++)
             {
                 int row = i + 1;
-                grid.Children.Add(KeyName("F" + (i + 5), row));
+                keys.Children.Add(KeyName("F" + (i + 5), row));
 
                 string text = string.Empty;
                 try { if (_getMsgText != null) text = _getMsgText(i + 1) ?? string.Empty; }
                 catch (Exception swallowed) { Log.Swallow(swallowed); }
 
-                _msgLabels[i] = Cell(labels[i], 1, row);
+                _msgLabels[i] = Cell(cqLabels[i], 0, row);
+                _msgTexts[i] = Cell(text, 1, row, MacroLength);
+                _ansLabels[i] = Cell(ansLabels[i], 0, row);
+                _ansTexts[i] = Cell(ansTexts[i], 1, row, MacroLength);
 
                 // The four write at eleven point in the system font - see the label TextBlock in the
                 // main window's XAML - so their names are measured against that and not against the
                 // keyer's larger keys.
-                CwKeyboardWindow.HoldToKeycap(_msgLabels[i], MsgKeycapRoom, null, 11, this);
-                _msgTexts[i] = Cell(text, 2, row, MacroLength);
+                CwKeyboardWindow.HoldToKeycap(_msgLabels[i], MsgKeycapRoom, null, 11, this, bold: true);
+                CwKeyboardWindow.HoldToKeycap(_ansLabels[i], MsgKeycapRoom, null, 11, this, bold: true);
 
-                // WHAT THE KEY SAYS TODAY, greyed out behind an empty box. These four have a name of
-                // their own only if he gives them one; with none they fall back to Txt 1 to Txt 4 in CW
-                // and Msg1 to Msg4 in SSB. An empty box beside a button plainly reading "Txt 1" looks
-                // like the editor has lost something, and that is exactly how it was reported.
-                grid.Children.Add(WithPlaceholder(_msgLabels[i], "Txt " + (i + 1)));
-                grid.Children.Add(_msgTexts[i]);
+                // WHAT THE KEY SAYS TODAY, greyed out behind an empty name box.
+                cqGrid.Children.Add(WithPlaceholder(_msgLabels[i], "Txt " + (i + 1)));
+                cqGrid.Children.Add(_msgTexts[i]);
+                ansGrid.Children.Add(WithPlaceholder(_ansLabels[i], "Txt " + (i + 1)));
+                ansGrid.Children.Add(_ansTexts[i]);
             }
 
-            // -- TWO BLOCKS, TWO GRIDS ---------------------------------------------------------
-            //
-            // The QRL question sits beside this table, and it USED TO SIT IN IT - same grid, another
-            // column. That is what put every one of these rows in the wrong place: rows are shared
-            // down a grid, so the QRL title wrapping onto two lines made the header row two lines
-            // tall, and the headers, the four keys and their boxes were all shoved down by the height
-            // of a sentence that has nothing to do with them.
-            //
-            // Side by side in a grid of their own, each block keeps its own rows. The title may wrap
-            // to two lines or ten; the four macro rows never move.
-            var both = new Grid();
-            both.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            both.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(30) });   // gap
-            both.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(QrlWidth) });
+            var sets = new Grid();
+            sets.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });   // key
+            sets.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(6) });
+            sets.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });   // CQ
+            sets.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(12) });
+            sets.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });   // Answer
 
-            grid.VerticalAlignment = VerticalAlignment.Top;
-            Grid.SetColumn(grid, 0);
-            both.Children.Add(grid);
+            Grid.SetColumn(keys, 0);
+            sets.Children.Add(keys);
 
-            var qrl = BuildQrlSection();
-            Grid.SetColumn(qrl, 2);
-            both.Children.Add(qrl);
+            var cqFrame = SetFrame("When you call CQ", cqGrid);
+            Grid.SetColumn(cqFrame, 2);
+            sets.Children.Add(cqFrame);
+
+            var ansFrame = SetFrame("When you answer a CQ", ansGrid);
+            Grid.SetColumn(ansFrame, 4);
+            sets.Children.Add(ansFrame);
 
             var holder = new StackPanel { Margin = new Thickness(0, 24, 0, 0) };
             holder.Children.Add(SectionTitle("The 4 Macro buttons on the main window",
-                "F5 to F8 with the keyer closed. These are for ordinary working and have one text each, "
-                + "not two.",
-                new Thickness(0, 0, 0, 10)));
-            holder.Children.Add(both);
+                "F5 to F8 with the keyer closed. Two sets: the CQ / ANS button on the top bar of the "
+                + "main window picks which one they send.",
+                new Thickness(0, 0, 0, 10),
+                "CQ / ANS"));
+            holder.Children.Add(sets);
+
+            // THE QRL QUESTION, UNDER THE TWO SETS. It sat beside the one set before; the second set
+            // took that room. It is the CQ set's question, so it follows that frame.
+            var qrl = (FrameworkElement)BuildQrlSection();
+            qrl.HorizontalAlignment = HorizontalAlignment.Left;
+            qrl.Margin = new Thickness(0, 20, 0, 0);
+            holder.Children.Add(qrl);
 
             return holder;
         }
 
-        // MEASURED, NOT GUESSED: at this width the QRL sentence wraps onto exactly two lines. WPF's
-        // own TextBlock was asked rather than a character count - it takes three lines under 446
-        // points and sits on one above 846, so 680 is in the middle of the two-line band with room
-        // on either side of it.
-        private const double QrlWidth = 680;
+        private static Grid NewMsgSetGrid()
+        {
+            var grid = new Grid();
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(NameBoxWidth) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(MacroBoxWidth) });
+            for (int r = 0; r <= MsgButtons; r++) grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(RowHeight) });
+            grid.RowDefinitions[0].Height = GridLength.Auto;
+            grid.Children.Add(Heading("Button text", 0, 0));
+            grid.Children.Add(Heading("Macro", 1, 0));
+            return grid;
+        }
+
 
         // THE NINTH TEXT. QRL? is not on any button, but it is a text the radio sends, and a man who
         // has come here to write what he sends should not have to go back to the settings window to
@@ -565,9 +581,10 @@ namespace HolyLogger
         // move a row of the table beside it, and nothing there can move these.
         private UIElement BuildQrlSection()
         {
+            // NO FIXED WIDTH SINCE IT MOVED UNDER THE TWO SETS (2026-11-18): it has the window's whole
+            // width now, and the text box and the minutes sit on one row (his request).
             var block = new StackPanel
             {
-                Width = QrlWidth,
                 VerticalAlignment = VerticalAlignment.Top
             };
 
@@ -601,7 +618,7 @@ namespace HolyLogger
             var row = new StackPanel { Orientation = Orientation.Horizontal };
             row.Children.Add(note);
             row.Children.Add(_qrlText);
-            block.Children.Add(row);
+            block.Children.Add(row);   // the minutes join this same row below
 
             _qrlMinutes = new TextBox
             {
@@ -616,12 +633,12 @@ namespace HolyLogger
             var minutesRow = new StackPanel
             {
                 Orientation = Orientation.Horizontal,
-                Margin = new Thickness(0, 10, 0, 0)
+                Margin = new Thickness(24, 0, 0, 0)
             };
             minutesRow.Children.Add(Words("Also ask after"));
             minutesRow.Children.Add(_qrlMinutes);
             minutesRow.Children.Add(Words("minutes on the same frequency. 0 never asks on time."));
-            block.Children.Add(minutesRow);
+            row.Children.Add(minutesRow);
 
             return block;
         }
@@ -752,6 +769,18 @@ namespace HolyLogger
             // makes it redraw that button's face, and the face reads the name out of the setting - so
             // saving the names afterwards left every one of the four showing the name it had BEFORE the
             // editor was opened, which is exactly what the operator reported.
+            // THE ANSWER SET FIRST: the CQ set's texts below redraw the main window's four faces, and
+            // the faces may be showing this set.
+            var ansLabels = new string[MsgButtons];
+            var ansTexts = new string[MsgButtons];
+            for (int i = 0; i < MsgButtons; i++)
+            {
+                ansLabels[i] = (_ansLabels[i].Text ?? string.Empty).Trim();
+                ansTexts[i] = (_ansTexts[i].Text ?? string.Empty).Trim();
+            }
+            CwKeyboardWindow.SaveLabels(CwKeyboardWindow.AnsMsgLabelsSetting, ansLabels, MsgButtons);
+            CwKeyboardWindow.SaveAnsMsgTexts(ansTexts);
+
             var msgLabels = new string[MsgButtons];
             for (int i = 0; i < MsgButtons; i++)
                 msgLabels[i] = (_msgLabels[i].Text ?? string.Empty).Trim();

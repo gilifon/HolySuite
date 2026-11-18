@@ -1402,7 +1402,6 @@ namespace HolyLogger
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
             Log.Warn("STARTUP " + Log.SinceLaunch() + "  main window: loaded, running its startup work");
-            Dispatcher.BeginInvoke(new Action(AlignLockOverSquareBox), DispatcherPriority.Loaded);
 
             // A WATCH ON THE THREAD THAT DRAWS THE WINDOW.
             //
@@ -3376,12 +3375,16 @@ namespace HolyLogger
                 // The keycap's own writing - see the label TextBlock in the XAML. Eleven point in the
                 // system font, which holds half again as many letters as the editor's sixteen would.
                 FaceFontSize = 11,
-                FaceFontFamily = null
+                FaceFontFamily = null,
+                FaceBold = true,
+                FaceRoom = MsgKeyFaceRoom(messageNumber)
             };
 
-            string updated = messageNumber == 1
+            bool answerSet = CwKeyboardWindow.MsgAnswerSetOn;
+            string updated = messageNumber == 1 && !answerSet
                            ? EditCqMessageText(name)
-                           : ShowCwTextEditDialog("Edit CW Text " + messageNumber + " (F" + (messageNumber + 4) + ")",
+                           : ShowCwTextEditDialog("Edit CW Text " + messageNumber + " (F" + (messageNumber + 4) + ")"
+                                                  + (answerSet ? " - Answer set" : " - CQ set"),
                                                   GetCwMessageText(messageNumber), name);
             if (updated == null) return;
 
@@ -3407,7 +3410,9 @@ namespace HolyLogger
 
                 // Same face the keycap itself wears - see ShowCwMessageEditDialog above.
                 FaceFontSize = 11,
-                FaceFontFamily = null
+                FaceFontFamily = null,
+                FaceBold = true,
+                FaceRoom = MsgKeyFaceRoom(messageNumber)
             };
 
             Border face = KeycapNameBox(name, out TextBox nameBox);
@@ -3591,6 +3596,15 @@ namespace HolyLogger
         // A BOX THAT LOOKS LIKE THE KEYCAP IT NAMES, and stops the typing where the keycap's own face
         // runs out. Built twice now - once for the button's ordinary name, once for the name it wears
         // while it is asking QRL? - so it is built in one place.
+        // What one of the four Msg keys has to write its name in: its width, less its 1 + 1 border and
+        // the 4 + 4 margin round the writing (MsgButton*Style). 38 at the 48 they are now.
+        private double MsgKeyFaceRoom(int messageNumber)
+        {
+            var button = GetMessageButton(messageNumber);
+            double width = button != null && button.ActualWidth > 0 ? button.ActualWidth : 48;
+            return width - 10;
+        }
+
         private Border KeycapNameBox(CwKeyboardWindow.ButtonName name, out TextBox box)
         {
             double boxWidth = name.BoxWidth > 0 ? name.BoxWidth : 60;
@@ -3601,8 +3615,9 @@ namespace HolyLogger
                            ? SystemFonts.MessageFontFamily
                            : new System.Windows.Media.FontFamily(name.FaceFontFamily);
 
-            double faceRoom = boxWidth - 8;
+            double faceRoom = name.FaceRoom > 0 ? name.FaceRoom : boxWidth - 8;
             if (faceRoom < 20) faceRoom = 20;
+            bool faceBold = name.FaceBold;
 
             var idBox = new TextBox
             {
@@ -3630,7 +3645,7 @@ namespace HolyLogger
             {
                 if (restoring) return;
 
-                if (MeasuredWidth(idBox.Text ?? string.Empty, faceFamily, faceSize) <= faceRoom)
+                if (MeasuredWidth(idBox.Text ?? string.Empty, faceFamily, faceSize, faceBold) <= faceRoom)
                 {
                     lastThatFits = idBox.Text;
                     return;
@@ -3663,14 +3678,14 @@ namespace HolyLogger
         // How wide a word really is in a given font, asked of WPF rather than guessed at from a
         // character count. Bold is not asked for: the keycaps are not bold, and a measurement taken in
         // a heavier face would refuse names that fit.
-        private double MeasuredWidth(string word, System.Windows.Media.FontFamily family, double size)
+        private double MeasuredWidth(string word, System.Windows.Media.FontFamily family, double size, bool bold = false)
         {
             if (string.IsNullOrEmpty(word)) return 0;
 
             try
             {
                 var typeface = new System.Windows.Media.Typeface(
-                    family ?? SystemFonts.MessageFontFamily, FontStyles.Normal, FontWeights.Normal,
+                    family ?? SystemFonts.MessageFontFamily, FontStyles.Normal, bold ? FontWeights.Bold : FontWeights.Normal,
                     FontStretches.Normal);
 
                 return new System.Windows.Media.FormattedText(
@@ -4697,8 +4712,25 @@ namespace HolyLogger
             RefreshEsmHint();
         }
 
+        // THE SET THE FOUR BUTTONS ARE ON NOW - CQ or Answer, see CwKeyboardWindow.MsgAnswerSetOn.
         private string GetCwMessageText(int messageNumber)
         {
+            return GetCwMessageTextIn(CwKeyboardWindow.MsgAnswerSetOn, messageNumber);
+        }
+
+        private void SetCwMessageText(int messageNumber, string text)
+        {
+            SetCwMessageTextIn(CwKeyboardWindow.MsgAnswerSetOn, messageNumber, text);
+        }
+
+        private string GetCwMessageTextIn(bool answerSet, int messageNumber)
+        {
+            if (answerSet)
+            {
+                string[] texts = CwKeyboardWindow.LoadAnsMsgTexts();
+                return messageNumber >= 1 && messageNumber <= 4 ? texts[messageNumber - 1] : string.Empty;
+            }
+
             switch (messageNumber)
             {
                 case 1: return Properties.Settings.Default.CwMsgText1 ?? string.Empty;
@@ -4709,8 +4741,17 @@ namespace HolyLogger
             }
         }
 
-        private void SetCwMessageText(int messageNumber, string text)
+        private void SetCwMessageTextIn(bool answerSet, int messageNumber, string text)
         {
+            if (answerSet)
+            {
+                if (messageNumber < 1 || messageNumber > 4) return;
+                string[] texts = CwKeyboardWindow.LoadAnsMsgTexts();
+                texts[messageNumber - 1] = text ?? string.Empty;
+                CwKeyboardWindow.SaveAnsMsgTexts(texts);
+                return;
+            }
+
             switch (messageNumber)
             {
                 case 1: Properties.Settings.Default.CwMsgText1 = text; break;
@@ -4728,7 +4769,8 @@ namespace HolyLogger
         // writes depends on the mode the name was given (or is being given) in.
         private static string MsgButtonLabel(int messageNumber, bool isCw)
         {
-            string setting = isCw ? CwKeyboardWindow.MsgLabelsSetting : CwKeyboardWindow.VoiceMsgLabelsSetting;
+            string setting = isCw ? CwKeyboardWindow.MsgLabelsSettingFor(CwKeyboardWindow.MsgAnswerSetOn)
+                                  : CwKeyboardWindow.VoiceMsgLabelsSetting;
             string[] labels = CwKeyboardWindow.ReadLabels(setting, 4);
 
             return messageNumber >= 1 && messageNumber <= labels.Length
@@ -4740,7 +4782,8 @@ namespace HolyLogger
         {
             if (messageNumber < 1 || messageNumber > 4) return;
 
-            string setting = isCw ? CwKeyboardWindow.MsgLabelsSetting : CwKeyboardWindow.VoiceMsgLabelsSetting;
+            string setting = isCw ? CwKeyboardWindow.MsgLabelsSettingFor(CwKeyboardWindow.MsgAnswerSetOn)
+                                  : CwKeyboardWindow.VoiceMsgLabelsSetting;
             string[] labels = CwKeyboardWindow.ReadLabels(setting, 4);
             labels[messageNumber - 1] = (label ?? string.Empty).Trim();
             CwKeyboardWindow.SaveLabels(setting, labels, 4);
@@ -4859,7 +4902,8 @@ namespace HolyLogger
                                                                   out _, name, null, keys),
                 // Only so a keyer opening for the first time can take a COPY of the four Msg texts into
                 // its own first four - see LoadButtonTexts. After that the two sets are apart.
-                GetCwMessageText,
+                // THE CQ SET, ALWAYS - the macro editor reads and writes the Answer set on its own.
+                n => GetCwMessageTextIn(false, n),
                 // A Yaesu has no character buffer: the keyer must let each memory finish playing
                 // before it writes the next one over the top of it. Not from a port: nothing is
                 // written to the radio's memory there at all.
@@ -4921,10 +4965,12 @@ namespace HolyLogger
             };
 
             // The macro editor writes the four Msg texts as well as the keyer's own twelve.
+            // The CQ set, always; all four faces redrawn, because the editor saves the Answer set
+            // just before this and the buttons may be showing that one.
             cwKeyboard.SetMsgText = (number, text) =>
             {
-                SetCwMessageText(number, text);
-                UpdateMessageButtonLabel(GetMessageButton(number), number, IsCwModeActive());
+                SetCwMessageTextIn(false, number, text);
+                UpdateMessageButtonLabels();
             };
 
             // Where the radio is listening, so the CQ button can tell a frequency it has already called
@@ -6092,7 +6138,7 @@ namespace HolyLogger
             // BUTTON 1 IS THE CQ - see PaintCqMessageButton. Everything below this line treats the
             // question as any other text: it is expanded, sent and monitored the same way. Not for
             // ESM's texts, which are the keyer's own twelve and carry their own first button.
-            bool isCqButton = messageNumber == 1 && storedTextOverride == null;
+            bool isCqButton = messageNumber == 1 && storedTextOverride == null && !CwKeyboardWindow.MsgAnswerSetOn;
             if (isCqButton && CwKeyboardWindow.ShouldAskQrl(RxFrequencyHz()))
                 storedText = CwKeyboardWindow.QrlText();
 
@@ -6613,6 +6659,37 @@ namespace HolyLogger
             UpdateMessageButtonLabel(Btn_Msg2, 2, isCw, isRtty);
             UpdateMessageButtonLabel(Btn_Msg3, 3, isCw, isRtty);
             UpdateMessageButtonLabel(Btn_Msg4, 4, isCw, isRtty);
+            PaintMsgSetToggle(isCw);
+        }
+
+        // -- CQ / ANS: WHICH SET THE FOUR SEND IN CW --------------------------------------------
+        //
+        // Two sets of four texts (CwKeyboardWindow.MsgAnswerSetOn): one for calling CQ, one for
+        // answering somebody else's CQ. A two-halves pill on the top bar, like CAT / Manual: both
+        // choices in sight, the chosen one filled and bold.
+        private void PaintMsgSetToggle(bool isCw)
+        {
+            if (MsgSetToggle == null) return;
+
+            MsgSetToggle.Visibility = isCw ? Visibility.Visible : Visibility.Collapsed;
+
+            bool answer = CwKeyboardWindow.MsgAnswerSetOn;
+            RB_MsgSetCq.IsChecked = !answer;
+            RB_MsgSetAns.IsChecked = answer;
+            RB_MsgSetCq.FontWeight = answer ? FontWeights.Normal : FontWeights.Bold;
+            RB_MsgSetAns.FontWeight = answer ? FontWeights.Bold : FontWeights.Normal;
+        }
+
+        private void MsgSet_Click(object sender, RoutedEventArgs e)
+        {
+            bool answer = sender == RB_MsgSetAns;
+            if (answer == CwKeyboardWindow.MsgAnswerSetOn) { PaintMsgSetToggle(IsCwModeActive()); return; }
+
+            CwKeyboardWindow.MsgAnswerSetOn = answer;
+
+            // Faces, names and colour all follow at once; the CQ button's red QRL? look goes too.
+            UpdateMessageButtonLabels();
+            PaintCqMessageButton();
         }
 
         // THREE STATES (RTTY joined voice and CW on 2026-10-22, his request): purple keycaps play the
@@ -6755,8 +6832,10 @@ namespace HolyLogger
         }
 
         // Only in CW. In voice the four buttons play audio files and there is no CQ among them.
+        // And not in the Answer set, where button 1 answers somebody else's CQ.
         private bool ShouldAskQrlNow()
         {
+            if (CwKeyboardWindow.MsgAnswerSetOn) return false;
             return IsCwModeActive() && CwKeyboardWindow.ShouldAskQrl(RxFrequencyHz());
         }
 
@@ -12243,20 +12322,49 @@ namespace HolyLogger
             catch (System.Exception swallowed) { Log.Swallow(swallowed); }
         }
 
-        // THE LOCK STANDS OVER THE HOLYLAND SQUARE BOX (his request, 2026-10-20): its left edge exactly on the
-        // box's left edge in the row below. It follows the menu, whose width depends on the fonts, so it is
-        // lined up by measuring both once the window is laid out, not by a guessed margin.
-        private void AlignLockOverSquareBox()
+        // THE LOCK SITS RIGHT AFTER HELP NOW (his request, 2026-11-18). It used to be pushed right at
+        // startup to stand over the Holyland Square box (his request, 2026-10-20); that took the room the
+        // CQ / ANS button needs, so the lock keeps the margin the XAML gives it.
+
+        // THE TYPING BOX ENDS WHERE F8 ENDS (his request, 2026-11-18): CQ / ANS, the key icon, the box and
+        // WPM move together (CwBarGroup) until the box's right edge stands over F8's right edge. Measured
+        // after layout, because the menu's width depends on the fonts. Runs again whenever the group
+        // changes size - the keyer appearing or going, CQ / ANS showing or hiding. Moving the group does
+        // not change its size, so this cannot set itself off. Nothing is moved while the box is not shown.
+        private void CwBarGroup_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            Dispatcher.BeginInvoke(new Action(AlignCwBarToF8), DispatcherPriority.Loaded);
+        }
+
+        private void AlignCwBarToF8()
         {
             try
             {
-                if (LockBtnBorder == null || TB_MyHolyland == null || !LockBtnBorder.IsVisible || !TB_MyHolyland.IsVisible) return;
-                double lockX = LockBtnBorder.TranslatePoint(new Point(0, 0), this).X;
-                double boxX = TB_MyHolyland.TranslatePoint(new Point(0, 0), this).X;
-                double left = LockBtnBorder.Margin.Left + (boxX - lockX);
-                if (left < 0) return;          // the menu has grown past the box: leave it where it is
-                var m = LockBtnBorder.Margin;
-                LockBtnBorder.Margin = new Thickness(left, m.Top, m.Right, m.Bottom);
+                // SINCE 2026-11-18 (later the same day): the right edge of the frame round the four Macro
+                // buttons, which itself ends where Spot ends - so the box, the four and Spot share one edge.
+                if (CwBarGroup == null || PlayCommandsBorder == null || CwLiteKeyerHost == null) return;
+                if (!PlayCommandsBorder.IsVisible || !CwBarGroup.IsVisible) return;
+
+                // PLACED BY WHERE THE STRIP STARTS, NOT BY THE STRIP ITSELF. The strip only arrives
+                // once the radio is connected - or never, with no radio that can key - and placing the
+                // group by its frame left CQ / ANS beside the lock all through loading, then jumped
+                // (his screenshots). The strip's width up to the frame's right edge is fixed, so the
+                // spot where it starts is known before it exists; measured from the real one when it
+                // is there.
+                double span = CwLiteKeyer.LeftToFrameRight;
+                FrameworkElement frame = cwLiteKeyer != null ? cwLiteKeyer.TypingFrame : null;
+                if (frame != null && frame.IsVisible)
+                    span = frame.TranslatePoint(new Point(frame.ActualWidth, 0), CwLiteKeyerHost).X;
+
+                double hostLeft = CwLiteKeyerHost.TranslatePoint(new Point(0, 0), this).X;
+                double f8Right = PlayCommandsBorder.TranslatePoint(new Point(PlayCommandsBorder.ActualWidth, 0), this).X;
+
+                double left = CwBarGroup.Margin.Left + (f8Right - span - hostLeft);
+                if (left < 0) left = 0;   // no room to reach it: as far left as it goes
+                if (Math.Abs(left - CwBarGroup.Margin.Left) < 0.5) return;
+
+                var m = CwBarGroup.Margin;
+                CwBarGroup.Margin = new Thickness(left, m.Top, m.Right, m.Bottom);
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
         }
