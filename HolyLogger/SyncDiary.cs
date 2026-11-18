@@ -297,7 +297,27 @@ namespace HolyLogger
             var dal = DataAccess.GetInstance();
             if (dal == null) return;
             string account = GoogleDrive.Email ?? "";
-            if (dal.GetDbState("sync_dumped") == account) return;
+            if (_ticks % 10 == 0) GoogleDrive.ForgetFolderIfGone(TimeSpan.FromSeconds(60));
+            if (dal.GetDbState("sync_dumped") == account)
+            {
+                // SENT ONCE - BUT IS IT STILL THERE? (2026-11-18, a friend's computers.) His "HolyLogger
+                // Sync" folder was deleted to start afresh minutes after his main computer had sent this
+                // file. The computer remembered "sent" and never sent it again, so his second computer
+                // never got the main one's 1,071 QSOs. Now, at the first tick and every ten minutes, the
+                // folder is looked at: this computer's file missing means it is sent again (the others
+                // simply find what they already have), and a missing diary is sent again too.
+                if (_ticks % 10 != 0) return;
+                var files = GoogleDrive.ListFolder(TimeSpan.FromSeconds(60));
+                string me = ComputerId();
+                if (!files.Any(f => f.Name == me + ".diary") && File.Exists(DiaryPath()))
+                {
+                    Log.Warn("Google Drive: this computer's diary is no longer in the folder; it is sent again.");
+                    GoogleDrive.ForgetDiaryUpload();
+                    if (GoogleDrive.UploadDiary(DiaryPath(), TimeSpan.FromSeconds(60))) ReportContact(null);
+                }
+                if (files.Any(f => f.Name == me + ".dump")) return;
+                Log.Warn("Google Drive: this computer's logs and QSOs are no longer in the folder; they are sent again.");
+            }
             MakeDump(dal, account);
         }
 
@@ -956,8 +976,48 @@ namespace HolyLogger
         {
             Save(new State());
             _access = null;
+            // Signing in again sends this computer's logs and QSOs once more (his request, 2026-11-18):
+            // signing out and in is what an operator does when something looks wrong, and a second copy
+            // does no harm - the others find what they already have.
+            try { DataAccess.GetInstance()?.SetDbState("sync_dumped", ""); }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
             Log.Warn("Google Drive: signed out on this computer.");
             SyncDiary.ReportContact(null);
+        }
+
+        // IS THE FOLDER STILL THERE? (2026-11-18: a friend deleted his "HolyLogger Sync" folder to start
+        // afresh.) A computer keeps the folder's Drive id, and Drive still accepts files into a folder
+        // that is in the Trash - so without this, every send would quietly land in the Trash. Gone or in
+        // the Trash: the folder, the diary's file and how much of it was sent are all forgotten, and the
+        // next listing or send finds the folder again (or makes it).
+        public static void ForgetFolderIfGone(TimeSpan limit)
+        {
+            State st = Load();
+            if (string.IsNullOrEmpty(st.RefreshToken) || !Registered || string.IsNullOrEmpty(st.FolderId)) return;
+            using (var cts = new CancellationTokenSource(limit))
+            {
+                var req = new HttpRequestMessage(HttpMethod.Get,
+                    "https://www.googleapis.com/drive/v3/files/" + st.FolderId + "?fields=trashed");
+                HttpResponseMessage res = Send(req, cts.Token);
+                bool gone = res.StatusCode == HttpStatusCode.NotFound;
+                if (!gone)
+                {
+                    JObject j = JObject.Parse(Check(res).Content.ReadAsStringAsync().GetAwaiter().GetResult());
+                    gone = (bool?)j["trashed"] == true;
+                }
+                if (!gone) return;
+                st.FolderId = null; st.FileId = null; st.UploadedBytes = 0;
+                Save(st);
+                Log.Warn("Google Drive: the " + FolderName + " folder was deleted; it is found or made again.");
+            }
+        }
+
+        // The diary is no longer in Drive: the next send sends it whole, into a file found or made anew.
+        public static void ForgetDiaryUpload()
+        {
+            State st = Load();
+            st.FileId = null; st.UploadedBytes = 0;
+            Save(st);
         }
 
         // ── sending the diary ───────────────────────────────────────────────────────────────────────
