@@ -612,7 +612,9 @@ namespace HolyLogger
         // commonest cause of a logger that "went slow for no reason".
         //
         // What is deliberately NOT sent: the Windows user name, any file path, and anything at all about
-        // other software on the machine. None of it would help and all of it is theirs.
+        // other software on the machine. None of it would help and all of it is theirs. Sent since
+        // 2026-11-18 because sync problems cannot be followed without them: the computer's name and,
+        // when signed in to Google Drive Sync, the Google account it syncs with.
         private static string MachineReport()
         {
             var sb = new StringBuilder();
@@ -638,8 +640,79 @@ namespace HolyLogger
                 sb.AppendLine("Memory in use:  "
                               + (System.Diagnostics.Process.GetCurrentProcess().WorkingSet64 / (1024 * 1024))
                               + " MB");
+
+                // WHICH COMPUTER, AND IS ITS CLOCK RIGHT? (his request, 2026-11-18). A friend's Google
+                // Drive held diaries from three computer names while he spoke of two computers, and no
+                // mail said which computer it came from. The clock matters to sync: when a QSO was
+                // changed on two computers the later change wins, so a clock hours wrong picks the
+                // wrong one. The language decides how dates are written - a date read in the wrong
+                // form cost a whole day once (SyncDiary.ParseLine).
+                var inv = System.Globalization.CultureInfo.InvariantCulture;
+                sb.AppendLine("Computer name:  " + Environment.MachineName);
+                DateTime now = DateTime.Now;
+                sb.AppendLine("Clock (local):  " + now.ToString("yyyy-MM-dd HH:mm:ss", inv));
+                sb.AppendLine("Clock (UTC):    " + now.ToUniversalTime().ToString("yyyy-MM-dd HH:mm:ss", inv));
+                sb.AppendLine("Time zone:      " + TimeZoneInfo.Local.Id);
+                sb.AppendLine("Language:       " + System.Globalization.CultureInfo.CurrentCulture.Name
+                              + " (a date here looks like " + now.ToString("d") + ")");
+                sb.Append(SyncReport(dal));
             }
             catch (Exception ex) { Log.Swallow(ex); sb.AppendLine("(the machine details could not be read)"); }
+            return sb.ToString();
+        }
+
+        // GOOGLE DRIVE SYNC, AS THIS COMPUTER SEES IT. Everything needed to follow a "my computers are
+        // not the same" complaint without asking the operator to dig: which Google account, this
+        // computer's id in the diaries, whether its whole log went up once, when Drive last answered,
+        // and - for every other computer - its name, how far its diary has been read, whether its
+        // "everything once" file was read, and how many of its QSOs wait for a log that has not come.
+        private static string SyncReport(DataAccess dal)
+        {
+            var inv = System.Globalization.CultureInfo.InvariantCulture;
+            var sb = new StringBuilder();
+            sb.AppendLine();
+            sb.AppendLine("GOOGLE DRIVE SYNC");
+            try
+            {
+                if (!GoogleDrive.Registered) { sb.AppendLine("Not available in this copy."); return sb.ToString(); }
+                if (!GoogleDrive.SignedIn) { sb.AppendLine("Not signed in."); return sb.ToString(); }
+                sb.AppendLine("Google account: " + GoogleDrive.Email);
+                if (dal == null) return sb.ToString();
+                sb.AppendLine("This computer:  " + SyncDiary.ComputerId());
+                string dumped = dal.GetDbState("sync_dumped");
+                sb.AppendLine("Whole log sent once: " + (string.IsNullOrEmpty(dumped) ? "no" : "yes (" + dumped + ")"));
+                sb.AppendLine("Own times noted: " + (dal.GetDbState("sync_times_set") == "1" ? "yes" : "no"));
+                string diary = SyncDiary.DiaryPath();
+                sb.AppendLine("Own diary:      " + (File.Exists(diary) ? new FileInfo(diary).Length + " bytes" : "none yet"));
+                DateTime? up = GoogleDrive.LastUploadUtc;
+                sb.AppendLine("Diary last sent: " + (up.HasValue ? up.Value.ToString("yyyy-MM-dd HH:mm:ss", inv) + " UTC" : "never"));
+                sb.AppendLine("Changes not yet in the diary: " + dal.SyncJournalCount());
+                DateTime? c = SyncDiary.LastContactUtc;
+                sb.AppendLine("Drive last answered: " + (c.HasValue ? c.Value.ToString("yyyy-MM-dd HH:mm:ss", inv) + " UTC" : "not since start"));
+                if (SyncDiary.LastProblem != null) sb.AppendLine("Last problem:   " + SyncDiary.LastProblem);
+
+                // one line per other computer, by its diary file name
+                var state = dal.GetDbStatesStartingWith("sync_").ToDictionary(kv => kv.Key, kv => kv.Value);
+                string mine = SyncDiary.ComputerId() + ".diary";
+                var diaries = state.Keys
+                    .Select(k => k.StartsWith("sync_read_") ? k.Substring("sync_read_".Length)
+                               : k.StartsWith("sync_machine_") ? k.Substring("sync_machine_".Length) : null)
+                    .Where(f => f != null && f.EndsWith(".diary") && f != mine).Distinct().OrderBy(f => f).ToList();
+                foreach (string f in diaries)
+                {
+                    state.TryGetValue("sync_machine_" + f, out string machine);
+                    state.TryGetValue("sync_read_" + f, out string read);
+                    state.TryGetValue("sync_dump_read_" + Path.GetFileNameWithoutExtension(f) + ".dump", out string dumpRead);
+                    int waiting = dal.ReadWaitingSyncLines(f).Count;
+                    sb.AppendLine("Other computer: " + (string.IsNullOrEmpty(machine) ? "(name not known)" : machine)
+                                  + " = " + Path.GetFileNameWithoutExtension(f)
+                                  + "; diary read to " + (string.IsNullOrEmpty(read) ? "0" : read) + " bytes"
+                                  + "; whole log read: " + (dumpRead == "done" ? "yes" : "no")
+                                  + "; QSOs waiting for their log: " + waiting);
+                }
+                if (diaries.Count == 0) sb.AppendLine("Other computers: none read yet");
+            }
+            catch (Exception ex) { Log.Swallow(ex); sb.AppendLine("(the sync details could not be read)"); }
             return sb.ToString();
         }
 
