@@ -3618,6 +3618,9 @@ namespace HolyLogger
                 FontSize = 16,
                 Width = 70,
                 Padding = new Thickness(4, 2, 4, 2),
+                // Its own height, not the row's - the row was as tall as the button and link at its
+                // right, and the box stretched to match (his screenshot, 2026-11-19).
+                VerticalAlignment = VerticalAlignment.Center,
                 VerticalContentAlignment = VerticalAlignment.Center
             };
 
@@ -3664,7 +3667,8 @@ namespace HolyLogger
                 HorizontalAlignment = HorizontalAlignment.Right,
                 Margin = new Thickness(20, 0, 24, 0)
             };
-            topRight.Children.Add(BuildMacroEditorButton());
+            // The Macros Editor button moved to the bottom-left corner, beside OK and Cancel, as in
+            // the Msg buttons' right-click editor (his request, 2026-11-19). The link stays here.
             topRight.Children.Add(BuildRadioLink());
             DockPanel.SetDock(topRight, Dock.Right);
             secondsRow.Children.Add(topRight);
@@ -3673,14 +3677,22 @@ namespace HolyLogger
             var cancelBtn = new Button { Content = "Cancel", FontSize = 16, Width = 90, Height = 32, IsCancel = true, Margin = new Thickness(10, 0, 0, 0) };
 
             // In the MIDDLE, under the settings they close - the same as the macro editor's pair.
-            var buttons = new StackPanel
+            var pair = new StackPanel
             {
                 Orientation = Orientation.Horizontal,
-                HorizontalAlignment = HorizontalAlignment.Center,
-                Margin = new Thickness(0, 18, 0, 0)
+                HorizontalAlignment = HorizontalAlignment.Center
             };
-            buttons.Children.Add(okBtn);
-            buttons.Children.Add(cancelBtn);
+            pair.Children.Add(okBtn);
+            pair.Children.Add(cancelBtn);
+
+            // AND THE MACROS EDITOR IN THE BOTTOM-LEFT CORNER, on the same line - where the Msg
+            // buttons' right-click editor has it.
+            var macrosBtn = (FrameworkElement)BuildMacroEditorButton();
+            macrosBtn.HorizontalAlignment = HorizontalAlignment.Left;
+
+            var buttons = new Grid { Margin = new Thickness(0, 18, 0, 0) };
+            buttons.Children.Add(pair);
+            buttons.Children.Add(macrosBtn);
 
             var stack = new StackPanel { Margin = new Thickness(16) };
             stack.Children.Add(secondsRow);
