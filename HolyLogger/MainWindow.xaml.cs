@@ -3377,7 +3377,8 @@ namespace HolyLogger
                 FaceFontSize = 11,
                 FaceFontFamily = null,
                 FaceBold = true,
-                FaceRoom = MsgKeyFaceRoom(messageNumber)
+                FaceRoom = MsgKeyFaceRoom(messageNumber),
+                OffersMacroEditor = true
             };
 
             bool answerSet = CwKeyboardWindow.MsgAnswerSetOn;
@@ -3386,13 +3387,35 @@ namespace HolyLogger
                            : ShowCwTextEditDialog("Edit CW Text " + messageNumber + " (F" + (messageNumber + 4) + ")"
                                                   + (answerSet ? " - Answer set" : " - CQ set"),
                                                   GetCwMessageText(messageNumber), name);
-            if (updated == null) return;
+            if (updated == null)
+            {
+                if (name.WantsMacroEditor) OpenCwMacroEditor();
+                return;
+            }
 
             SaveMsgButtonLabel(messageNumber, name.Label, isCw: true);
             SetCwMessageText(messageNumber, updated);
             UpdateMessageButtonLabel(GetMessageButton(messageNumber), messageNumber, isCw: true);
 
             // The keyer shows these same four along its bottom row. Edited here, redrawn there.
+        }
+
+        // THE CW MACROS WINDOW, OPENED FROM HERE rather than from the keyer - the same window, wired
+        // the same way the keyer wires it (the CQ set through these two; the Answer set and the
+        // keyer's twelve it reads and writes itself). An open keyer redraws its own faces after.
+        private void OpenCwMacroEditor()
+        {
+            var editor = new CwMacroEditorWindow(this,
+                n => GetCwMessageTextIn(false, n),
+                (n, text) =>
+                {
+                    SetCwMessageTextIn(false, n, text);
+                    UpdateMessageButtonLabels();
+                });
+            if (editor.ShowDialog() != true) return;
+
+            UpdateMessageButtonLabels();
+            if (cwKeyboard != null) cwKeyboard.ReloadButtonTexts();
         }
 
         // VOICE MODE'S RIGHT-CLICK. There is no macro text to open here - what a voice button sends is
@@ -4038,10 +4061,24 @@ namespace HolyLogger
             buttonRow.Children.Add(btnSave);
             buttonRow.Children.Add(btnCancel);
 
-            Grid.SetRow(buttonRow, 6);
-            Grid.SetColumn(buttonRow, 0);
-            Grid.SetColumnSpan(buttonRow, 3);
-            grid.Children.Add(buttonRow);
+            // THE MAIN WINDOW'S FOUR ALSO GET A WAY TO ALL THE MACROS - on the left, so Save and
+            // Cancel stay where they always are. Pressing it closes this one unsaved.
+            var buttonLine = new Grid();
+            buttonLine.Children.Add(buttonRow);
+            if (name != null && name.OffersMacroEditor)
+            {
+                // The keyer's own button - same words, size and blue.
+                var btnMacros = CwKeyboardWindow.NewMacroEditorButton();
+                btnMacros.HorizontalAlignment = HorizontalAlignment.Left;
+                btnMacros.ToolTip = "Close this and open all CW macros in one window.";
+                btnMacros.Click += (s, e) => { name.WantsMacroEditor = true; dialog.DialogResult = false; };
+                buttonLine.Children.Add(btnMacros);
+            }
+
+            Grid.SetRow(buttonLine, 6);
+            Grid.SetColumn(buttonLine, 0);
+            Grid.SetColumnSpan(buttonLine, 3);
+            grid.Children.Add(buttonLine);
 
             // WHAT WOULD GO ON AIR, worked out again on every keystroke. A macro is only ever as good
             // as what is behind it, and until now the only way to find out was to press the button.
