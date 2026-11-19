@@ -51,6 +51,7 @@ namespace HolyLogger
         private readonly TextBox[] _ansTexts = new TextBox[MsgButtons];
 
         private TextBox _qrlText;
+        private CheckBox _qrlOn;
         private TextBox _qrlMinutes;
 
         private readonly Func<int, string> _getMsgText;
@@ -357,34 +358,39 @@ namespace HolyLogger
             row3.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             row3.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });                    // Run + S&P
 
-            // A ROW OF ITS OWN, ABOVE THE FRAMES, for the button that fills them. It used to sit at
-            // the bottom of the whole window, a long way from the eight rows it rewrites; it is
-            // right-justified to the Contest frame here because that frame - Run and S&P - is exactly
-            // what it fills.
-            row3.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            // THE BUTTON THAT FILLS THE CONTEST FRAME HANGS UNDER IT, right-justified to it - that
+            // frame (Run and S&P) is exactly what it fills. It sat in a row of its own above the
+            // frames, which cost the window a row (his request, 2026-11-19, moved it here).
+            //
+            // AND IT TAKES NO ROOM OF ITS OWN: it sits at the bottom of the Contest frame's cell and is
+            // drawn 4 below it, so the next section comes up beside it - its heading is on the left,
+            // this button on the right. ("Shift up what can be shifted", same day.)
             row3.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
             var standardBtn = (FrameworkElement)BuildStandardTextsButton();
             standardBtn.HorizontalAlignment = HorizontalAlignment.Right;
-            standardBtn.Margin = new Thickness(0, 0, 0, 8);
+            standardBtn.VerticalAlignment = VerticalAlignment.Bottom;
+            var hang = new TranslateTransform();
+            standardBtn.RenderTransform = hang;
+            standardBtn.SizeChanged += (s, e) => hang.Y = standardBtn.ActualHeight + 4;
             Grid.SetColumn(standardBtn, 4);
             Grid.SetRow(standardBtn, 0);
-            row3.Children.Add(standardBtn);
 
             Grid.SetColumn(keys, 0);
-            Grid.SetRow(keys, 1);
+            Grid.SetRow(keys, 0);
             row3.Children.Add(keys);
 
             var offFrame = SetFrame("General", offGrid);
             Grid.SetColumn(offFrame, 2);
-            Grid.SetRow(offFrame, 1);
+            Grid.SetRow(offFrame, 0);
             row3.Children.Add(offFrame);
 
             var runFrame = SetFrame("Contest", runGrid);
             Grid.SetColumn(runFrame, 4);
-            Grid.SetRow(runFrame, 1);
+            Grid.SetRow(runFrame, 0);
             runFrame.HorizontalAlignment = HorizontalAlignment.Right;
             row3.Children.Add(runFrame);
+            row3.Children.Add(standardBtn);
 
             var holder = new StackPanel();
             holder.Children.Add(SectionTitle("The CW keyer's twelve buttons",
@@ -409,6 +415,12 @@ namespace HolyLogger
         // the gap between the two frames, which had nothing in it.
         private const double NameBoxWidth = 96;
         private const double MacroBoxWidth = 280;
+
+        // THE FOUR MSG BUTTONS' MACROS ARE LONGER - a whole QSO line, not a contest exchange. The
+        // longest standard one, "{CALL} DE {MYCALL} R TNX UR {SENTRST} {SENTRST} BK", is 391 wide at
+        // 16 and was cut off in a 280 box (his screenshot, 2026-11-19). Two of these sets side by side
+        // still fit inside the width the keyer table fixes for the window.
+        private const double MsgMacroBoxWidth = 420;
 
         // THE BLUE FRAME ROUND A SET, WITH ITS NAME CUT INTO THE TOP LINE - General and Contest -
         // the way a frame has named what it holds since forms were printed on paper. The name sat
@@ -542,7 +554,8 @@ namespace HolyLogger
 
             var holder = new StackPanel { Margin = new Thickness(0, 24, 0, 0) };
             holder.Children.Add(SectionTitle("The 4 Macro buttons on the main window",
-                "F5 to F8 with the keyer closed. Two sets: the CQ / ANS button on the top bar of the "
+                // "Two sets" starts the second line (his request, 2026-11-19).
+                "F5 to F8 with the keyer closed.\nTwo sets: the CQ / ANS button on the top bar of the "
                 + "main window picks which one they send.",
                 new Thickness(0, 0, 0, 10),
                 "CQ / ANS"));
@@ -562,7 +575,7 @@ namespace HolyLogger
         {
             var grid = new Grid();
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(NameBoxWidth) });
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(MacroBoxWidth) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(MsgMacroBoxWidth) });
             for (int r = 0; r <= MsgButtons; r++) grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(RowHeight) });
             grid.RowDefinitions[0].Height = GridLength.Auto;
             grid.Children.Add(Heading("Button text", 0, 0));
@@ -596,11 +609,16 @@ namespace HolyLogger
             {
                 Text = CwKeyboardWindow.QrlText(),
                 FontSize = 16,
-                Width = 150,
+                Width = 80,     // "QRL?" with room to spare; was 150 (his request, 2026-11-19)
                 Padding = new Thickness(4, 2, 4, 2),
                 CharacterCasing = CharacterCasing.Upper,
                 HorizontalAlignment = HorizontalAlignment.Left,
-                VerticalContentAlignment = VerticalAlignment.Center
+                VerticalContentAlignment = VerticalAlignment.Center,
+                // THE SAME RED THE CQ KEY WEARS while its next press would send this (his request,
+                // 2026-11-19), so the box and the key it changes are plainly one thing.
+                Background = CwKeyboardWindow.QrlWarningBrush,
+                Foreground = Brushes.Black,
+                ToolTip = "The CQ button sends this first, to ask if the frequency is free."
             };
 
             // "RECOMMENDED" FIRST, THE BOX SECOND - it reads as a sentence that way round rather than
@@ -615,16 +633,34 @@ namespace HolyLogger
             };
             note.SetResourceReference(TextBlock.ForegroundProperty, "MutedTextBrush");
 
+            // THE TICK FIRST: on or off, with nothing to type (his request, 2026-11-19). Off greys
+            // out the rest of the row - none of it does anything then.
+            _qrlOn = new CheckBox
+            {
+                Content = "Ask",
+                FontSize = 16,
+                IsChecked = CwKeyboardWindow.QrlOn,
+                VerticalAlignment = VerticalAlignment.Center,
+                VerticalContentAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 24, 0),
+                ToolTip = "Ticked: the CQ button asks if the frequency is free before calling CQ.\n"
+                        + "Not ticked: it never asks - it always sends CQ."
+            };
+
+            var asking = new StackPanel { Orientation = Orientation.Horizontal };
+
             var row = new StackPanel { Orientation = Orientation.Horizontal };
-            row.Children.Add(note);
-            row.Children.Add(_qrlText);
+            row.Children.Add(_qrlOn);
+            row.Children.Add(asking);
+            asking.Children.Add(note);
+            asking.Children.Add(_qrlText);
             block.Children.Add(row);   // the minutes join this same row below
 
             _qrlMinutes = new TextBox
             {
                 Text = CwKeyboardWindow.QrlMinutes().ToString(CultureInfo.InvariantCulture),
                 FontSize = 16,
-                Width = 60,
+                Width = 44,     // three digits; was 60
                 Padding = new Thickness(4, 2, 4, 2),
                 VerticalContentAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(10, 0, 10, 0)
@@ -638,7 +674,11 @@ namespace HolyLogger
             minutesRow.Children.Add(Words("Also ask after"));
             minutesRow.Children.Add(_qrlMinutes);
             minutesRow.Children.Add(Words("minutes on the same frequency. 0 never asks on time."));
-            row.Children.Add(minutesRow);
+            asking.Children.Add(minutesRow);
+
+            asking.IsEnabled = _qrlOn.IsChecked == true;
+            _qrlOn.Checked += (s, e) => asking.IsEnabled = true;
+            _qrlOn.Unchecked += (s, e) => asking.IsEnabled = false;
 
             return block;
         }
@@ -670,6 +710,13 @@ namespace HolyLogger
             {
                 Content = "Use the standard contest texts",
                 FontSize = 16,
+                // Green, his choice (2026-11-19) - the green the Log Fixer and Duplicates use.
+                FontWeight = FontWeights.Bold,
+                Foreground = Brushes.White,
+                Background = new SolidColorBrush(Color.FromRgb(0x2E, 0x7D, 0x32)),
+                BorderBrush = new SolidColorBrush(Color.FromRgb(0x1B, 0x5E, 0x20)),
+                BorderThickness = new Thickness(1),
+                Cursor = System.Windows.Input.Cursors.Hand,
                 Padding = new Thickness(12, 4, 12, 4),
                 VerticalAlignment = VerticalAlignment.Center,
                 HorizontalAlignment = HorizontalAlignment.Left,
@@ -796,6 +843,7 @@ namespace HolyLogger
             try
             {
                 Properties.Settings.Default.CwKeyerQrlText = (_qrlText.Text ?? string.Empty).Trim();
+                Properties.Settings.Default.CwKeyerQrlOn = _qrlOn.IsChecked == true;
                 Properties.Settings.Default.CwKeyerQrlMinutes = minutes;
                 Properties.Settings.Default.Save();
             }

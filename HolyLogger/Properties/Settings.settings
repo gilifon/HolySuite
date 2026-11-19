@@ -633,16 +633,16 @@
       <Value Profile="(Default)"></Value>
     </Setting>
     <Setting Name="CwMsgText1" Type="System.String" Scope="User">
-      <Value Profile="(Default)">CQ CQ DE * * K</Value>
+      <Value Profile="(Default)">CQ CQ DE {MYCALL} {MYCALL} K</Value>
     </Setting>
     <Setting Name="CwMsgText2" Type="System.String" Scope="User">
-      <Value Profile="(Default)">DE * K</Value>
+      <Value Profile="(Default)">{CALL} DE {MYCALL} TNX UR {SENTRST} {SENTRST} BK</Value>
     </Setting>
     <Setting Name="CwMsgText3" Type="System.String" Scope="User">
-      <Value Profile="(Default)">TU 73 !</Value>
+      <Value Profile="(Default)">R TU 73 {CALL} DE {MYCALL} SK {LOG}</Value>
     </Setting>
     <Setting Name="CwMsgText4" Type="System.String" Scope="User">
-      <Value Profile="(Default)">{MYCALL}</Value>
+      <Value Profile="(Default)">PSE AGN</Value>
     </Setting>
     <Setting Name="EsmEnabled" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">False</Value>
@@ -886,6 +886,9 @@
     </Setting>
     <Setting Name="CwKeyerQrlMinutes" Type="System.Int32" Scope="User">
       <Value Profile="(Default)">5</Value>
+    </Setting>
+    <Setting Name="CwKeyerQrlOn" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">True</Value>
     </Setting>
     <Setting Name="CwKeyerHoldForEnter" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">False</Value>

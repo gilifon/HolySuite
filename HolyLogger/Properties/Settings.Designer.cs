@@ -2585,7 +2585,7 @@ namespace HolyLogger.Properties {
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("CQ CQ DE * * K")]
+        [global::System.Configuration.DefaultSettingValueAttribute("CQ CQ DE {MYCALL} {MYCALL} K")]
         public string CwMsgText1 {
             get {
                 return ((string)(this["CwMsgText1"]));
@@ -2597,7 +2597,7 @@ namespace HolyLogger.Properties {
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("DE * K")]
+        [global::System.Configuration.DefaultSettingValueAttribute("{CALL} DE {MYCALL} TNX UR {SENTRST} {SENTRST} BK")]
         public string CwMsgText2 {
             get {
                 return ((string)(this["CwMsgText2"]));
@@ -2609,7 +2609,7 @@ namespace HolyLogger.Properties {
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("TU 73 !")]
+        [global::System.Configuration.DefaultSettingValueAttribute("R TU 73 {CALL} DE {MYCALL} SK {LOG}")]
         public string CwMsgText3 {
             get {
                 return ((string)(this["CwMsgText3"]));
@@ -2621,7 +2621,7 @@ namespace HolyLogger.Properties {
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("{MYCALL}")]
+        [global::System.Configuration.DefaultSettingValueAttribute("PSE AGN")]
         public string CwMsgText4 {
             get {
                 return ((string)(this["CwMsgText4"]));
@@ -3539,6 +3539,18 @@ namespace HolyLogger.Properties {
             }
             set {
                 this["CwKeyerQrlMinutes"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool CwKeyerQrlOn {
+            get {
+                return ((bool)(this["CwKeyerQrlOn"]));
+            }
+            set {
+                this["CwKeyerQrlOn"] = value;
             }
         }
 

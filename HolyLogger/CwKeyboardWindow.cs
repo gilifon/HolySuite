@@ -192,6 +192,17 @@ namespace HolyLogger
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); return QrlDefaultText; }
         }
+
+        // ON OR OFF, A TICK IN THE CW MACROS WINDOW (his request, 2026-11-19) - turning the question
+        // off should not mean typing anything, or emptying a box. On unless he has ticked it off.
+        internal static bool QrlOn
+        {
+            get
+            {
+                try { return Properties.Settings.Default.CwKeyerQrlOn; }
+                catch (Exception swallowed) { Log.Swallow(swallowed); return true; }
+            }
+        }
         // AND WHAT THE KEYCAP IS CALLED WHILE IT ASKS. A button that says CQ and sends QRL? is a
         // button telling the operator something untrue at the one moment it matters, and the red face
         // alone does not say WHAT it will send instead. So the question may carry a name of its own -
@@ -259,6 +270,7 @@ namespace HolyLogger
         // frequency to hand and needs no callback to fetch it.
         internal static bool ShouldAskQrl(double now)
         {
+            if (!QrlOn) return false;   // ticked off in the CW Macros window: never ask
             if (now <= 0) return false;
 
             // Never called from here at all.
@@ -1837,7 +1849,7 @@ namespace HolyLogger
         //
         // ASKED ONCE A SECOND, not on every tick: it is a question that leaves the program for the
         // radio's frequency, and the answer cannot change faster than a hand can turn the dial.
-        private static readonly Brush QrlWarningBrush = MakeQrlWarningBrush();
+        internal static readonly Brush QrlWarningBrush = MakeQrlWarningBrush();   // also the CW Macros window's QRL? box
 
         // The name the first keycap is wearing at this moment, so PaintCqButton can tell whether the
         // face still says what it should. Empty means it is wearing its ordinary name.
@@ -2292,12 +2304,14 @@ namespace HolyLogger
 
         // THE NAMES THE FOUR MSG BUTTONS ARRIVE WITH - see ReadLabels, which hands them out on a fresh
         // installation and never over a name the operator has saved. They are the operator's own words
-        // for the four texts CwMsgText1..4 ship with: the CQ, what he sends back, the TU, and his call.
+        // for the four texts CwMsgText1..4 ship with: the CQ, the report, the TU, and PSE AGN. Since
+        // 2026-11-19 they are the CQ side of the Answer set's exchange - each one is what he sends
+        // between the other station's Answer-set messages (his request).
         //
         // ALL FOUR ARE MEASURED, not judged by eye. These keycaps are 48 wide (44 until 2026-11-18) and
-        // write BOLD at 11 in the system font, which leaves 38 for the word; the longest of these, Mycall,
-        // takes 33.8 bold ("My call" 36.9). Anything longer wants measuring the same way before it goes here.
-        internal static readonly string[] StandardMsgLabels = { "CQ", "DE", "TU", "Mycall" };
+        // write BOLD at 11 in the system font, which leaves 38 for the word; the longest of these, AGN,
+        // takes 32.2 bold (RST 26.4; "My call" 36.9). Anything longer wants measuring the same way before it goes here.
+        internal static readonly string[] StandardMsgLabels = { "CQ", "RST", "TU", "AGN" };
 
         // Voice keeps the name these four buttons have always worn - it is what the keycaps said before
         // any of them could be named at all, and it fits: the XAML shipped "Msg1" on a 44-wide face.
