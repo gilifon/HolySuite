@@ -354,6 +354,36 @@ namespace HolyLogger
         private int? pendingVoiceMessageNumber;
         private int? activeVoiceMessageNumber;
         private DateTime pendingVoiceMessageDeadlineUtc;
+
+        // THE END OF A MESSAGE IS LOOKED FOR FIVE TIMES A SECOND WHILE ONE IS GOING OUT (his report,
+        // 2026-11-19: "I cannot send again this macro only after 5 seconds"). It was looked for only
+        // when the radio reported a change, and the CW end needs a second look after the radio has
+        // gone quiet - which nothing triggered, so it waited for the 5-second CAT tick. Until then the
+        // button still counted as sending, and pressing it sent Stop. Stops itself once nothing is
+        // going out, so an idle program asks the radio nothing extra.
+        private System.Windows.Threading.DispatcherTimer _msgEndWatch;
+
+        private void WatchMessageEnd()
+        {
+            if (_msgEndWatch == null)
+            {
+                _msgEndWatch = new System.Windows.Threading.DispatcherTimer
+                {
+                    Interval = TimeSpan.FromMilliseconds(200)
+                };
+                _msgEndWatch.Tick += (s, e) =>
+                {
+                    if (!pendingVoiceMessageNumber.HasValue && !activeVoiceMessageNumber.HasValue)
+                    {
+                        _msgEndWatch.Stop();
+                        return;
+                    }
+                    try { UpdateVoiceMessageState(); }
+                    catch (Exception swallowed) { Log.Swallow(swallowed); }
+                };
+            }
+            if (!_msgEndWatch.IsEnabled) _msgEndWatch.Start();
+        }
         private static readonly SolidColorBrush VoiceMessageDefaultBrush = new SolidColorBrush(Color.FromRgb(0xE6, 0xCC, 0xFF));
         private static readonly SolidColorBrush VoiceMessageActiveBrush = new SolidColorBrush(Color.FromRgb(0xFF, 0xC9, 0x57));
 
@@ -6225,6 +6255,7 @@ namespace HolyLogger
                 pendingVoiceMessageNumber = messageNumber;
                 activeVoiceMessageNumber = null;
                 pendingVoiceMessageDeadlineUtc = DateTime.UtcNow.AddSeconds(30);
+                WatchMessageEnd();
                 if (isCqButton) CwKeyboardWindow.RememberCq(RxFrequencyHz());
                 ShowCwSendMonitor(cwText);
                 RunCwMacroActions(logsQso, wipesForm);
@@ -6255,6 +6286,7 @@ namespace HolyLogger
                 pendingVoiceMessageNumber = messageNumber;
                 activeVoiceMessageNumber = null;
                 pendingVoiceMessageDeadlineUtc = DateTime.UtcNow.AddSeconds(30);
+                WatchMessageEnd();
 
                 // ONLY NOW, WITH SOMETHING REALLY GOING OUT. Marked any earlier, an empty button or a
                 // macro that could not be filled in would count as having called on this frequency,
@@ -6293,6 +6325,7 @@ namespace HolyLogger
             pendingVoiceMessageNumber = messageNumber;
             activeVoiceMessageNumber = null;
             pendingVoiceMessageDeadlineUtc = DateTime.UtcNow.AddSeconds(30);
+            WatchMessageEnd();
 
             if (isCqButton) CwKeyboardWindow.RememberCq(RxFrequencyHz());
 
@@ -9006,6 +9039,7 @@ namespace HolyLogger
             pendingVoiceMessageNumber = messageNumber;
             activeVoiceMessageNumber = null;
             pendingVoiceMessageDeadlineUtc = DateTime.UtcNow.AddSeconds(30);
+            WatchMessageEnd();
         }
 
         // ── WHY THAT BUTTON DID NOTHING ─────────────────────────────────────────────────────────
@@ -9257,6 +9291,17 @@ namespace HolyLogger
                     pendingVoiceMessageNumber = null;
                     CloseCwSendMonitor(false);
                 }
+            }
+            else if (activeVoiceMessageNumber.HasValue && !txOn && IsVoiceMessageModeActive())
+            {
+                // A VOICE MESSAGE IS OVER THE MOMENT THE RADIO IS BACK ON RECEIVE (his report,
+                // 2026-11-19). The waits below are CW's: break-in drops the transmit flag between
+                // letters. Voice has no such gaps, and the wait only ended on the next rig event or
+                // the 5-second tick - so for up to 5 s the button still counted as playing, and a
+                // press sent Stop instead of the message.
+                activeVoiceMessageNumber = null;
+                cwTxOffSinceUtc = DateTime.MinValue;
+                OnCwTransmitEnded();
             }
             else if (activeVoiceMessageNumber.HasValue && !txOn)
             {
@@ -11623,6 +11668,7 @@ namespace HolyLogger
             try { if (HeartbeatTimer != null && HeartbeatTimer.IsEnabled) HeartbeatTimer.Stop(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
             try { if (UTCTimer != null && UTCTimer.IsEnabled) UTCTimer.Stop(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
             try { if (CallsignLookupDebounceTimer != null && CallsignLookupDebounceTimer.IsEnabled) CallsignLookupDebounceTimer.Stop(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+            try { if (_msgEndWatch != null) _msgEndWatch.Stop(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
             try { VoiceMessageAvailabilityTimer.Tick -= VoiceMessageAvailabilityTimer_Tick; if (VoiceMessageAvailabilityTimer.IsEnabled) VoiceMessageAvailabilityTimer.Stop(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
             // Null after disposing so Window_Closed's teardown (which runs after this on a normal
             // close) can tell it's already done and doesn't Stop()/Dispose() a disposed timer.
