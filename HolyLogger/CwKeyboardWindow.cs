@@ -92,6 +92,12 @@ namespace HolyLogger
             // was let through and then cut off on the key (his screenshot, 2026-11-18).
             public bool FaceBold;
             public double FaceRoom;
+
+            // THE WAY INTO THE CW MACROS WINDOW from the main window's four (his request, 2026-11-19):
+            // it used to open only from the keyer. Offers asks the editor for the button; Wants is
+            // set when he presses it, and the editor then closes as Cancel.
+            public bool OffersMacroEditor;
+            public bool WantsMacroEditor;
         }
 
         // Aborts whatever the radio is keying.
@@ -3788,7 +3794,18 @@ namespace HolyLogger
         // operators open this window at all.
         private UIElement BuildMacroEditorButton()
         {
-            var button = new Button
+            var button = NewMacroEditorButton();
+            button.HorizontalAlignment = HorizontalAlignment.Right;
+            button.Click += (s, e) => ShowMacroEditor();
+
+            return button;
+        }
+
+        // THE ONE LOOK FOR THIS BUTTON, wherever it is: here, and in the main window's Msg editor
+        // (he asked for the same size and colour there, 2026-11-19).
+        internal static Button NewMacroEditorButton()
+        {
+            return new Button
             {
                 Content = "Macros Editor",
                 FontSize = 16,
@@ -3798,15 +3815,10 @@ namespace HolyLogger
                 BorderBrush = new SolidColorBrush(Color.FromRgb(0x0D, 0x47, 0xA1)),
                 BorderThickness = new Thickness(1),
                 Padding = new Thickness(16, 6, 16, 6),
-                HorizontalAlignment = HorizontalAlignment.Right,
                 VerticalAlignment = VerticalAlignment.Center,
                 Cursor = System.Windows.Input.Cursors.Hand,
                 ToolTip = "The twelve keyer buttons in both banks, and the four Msg buttons, in one table."
             };
-
-            button.Click += (s, e) => ShowMacroEditor();
-
-            return button;
         }
 
         private void ShowMacroEditor()
