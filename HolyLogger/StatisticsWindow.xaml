@@ -359,7 +359,7 @@
                                 <Border x:Name="TileConfirmed" Margin="0,0,14,0" Padding="18,8" VerticalAlignment="Top" Background="{DynamicResource PanelBg}" BorderBrush="#2E9E4F" BorderThickness="1">
                                     <StackPanel>
                                         <Grid Height="44">
-                                            <TextBlock x:Name="TB_ConfirmedTileLabel" Text="Confirmed Active Countries" Width="156" TextWrapping="Wrap" TextAlignment="Center" VerticalAlignment="Center" FontSize="16" Foreground="{DynamicResource MutedTextBrush}"/>
+                                            <TextBlock x:Name="TB_ConfirmedTileLabel" Text="Confirmed Active Countries" Width="180" TextWrapping="Wrap" TextAlignment="Center" VerticalAlignment="Center" FontSize="16" Foreground="{DynamicResource MutedTextBrush}"/>
                                         </Grid>
                                         <!-- Fixed 44, the same as the Missing tile beside it, which now
                                              carries two lines. Without it these tiles would be 4px
@@ -373,7 +373,7 @@
                                 <Border Margin="0,0,14,0" Padding="18,8" VerticalAlignment="Top" Background="{DynamicResource PanelBg}" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1">
                                     <StackPanel>
                                         <Grid Height="44">
-                                            <TextBlock x:Name="TB_WorkedTileLabel" Text="Worked Active, not confirmed" Width="156" TextWrapping="Wrap" TextAlignment="Center" VerticalAlignment="Center" FontSize="16" Foreground="{DynamicResource MutedTextBrush}"/>
+                                            <TextBlock x:Name="TB_WorkedTileLabel" Text="Worked Active Countries, not confirmed" Width="180" TextWrapping="Wrap" TextAlignment="Center" VerticalAlignment="Center" FontSize="16" Foreground="{DynamicResource MutedTextBrush}"/>
                                         </Grid>
                                         <Grid Height="44">
                                             <TextBlock x:Name="TB_UniqueCountries" FontSize="30" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
@@ -383,7 +383,7 @@
                                 <Border Padding="18,8" VerticalAlignment="Top" Background="{DynamicResource PanelBg}" BorderBrush="{DynamicResource Danger}" BorderThickness="1">
                                     <StackPanel>
                                         <Grid Height="44">
-                                            <TextBlock x:Name="TB_MissingTileLabel" Text="Missing Active Countries" Width="156" TextWrapping="Wrap" TextAlignment="Center" VerticalAlignment="Center" FontSize="16" Foreground="{DynamicResource MutedTextBrush}"/>
+                                            <TextBlock x:Name="TB_MissingTileLabel" Text="Missing Active Countries" Width="180" TextWrapping="Wrap" TextAlignment="Center" VerticalAlignment="Center" FontSize="16" Foreground="{DynamicResource MutedTextBrush}"/>
                                         </Grid>
                                         <!-- TWO answers, not one: how many entities are missing out of the
                                              340 that exist, and how many are missing for the DXCC Honor
@@ -727,7 +727,7 @@
                                                    FontWeight="Bold" Margin="0,0,0,0" VerticalAlignment="Center"
                                                    Foreground="#2E9E4F"/>
 
-                                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Matched in this log" FontSize="16"
+                                        <TextBlock Grid.Row="1" Grid.Column="0" x:Name="TB_SumMatchedLabel" Text="Matched in this log" FontSize="16"
                                                    Margin="0,0,18,0" VerticalAlignment="Center"
                                                    ToolTip="Confirmations that matched a QSO in the log open now, and carry the LoTW tick"
                                                    Foreground="{DynamicResource MutedTextBrush}"/>

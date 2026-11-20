@@ -2365,7 +2365,7 @@ namespace HolyLogger
             if (_source != ConfSource.Worked && _confirmedCodes.Count > 0)
             {
                 TB_LotwStatus.Inlines.Add(new System.Windows.Documents.Run(
-                    $"Confirmed: {confirmedActive} active,  "));
+                    $"{(_source == ConfSource.Award ? "Granted" : "Confirmed")}: {confirmedActive} active,  "));
 
                 if (deletedConfirmed > 0)
                 {
@@ -2450,11 +2450,17 @@ namespace HolyLogger
                 // Confirmation folder: Confirmed + Missing partition all 340. Worked-not-confirmed is
                 // the chaseable subset (contacted but not confirmed here). Labels spell out "Countries";
                 // the source name is dropped here because the folder tab (and status line) already show it.
-                TB_ConfirmedTileLabel.Text = "Confirmed Active Countries";
+                // The ARRL folder says "granted": what it counts is credit the ARRL has granted.
+                bool granted = _source == ConfSource.Award;
+                TB_ConfirmedTileLabel.Text = granted ? "Granted Active Countries" : "Confirmed Active Countries";
                 // Two lines, because the label area is a fixed 44px shared by all three tiles: the full
                 // sentence needed three and the first one was cut off. The tooltip carries the long form.
-                TB_WorkedTileLabel.Text = "Worked Active, not confirmed";
-                TB_WorkedTileLabel.ToolTip = "Countries that still exist as DXCC entities, which you have worked but this source has not confirmed";
+                // "Countries" spelled out, like the two tiles beside it; the labels are 180 wide so
+                // "Worked Active Countries," fits on the first line and the rest on the second.
+                TB_WorkedTileLabel.Text = granted ? "Worked Active Countries, not granted" : "Worked Active Countries, not confirmed";
+                TB_WorkedTileLabel.ToolTip = granted
+                    ? "Countries that still exist as DXCC entities, which you have worked but the ARRL has not granted"
+                    : "Countries that still exist as DXCC entities, which you have worked but this source has not confirmed";
                 TB_MissingTileLabel.Text = "Missing Active Countries";
                 TB_ConfirmedDxcc.Text = $"{confirmedActive} / {totalDxcc}";
                 // ACTIVE only, like the two tiles beside it. It used to be worked-minus-confirmed over
@@ -2520,6 +2526,20 @@ namespace HolyLogger
             }
             ConfirmSummaryPanel.Visibility = Visibility.Visible;
 
+            // The two "New" rows mean nothing on the ARRL folder (always a full download, never a
+            // "since"), so they are not shown there; every other folder shows them.
+            var newRows = _source == ConfSource.Award ? Visibility.Collapsed : Visibility.Visible;
+            foreach (var t in new FrameworkElement[] { TB_NewConfLabel, TB_NewConfValue, TB_NewCountriesLabel, TB_NewCountriesValue })
+                if (t != null) t.Visibility = newRows;
+            if (TB_SumMatchedLabel != null)
+            {
+                bool award = _source == ConfSource.Award;
+                TB_SumMatchedLabel.Text = award ? "Granted QSOs in this log" : "Matched in this log";
+                TB_SumMatchedLabel.ToolTip = award
+                    ? "QSOs in the log open now that carry a DXCC credit granted by the ARRL"
+                    : "Confirmations that matched a QSO in the log open now, and carry the LoTW tick";
+            }
+
             var dal = DataAccess.GetInstance();
 
             if (_source == ConfSource.Award)
@@ -2529,7 +2549,9 @@ namespace HolyLogger
                 //           imported ADIF file, or typed in the QSO editor).
                 var granted = ReadArrlGranted();
                 int creditedHere = _allQsos == null ? 0 : _allQsos.Count(q => q != null && HasDxccCredit(q.CreditGranted));
-                TB_SumConfirmedLabel.Text = "Granted by the ARRL";
+                // QSOs, not countries: one country can be granted on several QSOs (a band, a mode) - the
+                // countries are the tile's number. "Granted by the ARRL 194" beside "102" read as a contradiction.
+                TB_SumConfirmedLabel.Text = "Granted QSOs";
                 TB_SumTotalQsls.Text = granted == null ? "not checked yet" : granted.Credits.ToString("N0", inv);
                 TB_SumMatchedInLog.Text = creditedHere.ToString("N0", inv);
                 TB_SumNewQsls.Text = "—";
@@ -5273,10 +5295,12 @@ namespace HolyLogger
                                     :                                      "Country\nCode";
             // Blank on the Worked folder (no confirmation source), so there is no "Conf." header over an
             // empty column.
+            // "Gr." on the ARRL folder: what it marks there is a GRANTED credit, not a confirmation.
+            string confWord = _source == ConfSource.Award ? "Gr." : "Conf.";
             TB_SortWorkedConfirmed.Text = _source == ConfSource.Worked ? ""
-                                        : _workedSort == WorkedSort.ConfirmedDesc ? "Conf. ▼"
-                                        : _workedSort == WorkedSort.ConfirmedAsc  ? "Conf. ▲"
-                                        :                                            "Conf.";
+                                        : _workedSort == WorkedSort.ConfirmedDesc ? confWord + " ▼"
+                                        : _workedSort == WorkedSort.ConfirmedAsc  ? confWord + " ▲"
+                                        :                                            confWord;
         }
 
         private void UpdateMissingSortHeaders()
