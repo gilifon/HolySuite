@@ -795,6 +795,17 @@
                                                 </ToolTip>
                                             </Button.ToolTip>
                                         </Button>
+                                        <Button x:Name="BTN_GetArrlCredits" Grid.Row="4" Grid.ColumnSpan="2"
+                                                Content="Get All ARRL Granted DXCC" FontSize="16" Padding="8,0"
+                                                HorizontalAlignment="Left" Margin="0,1,0,0" Visibility="Collapsed"
+                                                Click="BTN_GetArrlCredits_Click">
+                                            <Button.ToolTip>
+                                                <ToolTip>
+                                                    <TextBlock FontSize="16" TextWrapping="Wrap" MaxWidth="340"
+                                                               Text="Downloads the DXCC credits the ARRL has granted you (LoTW and paper cards) and marks those QSOs.&#10;&#10;Credits come only after you have applied for the DXCC award. Uses your LoTW login (Options ▸ LoTW)."/>
+                                                </ToolTip>
+                                            </Button.ToolTip>
+                                        </Button>
                                     </Grid>
                                 </Border>
                                 </Border>

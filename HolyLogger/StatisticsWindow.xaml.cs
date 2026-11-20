@@ -73,13 +73,11 @@ namespace HolyLogger
         // The confirmation source whose analysis the window is currently showing - one folder each in the
         // vertical tab strip. "Worked" is the plain log with no confirmation overlay; the rest color the
         // worked list by that service's confirmations. Only LoTW and QRZ are wired in this first step.
-        // Award is not a service: it is every source the ARRL actually accepts, added together - LoTW,
-        // a paper card, or a credit the ARRL has already granted. It exists because no single tab can
-        // answer "how many countries do I have for DXCC": the sets genuinely differ. In the log this was
-        // built against, LoTW confirms 325 including Bouvet but not Minami Torishima (paper card only),
-        // and the granted credits are a different 325 - Minami yes, Bouvet never submitted. Together: 326.
-        // QRZ, eQSL and Club Log are deliberately NOT in it. The ARRL does not accept them, so counting
-        // them would produce a bigger number that no award will honour.
+        // Award is "ARRL Granted": ONLY what the ARRL has actually credited toward DXCC (2026-11-20, his
+        // decision) - QSOs whose CREDIT_GRANTED names a DXCC award, plus the granted countries from "Get
+        // All ARRL Granted DXCC" whose QSO is not in HolyLogger. It used to add LoTW and paper cards in
+        // as well; those have their own folders, and a confirmation is not a credit until the ARRL
+        // grants it (after an application).
         private enum ConfSource { Worked, Lotw, Qrz, Eqsl, Clublog, Paper, Award }
         private ConfSource _source = ConfSource.Worked;
 
@@ -1363,7 +1361,10 @@ namespace HolyLogger
                 ElementStyle = CentredCell(),
             });
             grid.Columns.Add(new DataGridTextColumn { Header = "QSOs", Binding = new System.Windows.Data.Binding("Count"), Width = 70 });
-            grid.Columns.Add(new DataGridTextColumn { Header = "Confirmed by", Binding = new System.Windows.Data.Binding("ConfirmedBy"), Width = 190 });
+            // "ELSEWHERE": these countries are NOT confirmed in the folder open now - the column names the
+            // other services that did confirm them (eQSL on the ARRL folder, LoTW on the eQSL folder).
+            // Plain "Confirmed by" read as if this folder had confirmed them. Wider to fit the longer name.
+            grid.Columns.Add(new DataGridTextColumn { Header = "Confirmed elsewhere by", Binding = new System.Windows.Data.Binding("ConfirmedBy"), Width = 240 });
 
             // THE SAME GREEN BUTTON THE DELETED-ENTITIES WINDOW HAS. A list of countries answers "which
             // ones", and the next question is always "which contacts" - and it was a question this
@@ -1384,22 +1385,42 @@ namespace HolyLogger
                 BorderThickness = new Thickness(1.5),
             };
 
+            // ONE LINE THAT SAYS WHAT THE TABLE IS. A table of "not confirmed" countries with LoTW or eQSL
+            // in its last column read as a contradiction; the line says they are not confirmed by THIS
+            // folder's source, and that the last column is the other services.
+            string notWhat = _source == ConfSource.Award ? "not granted by the ARRL"
+                           : _source == ConfSource.Paper ? "not confirmed by a paper QSL"
+                           : "not confirmed by " + SourceName;
+            var explain = new TextBlock
+            {
+                Text = $"These countries are {notWhat}. The last column shows where else they are confirmed.",
+                FontSize = 16,
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(0, 0, 0, 8),
+                Foreground = ThemeManager.Brush("TextBrush"),
+            };
+
             var layout = new Grid();
+            layout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             layout.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
             layout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            Grid.SetRow(grid, 0);
-            Grid.SetRow(openButton, 1);
+            Grid.SetRow(explain, 0);
+            Grid.SetRow(grid, 1);
+            Grid.SetRow(openButton, 2);
+            layout.Children.Add(explain);
             layout.Children.Add(grid);
             layout.Children.Add(openButton);
 
             var win = new Window
             {
-                Title = $"Worked, not confirmed at {SourceName} ({rows.Count})",
+                // Short: the line above the table already says it in large letters; the title bar's
+                // small Windows font only repeated it.
+                Title = $"Not confirmed ({rows.Count})",
                 Owner = this,
-                Width = 620,
-                Height = 360,
-                MinWidth = 420,
-                MinHeight = 240,
+                Width = 670,
+                Height = 415,
+                MinWidth = 470,
+                MinHeight = 295,
                 ResizeMode = ResizeMode.CanResize,
                 WindowStartupLocation = WindowStartupLocation.CenterOwner,
                 Background = (System.Windows.Media.Brush)ThemeManager.Brush("WindowBg"),
@@ -1872,10 +1893,11 @@ namespace HolyLogger
                 case ConfSource.Eqsl:    return q.EqslQslRcvd == 1;
                 case ConfSource.Clublog: return q.ClublogQslRcvd == 1;
                 case ConfSource.Paper:   return q.PaperQslRcvd == 1;
-                // Everything the ARRL accepts, in one answer: confirmed at LoTW, a paper card in hand, or
-                // a credit they have already granted for this contact.
-                case ConfSource.Award:   return q.LotwQslRcvd == 1 || q.PaperQslRcvd == 1
-                                             || HasDxccCredit(q.CreditGranted);
+                // GRANTED ONLY (his decision, 2026-11-20). The folder is "ARRL Granted": a QSO counts
+                // only when the ARRL has actually credited it toward DXCC. It used to add LoTW and paper
+                // cards too, but those have folders of their own, and a confirmation is not a credit.
+                // Granted countries whose QSO is not in HolyLogger are added in LoadConfirmedCache.
+                case ConfSource.Award:   return HasDxccCredit(q.CreditGranted);
                 default:                 return true;
             }
         }
@@ -2235,6 +2257,26 @@ namespace HolyLogger
                 }
                 catch (Exception swallowed) { Log.Swallow(swallowed); }
             }
+
+            // THE ARRL FOLDER ALSO COUNTS THE COUNTRIES THE ARRL HAS GRANTED, whether or not their QSO is
+            // in this log - a contact made before HolyLogger was used still counts for DXCC. They come
+            // from the last "Get All ARRL Granted DXCC" for this station callsign.
+            if (_source == ConfSource.Award)
+            {
+                var granted = ReadArrlGranted();
+                if (granted?.Codes != null)
+                    foreach (int code in granted.Codes)
+                    {
+                        if (code <= 0) continue;
+                        _confirmedCodes.Add(code);
+                        try
+                        {
+                            if (DXCCManager.CountryLookup.Shared.IsDeletedEntityCode(code))
+                                _confirmedDeletedCodes.Add(code);
+                        }
+                        catch (Exception swallowed) { Log.Swallow(swallowed); }
+                    }
+            }
             // (A self-heal for a bogus confirmed-QSO total lived here, behind a return that made it
             // unreachable. It was left stranded by "Confirmed countries are counted from the log, not
             // from a saved list" (d3a35bc): the count no longer comes from a saved total, so there is
@@ -2420,7 +2462,9 @@ namespace HolyLogger
                 // operator's Blenheim Reef, on eQSL) showed up here as "worked, not confirmed" while the
                 // tiles either side of it were counting only the 340 that exist. Now all three answer for
                 // the same 340: this one is the part of Missing that has already been contacted.
-                int workedNotConfirmed = Math.Max(0, WorkedActiveCount() - confirmedActive);
+                // Counted directly, not as worked minus confirmed: on the ARRL folder a country can be
+                // confirmed (granted) without any QSO in this log, and the subtraction then came out short.
+                int workedNotConfirmed = _workedList.Count(c => !c.IsDeletedEntity && !(c.Code != 0 && achieved.Contains(c.Code)));
                 TB_UniqueCountries.Text = workedNotConfirmed.ToString();
 
                 // Clickable, like the deleted count below: the number is an accusation ("you have worked
@@ -2455,6 +2499,7 @@ namespace HolyLogger
             if (BTN_CheckQrz != null)           BTN_CheckQrz.Visibility           = _source == ConfSource.Qrz     ? Visibility.Visible : Visibility.Collapsed;
             if (BTN_CheckEqsl != null)          BTN_CheckEqsl.Visibility          = _source == ConfSource.Eqsl    ? Visibility.Visible : Visibility.Collapsed;
             if (BTN_CheckClublog != null)       BTN_CheckClublog.Visibility       = _source == ConfSource.Clublog ? Visibility.Visible : Visibility.Collapsed;
+            if (BTN_GetArrlCredits != null)     BTN_GetArrlCredits.Visibility     = _source == ConfSource.Award   ? Visibility.Visible : Visibility.Collapsed;
 
             // THE BUTTON WEARS ITS FOLDER'S COLOUR. Four buttons sit on top of each other in this one
             // slot and only the open folder's is shown, so a button that looks the same on every folder
@@ -2462,15 +2507,13 @@ namespace HolyLogger
             // SourceBackground, the same brush the tab and the page behind it use - so the button reads
             // as part of the folder rather than as a grey control that happens to be there.
             Brush folderTint = SourceBackground(_source);
-            foreach (var b in new[] { BTN_GetAllConfirmations, BTN_CheckQrz, BTN_CheckEqsl, BTN_CheckClublog })
+            foreach (var b in new[] { BTN_GetAllConfirmations, BTN_CheckQrz, BTN_CheckEqsl, BTN_CheckClublog, BTN_GetArrlCredits })
                 if (b != null && b.Visibility == Visibility.Visible) b.Background = folderTint;
 
-            // Worked and Paper QSL have no downloaded summary (Paper is manual). Keep the frame's SPACE
-            // (Hidden) so the zone lists still line up with the download folders.
-            // Worked, Paper QSL and DXCC Award have no download of their own (Paper is manual, and Award is
-            // computed from the other sources), so there is no summary to show. Keep the frame's SPACE
-            // (Hidden) so the zone lists still line up with the download folders.
-            if (_source == ConfSource.Worked || _source == ConfSource.Paper || _source == ConfSource.Award)
+            // Worked and Paper QSL have no download of their own (Paper is manual), so there is no
+            // summary to show. Keep the frame's SPACE (Hidden) so the zone lists still line up with the
+            // download folders. The ARRL folder now has one: the ARRL's granted DXCC credits.
+            if (_source == ConfSource.Worked || _source == ConfSource.Paper)
             {
                 ConfirmSummaryPanel.Visibility = Visibility.Hidden;
                 return;
@@ -2478,6 +2521,24 @@ namespace HolyLogger
             ConfirmSummaryPanel.Visibility = Visibility.Visible;
 
             var dal = DataAccess.GetInstance();
+
+            if (_source == ConfSource.Award)
+            {
+                //   Row 0 = how many credits the ARRL reported on the last download for this log.
+                //   Row 1 = QSOs of the log open now that carry a DXCC credit (from the download, an
+                //           imported ADIF file, or typed in the QSO editor).
+                var granted = ReadArrlGranted();
+                int creditedHere = _allQsos == null ? 0 : _allQsos.Count(q => q != null && HasDxccCredit(q.CreditGranted));
+                TB_SumConfirmedLabel.Text = "Granted by the ARRL";
+                TB_SumTotalQsls.Text = granted == null ? "not checked yet" : granted.Credits.ToString("N0", inv);
+                TB_SumMatchedInLog.Text = creditedHere.ToString("N0", inv);
+                TB_SumNewQsls.Text = "—";
+                TB_SumSince.Text = "   (full download)";
+                TB_SumNewCountries.Text = "—";
+                StyleSummaryLink(LNK_NewQsls, false, muted);
+                StyleSummaryLink(LNK_NewCountries, false, muted);
+                return;
+            }
 
             if (_source == ConfSource.Lotw)
             {
@@ -3160,6 +3221,379 @@ namespace HolyLogger
 
             _forceFullDownload = true;
             BTN_CheckLotw_Click(sender, e);
+        }
+
+        // ── ARRL granted DXCC credits ──────────────────────────────────────
+        //
+        // "Granted" is the ARRL's word for a QSO it has actually CREDITED toward DXCC - after the operator
+        // applied (and paid) for it. A LoTW confirmation alone is not a credit. The normal LoTW report
+        // (lotwreport.adi) carries CREDIT_GRANTED only for LoTW confirmations, and says so: "award credit
+        // granted to QSOs for QSL card confirmations is not reported". The ARRL's DXCC credits download
+        // (qslcards.php, same LoTW login) gives EVERY granted credit, paper cards included - so that is
+        // the one asked. https://lotw.arrl.org/lotw-help/developer-query-dxcc-credits/
+        //
+        // A credit record names the entity, the date and, when the ARRL recorded them, the band and mode
+        // group. Its CALL "may be abbreviated to a prefix or a numeric ARRL DXCC Entity code", so the call
+        // cannot be the key: a credit is matched to the QSO of THIS log with the same date and entity (and
+        // band and mode group when given), preferring the one whose callsign matches when it is a real
+        // callsign. The award list is written into the QSO's own CREDIT_GRANTED, merged with what is
+        // there - the field the ARRL folder already reads, and one that syncs with the rest of the QSO.
+        private class ArrlCredit
+        {
+            public string Date, Band, ModeGroup, Call, Credit;
+            public int Dxcc;
+        }
+
+        private static string ModeGroupOf(string mode)
+        {
+            string m = (mode ?? string.Empty).Trim().ToUpperInvariant();
+            if (m.Length == 0) return string.Empty;
+            if (m == "CW") return "CW";
+            if (m == "SSB" || m == "USB" || m == "LSB" || m == "AM" || m == "FM" || m == "PHONE"
+                || m == "DIGITALVOICE" || m == "DV" || m == "C4FM" || m == "DSTAR") return "PHONE";
+            return "DATA";
+        }
+
+        // Adds the award names of one credit to what a QSO already holds, without repeats.
+        private static string MergeCredit(string existing, string add)
+        {
+            var list = new List<string>();
+            foreach (string part in ((existing ?? string.Empty) + "," + (add ?? string.Empty)).Split(','))
+            {
+                string t = part.Trim();
+                if (t.Length > 0 && !list.Any(x => string.Equals(x, t, StringComparison.OrdinalIgnoreCase)))
+                    list.Add(t);
+            }
+            return string.Join(",", list);
+        }
+
+        // The granted countries as the ARRL last sent them are kept per STATION CALLSIGN in the synced
+        // arrl_granted table (DataAccess.EnsureArrlGrantedTable): a credit belongs to the station, every
+        // log signed with it shares them, and every computer in Google Drive Sync gets them.
+        //
+        // The station is the open log's callsign; the LoTW login when the log has none.
+        private string ArrlStationCall()
+        {
+            string call = ActiveLogCallsign();
+            if (string.IsNullOrWhiteSpace(call)) call = Properties.Settings.Default.LotwWebUser;
+            return (call ?? string.Empty).Trim();
+        }
+
+        private DataAccess.ArrlGrantedRow ReadArrlGranted()
+        {
+            try { return DataAccess.GetInstance()?.GetArrlGranted(ArrlStationCall()); }
+            catch (Exception swallowed) { Log.Swallow(swallowed); return null; }
+        }
+
+        // A QSO's DXCC entity number, off the UI thread: the shared resolver only (no per-window cache).
+        private static int BackgroundEntityCode(QSO q)
+        {
+            try
+            {
+                string call = (q?.DXCall ?? string.Empty).Trim();
+                if (call.Length == 0) return 0;
+                DXCC d = CountryLookup.Shared.Resolve(call, CountryLookup.QsoDate(q.Date));
+                return d != null && d.IsDxccEntity && d.DxccCode > 0 ? d.DxccCode : 0;
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); return 0; }
+        }
+
+        private async void BTN_GetArrlCredits_Click(object sender, RoutedEventArgs e)
+        {
+            if (BlockedAsAnotherStationsLog("LoTW")) return;
+
+            var s = Properties.Settings.Default;
+            string user = s.LotwWebUser?.Trim();
+            string pass = s.LotwWebPassword;
+            if (string.IsNullOrWhiteSpace(user) || string.IsNullOrWhiteSpace(pass))
+            {
+                bool openOptions = HolyMessageBox.ShowConfirm(
+                    "Your LoTW website username and password aren't set, so the granted DXCC credits can't be downloaded.\n\n" +
+                    "Open Options → LoTW to enter them now?",
+                    "LoTW login needed", HolyMsgType.Warning, this);
+                if (openOptions)
+                {
+                    var opts = new OptionsWindow();
+                    opts.LotwControlInstance.Dal = Dal;
+                    opts.Owner = this;
+                    opts.LotwItem.IsSelected = true;
+                    opts.ShowDialog();
+                }
+                return;
+            }
+
+            BTN_GetArrlCredits.IsEnabled = false;
+            LB_Source.IsEnabled = false;
+            _checkCts = new System.Threading.CancellationTokenSource();
+            var ct = _checkCts.Token;
+            BTN_StopCheck.IsEnabled = true;
+            TB_LotwStatus.Foreground = System.Windows.Media.Brushes.ForestGreen;
+            TB_LotwLoadingText.Text = "Asking the ARRL for your granted DXCC credits…";
+            TB_LotwLoadingSub.Text = "Waiting for LoTW to answer.";
+            ShowLotwSpinner(true);
+            try
+            {
+                string url = "https://lotw.arrl.org/lotwuser/logbook/qslcards.php"
+                           + "?login=" + Uri.EscapeDataString(user)
+                           + "&password=" + Uri.EscapeDataString(pass);
+
+                _uiPhase = "asking LoTW for the DXCC credits";
+                // Off the UI thread, request and all - see BTN_CheckLotw_Click for why on .NET 4.8.
+                Func<string, Task<string>> fetch = u => Task.Run(async () =>
+                {
+                    using (var handler = new System.Net.Http.HttpClientHandler
+                    {
+                        AutomaticDecompression = System.Net.DecompressionMethods.GZip | System.Net.DecompressionMethods.Deflate
+                    })
+                    using (var http = new System.Net.Http.HttpClient(handler) { Timeout = TimeSpan.FromSeconds(300) })
+                    using (var resp = await http.GetAsync(u, ct).ConfigureAwait(false))
+                        return await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
+                }, ct);
+                string body = await fetch(url);
+
+                // ONE LOGIN, SEVERAL DXCC AWARD ACCOUNTS (2026-11-21, his: 4Z5SL, 4X2XMAS, 4Z73SL - all
+                // Israel, so the 'entity' parameter cannot tell them apart). LoTW then answers with a list
+                // and no credits:
+                //     Account ID    Entity
+                //         1           336 (4Z5SL - ISRAEL)
+                // and wants 'ac_acct'. The account whose callsign is the open log's is asked for.
+                var accounts = System.Text.RegularExpressions.Regex.Matches(body,
+                    @"^\s*(\d+)\s+(\d+)\s+\(([^\s)]+)\s*-", System.Text.RegularExpressions.RegexOptions.Multiline);
+                if (accounts.Count > 0 && body.IndexOf("ac_acct", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    string station = ArrlStationCall();
+                    var mine = accounts.Cast<System.Text.RegularExpressions.Match>()
+                                       .FirstOrDefault(m => CallsignIdentity.Same(m.Groups[3].Value, station));
+                    if (mine == null)
+                    {
+                        ShowLotwSpinner(false);
+                        string list = string.Join(", ", accounts.Cast<System.Text.RegularExpressions.Match>().Select(m => m.Groups[3].Value));
+                        Log.Warn("ARRL DXCC credits: several DXCC accounts (" + list + "), none for '" + station + "'.");
+                        HolyMessageBox.Show(
+                            $"Your LoTW login has DXCC award accounts for {list}.\n\n" +
+                            $"None of them is for {(station.Length > 0 ? station : "this log's callsign")}, so there is nothing to bring for this log.",
+                            "ARRL Granted DXCC", HolyMsgType.Info, this);
+                        return;
+                    }
+                    Log.Warn("ARRL DXCC credits: several DXCC accounts; asking for account " + mine.Groups[1].Value
+                             + " (" + mine.Groups[3].Value + ").");
+                    body = await fetch(url + "&ac_acct=" + Uri.EscapeDataString(mine.Groups[1].Value));
+                }
+
+                // A failed query comes back as a web page; the ADIF end-of-header is what proves it is
+                // data. No longer the end: the LoTW confirmations below carry credits too.
+                int eoh = body.IndexOf("<eoh>", StringComparison.OrdinalIgnoreCase);
+                if (eoh < 0)
+                {
+                    Log.Warn("ARRL DXCC credits: no ADIF in the reply (" + body.Length + " chars).");
+                    body = "<eoh>";
+                    eoh = 0;
+                }
+
+                // THE REPLY IS KEPT, so a surprising answer can be looked at instead of guessed about
+                // (2026-11-21: his account, with a DXCC award, came back with 0 credits). It holds the
+                // DXCC record and the credits only - the login is in the request, never in the reply.
+                try
+                {
+                    if (!string.IsNullOrEmpty(Log.FilePath))
+                        System.IO.File.WriteAllText(System.IO.Path.Combine(
+                            System.IO.Path.GetDirectoryName(Log.FilePath), "arrl-dxcc-credits-last.adi"), body);
+                }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
+                string head = body.Substring(0, eoh);
+                Log.Warn("ARRL DXCC credits: reply " + body.Length + " chars; record call '"
+                         + (ExtractAdifField(head, "APP_LoTW_DXCCRecord_Call") ?? "") + "', entity '"
+                         + (ExtractAdifField(head, "APP_LoTW_DXCCRecord_Entity") ?? "") + "', NUMREC '"
+                         + (ExtractAdifField(head, "APP_LoTW_NUMREC") ?? "") + "'.");
+
+                var credits = new List<ArrlCredit>();
+                foreach (string rec in body.Substring(eoh + 5).Split(new[] { "<eor>", "<EOR>", "<Eor>" }, StringSplitOptions.None))
+                {
+                    string date = ExtractAdifField(rec, "QSO_DATE");
+                    int dxcc;
+                    if (string.IsNullOrWhiteSpace(date) || !int.TryParse(ExtractAdifField(rec, "DXCC"), out dxcc) || dxcc <= 0)
+                        continue;
+                    string group = ExtractAdifField(rec, "APP_LoTW_MODEGROUP");
+                    if (string.IsNullOrWhiteSpace(group)) group = ModeGroupOf(ExtractAdifField(rec, "MODE"));
+                    string credit = ExtractAdifField(rec, "CREDIT_GRANTED");
+                    credits.Add(new ArrlCredit
+                    {
+                        Date = date.Trim(),
+                        Dxcc = dxcc,
+                        Band = (ExtractAdifField(rec, "BAND") ?? string.Empty).Trim(),
+                        ModeGroup = (group ?? string.Empty).Trim().ToUpperInvariant(),
+                        Call = (ExtractAdifField(rec, "CALL") ?? string.Empty).Trim(),
+                        // every record IS a granted DXCC credit, even if the award list is missing
+                        Credit = string.IsNullOrWhiteSpace(credit) ? "DXCC" : credit.Trim(),
+                    });
+                }
+                int fromRecord = credits.Count;
+
+                // AND THE CREDITS ON THE LoTW CONFIRMATIONS (2026-11-21). The download above answers only
+                // for an award account linked to a DXCC record; his is not linked (the record fields came
+                // back empty, NUMREC 0) while LoTW shows 102 credits awarded. The ordinary confirmations
+                // report (lotwreport.adi) carries CREDIT_GRANTED on each LoTW QSL - "award credits granted
+                // based upon this QSL" - so it is asked too, for each station callsign of the open log, as
+                // the LoTW check asks. It never reports credits granted for paper cards; only the linked
+                // record does. A credit both downloads report is kept once.
+                var seen = new HashSet<string>(credits.Select(c => c.Date + "|" + c.Dxcc + "|" + c.Band.ToUpperInvariant() + "|" + c.ModeGroup),
+                                               StringComparer.OrdinalIgnoreCase);
+                int lotwQsls = 0;
+                foreach (string own in OwnCallsForActiveLog())
+                {
+                    ct.ThrowIfCancellationRequested();
+                    TB_LotwLoadingText.Text = "Reading the credits on your LoTW confirmations"
+                                            + (string.IsNullOrEmpty(own) ? "…" : " (" + own + ")…");
+                    TB_LotwLoadingSub.Text = "LoTW builds this report before sending it, so it can take a while.";
+                    string rep = await fetch("https://lotw.arrl.org/lotwuser/lotwreport.adi"
+                                             + "?login=" + Uri.EscapeDataString(user)
+                                             + "&password=" + Uri.EscapeDataString(pass)
+                                             + (string.IsNullOrEmpty(own) ? "" : "&qso_owncall=" + Uri.EscapeDataString(own))
+                                             + "&qso_query=1&qso_qsl=yes&qso_qsldetail=yes&qso_qslsince=1970-01-01");
+                    int e2 = rep.IndexOf("<eoh>", StringComparison.OrdinalIgnoreCase);
+                    if (e2 < 0) { Log.Warn("ARRL DXCC credits: the LoTW report for '" + own + "' had no ADIF (" + rep.Length + " chars)."); continue; }
+                    foreach (string rec in rep.Substring(e2 + 5).Split(new[] { "<eor>", "<EOR>", "<Eor>" }, StringSplitOptions.None))
+                    {
+                        string date = ExtractAdifField(rec, "QSO_DATE");
+                        if (string.IsNullOrWhiteSpace(date)) continue;
+                        lotwQsls++;
+                        string cg = ExtractAdifField(rec, "CREDIT_GRANTED");
+                        string appCg = ExtractAdifField(rec, "APP_LoTW_CREDIT_GRANTED");
+                        if (!HasDxccCredit(cg) && !HasDxccCredit(appCg)) continue;
+                        int dxcc;
+                        if (!int.TryParse(ExtractAdifField(rec, "DXCC"), out dxcc) || dxcc <= 0) continue;
+                        var c = new ArrlCredit
+                        {
+                            Date = date.Trim(),
+                            Dxcc = dxcc,
+                            Band = (ExtractAdifField(rec, "BAND") ?? string.Empty).Trim(),
+                            ModeGroup = ModeGroupOf(ExtractAdifField(rec, "MODE")),
+                            Call = (ExtractAdifField(rec, "CALL") ?? string.Empty).Trim(),
+                            Credit = HasDxccCredit(cg) ? cg.Trim() : "DXCC",
+                        };
+                        if (seen.Add(c.Date + "|" + c.Dxcc + "|" + c.Band.ToUpperInvariant() + "|" + c.ModeGroup)) credits.Add(c);
+                    }
+                }
+                Log.Warn($"ARRL DXCC credits: {fromRecord} from the DXCC record, {credits.Count - fromRecord} more from {lotwQsls} LoTW confirmation(s).");
+
+                // NOT ONLY THE OPEN LOG. A credit belongs to the station, not to a log, so every log
+                // signed with the same station callsign is searched - the open one, and its siblings.
+                var dal = DataAccess.GetInstance();
+                long activeId = dal?.ActiveLogId ?? 0;
+                string myCall = ActiveLogCallsign();
+                var otherLogs = new List<long>();
+                try
+                {
+                    if (dal != null && !string.IsNullOrWhiteSpace(myCall))
+                        foreach (var l in dal.GetLogs())
+                            if (l.Id != activeId && CallsignIdentity.Same(l.Callsign, myCall)) otherLogs.Add(l.Id);
+                }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+                _uiPhase = "matching the credits to the logs";
+                TB_LotwLoadingText.Text = $"Matching {credits.Count:N0} credits to your logs…";
+                TB_LotwLoadingSub.Text = "Marking each credited QSO.";
+                var openQsos = (_allQsos ?? new System.Collections.ObjectModel.ObservableCollection<QSO>())
+                               .Where(q => q != null).ToList();
+
+                var updates = new Dictionary<long, string>();
+                int matched = 0;
+                await Task.Run(() =>
+                {
+                    var qsos = new List<QSO>(openQsos);
+                    foreach (long logId in otherLogs)
+                    {
+                        ct.ThrowIfCancellationRequested();
+                        qsos.AddRange(dal.GetQSOsForLog(logId).Where(q => q != null));
+                    }
+                    // The country of each QSO, straight from the resolver (read-only, safe off the UI
+                    // thread - the LoTW matching relies on the same).
+                    var codes = qsos.Select(q => BackgroundEntityCode(q)).ToList();
+
+                    // date|entity -> indexes of the QSOs that day with that country
+                    var byKey = new Dictionary<string, List<int>>(StringComparer.OrdinalIgnoreCase);
+                    for (int i = 0; i < qsos.Count; i++)
+                    {
+                        if (codes[i] <= 0) continue;
+                        string k = (qsos[i].Date ?? string.Empty).Trim() + "|" + codes[i];
+                        List<int> l;
+                        if (!byKey.TryGetValue(k, out l)) byKey[k] = l = new List<int>();
+                        l.Add(i);
+                    }
+
+                    foreach (var c in credits)
+                    {
+                        ct.ThrowIfCancellationRequested();
+                        List<int> found;
+                        if (!byKey.TryGetValue(c.Date + "|" + c.Dxcc, out found)) continue;
+                        var fit = found.Where(i =>
+                                      (c.Band.Length == 0 || string.Equals((qsos[i].Band ?? string.Empty).Trim(), c.Band, StringComparison.OrdinalIgnoreCase))
+                                   && (c.ModeGroup.Length == 0 || ModeGroupOf(qsos[i].Mode) == c.ModeGroup))
+                                  .ToList();
+                        if (fit.Count == 0) continue;
+                        int pick = fit[0];
+                        foreach (int i in fit)
+                            if (CallsignIdentity.Same(qsos[i].DXCall, c.Call)) { pick = i; break; }
+
+                        matched++;
+                        long id = qsos[pick].id;
+                        string before;
+                        if (!updates.TryGetValue(id, out before)) before = qsos[pick].CreditGranted;
+                        string after = MergeCredit(before, c.Credit);
+                        if (!string.Equals(after, qsos[pick].CreditGranted ?? string.Empty, StringComparison.OrdinalIgnoreCase))
+                            updates[id] = after;
+                    }
+                }, ct);
+
+                int changed = 0;
+                if (updates.Count > 0)
+                {
+                    _uiPhase = "storing the credits";
+                    changed = await Task.Run(() => DataAccess.GetInstance()?.SetCreditGranted(updates) ?? 0);
+                    try { (Application.Current.Windows.OfType<MainWindow>().FirstOrDefault())?.ReloadActiveLogQsos(); }
+                    catch (Exception swallowed) { Log.Swallow(swallowed); }
+                }
+
+                // THE GRANTED COUNTRIES THEMSELVES ARE KEPT TOO, so a country counts in the ARRL folder
+                // even when its QSO is not in HolyLogger at all (logged before HolyLogger was used).
+                var grantedCodes = credits.Select(c => c.Dxcc).Distinct().ToList();
+                dal?.SetArrlGranted(ArrlStationCall(), credits.Count, grantedCodes);
+                Log.Warn($"ARRL DXCC credits: {credits.Count} received ({grantedCodes.Count} countries), {matched} matched in "
+                         + $"{1 + otherLogs.Count} log(s), {changed} QSO(s) changed.");
+
+                await ReloadQsosAfterCheck(changed > 0);
+                ShowLotwSpinner(false);
+
+                int notHere = credits.Count - matched;
+                HolyMessageBox.Show(
+                    credits.Count == 0
+                        ? "The ARRL has no granted DXCC credits for this LoTW account.\n\n" +
+                          "Credits only come after you have applied to the ARRL for the DXCC award."
+                        : $"The ARRL has granted you {credits.Count:N0} DXCC credits, for {grantedCodes.Count:N0} countries.\n\n" +
+                          $"{matched:N0} of them were found in your logs and marked." +
+                          (notHere == 1 ? "\n\n1 is for a QSO that is not in HolyLogger. Its country still counts in this folder."
+                           : notHere > 1 ? $"\n\n{notHere:N0} are for QSOs that are not in HolyLogger. Their countries still count in this folder." : ""),
+                    "ARRL Granted DXCC", HolyMsgType.Info, this);
+            }
+            catch (OperationCanceledException)
+            {
+                ShowLotwSpinner(false);
+                HolyMessageBox.Show("Stopped — no changes were made.", "ARRL Granted DXCC", HolyMsgType.Info, this);
+            }
+            catch (Exception ex)
+            {
+                Log.Warn("ARRL DXCC credits: download failed: " + ex.Message);
+                TB_LotwStatus.Foreground = System.Windows.Media.Brushes.IndianRed;
+                TB_LotwStatus.Text = "ARRL DXCC credits download failed: " + ex.Message;
+            }
+            finally
+            {
+                ShowLotwSpinner(false);
+                BTN_GetArrlCredits.IsEnabled = true;
+                LB_Source.IsEnabled = true;
+                _checkCts?.Dispose();
+                _checkCts = null;
+            }
         }
 
         // The header button serves the two folders that can answer "just what is new", so it routes to
