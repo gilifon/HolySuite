@@ -91,6 +91,7 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
         <!-- Type a frequency, press Enter, the radio goes there. -->
@@ -216,7 +217,7 @@
              NEGATIVE MARGINS ON PURPOSE: the outer Grid holds everything 8px in from the window,
              and the blue is meant to reach the window's own edge on both sides and along the bottom,
              so it is pulled back out by exactly that 8. Its top is flush with the divider. -->
-        <Border Grid.Row="3" Grid.RowSpan="2" Background="{DynamicResource FormBg}"
+        <Border Grid.Row="3" Grid.RowSpan="3" Background="{DynamicResource FormBg}"
                 Margin="-8,0,-8,-8"/>
 
         <!-- SSB, AM and CW - one row, filled in by BuildButtons the same way ButtonGrid's cells are.
@@ -261,5 +262,49 @@
                         Background="{DynamicResource ButtonBg}"/>
             </StackPanel>
         </Grid>
+
+        <!-- THE SPLIT ROW, the bottom one: the Split button on the left, in the same first column as
+             SSB and RTTY above it, and to its right a box saying how far ABOVE the main frequency the
+             radio will transmit, in kHz (below it, with a minus). The button lights while the radio
+             says split is on - only its own answer lights it, like every other button here - and the
+             box reads "-" while split is off, because then there is no second frequency to speak of.
+             Both are written from the same OmniRig event as the rest of the panel, in ShowSplit. -->
+        <!-- The split row is a small framed yellow box: a fine rounded edge, yellow only inside it,
+             and a narrow margin all round where the area's own colour shows. -->
+        <Border Grid.Row="5" Margin="2,4,2,0" Padding="2" CornerRadius="8"
+                BorderThickness="1" BorderBrush="#9E9D24" Background="#FFEB3B">
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition/>
+                <ColumnDefinition/>
+                <ColumnDefinition/>
+            </Grid.ColumnDefinitions>
+            <ToggleButton x:Name="SplitButton" Grid.Column="0" Content="SPLIT"
+                          Style="{StaticResource PanelToggleStyle}" Margin="4,4,2,4"
+                          Click="SplitButton_Click"
+                          ToolTip="Split: transmit on the radio's other VFO. The box shows how far above (or below) the main frequency that is, in kHz."/>
+            <Grid Grid.Column="1" Grid.ColumnSpan="2">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <!-- A real box: type the offset and press Enter, or roll the wheel over it (1 kHz a
+                     notch). Read-only, and showing a dash, while split is off. -->
+                <TextBox x:Name="SplitOffsetBox" Height="34" Margin="2,4,4,4" VerticalAlignment="Center"
+                         Text="&#x2014;" FontSize="18" FontWeight="Bold" MaxLength="6"
+                         HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                         Cursor="ScrollNS"
+                         Background="{DynamicResource ControlBg}" Foreground="{DynamicResource TextBrush}"
+                         BorderBrush="{DynamicResource InputBorder}" BorderThickness="1"
+                         PreviewTextInput="SplitOffsetBox_PreviewTextInput"
+                         KeyDown="SplitOffsetBox_KeyDown"
+                         PreviewMouseWheel="SplitOffsetBox_PreviewMouseWheel"
+                         LostFocus="SplitOffsetBox_LostFocus"/>
+                <TextBlock Grid.Column="1" Text="kHz/UP" FontSize="14" FontWeight="Bold"
+                           VerticalAlignment="Center" Margin="0,0,6,0"
+                           Foreground="Black"/>
+            </Grid>
+        </Grid>
+        </Border>
     </Grid>
 </Window>

@@ -1676,6 +1676,9 @@ namespace HolyLogger
             double khz = 0;
             string mode = null;
             bool? transmitting = null;
+            bool canSplit = false;
+            bool? splitOn = null;
+            double splitOffsetKhz = 0;
 
             if (online)
             {
@@ -1709,6 +1712,20 @@ namespace HolyLogger
                     var txState = Rig.Tx;
                     if (txState == (OmniRig.RigParamX)PM_TX) transmitting = true;
                     else if (txState == (OmniRig.RigParamX)PM_RX) transmitting = false;
+
+                    // Split: the radio's own word on whether it is on, and how far above the main
+                    // frequency it transmits. A rig that does not say stays unlit.
+                    canSplit = RigCanSplit();
+                    if (canSplit)
+                    {
+                        var splitState = Rig.Split;
+                        if (splitState == (OmniRig.RigParamX)PM_SPLITON) splitOn = true;
+                        else if (splitState == (OmniRig.RigParamX)PM_SPLITOFF) splitOn = false;
+                        if (splitOn == true)
+                            splitOffsetKhz = ((double)Rig.GetTxFrequency() - (double)Rig.GetRxFrequency()) / 1000.0;
+                        else if (splitOn == false)
+                            splitOffsetKhz = SplitOffsetIfSwitchedOn();
+                    }
                 }
                 catch (Exception swallowed)
                 {
@@ -1721,8 +1738,103 @@ namespace HolyLogger
             // buttons light, RTTY in its yellow beside SSB in its blue.
             radioPanel.RttyOverSsb = online && rttyDecodeWindow != null && RttyByAfsk()
                                      && string.Equals(mode, "SSB", StringComparison.OrdinalIgnoreCase);
-            try { radioPanel.ShowRigState(online, khz, mode, transmitting); }
+            try { radioPanel.ShowRigState(online, khz, mode, transmitting); radioPanel.ShowSplit(online, canSplit, splitOn, splitOffsetKhz); }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        // ---- split: the radio's other VFO ----------------------------------------------------------
+        //
+        // Split is switched with PM_SPLITON / PM_SPLITOFF and the transmit frequency is simply the
+        // radio's other VFO, written through FreqA / FreqB. SetSplitMode is not used: what it does to the
+        // VFOs differs from radio to radio.
+
+        internal bool RigCanSplit()
+        {
+            try
+            {
+                if (Rig == null) return false;
+                if (_writeableParamsCache < 0) _writeableParamsCache = (int)Rig.WriteableParams;
+                int c = _writeableParamsCache;
+                return (c & PM_SPLITON) != 0 && (c & PM_SPLITOFF) != 0 && (c & PM_FREQA) != 0 && (c & PM_FREQB) != 0;
+            }
+            catch (Exception swallowed)
+            {
+                Log.Swallow(swallowed);
+                _writeableParamsCache = -1;
+                return false;
+            }
+        }
+
+        // The VFO that is NOT the main one: A unless the radio is listening on B alone.
+        private bool OtherVfoIsA(long rxHz)
+        {
+            long a = Rig.FreqA, b = Rig.FreqB;
+            return rxHz == b && rxHz != a;
+        }
+
+        // What the box shows (in grey) while split is off: where the other VFO would be used - its
+        // present offset when that is already inside the From..To window, otherwise the From value,
+        // exactly what switching split on would do.
+        private double SplitOffsetIfSwitchedOn()
+        {
+            int from = Math.Max(1, Properties.Settings.Default.SplitRangeFromKhz);
+            int to = Math.Max(from, Properties.Settings.Default.SplitRangeToKhz);
+            long rx = Rig.GetRxFrequency();
+            if (rx <= 0) return from;
+            long other = OtherVfoIsA(rx) ? Rig.FreqA : Rig.FreqB;
+            double off = (other - rx) / 1000.0;
+            return (off < from - 0.0001 || off > to + 0.0001) ? from : off;
+        }
+
+        /// <summary>Switch split on or off. Switching on first moves the other VFO into the From..To window, so it never starts on a leftover frequency far away.</summary>
+        internal void ToggleRadioSplit(int fromKhz, int toKhz)
+        {
+            try
+            {
+                if (!RigCanSplit() || Rig.Status != OmniRig.RigStatusX.ST_ONLINE) return;
+
+                if (Rig.Split == (OmniRig.RigParamX)PM_SPLITON)
+                {
+                    Rig.Split = (OmniRig.RigParamX)PM_SPLITOFF;
+                }
+                else
+                {
+                    long rx = Rig.GetRxFrequency();
+                    if (rx <= 0) return;
+                    bool otherIsA = OtherVfoIsA(rx);
+                    long other = otherIsA ? Rig.FreqA : Rig.FreqB;
+                    double offKhz = (other - rx) / 1000.0;
+                    if (offKhz < fromKhz - 0.0001 || offKhz > toKhz + 0.0001)
+                    {
+                        int hz = (int)(rx + (long)fromKhz * 1000);
+                        if (otherIsA) Rig.FreqA = hz; else Rig.FreqB = hz;
+                    }
+                    Rig.Split = (OmniRig.RigParamX)PM_SPLITON;
+                }
+            }
+            catch (Exception swallowed)
+            {
+                Log.Swallow(swallowed);
+                _writeableParamsCache = -1;
+            }
+        }
+
+        /// <summary>Put the transmit VFO this many kHz above the main frequency.</summary>
+        internal void SetSplitOffsetKhz(double offsetKhz)
+        {
+            try
+            {
+                if (!RigCanSplit() || Rig.Status != OmniRig.RigStatusX.ST_ONLINE) return;
+                long rx = Rig.GetRxFrequency();
+                if (rx <= 0) return;
+                int hz = (int)Math.Round(rx + offsetKhz * 1000.0);
+                if (OtherVfoIsA(rx)) Rig.FreqA = hz; else Rig.FreqB = hz;
+            }
+            catch (Exception swallowed)
+            {
+                Log.Swallow(swallowed);
+                _writeableParamsCache = -1;
+            }
         }
 
         // ---- the wheel's own way to the radio ------------------------------------------------

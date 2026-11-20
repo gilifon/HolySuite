@@ -126,5 +126,20 @@
                 <TextBlock Text="Spectrum width manager" VerticalAlignment="Center"/>
             </StackPanel>
         </Button>
+
+        <!-- SPLIT RANGE (his request): the split box on the panel moves the radio's other VFO only
+             inside this window, kHz above the main frequency. 5 to 10 is what DX stations usually
+             listen on. -->
+        <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
+            <TextBlock FontSize="16" VerticalAlignment="Center"><Run FontWeight="Bold" Text="Split"/><Run Text=" range on the panel:  from"/></TextBlock>
+            <TextBox x:Name="TB_SplitFrom" Width="50" Height="30" FontSize="16" MaxLength="2" Margin="8,0,8,0"
+                     HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                     PreviewTextInput="SplitBox_PreviewTextInput" LostFocus="SplitBox_LostFocus"/>
+            <TextBlock Text="to" FontSize="16" VerticalAlignment="Center"/>
+            <TextBox x:Name="TB_SplitTo" Width="50" Height="30" FontSize="16" MaxLength="2" Margin="8,0,8,0"
+                     HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                     PreviewTextInput="SplitBox_PreviewTextInput" LostFocus="SplitBox_LostFocus"/>
+            <TextBlock Text="kHz above the main frequency" FontSize="16" VerticalAlignment="Center"/>
+        </StackPanel>
     </StackPanel>
 </UserControl>
