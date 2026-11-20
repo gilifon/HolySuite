@@ -3688,9 +3688,131 @@ Environment.NewLine +
             "lower(hex(randomblob(4)) || '-' || hex(randomblob(2)) || '-' || hex(randomblob(2)) || '-' || " +
             "hex(randomblob(2)) || '-' || hex(randomblob(6)))";
 
+        // ── THE ARRL'S GRANTED DXCC COUNTRIES, ONE ROW PER STATION CALLSIGN ───────────────────────────
+        //
+        // What "Get All ARRL Granted DXCC" (StatisticsWindow) last received: how many credits, and the
+        // DXCC entity numbers they are for. Kept because a granted country must count even when its QSO is
+        // not in HolyLogger at all (worked before HolyLogger was used). station_call is the base form
+        // (CallsignIdentity.Base, upper case), and is the row's natural key: two computers that each
+        // downloaded before they synced join on it (ApplySyncLines). A synced table of its own - the
+        // third kind in the diary after QSOs and logs, "granted".
+        private void EnsureArrlGrantedTable()
+        {
+            try
+            {
+                using (var cmd = new SQLiteCommand(
+                    "CREATE TABLE IF NOT EXISTS [arrl_granted] (" +
+                    "[Id] INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                    "[station_call] nvarchar(30) NOT NULL DEFAULT '', " +
+                    "[credits] INTEGER NOT NULL DEFAULT 0, " +
+                    "[codes] TEXT NOT NULL DEFAULT '', " +
+                    "[downloaded_utc] nvarchar(30) NOT NULL DEFAULT '')", con))
+                    cmd.ExecuteNonQuery();
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        public sealed class ArrlGrantedRow
+        {
+            public string StationCall, DownloadedUtc;
+            public int Credits;
+            public List<int> Codes = new List<int>();
+        }
+
+        // The row for this station callsign (any spelling: 4Z5SL/6 finds 4Z5SL); null when never downloaded.
+        public ArrlGrantedRow GetArrlGranted(string stationCall)
+        {
+            string key = CallsignIdentity.Base((stationCall ?? string.Empty).Trim()).ToUpperInvariant();
+            if (key.Length == 0) return null;
+            lock (_dbLock)
+            {
+                if (con == null || con.State != ConnectionState.Open) return null;
+                using (var cmd = new SQLiteCommand(
+                    "SELECT station_call, credits, codes, downloaded_utc FROM arrl_granted " +
+                    "WHERE station_call = @c COLLATE NOCASE ORDER BY downloaded_utc DESC LIMIT 1", con))
+                {
+                    cmd.Parameters.AddWithValue("@c", key);
+                    using (var rdr = cmd.ExecuteReader())
+                    {
+                        if (!rdr.Read()) return null;
+                        var row = new ArrlGrantedRow
+                        {
+                            StationCall = rdr.GetString(0),
+                            Credits = Convert.ToInt32(rdr.GetValue(1)),
+                            DownloadedUtc = rdr.IsDBNull(3) ? "" : rdr.GetString(3),
+                        };
+                        foreach (string p in (rdr.IsDBNull(2) ? "" : rdr.GetString(2)).Split(','))
+                            if (int.TryParse(p.Trim(), out int code) && code > 0) row.Codes.Add(code);
+                        return row;
+                    }
+                }
+            }
+        }
+
+        // Replaces this station callsign's row (one row per callsign). The sync triggers send it on.
+        public void SetArrlGranted(string stationCall, int credits, IEnumerable<int> codes)
+        {
+            string key = CallsignIdentity.Base((stationCall ?? string.Empty).Trim()).ToUpperInvariant();
+            if (key.Length == 0) return;
+            string list = string.Join(",", (codes ?? Enumerable.Empty<int>()).Where(c => c > 0).Distinct().OrderBy(c => c));
+            string at = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture);
+            lock (_dbLock)
+            {
+                if (con == null || con.State != ConnectionState.Open) return;
+                using (var tx = con.BeginTransaction())
+                {
+                    long? id = null;
+                    using (var cmd = new SQLiteCommand("SELECT Id FROM arrl_granted WHERE station_call = @c COLLATE NOCASE ORDER BY Id LIMIT 1", con, tx))
+                    {
+                        cmd.Parameters.AddWithValue("@c", key);
+                        object o = cmd.ExecuteScalar();
+                        if (o != null && o != DBNull.Value) id = Convert.ToInt64(o);
+                    }
+                    using (var cmd = new SQLiteCommand(id.HasValue
+                        ? "UPDATE arrl_granted SET station_call = @c, credits = @n, codes = @l, downloaded_utc = @a WHERE Id = @id"
+                        : "INSERT INTO arrl_granted (station_call, credits, codes, downloaded_utc) VALUES (@c, @n, @l, @a)", con, tx))
+                    {
+                        cmd.Parameters.AddWithValue("@c", key);
+                        cmd.Parameters.AddWithValue("@n", credits);
+                        cmd.Parameters.AddWithValue("@l", list);
+                        cmd.Parameters.AddWithValue("@a", at);
+                        if (id.HasValue) cmd.Parameters.AddWithValue("@id", id.Value);
+                        cmd.ExecuteNonQuery();
+                    }
+                    tx.Commit();
+                }
+            }
+        }
+
+        // An arriving granted row with the station callsign a row here has: the same row.
+        private long? SameGrantedHere(Dictionary<string, object> fields, SQLiteTransaction tx)
+        {
+            if (!fields.TryGetValue("station_call", out object c) || c == null) return null;
+            string call = Convert.ToString(c).Trim();
+            if (call.Length == 0) return null;
+            using (var cmd = new SQLiteCommand("SELECT Id FROM arrl_granted WHERE station_call = @c COLLATE NOCASE ORDER BY Id LIMIT 1", con, tx))
+            {
+                cmd.Parameters.AddWithValue("@c", call);
+                object o = cmd.ExecuteScalar();
+                return o == null || o == DBNull.Value ? (long?)null : Convert.ToInt64(o);
+            }
+        }
+
+        // The diary's name for each synced table, and back. The alias table and the triggers use the
+        // table name; the journal and the diary lines use these.
+        public static string SyncKindOfTable(string table)
+        {
+            return table == "qso" ? "qso" : table == "logs" ? "log" : table == "arrl_granted" ? "granted" : null;
+        }
+
+        public static string SyncTableOfKind(string kind)
+        {
+            return kind == "qso" ? "qso" : kind == "log" ? "logs" : kind == "granted" ? "arrl_granted" : null;
+        }
+
         private void AddSyncIds()
         {
-            foreach (string table in new[] { "qso", "logs" })
+            foreach (string table in SyncTables)
             {
                 try
                 {
@@ -3733,7 +3855,7 @@ Environment.NewLine +
         // The triggers are taken away while UpdateSchema runs - its upgrades are done by every computer
         // for itself, not changes for the diary - and made again at its end, from the columns the table
         // has then, so a column added by a later version is covered without anyone remembering to.
-        private static readonly string[] SyncTables = { "qso", "logs" };
+        private static readonly string[] SyncTables = { "qso", "logs", "arrl_granted" };
 
         private void DropSyncJournalTriggers()
         {
@@ -3814,7 +3936,7 @@ Environment.NewLine +
 
                 foreach (string t in SyncTables)
                 {
-                    string kind = t == "qso" ? "qso" : "log";
+                    string kind = SyncKindOfTable(t);
                     var changed = new List<string>();
                     using (var cmd = new SQLiteCommand("SELECT name FROM pragma_table_info('" + t + "')", con))
                     using (var rdr = cmd.ExecuteReader())
@@ -3990,7 +4112,7 @@ Environment.NewLine +
         public List<SyncNote> AllRowsAsNotes(string table, long afterId, int max)
         {
             var list = new List<SyncNote>();
-            string kind = table == "qso" ? "qso" : "log";
+            string kind = SyncKindOfTable(table);
             lock (_dbLock)
             {
                 if (con == null || con.State != ConnectionState.Open) return list;
@@ -4126,6 +4248,7 @@ Environment.NewLine +
 
                     var order = lines.Where(l => l.What == "log" && l.Op == "put")
                         .Concat(lines.Where(l => l.What == "qso"))
+                        .Concat(lines.Where(l => l.What != "log" && l.What != "qso"))   // "granted", and kinds unknown here (skipped below)
                         .Concat(lines.Where(l => l.What == "log" && l.Op == "del"));
                     var copyTargets = new List<KeyValuePair<long, string>>();
 
@@ -4134,13 +4257,15 @@ Environment.NewLine +
                         try
                         {
                             if (string.IsNullOrEmpty(l.Id) || string.IsNullOrEmpty(l.At)) { r.Skipped++; continue; }
-                            string table = l.What == "qso" ? "qso" : l.What == "log" ? "logs" : null;
+                            string table = SyncTableOfKind(l.What);
                             if (table == null) { r.Skipped++; continue; }
 
                             long? localId = LocalIdOfSync(table, l.Id, tx);
                             if (!localId.HasValue && l.Op == "put" && l.Fields != null)
                             {
-                                localId = table == "logs" ? SameNamedLog(l.Fields, tx) : SameQsoHere(l.Fields, tx);
+                                localId = table == "logs" ? SameNamedLog(l.Fields, tx)
+                                        : table == "qso" ? SameQsoHere(l.Fields, tx)
+                                        : SameGrantedHere(l.Fields, tx);
                                 if (localId.HasValue) AddSyncAlias(l.Id, table, localId.Value, tx);
                             }
                             // a row joined with one here keeps the times of the row here
@@ -4164,12 +4289,14 @@ Environment.NewLine +
                                         }
                                         DeleteLogRows(localId.Value, tx);
                                     }
-                                    else
+                                    else if (table == "qso")
                                     {
                                         if (LogIdOfQso(localId.Value, tx) == ActiveLogId) r.ActiveLogTouched = true;
                                         Exec("DELETE FROM [qso_fix] WHERE [qso_id] = @id", tx, localId.Value);
                                         Exec("DELETE FROM qso WHERE Id = @id", tx, localId.Value);
                                     }
+                                    else
+                                        Exec("DELETE FROM " + table + " WHERE Id = @id", tx, localId.Value);
                                 }
                                 NoteSyncTime(timeId, l.At, tx);
                                 r.Applied++;
@@ -4178,7 +4305,7 @@ Environment.NewLine +
 
                             if (l.Op != "put" || l.Fields == null) { r.Skipped++; continue; }
                             var f = l.Fields;
-                            var cols = table == "qso" ? qsoCols : logCols;
+                            var cols = table == "qso" ? qsoCols : table == "logs" ? logCols : SyncColumns(table);
                             var values = new Dictionary<string, object>();
                             foreach (var c in cols)
                             {
@@ -5617,6 +5744,33 @@ Environment.NewLine +
                     cmd.Parameters.Add(new SQLiteParameter("@id", (long)qso.id));
                     cmd.ExecuteNonQuery();
                 }
+            }
+        }
+
+        // Writes the ADIF CREDIT_GRANTED list onto QSOs, by local Id - used by "Get All ARRL Granted DXCC".
+        // Stored on the QSO itself, like every other confirmation mark, so it reaches the other computers
+        // through Google Drive Sync with the rest of the QSO. Returns how many rows changed.
+        public int SetCreditGranted(IDictionary<long, string> values)
+        {
+            if (values == null || values.Count == 0) return 0;
+            lock (_dbLock)
+            {
+                if (con == null || con.State != System.Data.ConnectionState.Open) return 0;
+                int changed = 0;
+                using (var tx = con.BeginTransaction())
+                using (var cmd = new SQLiteCommand("UPDATE qso SET credit_granted = @v WHERE Id = @id", con, tx))
+                {
+                    cmd.Parameters.Add(new SQLiteParameter("@v"));
+                    cmd.Parameters.Add(new SQLiteParameter("@id"));
+                    foreach (var p in values)
+                    {
+                        cmd.Parameters["@v"].Value = p.Value;
+                        cmd.Parameters["@id"].Value = p.Key;
+                        changed += cmd.ExecuteNonQuery();
+                    }
+                    tx.Commit();
+                }
+                return changed;
             }
         }
 
@@ -7378,6 +7532,7 @@ Environment.NewLine +
                     fixCopies.ExecuteNonQuery();
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
+            EnsureArrlGrantedTable();   // before AddSyncIds: it is a synced table
             AddSyncIds();
             EnsureEqslAccountsTable();
             EnsureTryAgainTable();

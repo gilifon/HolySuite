@@ -34,6 +34,10 @@ namespace HolyLogger
     //   {"at":"...Z","what":"qso","op":"put","id":"<sync_id>","fields":{...the whole QSO...}}
     //   {"at":"...Z","what":"qso","op":"del","id":"<sync_id>"}
     //
+    // "what" is "qso", "log", or (since 2026-11-20) "granted": the ARRL's granted DXCC countries of one
+    // station callsign (DataAccess.EnsureArrlGrantedTable). An older HolyLogger skips a kind it does not
+    // know.
+    //
     // "put" carries the WHOLE row as it is now - not just what changed - so a reader only ever has to
     // take the latest line for a QSO, and reading one line twice does no harm. The local numbers that
     // mean nothing on another computer are replaced by sync ids: log_id becomes "log", source_qso_id
@@ -164,8 +168,10 @@ namespace HolyLogger
             int written = 0;
             var qsoIds = ordered.Where(n => n.Kind == "qso" && n.Op == "put").Select(n => n.RowId).ToList();
             var logIds = ordered.Where(n => n.Kind == "log" && n.Op == "put").Select(n => n.RowId).ToList();
+            var grantedIds = ordered.Where(n => n.Kind == "granted" && n.Op == "put").Select(n => n.RowId).ToList();
             var qsos = dal.ReadRowsForSync("qso", qsoIds);
             var logs = dal.ReadRowsForSync("logs", logIds);
+            var granted = dal.ReadRowsForSync("arrl_granted", grantedIds);
 
             // the local numbers inside the rows, as sync ids
             var logRefs = new HashSet<long>();
@@ -197,7 +203,8 @@ namespace HolyLogger
                 }
                 else
                 {
-                    var rows = n.Kind == "qso" ? qsos : logs;
+                    var rows = n.Kind == "qso" ? qsos : n.Kind == "log" ? logs : n.Kind == "granted" ? granted : null;
+                    if (rows == null) continue;
                     if (!rows.TryGetValue(n.RowId, out var row)) continue;   // gone already; its del follows
                     if (!row.TryGetValue("sync_id", out object id)) continue;
                     sid = id.ToString();
@@ -338,7 +345,8 @@ namespace HolyLogger
                     using (var z = new GZipStream(fs, CompressionLevel.Optimal))
                     using (var w = new StreamWriter(z, new UTF8Encoding(false)))
                     {
-                        foreach (string table in new[] { "logs", "qso" })   // logs first: a QSO names its log
+                        // logs first: a QSO names its log. Then the ARRL's granted countries.
+                        foreach (string table in new[] { "logs", "qso", "arrl_granted" })
                         {
                             long after = 0;
                             while (true)
