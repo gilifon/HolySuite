@@ -428,6 +428,7 @@ namespace HolyLogger
             _rigOnline = rigOnline;
             _rigKhz = khz;
             _transmitting = transmitting;
+            if (!rigOnline) ShowSplit(false, false, null, 0);
             ShowTxRx(rigOnline ? transmitting : null);
             ShowWwffHint();
 
@@ -500,6 +501,103 @@ namespace HolyLogger
 
             // The digits may have shifted under a mouse that never moved.
             ShowWheelZone();
+        }
+
+        // ---- split ------------------------------------------------------------------------------
+        //
+        // The button follows the radio's own answer (like every other lamp here): a click asks the
+        // radio, and the lamp lights only when the radio says split is on. The box beside it shows how
+        // many kHz the transmit VFO sits above the main frequency, and can be changed - by typing or
+        // by the wheel - but only inside the From..To range set on the Options page (5 to 10 as
+        // delivered), because that is where DX stations listen in split.
+
+        private bool? _splitOn;
+        private double _splitOffsetKhz;
+
+        private static int SplitFrom { get { return Math.Max(1, Properties.Settings.Default.SplitRangeFromKhz); } }
+        private static int SplitTo { get { return Math.Max(SplitFrom, Properties.Settings.Default.SplitRangeToKhz); } }
+
+        public void ShowSplit(bool rigOnline, bool canSplit, bool? splitOn, double offsetKhz)
+        {
+            _splitOn = rigOnline && canSplit ? splitOn : null;
+            _splitOffsetKhz = offsetKhz;
+
+            SplitButton.IsEnabled = rigOnline && canSplit;
+            SplitButton.IsChecked = _splitOn == true;
+            SplitOffsetBox.IsEnabled = rigOnline && canSplit && _splitOn == true;
+            // Grey while split is not on: the number means nothing then.
+            if (_splitOn == true) SplitOffsetBox.SetResourceReference(TextBox.ForegroundProperty, "TextBrush");
+            else SplitOffsetBox.Foreground = System.Windows.Media.Brushes.Gray;
+            SplitOffsetBox.ToolTip = "Wheel or type: " + SplitFrom + " to " + SplitTo + " kHz above the main frequency. The range is set under Options.";
+
+            // Never rewritten under the user's fingers while they type.
+            if (!SplitOffsetBox.IsKeyboardFocused)
+                SplitOffsetBox.Text = _splitOn != null ? OffsetText(offsetKhz) : "\u2014";
+        }
+
+        private static string OffsetText(double khz)
+        {
+            return khz.ToString("0.#", CultureInfo.InvariantCulture);
+        }
+
+        private void SplitButton_Click(object sender, RoutedEventArgs e)
+        {
+            // The click flipped the button; put it back - the radio's answer lights it.
+            SplitButton.IsChecked = _splitOn == true;
+            if (_main != null) _main.ToggleRadioSplit(SplitFrom, SplitTo);
+        }
+
+        private void SendSplitOffset(int khz)
+        {
+            khz = Math.Max(SplitFrom, Math.Min(SplitTo, khz));
+            _splitOffsetKhz = khz;
+            SplitOffsetBox.Text = OffsetText(khz);
+            if (_main != null) _main.SetSplitOffsetKhz(khz);
+        }
+
+        private void SplitOffsetBox_PreviewTextInput(object sender, TextCompositionEventArgs e)
+        {
+            e.Handled = !e.Text.All(char.IsDigit);
+        }
+
+        private void SplitOffsetBox_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Enter)
+            {
+                CommitSplitText();
+                Keyboard.ClearFocus();
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Escape)
+            {
+                SplitOffsetBox.Text = _splitOn == true ? OffsetText(_splitOffsetKhz) : "\u2014";
+                Keyboard.ClearFocus();
+                e.Handled = true;
+            }
+        }
+
+        private void SplitOffsetBox_LostFocus(object sender, RoutedEventArgs e)
+        {
+            CommitSplitText();
+        }
+
+        private void CommitSplitText()
+        {
+            if (_splitOn != true) return;
+            int typed;
+            if (int.TryParse(SplitOffsetBox.Text, NumberStyles.None, CultureInfo.InvariantCulture, out typed)
+                && Math.Abs(typed - _splitOffsetKhz) > 0.0001)
+                SendSplitOffset(typed);
+            else
+                SplitOffsetBox.Text = OffsetText(_splitOffsetKhz);
+        }
+
+        private void SplitOffsetBox_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
+        {
+            e.Handled = true;
+            if (_splitOn != true || e.Delta == 0) return;
+            int current = (int)Math.Round(_splitOffsetKhz);
+            SendSplitOffset(current + (e.Delta > 0 ? 1 : -1));
         }
 
         /// <summary>
