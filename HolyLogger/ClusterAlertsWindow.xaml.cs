@@ -36,10 +36,7 @@ namespace HolyLogger
             _loading = true;
             try
             {
-                if (_main != null)
-                    foreach (string call in _main.GetClusterAlertCallsigns())
-                        Add(new AlertCall { Call = call });
-                EnsureTrailingEmptyLine();
+                LoadRows();
             }
             finally { _loading = false; }
 
@@ -79,12 +76,23 @@ namespace HolyLogger
             try
             {
                 _calls.Clear();
-                if (_main != null)
-                    foreach (string call in _main.GetClusterAlertCallsigns())
-                        Add(new AlertCall { Call = call });
-                EnsureTrailingEmptyLine();
+                LoadRows();
             }
             finally { _loading = false; }
+        }
+
+        // The saved list, with each line's Any Mode box. The settings keep only the callsigns whose box
+        // is CLEARED, so a list written before the box existed comes back ticked throughout.
+        private void LoadRows()
+        {
+            if (_main != null)
+            {
+                var limited = new HashSet<string>(_main.GetClusterAlertModeLimitedCallsigns(),
+                                                  StringComparer.OrdinalIgnoreCase);
+                foreach (string call in _main.GetClusterAlertCallsigns())
+                    Add(new AlertCall { Call = call, AnyMode = !limited.Contains(call.Trim()) });
+            }
+            EnsureTrailingEmptyLine();
         }
 
         // A LINE IS ALWAYS WAITING AT THE BOTTOM, the same way the Favorite Channels window keeps one.
@@ -139,7 +147,16 @@ namespace HolyLogger
         // then upsets the grid (and an ObservableCollection refuses a change inside its own event).
         private void Row_PropertyChanged(object sender, PropertyChangedEventArgs e)
         {
-            if (e.PropertyName != "Call" || _loading) return;
+            if (_loading) return;
+
+            // The box is saved the moment it is clicked, like a tick in the mode boxes below.
+            if (e.PropertyName == "AnyMode")
+            {
+                SaveList();
+                return;
+            }
+
+            if (e.PropertyName != "Call") return;
             Dispatcher.BeginInvoke(new Action(TidyBlankLines),
                                    System.Windows.Threading.DispatcherPriority.Background);
         }
@@ -164,6 +181,10 @@ namespace HolyLogger
         // as "write in it", which in a window whose whole purpose is typing is one click too many.
         private void Calls_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
+            // The Any Mode box turns itself over on a click; putting its cell into edit here would only
+            // get in the way of it.
+            if (FindParentCheckBox(e.OriginalSource as DependencyObject) != null) return;
+
             var cell = FindParentCell(e.OriginalSource as DependencyObject);
             if (cell == null || cell.IsEditing) return;
 
@@ -184,6 +205,13 @@ namespace HolyLogger
             while (from != null && !(from is DataGridCell))
                 from = VisualTreeHelper.GetParent(from);
             return from as DataGridCell;
+        }
+
+        private static CheckBox FindParentCheckBox(DependencyObject from)
+        {
+            while (from != null && !(from is CheckBox) && !(from is DataGridCell))
+                from = VisualTreeHelper.GetParent(from);
+            return from as CheckBox;
         }
 
         // The grid commits the cell AFTER this event, so the save is queued behind it - reading the
@@ -348,6 +376,7 @@ namespace HolyLogger
         {
             if (_loading || _main == null) return;
             var list = new List<string>();
+            var modeLimited = new List<string>();
             var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var row in _calls)
             {
@@ -355,8 +384,9 @@ namespace HolyLogger
                 if (call.Length == 0) continue;
                 if (!seen.Add(call)) continue;
                 list.Add(call);
+                if (!row.AnyMode) modeLimited.Add(call);
             }
-            _main.SetClusterAlertCallsigns(list);
+            _main.SetClusterAlertCallsigns(list, modeLimited);
         }
 
         // One row of the grid. The setter does the tidying (trim + upper) so a callsign typed in
@@ -365,6 +395,21 @@ namespace HolyLogger
         // as the callsign is written rather than at some later moment nobody can predict.
         public sealed class AlertCall : INotifyPropertyChanged
         {
+            // ANY MODE. Every line starts ticked, which is how the watch list behaved before this box
+            // existed: the callsign is alerted whatever mode it is spotted on. Cleared, it is alerted
+            // only on the modes ticked in the CLUSTER window.
+            private bool _anyMode = true;
+            public bool AnyMode
+            {
+                get { return _anyMode; }
+                set
+                {
+                    if (_anyMode == value) return;
+                    _anyMode = value;
+                    Raise("AnyMode");
+                }
+            }
+
             private string _call = string.Empty;
             public string Call
             {
