@@ -77,6 +77,10 @@ static class FistKeyer
         new Fist { Name = "bug",      Wpm = 25, Dah = 3.6, Dit = 1.0,  ElemGap = 1.0,  LetterGap = 3.5, WordGap = 8.0,  Jitter = 0.16, Drift = 0.05, Hesitate = 0.04, BugDits = true },
         new Fist { Name = "sloppy",   Wpm = 18, Dah = 3.4, Dit = 1.1,  ElemGap = 1.15, LetterGap = 4.2, WordGap = 9.5,  Jitter = 0.22, Drift = 0.12, Hesitate = 0.08 },
         new Fist { Name = "hesitant", Wpm = 20, Dah = 3.2, Dit = 1.0,  ElemGap = 1.0,  LetterGap = 3.4, WordGap = 8.0,  Jitter = 0.12, Drift = 0.08, Hesitate = 0.18 },
+        // added 2026-10-18 after the first on-air training session: the network lost the IC-7610 bench's French QSO
+        // at about 30 WPM, and no fist above went faster than 28
+        new Fist { Name = "racer",    Wpm = 31, Dah = 3.0, Dit = 0.95, ElemGap = 0.95, LetterGap = 3.0, WordGap = 6.5,  Jitter = 0.10, Drift = 0.05, Hesitate = 0.01 },
+        new Fist { Name = "blitz",    Wpm = 35, Dah = 3.1, Dit = 1.0,  ElemGap = 1.0,  LetterGap = 2.9, WordGap = 6.0,  Jitter = 0.09, Drift = 0.04, Hesitate = 0.01, BugDits = true },
     };
 
     // ---------------------------------------------------------------- texts
@@ -91,6 +95,24 @@ static class FistKeyer
     static readonly string[] Ants = { "DIPOLE", "YAGI", "VERTICAL", "LOOP", "WINDOM", "BEAM", "LONG WIRE", "HEXBEAM" };
     static readonly string[] Wx = { "SUNNY", "CLOUDY", "RAIN", "WARM", "COLD", "WINDY", "FOG", "HOT", "SNOW" };
     static readonly string[] Words = { "TNX", "FER", "CALL", "UR", "SIGS", "FB", "OM", "HR", "ES", "PSE", "AGN", "QSL", "VIA", "BURO", "LOTW", "HPE", "CUAGN", "GL", "DX", "73", "88", "QRM", "QSB", "QRN", "RIG", "ANT", "PWR", "WATTS", "WX", "TEMP", "NAME", "QTH", "RST", "CONDX", "BAND", "OPEN", "NICE", "SOLID", "COPY", "AR", "BK" };
+
+    // Other languages' QSO words (2026-10-18): the network learned English and ham talk only, and on the IC-7610
+    // bench's French QSO it wrote nonsense for words it had never seen. DELIBERATELY NOT the bench's own words
+    // (MERCI, POUR CE, AU PLAISIR, BONNE, SOIR) - teaching those would win that bench by memory, not by reading.
+    static readonly string[] Foreign = {
+        "AMITIES", "SALUT", "TRES BIEN", "A BIENTOT", "CHER AMI", "BEAUCOUP", "SIGNAL FORT", "COPIE", "RAPPORT", "BON TRAFIC", "VOTRE", "NOUS",
+        "VIELEN DANK", "AUF WIEDERHOREN", "GUTEN ABEND", "LIEBER", "SCHONES WOCHENENDE", "BIS BALD", "GRUSSE", "RAPPORT GUT",
+        "GRACIAS", "HASTA PRONTO", "BUENAS NOCHES", "AMIGO", "SALUDOS", "MUY BIEN", "SENAL",
+        "GRAZIE MILLE", "ARRIVEDERCI", "BUONA SERATA", "CIAO", "SALUTI", "SEGNALE", "OTTIMO",
+        "DOBRY DEN", "DEKUJI", "DZIEKUJE", "SPASIBO", "HYVAA", "TACK", "OBRIGADO", "EFHARISTO" };
+
+    static string Group(Random r, bool digits)
+    {
+        const string L = "ABCDEFGHIJKLMNOPQRSTUVWXYZ", D = "0123456789", M = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789/?";
+        var sb = new StringBuilder();
+        for (int i = 0; i < 5; i++) sb.Append(digits ? (i % 2 == 0 ? D : M)[r.Next(digits ? (i % 2 == 0 ? 10 : M.Length) : 26)] : L[r.Next(26)]);
+        return sb.ToString();
+    }
 
     static string Call(Random r)
     {
@@ -114,7 +136,7 @@ static class FistKeyer
     {
         var parts = new List<string>();
         string other = Call(r);
-        int kind = r.Next(4);
+        int kind = r.Next(6);
         if (kind == 0)
         {
             parts.Add(other + " DE 4Z5SL");
@@ -135,6 +157,26 @@ static class FistKeyer
             parts.Add(Call(r) + " " + Rst(r) + " " + (1 + r.Next(999)).ToString("000"));
             parts.Add(Call(r) + " " + Rst(r) + " " + (1 + r.Next(999)).ToString("000"));
             parts.Add("QRZ? " + Call(r));
+        }
+        else if (kind == 4)
+        {
+            // a ragchew in another language, with the calls and report a real one has
+            parts.Add(other + " DE 4Z5SL");
+            var w = new List<string>();
+            for (int i = 0; i < 6; i++) w.Add(Foreign[r.Next(Foreign.Length)]);
+            parts.Add(string.Join(" ", w.Take(3)) + " " + Rst(r));
+            parts.Add(string.Join(" ", w.Skip(3)));
+            parts.Add(Names[r.Next(Names.Length)] + " " + Places[r.Next(Places.Length)]);
+        }
+        else if (kind == 5)
+        {
+            // code groups: letters with no meaning, so it must READ them - no word to guess from
+            var g = new List<string>();
+            for (int i = 0; i < 5; i++) g.Add(Group(r, false));
+            parts.Add(string.Join(" ", g));
+            g.Clear();
+            for (int i = 0; i < 4; i++) g.Add(Group(r, true));
+            parts.Add(string.Join(" ", g));
         }
         else
         {
