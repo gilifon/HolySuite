@@ -109,6 +109,10 @@ namespace HolyLogger
 
         public StatisticsWindow(ObservableCollection<QSO> qsos)
         {
+            // Width of the last worked-table column, header and rows alike (see UpdateWorkedSortHeaders).
+            Resources["ConfColWidth"] = 102.0;
+            Resources["WorkedNameWidth"] = 190.0;   // set to the longest name each time a table fills
+            Resources["MissingNameWidth"] = 190.0;
             InitializeComponent();
             _allQsos = qsos;
 
@@ -5259,6 +5263,7 @@ namespace HolyLogger
             for (int i = 0; i < sorted.Count; i++)
                 sorted[i].RowBg = i % 2 == 0 ? ThemeManager.Brush("GridRowBg") : ThemeManager.Brush("GridAltRowBg");
 
+            Resources["WorkedNameWidth"] = NameColumnWidth(sorted, TB_SortWorkedName);
             IC_WorkedCountries.ItemsSource = sorted;
             UpdateWorkedSortHeaders();
         }
@@ -5276,8 +5281,24 @@ namespace HolyLogger
             for (int i = 0; i < sorted.Count; i++)
                 sorted[i].RowBg = i % 2 == 0 ? ThemeManager.Brush("GridRowBg") : ThemeManager.Brush("GridAltRowBg");
 
+            Resources["MissingNameWidth"] = NameColumnWidth(sorted, TB_SortMissingName);
             IC_MissingCountries.ItemsSource = sorted;
             UpdateMissingSortHeaders();
+        }
+
+        // The Country column is as wide as the longest name IN THIS TABLE (never narrower than its
+        // "Country ▲" header), so a short list carries no blank gap. A fixed 190 fitted the longest
+        // DXCC name of all ("Tristan da Cunha & Gough", 187) and left most lists half empty.
+        private double NameColumnWidth(IEnumerable<CountryItem> rows, TextBlock header)
+        {
+            var dpi = VisualTreeHelper.GetDpi(this).PixelsPerDip;
+            var face = new Typeface(header.FontFamily, FontStyles.Normal, FontWeights.Normal, FontStretches.Normal);
+            var bold = new Typeface(header.FontFamily, FontStyles.Normal, FontWeights.Bold, FontStretches.Normal);
+            Func<string, Typeface, double> measure = (s, t) => new FormattedText(s ?? "", System.Globalization.CultureInfo.CurrentCulture,
+                FlowDirection.LeftToRight, t, 16, Brushes.Black, dpi).WidthIncludingTrailingWhitespace;
+            double w = measure("Country ▲", bold);
+            foreach (var r in rows) w = Math.Max(w, measure(r.Name, face));
+            return Math.Ceiling(w) + 6;
         }
 
         private void UpdateWorkedSortHeaders()
@@ -5285,9 +5306,9 @@ namespace HolyLogger
             TB_SortWorkedName.Text  = _workedSort == WorkedSort.NameAsc  ? "Country ▲"
                                     : _workedSort == WorkedSort.NameDesc ? "Country ▼"
                                     :                                       "Country";
-            TB_SortWorkedCount.Text = _workedSort == WorkedSort.CountDesc ? "Count ▼"
-                                    : _workedSort == WorkedSort.CountAsc  ? "Count ▲"
-                                    :                                        "Count";
+            TB_SortWorkedCount.Text = _workedSort == WorkedSort.CountDesc ? "QSOs ▼"
+                                    : _workedSort == WorkedSort.CountAsc  ? "QSOs ▲"
+                                    :                                        "QSOs";
             // Two lines: "Country" over "Code", the sort arrow beside the second. \n in a TextBlock's Text
             // is a line break, so the header can still be assigned as one string from here.
             TB_SortWorkedCode.Text  = _workedSort == WorkedSort.CodeAsc  ? "Country\nCode ▲"
@@ -5295,8 +5316,11 @@ namespace HolyLogger
                                     :                                      "Country\nCode";
             // Blank on the Worked folder (no confirmation source), so there is no "Conf." header over an
             // empty column.
-            // "Gr." on the ARRL folder: what it marks there is a GRANTED credit, not a confirmation.
-            string confWord = _source == ConfSource.Award ? "Gr." : "Conf.";
+            // "Granted" on the ARRL folder: what it marks there is a GRANTED credit, not a confirmation.
+            // The word is written out in full, so that column is wider there ("Granted ▼" measures 79
+            // in bold 16, "Confirmed ▼" 98); the header and the rows share the ConfColWidth resource so they stay lined up.
+            string confWord = _source == ConfSource.Award ? "Granted" : "Confirmed";
+            Resources["ConfColWidth"] = _source == ConfSource.Award ? 84.0 : _source == ConfSource.Worked ? 48.0 : 102.0;
             TB_SortWorkedConfirmed.Text = _source == ConfSource.Worked ? ""
                                         : _workedSort == WorkedSort.ConfirmedDesc ? confWord + " ▼"
                                         : _workedSort == WorkedSort.ConfirmedAsc  ? confWord + " ▲"

@@ -469,15 +469,15 @@
                                                            ToolTip="The ARRL DXCC entity number — click to sort by it"/>
                                                 <TextBlock Width="30"/>
                                                 <TextBlock x:Name="TB_SortWorkedName" Text="Country ▲"
-                                                           Width="160" FontSize="16" FontWeight="Bold"
+                                                           Width="{DynamicResource WorkedNameWidth}" FontSize="16" FontWeight="Bold"
                                                            VerticalAlignment="Center"
                                                            Cursor="Hand" Foreground="{DynamicResource TextBrush}"/>
-                                                <TextBlock x:Name="TB_SortWorkedCount" Text="Count ▼"
-                                                           Width="52" FontSize="16" FontWeight="Bold"
+                                                <TextBlock x:Name="TB_SortWorkedCount" Text="QSOs ▼"
+                                                           Width="66" FontSize="16" FontWeight="Bold"
                                                            VerticalAlignment="Center"
                                                            Cursor="Hand" TextAlignment="Right" Foreground="{DynamicResource TextBrush}"/>
-                                                <TextBlock x:Name="TB_SortWorkedConfirmed" Text="Conf."
-                                                           Width="48" FontSize="16" FontWeight="Bold" Margin="8,0,0,0"
+                                                <TextBlock x:Name="TB_SortWorkedConfirmed" Text="Confirmed"
+                                                           Width="{DynamicResource ConfColWidth}" FontSize="16" FontWeight="Bold" Margin="8,0,0,0"
                                                            VerticalAlignment="Center"
                                                            Cursor="Hand" TextAlignment="Center" Foreground="{DynamicResource TextBrush}"/>
                                             </StackPanel>
@@ -529,17 +529,17 @@
                                                                 <TextBlock Text="{Binding Name}" FontSize="16"
                                                                            Foreground="{DynamicResource TextBrush}"
                                                                            VerticalAlignment="Center"
-                                                                           Width="160"
+                                                                           Width="{DynamicResource WorkedNameWidth}"
                                                                            TextTrimming="CharacterEllipsis"/>
                                                                 <TextBlock Text="{Binding CountStr}" FontSize="16"
                                                                            FontWeight="Bold"
                                                                            VerticalAlignment="Center"
-                                                                           TextAlignment="Right" Width="52"
+                                                                           TextAlignment="Right" Width="66"
                                                                            Foreground="{DynamicResource AccentBrush}"/>
                                                                 <TextBlock Text="{Binding ConfirmedMark}" FontSize="16"
                                                                            FontWeight="Bold" Margin="8,0,0,0"
                                                                            VerticalAlignment="Center"
-                                                                           TextAlignment="Center" Width="48"
+                                                                           TextAlignment="Center" Width="{DynamicResource ConfColWidth}"
                                                                            Foreground="{Binding ConfirmedBrush}"
                                                                            ToolTip="{Binding ConfirmedTip}"/>
                                                             </StackPanel>
@@ -616,7 +616,7 @@
                                                            ToolTip="The ARRL DXCC entity number — click to sort by it"/>
                                                 <TextBlock Width="30"/>
                                                 <TextBlock x:Name="TB_SortMissingName" Text="Country ▲"
-                                                           Width="130" FontSize="16" FontWeight="Bold"
+                                                           Width="{DynamicResource MissingNameWidth}" FontSize="16" FontWeight="Bold"
                                                            VerticalAlignment="Center"
                                                            Cursor="Hand" Foreground="{DynamicResource TextBrush}"/>
                                             </StackPanel>
@@ -657,7 +657,7 @@
                                                                 <TextBlock Text="{Binding Name}" FontSize="16"
                                                                            Foreground="{DynamicResource TextBrush}"
                                                                            VerticalAlignment="Center"
-                                                                           Width="130"
+                                                                           Width="{DynamicResource MissingNameWidth}"
                                                                            TextTrimming="CharacterEllipsis"/>
                                                             </StackPanel>
                                                         </Border>
