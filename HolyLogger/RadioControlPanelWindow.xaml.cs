@@ -528,7 +528,7 @@ namespace HolyLogger
             // Grey while split is not on: the number means nothing then.
             if (_splitOn == true) SplitOffsetBox.SetResourceReference(TextBox.ForegroundProperty, "TextBrush");
             else SplitOffsetBox.Foreground = System.Windows.Media.Brushes.Gray;
-            SplitOffsetBox.ToolTip = "Wheel or type: " + SplitFrom + " to " + SplitTo + " kHz above the main frequency. The range is set under Options.";
+            SplitOffsetBox.ToolTip = "Wheel or type: " + SplitFrom + " to " + SplitTo + " kHz above the main frequency, " + SplitStep.ToString("0.#", CultureInfo.InvariantCulture) + " kHz a notch. Range and step are set under Options.";
 
             // Never rewritten under the user's fingers while they type.
             if (!SplitOffsetBox.IsKeyboardFocused)
@@ -547,9 +547,19 @@ namespace HolyLogger
             if (_main != null) _main.ToggleRadioSplit(SplitFrom, SplitTo);
         }
 
-        private void SendSplitOffset(int khz)
+        // One wheel notch, in kHz: 0.1, 0.5 or 1, chosen on the Options page.
+        private static double SplitStep
         {
-            khz = Math.Max(SplitFrom, Math.Min(SplitTo, khz));
+            get
+            {
+                double step = Properties.Settings.Default.SplitStepKhz;
+                return step > 0.05 && step <= 1.0 ? step : 1.0;
+            }
+        }
+
+        private void SendSplitOffset(double khz)
+        {
+            khz = Math.Round(Math.Max(SplitFrom, Math.Min(SplitTo, khz)), 1);
             _splitOffsetKhz = khz;
             SplitOffsetBox.Text = OffsetText(khz);
             if (_main != null) _main.SetSplitOffsetKhz(khz);
@@ -557,7 +567,9 @@ namespace HolyLogger
 
         private void SplitOffsetBox_PreviewTextInput(object sender, TextCompositionEventArgs e)
         {
-            e.Handled = !e.Text.All(char.IsDigit);
+            // Digits and one decimal point (0.1 kHz steps are possible).
+            e.Handled = !e.Text.All(c => char.IsDigit(c) || c == '.')
+                        || (e.Text.Contains('.') && SplitOffsetBox.Text.Contains('.'));
         }
 
         private void SplitOffsetBox_KeyDown(object sender, KeyEventArgs e)
@@ -584,8 +596,8 @@ namespace HolyLogger
         private void CommitSplitText()
         {
             if (_splitOn != true) return;
-            int typed;
-            if (int.TryParse(SplitOffsetBox.Text, NumberStyles.None, CultureInfo.InvariantCulture, out typed)
+            double typed;
+            if (double.TryParse(SplitOffsetBox.Text, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out typed)
                 && Math.Abs(typed - _splitOffsetKhz) > 0.0001)
                 SendSplitOffset(typed);
             else
@@ -596,8 +608,7 @@ namespace HolyLogger
         {
             e.Handled = true;
             if (_splitOn != true || e.Delta == 0) return;
-            int current = (int)Math.Round(_splitOffsetKhz);
-            SendSplitOffset(current + (e.Delta > 0 ? 1 : -1));
+            SendSplitOffset(_splitOffsetKhz + (e.Delta > 0 ? SplitStep : -SplitStep));
         }
 
         /// <summary>

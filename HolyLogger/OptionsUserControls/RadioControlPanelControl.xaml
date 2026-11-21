@@ -141,5 +141,13 @@
                      PreviewTextInput="SplitBox_PreviewTextInput" LostFocus="SplitBox_LostFocus"/>
             <TextBlock Text="kHz above the main frequency" FontSize="16" VerticalAlignment="Center"/>
         </StackPanel>
+
+        <!-- One notch of the mouse wheel over the split box. -->
+        <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+            <TextBlock FontSize="16" VerticalAlignment="Center"><Run FontWeight="Bold" Text="Split"/><Run Text=" mouse wheel step:"/></TextBlock>
+            <RadioButton x:Name="RB_Step01" Content="0.1 kHz" Tag="0.1" FontSize="16" Margin="14,0,0,0" VerticalContentAlignment="Center" Checked="SplitStep_Checked"/>
+            <RadioButton x:Name="RB_Step05" Content="0.5 kHz" Tag="0.5" FontSize="16" Margin="14,0,0,0" VerticalContentAlignment="Center" Checked="SplitStep_Checked"/>
+            <RadioButton x:Name="RB_Step1" Content="1 kHz" Tag="1" FontSize="16" Margin="14,0,0,0" VerticalContentAlignment="Center" Checked="SplitStep_Checked"/>
+        </StackPanel>
     </StackPanel>
 </UserControl>

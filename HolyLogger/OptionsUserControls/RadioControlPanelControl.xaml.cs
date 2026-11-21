@@ -59,6 +59,20 @@ namespace HolyLogger.OptionsUserControls
             BuildActivityRows(_cota, bands);
             TB_SplitFrom.Text = Properties.Settings.Default.SplitRangeFromKhz.ToString(CultureInfo.InvariantCulture);
             TB_SplitTo.Text = Properties.Settings.Default.SplitRangeToKhz.ToString(CultureInfo.InvariantCulture);
+            double step = Properties.Settings.Default.SplitStepKhz;
+            if (Math.Abs(step - 0.1) < 0.001) RB_Step01.IsChecked = true;
+            else if (Math.Abs(step - 0.5) < 0.001) RB_Step05.IsChecked = true;
+            else RB_Step1.IsChecked = true;
+        }
+
+        private void SplitStep_Checked(object sender, RoutedEventArgs e)
+        {
+            double step;
+            var rb = sender as RadioButton;
+            if (rb == null || !double.TryParse((string)rb.Tag, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out step)) return;
+            if (Math.Abs(Properties.Settings.Default.SplitStepKhz - step) < 0.0001) return;
+            Properties.Settings.Default.SplitStepKhz = step;
+            Properties.Settings.Default.Save();
         }
 
         private bool WwffFolderOpen => LB_Folder != null && LB_Folder.SelectedIndex == 1;
