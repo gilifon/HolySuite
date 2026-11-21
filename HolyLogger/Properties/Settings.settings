@@ -743,6 +743,9 @@
     <Setting Name="ClusterAlertCallsigns" Type="System.String" Scope="User">
       <Value Profile="(Default)" />
     </Setting>
+    <Setting Name="ClusterAlertCallsignsModeLimited" Type="System.String" Scope="User">
+      <Value Profile="(Default)" />
+    </Setting>
     <Setting Name="ClusterAlertModes" Type="System.String" Scope="User">
       <Value Profile="(Default)" />
     </Setting>

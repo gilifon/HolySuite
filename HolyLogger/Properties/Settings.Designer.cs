@@ -2970,6 +2970,18 @@ namespace HolyLogger.Properties {
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string ClusterAlertCallsignsModeLimited {
+            get {
+                return ((string)(this["ClusterAlertCallsignsModeLimited"]));
+            }
+            set {
+                this["ClusterAlertCallsignsModeLimited"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
         public string ClusterAlertModes {
             get {
                 return ((string)(this["ClusterAlertModes"]));

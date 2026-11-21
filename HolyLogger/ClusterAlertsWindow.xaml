@@ -1,7 +1,7 @@
 ﻿<Window x:Class="HolyLogger.ClusterAlertsWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Alerts" Width="460" Height="580" MinWidth="400" MinHeight="430"
+        Title="Alerts" Width="560" Height="580" MinWidth="470" MinHeight="430"
         WindowStartupLocation="Manual" ShowInTaskbar="False" ResizeMode="CanResize"
         Icon="Images/crown.png"
         Background="{DynamicResource WindowBg}"
@@ -18,7 +18,7 @@
         </Grid.RowDefinitions>
 
         <TextBlock Grid.Row="0" FontSize="16" TextWrapping="Wrap" Margin="0,0,0,10">
-            <Run Text="Type a callsign on the empty line at the bottom. When one of these is spotted you hear the alert sound and the spot is framed in purple. If it is on a band you are not showing, it is pinned at the top of the spots table."/>
+            <Run Text="Type a callsign on the empty line at the bottom. When one of these is spotted you hear the alert sound and the spot is framed in purple. If it is on a band you are not showing, it is pinned at the top of the spots table. Clear Any Mode to be told about that callsign only on the modes ticked in the cluster window."/>
         </TextBlock>
 
         <DataGrid Grid.Row="1" x:Name="GRD_Calls"
@@ -117,13 +117,35 @@
                         </Style>
                     </DataGridTextColumn.ElementStyle>
                 </DataGridTextColumn>
+
+                <!-- ANY MODE (user, 2026-11-21): ticked - how every line starts - the callsign is
+                     alerted whatever mode it is spotted on. Cleared, it is alerted only on the modes
+                     ticked in the CLUSTER window. A plain CheckBox in a template column, so one click
+                     turns it over; a DataGridCheckBoxColumn needs the cell put into edit first. -->
+                <DataGridTemplateColumn Width="100" CanUserResize="False" SortMemberPath="AnyMode">
+                    <DataGridTemplateColumn.Header>
+                        <TextBlock Text="Any Mode" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                   TextAlignment="Center"
+                                   ToolTip="Ticked: alert on any mode. Cleared: alert only on the modes ticked in the cluster window."/>
+                    </DataGridTemplateColumn.Header>
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <CheckBox IsChecked="{Binding AnyMode, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                      HorizontalAlignment="Center" VerticalAlignment="Center"
+                                      ToolTip="Ticked: alert on any mode. Cleared: alert only on the modes ticked in the cluster window."/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
             </DataGrid.Columns>
         </DataGrid>
 
         <!-- MODE ALERT (user, 2026-10-25): the same mode boxes the cluster window has, in the same
              order. A spot on a ticked mode is treated like a watched callsign. The boxes are built in
-             code (see BuildModeBoxes) so the list of modes is written once. -->
-        <GroupBox Grid.Row="2" Header="Mode alert" FontSize="16" Margin="0,12,0,0" Padding="6,4,6,6"
+             code (see BuildModeBoxes) so the list of modes is written once.
+             The header used to read "Mode alert", and a user read it as "only these modes" - a filter -
+             and ticked SSB, which framed his whole table in purple (4X1ZQ, 2026-11-21). It now says
+             what it does: EVERY spot in a ticked mode is an alert, from any station. -->
+        <GroupBox Grid.Row="2" Header="Alert on every spot in these modes" FontSize="16" Margin="0,12,0,0" Padding="6,4,6,6"
                   BorderBrush="#1565C0" Foreground="{DynamicResource TextBrush}">
             <UniformGrid x:Name="PNL_Modes" Rows="1"/>
         </GroupBox>

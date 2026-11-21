@@ -13514,7 +13514,9 @@ namespace HolyLogger
                 {
                     enabledModes.Add(mode);
                     SaveEnabledClusterModes(enabledModes);
-                    RefreshClusterVisibleSpots();
+                    // Re-mark, not just refresh: a watched callsign whose "Any Mode" box is cleared
+                    // follows these boxes, so what counts as an alert changes with them.
+                    RemarkClusterAlertSpots();
                 }
             };
 
@@ -13534,7 +13536,7 @@ namespace HolyLogger
                     }
                     enabledModes.Remove(mode);
                     SaveEnabledClusterModes(enabledModes);
-                    RefreshClusterVisibleSpots();
+                    RemarkClusterAlertSpots();   // see the Checked handler above
                 }
             };
 
