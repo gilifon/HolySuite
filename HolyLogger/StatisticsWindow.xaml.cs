@@ -27,8 +27,9 @@ namespace HolyLogger
             { "160", "80", "60", "40", "30", "20", "17", "15", "12", "10", "6", "2", "70cm", "13cm" };
 
         // ── column widths (pixels) ────────────────────────────────────────
-        // Band[m] | SSB | CW | DIGI | FM | Total-% | Total-Num
-        private static readonly double[] ColW = { 70, 50, 50, 50, 50, 55, 58 };
+        // Band[m] | SSB | CW | DIGI | FM | Total-% | Total-Num. Bold 16 measures "Band [m]" 69 and
+        // "number" 59; each cell adds 5 (padding 2+2, line 1), so 76 and 66 show them whole.
+        private static readonly double[] ColW = { 76, 50, 50, 50, 50, 55, 66 };
 
         // Shared across all StatisticsWindow instances — built once per process
         private static readonly EntityResolver _masterResolver = new EntityResolver();
@@ -184,10 +185,9 @@ namespace HolyLogger
                     AdjustZoneHeights();
                 }
             };
-            // The zone lists (CQ/ITU) live in the right column, UNDER the LoTW panel slot. On the LoTW
-            // folder that slot is taller than the tiles, so the zones start lower; shrink them by that
-            // extra offset so their BOTTOMS line up with the country lists. When the slot height changes
-            // (folder switch shows/hides the panel), recompute.
+            // The zone lists (CQ/ITU) now sit in the row of the country lists and the summary slot sits
+            // beside the tiles, so the slot can no longer push the zones down; the extra offset below is
+            // normally 0. Kept as a guard in case the slot ever grows taller than the tiles again.
             LotwSlot.SizeChanged += (snd, ev) => AdjustZoneHeights();
         }
 
@@ -453,8 +453,10 @@ namespace HolyLogger
             // confirmed QSOs, not the log's total - so the tile names the source, like the pivot header
             // right below it already does.
             if (TB_TotalQsoLabel != null)
-                TB_TotalQsoLabel.Text = _source == ConfSource.Worked
-                    ? "Total QSOs"
+                // "Granted QSOs" on the ARRL folder: "ARRL DXCC Award QSOs" measures 174 at 16 and the
+                // tile has 120 inside, so it was cut off.
+                TB_TotalQsoLabel.Text = _source == ConfSource.Worked ? "Total QSOs"
+                    : _source == ConfSource.Award ? "Granted QSOs"
                     : LeftSourceTitle() + " QSOs";
 
             _uniqueCallsText = st.UniqueCalls.ToString("N0");
@@ -897,7 +899,7 @@ namespace HolyLogger
         // cell it was worked in - 15m SSB and 20m CW and 40m CW - so percentages would add to several
         // hundred and invite the reasonable question "how can 99.6% and 23.5% come to more than 100%".
         // The counts say the same thing without the trap.
-        private static readonly double[] CountryColW = { 70, 61, 61, 61, 61, 69 };
+        private static readonly double[] CountryColW = { 76, 61, 61, 61, 61, 69 };
 
         private void BuildCountryPivot()
         {

@@ -1,6 +1,6 @@
 ﻿<!-- Width fits the SEVEN source folders across the top of the right-hand page. Measured, not guessed:
      the tabs come to 636px (Worked 92, LoTW 80, QRZ 71, eQSL 76, Club Log 99, Paper QSL 107, ARRL
-     Granted / DXCC Award 112) plus their 16px margins, and the left page cannot go below 565 (its 513
+     Granted / DXCC Award 112) plus their 16px margins, and the left page cannot go below 528 (its 476
      MinWidth plus margins and border). 636 + 16 + 565 + chrome = 1233, so at the old 950 the last
      folders were cut off the right edge for anyone with all the services on. MinWidth carries the
      same number as Width: a
@@ -188,10 +188,10 @@
                 <Border Grid.Row="1" Grid.Column="0" Margin="14,0,12,8"
                         BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1">
                 <ScrollViewer x:Name="SV_LeftContent" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
-                    <!-- MinWidth = the tiles row (175 + 14 + 150 + 14 + 160). Without it a folder with nothing to
+                    <!-- MinWidth = the tiles row (150 + 14 + 138 + 14 + 160). Without it a folder with nothing to
                          show - QRZ before its first download - draws a narrow pivot table and the whole left
                          page shrinks to it, so the window jumps every time the operator changes folder. -->
-                    <StackPanel VerticalAlignment="Top" Margin="12,10,12,10" MinWidth="513">
+                    <StackPanel VerticalAlignment="Top" Margin="12,10,12,10" MinWidth="476">
                         <!-- The three left tiles. VerticalAlignment=Stretch on each frame (and the row
                              named, so the tiles opposite can match its height) makes every bottom edge sit
                              on one line - the Countries tile carries a breakdown and is the tallest, and
@@ -201,7 +201,7 @@
                             <!-- Fixed width, like the two beside it: the label changes with the folder ("QRZ QSOs" is far
                                  shorter than "LoTW + card QSOs") and a tile that resizes drags the whole left
                                  page - and the source folders beyond it - sideways on every folder change. -->
-                            <Border VerticalAlignment="Stretch" Width="175" Margin="0,0,14,0" Padding="18,8" Background="{DynamicResource PanelBg}" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1">
+                            <Border VerticalAlignment="Stretch" Width="150" Margin="0,0,14,0" Padding="14,8" Background="{DynamicResource PanelBg}" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1">
                                 <StackPanel>
                                     <!-- Reads "Total QSOs" on the Worked folder and "<source> QSOs" on a
                                          confirmation folder, because the number below it is the FILTERED
@@ -216,7 +216,7 @@
                                  with it the whole left page and the source folders beyond - would jump
                                  19px narrower every time you opened the DXCC folder. Wide enough for the
                                  longer label and for a five-figure count. -->
-                            <Border VerticalAlignment="Stretch" Margin="0,0,14,0" Padding="18,8" Width="150" Background="{DynamicResource PanelBg}" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1">
+                            <Border VerticalAlignment="Stretch" Margin="0,0,14,0" Padding="12,8" Width="138" Background="{DynamicResource PanelBg}" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1">
                                 <StackPanel>
                                     <!-- This tile changes with the left folder: unique callsigns worked on
                                          the QSO folder, countries on the DXCC one (see ApplyLeftView). -->
@@ -343,11 +343,9 @@
                     <Border Grid.Row="1" Grid.Column="1" Margin="8,0,8,8"
                             BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1">
                     <ScrollViewer x:Name="SV_SourceContent" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
-                        <StackPanel Orientation="Horizontal" Margin="12,10,12,10" VerticalAlignment="Top">
-
-                            <!-- COL A: source tiles + the two big country lists. The lists sit directly
-                                 under the SHORT tiles, so they line up with the pivot table on the left. -->
-                            <StackPanel Orientation="Vertical">
+                        <StackPanel Orientation="Vertical" Margin="12,10,12,10" VerticalAlignment="Top">
+                            <!-- TOP ROW: the source tiles, then the summary frame. -->
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Top">
                             <StackPanel x:Name="TilesRow" Orientation="Horizontal" Margin="0,0,0,10">
                                 <!-- Confirmed is the headline number for a source, so it is leftmost.
                                      Confirmed + Missing partition all DXCC entities (out of 340). Hidden
@@ -412,6 +410,138 @@
                                 </Border>
 
                             </StackPanel>
+                            <!-- The summary frame sits BESIDE the three tiles, over the zone lists. It used to head a
+                                 column of its own above the zones; being wider than them, it left a blank strip down
+                                 the right of the page and made the window wider than it needed to be. Its height is
+                                 the tiles' height, so the frame and the tiles read as one row. -->
+                                <Border x:Name="LotwSlot" Margin="14,0,0,0" VerticalAlignment="Top" Height="{Binding ActualHeight, ElementName=TilesRow}">
+                                <!-- No title: this frame only ever shows on the LoTW folder. Tight rows. -->
+                                <!-- Stretch, not Top: the slot is already exactly the tiles' height, so
+                                     filling it makes this frame and the tile beside it the same height
+                                     and the row reads as one. Top-aligned it shrank to its text and sat
+                                     short against a taller neighbour. The rows inside are Auto, so the
+                                     content still starts at the top - only the frame grows. -->
+                                <Border x:Name="ConfirmSummaryPanel" Padding="10,4"
+                                        VerticalAlignment="Stretch" CornerRadius="3"
+                                        BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1"
+                                        Background="{DynamicResource GridAltRowBg}" Visibility="Collapsed">
+                                    <Grid>
+                                        <!-- THE ROWS ARE PACKED TIGHTER THAN THE FONT WOULD PACK THEM.
+                                             This frame lives in a slot of FIXED height - pinned to the
+                                             tiles above so the zone lists line up with the country
+                                             lists - so it cannot grow, it can only spill. Four lines at
+                                             16pt need 21.3px each by default; that plus the button came
+                                             to more than the slot and the button was cut in half.
+                                             18px a line still clears every descender at this size and
+                                             gives the button its room back. -->
+                                        <Grid.Resources>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="LineHeight" Value="18"/>
+                                                <Setter Property="LineStackingStrategy" Value="BlockLineHeight"/>
+                                            </Style>
+                                        </Grid.Resources>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
+
+                                        <TextBlock Grid.Row="0" Grid.Column="0" x:Name="TB_SumConfirmedLabel" Text="Confirmed at LoTW" FontSize="16"
+                                                   Margin="0,0,18,0" VerticalAlignment="Center"
+                                                   Foreground="{DynamicResource MutedTextBrush}"/>
+                                        <TextBlock Grid.Row="0" Grid.Column="1" x:Name="TB_SumTotalQsls" FontSize="16"
+                                                   FontWeight="Bold" Margin="0,0,0,0" VerticalAlignment="Center"
+                                                   Foreground="#2E9E4F"/>
+
+                                        <TextBlock Grid.Row="1" Grid.Column="0" x:Name="TB_SumMatchedLabel" Text="Matched in this log" FontSize="16"
+                                                   Margin="0,0,18,0" VerticalAlignment="Center"
+                                                   ToolTip="Confirmations that matched a QSO in the log open now, and carry the LoTW tick"
+                                                   Foreground="{DynamicResource MutedTextBrush}"/>
+                                        <TextBlock Grid.Row="1" Grid.Column="1" x:Name="TB_SumMatchedInLog" FontSize="16"
+                                                   FontWeight="Bold" Margin="0,0,0,0" VerticalAlignment="Center"
+                                                   Foreground="#2E9E4F"/>
+
+                                        <TextBlock Grid.Row="2" Grid.Column="0" x:Name="TB_NewConfLabel" Text="New confirmations" FontSize="16"
+                                                   Margin="0,0,18,0" VerticalAlignment="Center"
+                                                   Foreground="{DynamicResource MutedTextBrush}"/>
+                                        <TextBlock Grid.Row="2" Grid.Column="1" x:Name="TB_NewConfValue" FontSize="16" Margin="0,0,0,0"
+                                                   VerticalAlignment="Center"><Hyperlink x:Name="LNK_NewQsls" Click="NewQsls_Click"
+                                                   ToolTip="Click to see the new confirmations"><Run x:Name="TB_SumNewQsls" FontWeight="Bold"/></Hyperlink><Run x:Name="TB_SumSince" FontSize="16" Foreground="{DynamicResource MutedTextBrush}"/></TextBlock>
+
+                                        <TextBlock Grid.Row="3" Grid.Column="0" x:Name="TB_NewCountriesLabel" Text="New countries" FontSize="16"
+                                                   Margin="0,0,18,0" VerticalAlignment="Center"
+                                                   Foreground="{DynamicResource MutedTextBrush}"/>
+                                        <TextBlock Grid.Row="3" Grid.Column="1" x:Name="TB_NewCountriesValue" FontSize="16" Margin="0,0,0,0"
+                                                   VerticalAlignment="Center"><Hyperlink x:Name="LNK_NewCountries" Click="NewCountries_Click"
+                                                   ToolTip="Click to see the QSOs that gave a new country"><Run x:Name="TB_SumNewCountries" FontWeight="Bold"/></Hyperlink></TextBlock>
+
+                                        <!-- The source's full-download button lives in the frame; only the one for the
+                                             current folder is shown. (LoTW also keeps "Check LoTW Updates" in the header.) -->
+                                        <Button x:Name="BTN_GetAllConfirmations" Grid.Row="4" Grid.ColumnSpan="2"
+                                                Content="Get All LoTW Confirmations" FontSize="16" Padding="8,0"
+                                                HorizontalAlignment="Left" Margin="0,1,0,0"
+                                                Click="BTN_GetAllConfirmations_Click">
+                                            <Button.ToolTip>
+                                                <ToolTip>
+                                                    <TextBlock FontSize="16" TextWrapping="Wrap" MaxWidth="340"
+                                                               Text="Rebuild from scratch: downloads your ENTIRE LoTW history and re-marks every log. Slower, and needed only once — to fill in past years.&#10;&#10;For routine updates use “Check LoTW Updates” above."/>
+                                                </ToolTip>
+                                            </Button.ToolTip>
+                                        </Button>
+                                        <Button x:Name="BTN_CheckQrz" Grid.Row="4" Grid.ColumnSpan="2"
+                                                Content="Get All QRZ Confirmations" FontSize="16" Padding="8,0"
+                                                HorizontalAlignment="Left" Margin="0,1,0,0" Visibility="Collapsed"
+                                                Click="BTN_CheckQrz_Click">
+                                            <Button.ToolTip>
+                                                <ToolTip>
+                                                    <TextBlock FontSize="16" TextWrapping="Wrap" MaxWidth="340"
+                                                               Text="Downloads every confirmed QSO from your QRZ.com logbook and marks them with the QRZ tick.&#10;&#10;Needs your QRZ Logbook API key (Options ▸ QRZ Logbook)."/>
+                                                </ToolTip>
+                                            </Button.ToolTip>
+                                        </Button>
+                                        <Button x:Name="BTN_CheckEqsl" Grid.Row="4" Grid.ColumnSpan="2"
+                                                Content="Get All eQSL Confirmations" FontSize="16" Padding="8,0"
+                                                HorizontalAlignment="Left" Margin="0,1,0,0" Visibility="Collapsed"
+                                                Click="BTN_CheckEqsl_Click">
+                                            <Button.ToolTip>
+                                                <ToolTip>
+                                                    <TextBlock FontSize="16" TextWrapping="Wrap" MaxWidth="340"
+                                                               Text="Downloads your eQSL In Box (the cards other stations sent you) for every eQSL account and marks the confirmed QSOs.&#10;&#10;Uses the accounts in Options ▸ eQSL."/>
+                                                </ToolTip>
+                                            </Button.ToolTip>
+                                        </Button>
+                                        <Button x:Name="BTN_CheckClublog" Grid.Row="4" Grid.ColumnSpan="2"
+                                                Content="Get All Club Log Confirmations" FontSize="16" Padding="8,0"
+                                                HorizontalAlignment="Left" Margin="0,1,0,0" Visibility="Collapsed"
+                                                Click="BTN_CheckClublog_Click">
+                                            <Button.ToolTip>
+                                                <ToolTip>
+                                                    <TextBlock FontSize="16" TextWrapping="Wrap" MaxWidth="340"
+                                                               Text="Downloads your Club Log log (getadif) for every station callsign you have used and marks the QSOs Club Log reports confirmed (QSL received).&#10;&#10;Uses the account in Options ▸ Club Log."/>
+                                                </ToolTip>
+                                            </Button.ToolTip>
+                                        </Button>
+                                        <Button x:Name="BTN_GetArrlCredits" Grid.Row="4" Grid.ColumnSpan="2"
+                                                Content="Get All ARRL Granted DXCC" FontSize="16" Padding="8,0"
+                                                HorizontalAlignment="Left" Margin="0,1,0,0" Visibility="Collapsed"
+                                                Click="BTN_GetArrlCredits_Click">
+                                            <Button.ToolTip>
+                                                <ToolTip>
+                                                    <TextBlock FontSize="16" TextWrapping="Wrap" MaxWidth="340"
+                                                               Text="Downloads the DXCC credits the ARRL has granted you (LoTW and paper cards) and marks those QSOs.&#10;&#10;Credits come only after you have applied for the DXCC award. Uses your LoTW login (Options ▸ LoTW)."/>
+                                                </ToolTip>
+                                            </Button.ToolTip>
+                                        </Button>
+                                    </Grid>
+                                </Border>
+                                </Border>
+                            </StackPanel>   <!-- close the top row -->
 
                             <!-- The country / zone tables, laid out in a row. -->
                             <StackPanel Orientation="Horizontal" VerticalAlignment="Top">
@@ -475,7 +605,7 @@
                                                 <TextBlock x:Name="TB_SortWorkedCount" Text="QSOs ▼"
                                                            Width="66" FontSize="16" FontWeight="Bold"
                                                            VerticalAlignment="Center"
-                                                           Cursor="Hand" TextAlignment="Right" Foreground="{DynamicResource TextBrush}"/>
+                                                           Cursor="Hand" TextAlignment="Left" Foreground="{DynamicResource TextBrush}"/>
                                                 <TextBlock x:Name="TB_SortWorkedConfirmed" Text="Confirmed"
                                                            Width="{DynamicResource ConfColWidth}" FontSize="16" FontWeight="Bold" Margin="8,0,0,0"
                                                            VerticalAlignment="Center"
@@ -534,7 +664,7 @@
                                                                 <TextBlock Text="{Binding CountStr}" FontSize="16"
                                                                            FontWeight="Bold"
                                                                            VerticalAlignment="Center"
-                                                                           TextAlignment="Right" Width="66"
+                                                                           TextAlignment="Left" Width="66"
                                                                            Foreground="{DynamicResource AccentBrush}"/>
                                                                 <TextBlock Text="{Binding ConfirmedMark}" FontSize="16"
                                                                            FontWeight="Bold" Margin="8,0,0,0"
@@ -669,149 +799,8 @@
                                 </Border>
                             </StackPanel>
 
-                            </StackPanel>   <!-- close the Worked + Missing lists row -->
-                            </StackPanel>   <!-- close COL A -->
-
-                            <!-- COL B: the LoTW summary panel on top, then the zone lists. This column is
-                                 taller than the tiles, so the zones sit lower than the country lists. -->
-                            <StackPanel Orientation="Vertical" Margin="20,0,0,0">
-
-                                <!-- Slot that reserves EXACTLY the tiles' height above the zones, so the zone
-                                     lists start on the same line as the country lists to their left on every
-                                     folder. It used to be a MinHeight, which let the taller LoTW summary
-                                     frame grow the slot and push the zones a good 30px below the country
-                                     lists - two tables that plainly belong to one row, starting at two
-                                     different heights. The frame inside is trimmed to fit this height. -->
-                                <Border x:Name="LotwSlot" Height="{Binding ActualHeight, ElementName=TilesRow}">
-                                <!-- No title: this frame only ever shows on the LoTW folder. Tight rows. -->
-                                <!-- Stretch, not Top: the slot is already exactly the tiles' height, so
-                                     filling it makes this frame and the tile beside it the same height
-                                     and the row reads as one. Top-aligned it shrank to its text and sat
-                                     short against a taller neighbour. The rows inside are Auto, so the
-                                     content still starts at the top - only the frame grows. -->
-                                <Border x:Name="ConfirmSummaryPanel" Padding="10,4"
-                                        VerticalAlignment="Stretch" CornerRadius="3"
-                                        BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1"
-                                        Background="{DynamicResource GridAltRowBg}" Visibility="Collapsed">
-                                    <Grid>
-                                        <!-- THE ROWS ARE PACKED TIGHTER THAN THE FONT WOULD PACK THEM.
-                                             This frame lives in a slot of FIXED height - pinned to the
-                                             tiles above so the zone lists line up with the country
-                                             lists - so it cannot grow, it can only spill. Four lines at
-                                             16pt need 21.3px each by default; that plus the button came
-                                             to more than the slot and the button was cut in half.
-                                             18px a line still clears every descender at this size and
-                                             gives the button its room back. -->
-                                        <Grid.Resources>
-                                            <Style TargetType="TextBlock">
-                                                <Setter Property="LineHeight" Value="18"/>
-                                                <Setter Property="LineStackingStrategy" Value="BlockLineHeight"/>
-                                            </Style>
-                                        </Grid.Resources>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="*"/>
-                                        </Grid.ColumnDefinitions>
-                                        <Grid.RowDefinitions>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="Auto"/>
-                                        </Grid.RowDefinitions>
-
-                                        <TextBlock Grid.Row="0" Grid.Column="0" x:Name="TB_SumConfirmedLabel" Text="Confirmed at LoTW" FontSize="16"
-                                                   Margin="0,0,18,0" VerticalAlignment="Center"
-                                                   Foreground="{DynamicResource MutedTextBrush}"/>
-                                        <TextBlock Grid.Row="0" Grid.Column="1" x:Name="TB_SumTotalQsls" FontSize="16"
-                                                   FontWeight="Bold" Margin="0,0,0,0" VerticalAlignment="Center"
-                                                   Foreground="#2E9E4F"/>
-
-                                        <TextBlock Grid.Row="1" Grid.Column="0" x:Name="TB_SumMatchedLabel" Text="Matched in this log" FontSize="16"
-                                                   Margin="0,0,18,0" VerticalAlignment="Center"
-                                                   ToolTip="Confirmations that matched a QSO in the log open now, and carry the LoTW tick"
-                                                   Foreground="{DynamicResource MutedTextBrush}"/>
-                                        <TextBlock Grid.Row="1" Grid.Column="1" x:Name="TB_SumMatchedInLog" FontSize="16"
-                                                   FontWeight="Bold" Margin="0,0,0,0" VerticalAlignment="Center"
-                                                   Foreground="#2E9E4F"/>
-
-                                        <TextBlock Grid.Row="2" Grid.Column="0" x:Name="TB_NewConfLabel" Text="New confirmations" FontSize="16"
-                                                   Margin="0,0,18,0" VerticalAlignment="Center"
-                                                   Foreground="{DynamicResource MutedTextBrush}"/>
-                                        <TextBlock Grid.Row="2" Grid.Column="1" x:Name="TB_NewConfValue" FontSize="16" Margin="0,0,0,0"
-                                                   VerticalAlignment="Center"><Hyperlink x:Name="LNK_NewQsls" Click="NewQsls_Click"
-                                                   ToolTip="Click to see the new confirmations"><Run x:Name="TB_SumNewQsls" FontWeight="Bold"/></Hyperlink><Run x:Name="TB_SumSince" FontSize="16" Foreground="{DynamicResource MutedTextBrush}"/></TextBlock>
-
-                                        <TextBlock Grid.Row="3" Grid.Column="0" x:Name="TB_NewCountriesLabel" Text="New countries" FontSize="16"
-                                                   Margin="0,0,18,0" VerticalAlignment="Center"
-                                                   Foreground="{DynamicResource MutedTextBrush}"/>
-                                        <TextBlock Grid.Row="3" Grid.Column="1" x:Name="TB_NewCountriesValue" FontSize="16" Margin="0,0,0,0"
-                                                   VerticalAlignment="Center"><Hyperlink x:Name="LNK_NewCountries" Click="NewCountries_Click"
-                                                   ToolTip="Click to see the QSOs that gave a new country"><Run x:Name="TB_SumNewCountries" FontWeight="Bold"/></Hyperlink></TextBlock>
-
-                                        <!-- The source's full-download button lives in the frame; only the one for the
-                                             current folder is shown. (LoTW also keeps "Check LoTW Updates" in the header.) -->
-                                        <Button x:Name="BTN_GetAllConfirmations" Grid.Row="4" Grid.ColumnSpan="2"
-                                                Content="Get All LoTW Confirmations" FontSize="16" Padding="8,0"
-                                                HorizontalAlignment="Left" Margin="0,1,0,0"
-                                                Click="BTN_GetAllConfirmations_Click">
-                                            <Button.ToolTip>
-                                                <ToolTip>
-                                                    <TextBlock FontSize="16" TextWrapping="Wrap" MaxWidth="340"
-                                                               Text="Rebuild from scratch: downloads your ENTIRE LoTW history and re-marks every log. Slower, and needed only once — to fill in past years.&#10;&#10;For routine updates use “Check LoTW Updates” above."/>
-                                                </ToolTip>
-                                            </Button.ToolTip>
-                                        </Button>
-                                        <Button x:Name="BTN_CheckQrz" Grid.Row="4" Grid.ColumnSpan="2"
-                                                Content="Get All QRZ Confirmations" FontSize="16" Padding="8,0"
-                                                HorizontalAlignment="Left" Margin="0,1,0,0" Visibility="Collapsed"
-                                                Click="BTN_CheckQrz_Click">
-                                            <Button.ToolTip>
-                                                <ToolTip>
-                                                    <TextBlock FontSize="16" TextWrapping="Wrap" MaxWidth="340"
-                                                               Text="Downloads every confirmed QSO from your QRZ.com logbook and marks them with the QRZ tick.&#10;&#10;Needs your QRZ Logbook API key (Options ▸ QRZ Logbook)."/>
-                                                </ToolTip>
-                                            </Button.ToolTip>
-                                        </Button>
-                                        <Button x:Name="BTN_CheckEqsl" Grid.Row="4" Grid.ColumnSpan="2"
-                                                Content="Get All eQSL Confirmations" FontSize="16" Padding="8,0"
-                                                HorizontalAlignment="Left" Margin="0,1,0,0" Visibility="Collapsed"
-                                                Click="BTN_CheckEqsl_Click">
-                                            <Button.ToolTip>
-                                                <ToolTip>
-                                                    <TextBlock FontSize="16" TextWrapping="Wrap" MaxWidth="340"
-                                                               Text="Downloads your eQSL In Box (the cards other stations sent you) for every eQSL account and marks the confirmed QSOs.&#10;&#10;Uses the accounts in Options ▸ eQSL."/>
-                                                </ToolTip>
-                                            </Button.ToolTip>
-                                        </Button>
-                                        <Button x:Name="BTN_CheckClublog" Grid.Row="4" Grid.ColumnSpan="2"
-                                                Content="Get All Club Log Confirmations" FontSize="16" Padding="8,0"
-                                                HorizontalAlignment="Left" Margin="0,1,0,0" Visibility="Collapsed"
-                                                Click="BTN_CheckClublog_Click">
-                                            <Button.ToolTip>
-                                                <ToolTip>
-                                                    <TextBlock FontSize="16" TextWrapping="Wrap" MaxWidth="340"
-                                                               Text="Downloads your Club Log log (getadif) for every station callsign you have used and marks the QSOs Club Log reports confirmed (QSL received).&#10;&#10;Uses the account in Options ▸ Club Log."/>
-                                                </ToolTip>
-                                            </Button.ToolTip>
-                                        </Button>
-                                        <Button x:Name="BTN_GetArrlCredits" Grid.Row="4" Grid.ColumnSpan="2"
-                                                Content="Get All ARRL Granted DXCC" FontSize="16" Padding="8,0"
-                                                HorizontalAlignment="Left" Margin="0,1,0,0" Visibility="Collapsed"
-                                                Click="BTN_GetArrlCredits_Click">
-                                            <Button.ToolTip>
-                                                <ToolTip>
-                                                    <TextBlock FontSize="16" TextWrapping="Wrap" MaxWidth="340"
-                                                               Text="Downloads the DXCC credits the ARRL has granted you (LoTW and paper cards) and marks those QSOs.&#10;&#10;Credits come only after you have applied for the DXCC award. Uses your LoTW login (Options ▸ LoTW)."/>
-                                                </ToolTip>
-                                            </Button.ToolTip>
-                                        </Button>
-                                    </Grid>
-                                </Border>
-                                </Border>
-
-                                <!-- Zone lists (CQ + ITU) under the LoTW panel. -->
-                                <StackPanel Orientation="Horizontal" VerticalAlignment="Top" Margin="0,10,0,0">
+                            <!-- Zone lists (CQ + ITU), in the same row as the country lists. -->
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Top" Margin="20,0,0,0">
 
                             <!-- Missing CQ Zones (1..40) -->
                             <StackPanel Margin="0,0,0,0" VerticalAlignment="Top">
@@ -878,7 +867,8 @@
                             </StackPanel>
 
                                 </StackPanel>
-                            </StackPanel>
+                            </StackPanel>   <!-- close the Worked + Missing lists row -->
+
                         </StackPanel>
                     </ScrollViewer>
                     </Border>
