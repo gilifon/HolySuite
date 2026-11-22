@@ -5950,6 +5950,7 @@ namespace HolyLogger
         private void OmniRigEngine_CustomReply(int RigNumber, object Command, object Reply)
         {
             PcSoundReplyArrived(Reply);   // the "Set the radio for CW decoding" window reading a setting back
+            CwFilterReplyArrived(Reply);  // the CW window's filter waterfall: the radio's filter width and CW pitch
 
             if (DateTime.UtcNow - breakInAskedUtc < TimeSpan.FromSeconds(3))
             {

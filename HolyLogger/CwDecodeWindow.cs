@@ -174,7 +174,7 @@ namespace HolyLogger
         public CwDecodeWindow()
         {
             Title = "CW Decoder";
-            Width = 740;
+            Width = 740 + SpectrumPanelWidth;
             Height = 300 + WaterfallRowHeight;
 
             // WIDE ENOUGH FOR THE BAR, SHORT ENOUGH FOR ONE LINE. The floor on the height is the bar
@@ -358,8 +358,13 @@ namespace HolyLogger
             boxes.Children.Add(_timeNetFrame);
             boxes.Children.Add(_mixFrame);
 
+            // THE FILTER WATERFALL DOWN THE RIGHT SIDE, the whole height under the bar (his design, 2026-11-22).
+            var spectrum = BuildSpectrum();
+            DockPanel.SetDock(spectrum, Dock.Right);
+
             var body = new DockPanel();
             body.Children.Add(titleBar);
+            body.Children.Add(spectrum);
             body.Children.Add(boxes);
 
             Content = body;
@@ -752,7 +757,8 @@ namespace HolyLogger
         static bool _devMode;
         // Measured 2026-10-21 (Bar harness, widest speed "38 WPM   1000 Hz"): the bar needs 503 px with no reader
         // buttons and 739 with the four developer ones; plus the 3 px blue edge each side and a little air.
-        const double NormalMinWidth = 521, DevMinWidth = 757;
+        // Since the filter waterfall (2026-11-22): its panel plus room for about 25 letters of text beside it.
+        const double NormalMinWidth = 600, DevMinWidth = 757;
         UIElement _whichFrame;
 
         void ToggleDeveloperMode()
@@ -1098,7 +1104,307 @@ namespace HolyLogger
             _wfBorder.Height = CwWaterfallStrip.Rows + lines * LetterRowHeight + 2;
         }
 
-        long _wfBase;                                   // waterfall sample count when the readers were made
+        // ---- the filter waterfall (his design, 2026-11-22; see CwFilterSpectrum) ----
+        //
+        // HOW WIDE: what the radio says its filter is (the main window asks an IC-7610 every second - RadioFilter),
+        // else what the sound itself shows (CwFilterSpectrum.MeasuredFilter). WHERE: the filter sits around the
+        // radio's own CW pitch (RadioPitch), else around the middle of what was measured, else around his pitch.
+        // The ruler is the radio's frequency: the dial is what a station heard in the middle of the filter is on.
+        const int SpectrumPanelWidth = CwFilterSpectrum.Columns + 2;   // the picture plus its frame
+        const double SpectrumRulerHeight = 30;
+
+        /// <summary>Set by the main window: the radio's dial in Hz, 0 when there is no radio.</summary>
+        public Func<double> DialHz;
+        /// <summary>Set by the main window: +1 when the radio hears CW on the upper side, -1 on the lower, 0 not known.</summary>
+        public Func<int> CwSide;
+
+        CwFilterSpectrum _spectrum;
+        Grid _specPicture;
+        Canvas _specRuler;
+        string _specSay = string.Empty;   // the filter width, "BW 400", drawn in the ruler row
+        int _spectrumTicks;
+        int _radioFilterHz, _radioPitchHz;
+        DateTime _radioFilterAt = DateTime.MinValue, _radioPitchAt = DateTime.MinValue;
+        // What is on show: the middle note and the width (sound Hz), the side, and the dial the ruler is drawn for.
+        double _specCentreHz = 700, _specWidthHz = 600, _specDial;
+        int _specSide;
+        // The notes at the two edges of the picture. Centred on the middle of the filter - except that the sound has
+        // nothing under 0 Hz: a 3 kHz filter around a 600 Hz pitch is shown from 0 Hz up, so it is not centred then.
+        double _specLowHz = 400, _specHighHz = 1000;
+        Rectangle _specCentreLine;
+        // HIS PITCH (Options > General), where the red line is and where a clicked station goes (his request,
+        // 2026-11-22) - the same pitch as the red marks on the strip and the Tune key.
+        int _specPitchHz = 700;
+
+        /// <summary>From the main window: the radio's filter width now, in Hz.</summary>
+        public void RadioFilter(int widthHz) { _radioFilterHz = widthHz; _radioFilterAt = DateTime.UtcNow; }
+
+        /// <summary>From the main window: the radio's own CW pitch in Hz - the middle of its CW filter.</summary>
+        public void RadioPitch(int hz) { _radioPitchHz = hz; _radioPitchAt = DateTime.UtcNow; }
+
+        readonly Image[] _specRing = new Image[2];
+        TimeSpan _specLastFrame = TimeSpan.Zero;
+
+        void OnSpectrumFrame(object sender, EventArgs e)
+        {
+            if (_spectrum == null) return;
+            var args = e as System.Windows.Media.RenderingEventArgs;
+            TimeSpan now = args != null ? args.RenderingTime : TimeSpan.Zero;
+            if (now == _specLastFrame) return;          // WPF can call twice for one frame
+            double seconds = _specLastFrame == TimeSpan.Zero ? 0 : (now - _specLastFrame).TotalSeconds;
+            _specLastFrame = now;
+            if (_spectrum.Paint(seconds)) PlaceSpectrumRing();
+        }
+
+        // The newest row at the top, the copy below it carrying on with the older rows.
+        void PlaceSpectrumRing()
+        {
+            if (_spectrum == null || _specRing[0] == null) return;
+            int head = _spectrum.Head;
+            Canvas.SetTop(_specRing[0], -head);
+            Canvas.SetTop(_specRing[1], CwFilterSpectrum.Rows - head);
+        }
+
+        UIElement BuildSpectrum()
+        {
+            _spectrum = new CwFilterSpectrum();
+
+            // The ring picture shown twice, one copy above the other, moved so the newest row is at the top
+            // (see CwFilterSpectrum.Paint and PlaceSpectrumRing).
+            var ring = new Canvas { IsHitTestVisible = false, ClipToBounds = true };
+            foreach (int copy in new[] { 0, 1 })
+            {
+                var image = new Image
+                {
+                    Source = _spectrum.Bitmap,
+                    Stretch = Stretch.Fill,
+                    Height = CwFilterSpectrum.Rows,
+                    IsHitTestVisible = false
+                };
+                RenderOptions.SetBitmapScalingMode(image, BitmapScalingMode.LowQuality);
+                _specRing[copy] = image;
+                ring.Children.Add(image);
+            }
+
+            // His pitch: where a clicked station is put (placed by PlaceSpectrumCentre).
+            var centre = new Rectangle { Width = 3, Fill = MarkBrush, Opacity = 0.8, IsHitTestVisible = false, HorizontalAlignment = HorizontalAlignment.Left };
+            _specCentreLine = centre;
+
+            _specPicture = new Grid
+            {
+                Background = Brushes.Black,
+                ClipToBounds = true,
+                // THE MOUSE BECOMES A SHORT UPRIGHT LINE over the picture (his request, 2026-11-22): laid over a
+                // station's stripe, then clicked, and the station snaps to the red line. No tooltip here - it would
+                // pop up over the very place he is aiming at; the explanation is on the row above.
+                Cursor = System.Windows.Input.Cursors.None
+            };
+            var hover = new Rectangle
+            {
+                Width = 2,
+                Height = 30,
+                Fill = Brushes.White,
+                IsHitTestVisible = false,
+                HorizontalAlignment = HorizontalAlignment.Left,
+                VerticalAlignment = VerticalAlignment.Top,
+                Visibility = Visibility.Collapsed
+            };
+            _specPicture.MouseMove += (s, e) =>
+            {
+                var at = e.GetPosition(_specPicture);
+                hover.Margin = new Thickness(at.X - hover.Width / 2, at.Y - hover.Height / 2, 0, 0);
+                hover.Visibility = Visibility.Visible;
+            };
+            _specPicture.MouseLeave += (s, e) => hover.Visibility = Visibility.Collapsed;
+            _specPicture.Children.Add(ring);
+            _specPicture.Children.Add(centre);
+            _specPicture.Children.Add(hover);
+            _specPicture.MouseLeftButtonDown += OnSpectrumClick;
+            _specPicture.SizeChanged += (s, e) =>
+            {
+                foreach (var image in _specRing) image.Width = _specPicture.ActualWidth;
+                PlaceSpectrumCentre();
+                PlaceSpectrumRing();
+            };
+
+            // Every frame the screen draws, while the window is open: the lines let out on a steady clock.
+            System.Windows.Media.CompositionTarget.Rendering += OnSpectrumFrame;
+            Closed += (s, e) => System.Windows.Media.CompositionTarget.Rendering -= OnSpectrumFrame;
+
+            _specRuler = new Canvas { Height = SpectrumRulerHeight, Background = Brushes.Black, ClipToBounds = true };
+            _specRuler.SizeChanged += (s, e) => DrawSpectrumRuler();
+
+            var stack = new DockPanel();
+            DockPanel.SetDock(_specRuler, Dock.Top);
+            stack.Children.Add(_specRuler);
+            stack.Children.Add(_specPicture);
+
+            UpdateSpectrumSpan();
+            return new Border
+            {
+                Child = stack,
+                Width = SpectrumPanelWidth,
+                // Clear of the bar (his screen, 2026-11-22: the ruler sat tight against it), level with the strip on
+                // the left, which starts the same 3 px under the bar (see BuildWaterfall's margin).
+                Margin = new Thickness(0, (WaterfallRowHeight - (CwWaterfallStrip.Rows + 2 * LetterRowHeight + 2)) / 2, 0, 0),
+                BorderThickness = new Thickness(1),
+                BorderBrush = GroupEdgeBrush,
+                Background = Brushes.Black,
+                ClipToBounds = true
+            };
+        }
+
+        // Four times a second: the filter's width and middle, the side and the dial - the picture and the ruler follow.
+        void UpdateSpectrumSpan()
+        {
+            if (_spectrum == null) return;
+            DateTime now = DateTime.UtcNow;
+            int pitch = 700;
+            try { pitch = Properties.Settings.Default.CwPitchHz; }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+            double mLow, mHigh;
+            bool measured = _spectrum.MeasuredFilter(out mLow, out mHigh);
+            bool fromRadio = _radioFilterHz > 0 && now - _radioFilterAt < TimeSpan.FromSeconds(5);
+            bool radioPitch = _radioPitchHz > 0 && now - _radioPitchAt < TimeSpan.FromSeconds(15);
+
+            double width, centre;
+            string say, tip;
+            // "BW 400", as the IC-7610 writes its filter width; "~" when it is only measured from the sound.
+            if (fromRadio)
+            {
+                width = _radioFilterHz;
+                say = "BW " + width.ToString("0");
+                tip = "Filter width " + width.ToString("0") + " Hz, read from the radio.";
+            }
+            else if (measured)
+            {
+                width = Math.Max(50, Math.Round((mHigh - mLow) / 50) * 50);   // steadied: the measure wanders a little
+                say = "BW ~" + width.ToString("0");
+                tip = "Filter width about " + width.ToString("0") + " Hz, measured from the sound.";
+            }
+            else
+            {
+                width = 600;
+                say = "BW ?";
+                tip = "Filter width not known yet. It is measured from the sound once there is some.";
+            }
+            if (radioPitch) centre = _radioPitchHz;
+            else if (measured) centre = Math.Round((mLow + mHigh) / 2 / 10) * 10;
+            else centre = pitch;
+
+            int side = 0;
+            double dial = 0;
+            try
+            {
+                if (CwSide != null) side = CwSide();
+                if (DialHz != null && side != 0) dial = DialHz();
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+            // A measured middle that moved only a little is left where it is: every move clears the picture.
+            if (!radioPitch && Math.Abs(centre - _specCentreHz) < Math.Max(15, 0.05 * width)) centre = _specCentreHz;
+
+            bool changed = Math.Abs(centre - _specCentreHz) >= 1 || Math.Abs(width - _specWidthHz) >= 1 || side != _specSide;
+            bool dialMoved = Math.Abs(dial - _specDial) >= 1;
+            if (pitch != _specPitchHz) { _specPitchHz = pitch; changed = true; }
+            _specCentreHz = centre; _specWidthHz = width; _specSide = side; _specDial = dial;
+            _specLowHz = Math.Max(0, centre - width / 2);
+            _specHighHz = centre + width / 2;
+            _spectrum.SetSpan(_specLowHz, _specHighHz, side < 0);
+            if (say != _specSay) { _specSay = say; changed = true; }
+            _specRuler.ToolTip = "The frequency of a station on the red line (your pitch).\n" + tip
+                               + "\nBelow: the filter, radio frequency across, time down. Put the white line on a station and click: it moves to the red line.";
+            if (changed || dialMoved) { DrawSpectrumRuler(); PlaceSpectrumCentre(); }
+        }
+
+        // Where a note is across the picture, 0 at the left edge and 1 at the right (radio frequency rises to the right).
+        double SpectrumAcross(double noteHz)
+        {
+            double span = _specHighHz - _specLowHz;
+            if (span <= 0) return 0.5;
+            double a = (noteHz - _specLowHz) / span;
+            return _specSide < 0 ? 1 - a : a;
+        }
+
+        // And back: the note at a point across the picture.
+        double SpectrumNoteAt(double across)
+        {
+            double span = _specHighHz - _specLowHz;
+            return _specLowHz + (_specSide < 0 ? 1 - across : across) * span;
+        }
+
+        // The red line: his pitch, where a clicked station goes. Not drawn when his pitch is outside the filter.
+        void PlaceSpectrumCentre()
+        {
+            if (_specCentreLine == null || _specPicture == null) return;
+            double across = SpectrumAcross(_specPitchHz);
+            _specCentreLine.Visibility = across >= 0 && across <= 1 ? Visibility.Visible : Visibility.Collapsed;
+            _specCentreLine.Margin = new Thickness(across * _specPicture.ActualWidth - _specCentreLine.Width / 2, 0, 0, 0);
+        }
+
+        static readonly Brush BwInk = Frozen(Color.FromRgb(0x9E, 0xC9, 0xFF));
+
+        // ONE NUMBER, OVER THE RED LINE (his choice, 2026-11-22). Round figures every so often came and went as the dial
+        // moved and changed with the filter width. Now the one figure is the frequency of a station sitting on his pitch
+        // - in radio kHz, 10 Hz steps - always in the same place; with no radio, the pitch itself in Hz.
+        void DrawSpectrumRuler()
+        {
+            if (_specRuler == null) return;
+            _specRuler.Children.Clear();
+            double w = _specRuler.ActualWidth;
+            if (w <= 0 || _specHighHz <= _specLowHz) return;
+            double across = SpectrumAcross(_specPitchHz);
+            bool onShow = across >= 0 && across <= 1;     // his pitch is outside the filter: no red line, no figure
+            double x = Math.Max(0, Math.Min(1, across)) * w;
+
+            // THE FILTER WIDTH IN THE SAME ROW (his request, 2026-11-22), on whichever side of the figure has more
+            // room - in muted blue, so it is not read as a frequency.
+            var bw = new TextBlock { Text = _specSay, FontSize = 16, Foreground = BwInk };
+            bw.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+            Canvas.SetLeft(bw, x > w / 2 ? 4 : w - bw.DesiredSize.Width - 4);
+            Canvas.SetTop(bw, 3);
+            _specRuler.Children.Add(bw);
+            if (!onShow) return;
+
+            // The dial is what a station heard in the middle of the filter is on; a note `off` Hz from the middle is
+            // `off` Hz from the dial on the upper side and the other way on the lower.
+            string text = _specDial > 0
+                ? ((_specDial + (_specPitchHz - _specCentreHz) * (_specSide < 0 ? -1 : 1)) / 1000)
+                    .ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)
+                : _specPitchHz.ToString("0", System.Globalization.CultureInfo.InvariantCulture) + " Hz";
+
+            var tick = new Rectangle { Width = 3, Height = 5, Fill = MarkBrush };   // as wide as the red line under it
+            Canvas.SetLeft(tick, x - 1.5);
+            Canvas.SetTop(tick, SpectrumRulerHeight - 5);
+            _specRuler.Children.Add(tick);
+
+            var label = new TextBlock { Text = text, FontSize = 16, Foreground = Brushes.White };
+            label.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+            // Over the line; near an edge, pushed in so it is never cut.
+            double lx = Math.Max(0, Math.Min(w - label.DesiredSize.Width, x - label.DesiredSize.Width / 2));
+            Canvas.SetLeft(label, lx);
+            Canvas.SetTop(label, 3);   // off the top edge
+            _specRuler.Children.Add(label);
+        }
+
+        // A click on the picture: the station nearest it goes to his pitch (the red line).
+        void OnSpectrumClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            e.Handled = true;
+            double w = _specPicture.ActualWidth;
+            if (w <= 0 || _spectrum == null) return;
+            if (ShiftRadio == null) { SayTune("No radio"); return; }
+            double note = SpectrumNoteAt(e.GetPosition(_specPicture).X / w);
+            double found = _spectrum.FindStation(note, Math.Max(15, _specWidthHz * 0.06));
+            if (!double.IsNaN(found)) note = found;
+            double off = note - _specPitchHz;
+            if (Math.Abs(off) < 5) { SayTune("On the station"); return; }
+            string why = ShiftRadio(off);
+            SayTune(why ?? "Moved " + Math.Round(Math.Abs(off)).ToString("N0") + " Hz");
+        }
+
+        long _wfBase;                                  // waterfall sample count when the readers were made
 
         // EVERY LETTER PLAIN SPELLS OUT, THE MOMENT IT DOES (his rule, 2026-10-21): written under the middle of
         // its marks on the waterfall, and at the same moment into Hybrid's text - not first held back by Plain
@@ -1349,6 +1655,8 @@ namespace HolyLogger
                 sideTone = _sideTone;   // his own hand keying: the readers get it like received sound
             }
             if (_strip != null) _strip.Feed(samples, count, _recorder.ActualSampleRate, tx, sideTone, _sideToneHz);
+            // The filter waterfall shows the band only: nothing is drawn while we transmit.
+            if (_spectrum != null && (!tx || sideTone)) _spectrum.Feed(samples, count, _recorder.ActualSampleRate);
             if (tx && !sideTone)
             {
                 if (_silence.Length < count) _silence = new short[count];
@@ -1432,6 +1740,8 @@ namespace HolyLogger
             FlushPendingText();
             UpdateLamp();
             UpdateSpeed();
+            // The filter and the dial, 4 times a second; the picture itself moves on every frame (OnSpectrumFrame).
+            if (_spectrum != null && ++_spectrumTicks % 5 == 0) UpdateSpectrumSpan();
         }
 
         void FlushPendingText()
@@ -2144,6 +2454,366 @@ namespace HolyLogger
             public void Unhook() { if (!_hooked) return; _hooked = false; RemoveVisualChild(_visual); }
             protected override int VisualChildrenCount { get { return _hooked ? 1 : 0; } }
             protected override Visual GetVisualChild(int index) { return _visual; }
+        }
+    }
+
+    // THE FILTER WATERFALL (his design, 2026-11-22, after MixW's picture). Down the right side of the CW window, the
+    // whole height. Across: exactly what the radio's filter lets through - 400 Hz wide on a 400 Hz filter, 3 kHz on a
+    // 3 kHz one - laid out as radio frequency, low on the left. Down: time, the newest at the top. A station inside
+    // the filter is a bright stripe, and a click on it moves the radio so it sits on his pitch (the red line).
+    //
+    // Fed on the capture thread (an FFT every 40 ms, nothing beside the decoders), painted on the window's thread
+    // from the lines that piled up, like the RTTY waterfall.
+    sealed class CwFilterSpectrum
+    {
+        public const int Columns = 280;          // across: one per pixel of the panel
+        public const int Rows = 900;             // down: 18 s at 50 lines a second - taller than any window
+        const int LinesPerSecond = 50;           // one pixel every 20 ms: a glide, not steps
+        const double MeasureTopHz = 4000;        // the sound is looked at up to here when measuring the filter
+
+        public readonly WriteableBitmap Bitmap = new WriteableBitmap(Columns, Rows, 96, 96, PixelFormats.Bgr32, null);
+        readonly int[] _pixels = new int[Columns * Rows];
+        readonly System.Collections.Generic.Queue<int[]> _lines = new System.Collections.Generic.Queue<int[]>();
+        static readonly int[] Palette = MakePalette();
+
+        // MIXW'S COLOURS (his request, 2026-11-22, from his MixW screenshot): dark blue where there is nothing, the
+        // band's noise speckled blue and green, a station yellow going to orange and red as it gets louder.
+        // The level is set so the noise lands in the blue-green and a station 20-30 dB over it in orange-red
+        // (see NoiseAt and DbAcross).
+        const double NoiseAt = 0.32, DbAcross = 44;
+
+        static int[] MakePalette()
+        {
+            var stops = new[]
+            {
+                new double[] { 0.00,   0,   0,  40 },   // nothing: dark navy
+                new double[] { 0.20,   0,  40, 160 },   // blue
+                new double[] { 0.35,   0, 150, 120 },   // the noise: blue-green
+                new double[] { 0.50,  60, 200,  40 },   // green
+                new double[] { 0.65, 230, 220,   0 },   // a station: yellow
+                new double[] { 0.80, 255, 120,   0 },   // orange
+                new double[] { 1.00, 230,   0,   0 },   // loud: red
+            };
+            var p = new int[256];
+            for (int i = 0; i < 256; i++)
+            {
+                double t = i / 255.0;
+                int k = 0;
+                while (k < stops.Length - 2 && t > stops[k + 1][0]) k++;
+                double w = (t - stops[k][0]) / (stops[k + 1][0] - stops[k][0]);
+                int r = (int)(stops[k][1] + (stops[k + 1][1] - stops[k][1]) * w);
+                int g = (int)(stops[k][2] + (stops[k + 1][2] - stops[k][2]) * w);
+                int b = (int)(stops[k][3] + (stops[k + 1][3] - stops[k][3]) * w);
+                p[i] = (r << 16) | (g << 8) | b;
+            }
+            return p;
+        }
+
+        // What is shown, as the NOTE heard (sound Hz), and which way round: set on the window's thread.
+        // Flipped on the lower side (CW-R): there a higher note is a LOWER radio frequency, and the picture always
+        // runs low to high radio frequency, left to right, like the radio's own scope.
+        readonly object _spanGate = new object();
+        double _lowHz = 400, _highHz = 1000;
+        bool _flip;
+        volatile bool _clear;
+
+        // capture thread
+        short[] _buf = new short[0];
+        int _have, _rate, _lineCount;
+        double[] _re, _im, _shape, _power;
+        double _noise = double.NaN;
+
+        // Power per FFT bin up to MeasureTopHz: about the last half second (to find the station clicked) and about
+        // the last four (to measure the filter from the sound). Kept on the capture thread, read under the lock.
+        readonly object _averageGate = new object();
+        double[] _recent, _slow;
+        double _binHz;
+
+        // The filter as measured from the sound, in sound Hz; NaN until there is one.
+        double _measuredLow = double.NaN, _measuredHigh = double.NaN;
+
+        public CwFilterSpectrum()
+        {
+            for (int i = 0; i < _pixels.Length; i++) _pixels[i] = Palette[0];
+            Bitmap.WritePixels(new Int32Rect(0, 0, Columns, Rows), _pixels, Columns * 4, 0);
+        }
+
+        /// <summary>On the window's thread: show lowHz..highHz of the sound. A new span starts a clean picture -
+        /// lines drawn to the old one would put every station in the wrong place.</summary>
+        public void SetSpan(double lowHz, double highHz, bool flip)
+        {
+            if (!(highHz > lowHz)) return;
+            lock (_spanGate)
+            {
+                if (Math.Abs(lowHz - _lowHz) < 1 && Math.Abs(highHz - _highHz) < 1 && flip == _flip) return;
+                _lowHz = lowHz; _highHz = highHz; _flip = flip;
+            }
+            _clear = true;
+        }
+
+        /// <summary>The filter's edges measured from the sound, in sound Hz. False until it could be measured.</summary>
+        public bool MeasuredFilter(out double lowHz, out double highHz)
+        {
+            lock (_averageGate) { lowHz = _measuredLow; highHz = _measuredHigh; }
+            return !double.IsNaN(lowHz) && !double.IsNaN(highHz);
+        }
+
+        /// <summary>Sound, on the capture thread.</summary>
+        public void Feed(short[] samples, int count, int rate)
+        {
+            if (rate < 4000) return;
+            if (rate != _rate) Setup(rate);
+            int hop = rate / LinesPerSecond;
+            for (int i = 0; i < count; i++)
+            {
+                _buf[_have++] = samples[i];
+                if (_have == _buf.Length)
+                {
+                    MakeLine();
+                    Array.Copy(_buf, hop, _buf, 0, _buf.Length - hop);
+                    _have -= hop;
+                }
+            }
+        }
+
+        void Setup(int rate)
+        {
+            _rate = rate;
+            // About a sixth of a second: 5.9 Hz a bin at 48 kHz, fine enough for a 300 Hz filter, short enough
+            // that a dit still shows as a dash rather than a smear.
+            int nfft = 1;
+            while (nfft < rate / 8) nfft <<= 1;
+            _buf = new short[nfft];
+            _have = 0;
+            _re = new double[nfft];
+            _im = new double[nfft];
+            _shape = new double[nfft];
+            for (int i = 0; i < nfft; i++)
+            {
+                // Blackman-Harris, as in the RTTY waterfall: a loud station does not bleed sideways.
+                double a = 2 * Math.PI * i / (nfft - 1);
+                _shape[i] = 0.35875 - 0.48829 * Math.Cos(a) + 0.14128 * Math.Cos(2 * a) - 0.01168 * Math.Cos(3 * a);
+            }
+            _binHz = (double)rate / nfft;
+            int top = Math.Min(nfft / 2, (int)(MeasureTopHz / _binHz) + 2);
+            _power = new double[top];
+            lock (_averageGate) { _recent = new double[top]; _slow = new double[top]; _measuredLow = _measuredHigh = double.NaN; }
+            _noise = double.NaN;
+            _lineCount = 0;
+        }
+
+        void MakeLine()
+        {
+            int n = _buf.Length;
+            for (int i = 0; i < n; i++) { _re[i] = _buf[i] * _shape[i]; _im[i] = 0; }
+            RttyWaterfall.Fft(_re, _im);
+            int top = _power.Length;
+            for (int b = 0; b < top; b++) _power[b] = _re[b] * _re[b] + _im[b] * _im[b];
+
+            lock (_averageGate)
+            {
+                for (int b = 0; b < top; b++)
+                {
+                    // at 50 lines a second: about half a second, and about four
+                    _recent[b] += 0.04 * (_power[b] - _recent[b]);
+                    _slow[b] += 0.005 * (_power[b] - _slow[b]);
+                }
+            }
+            if (++_lineCount % LinesPerSecond == 0) MeasureFilter();
+
+            double low, high; bool flip;
+            lock (_spanGate) { low = _lowHz; high = _highHz; flip = _flip; }
+            double perColumn = (high - low) / Columns;
+            var db = new double[Columns];
+            for (int x = 0; x < Columns; x++)
+            {
+                // Column x, left to right in radio frequency; the note under it runs the other way when flipped.
+                double from = flip ? high - (x + 1) * perColumn : low + x * perColumn;
+                double p;
+                if (perColumn >= _binHz)
+                {
+                    // Wide filter: the strongest bin under the column, so a narrow stripe is never lost.
+                    int b0 = Clamp((int)Math.Round(from / _binHz), top), b1 = Clamp((int)Math.Round((from + perColumn) / _binHz) - 1, top);
+                    p = 0;
+                    for (int b = b0; b <= Math.Max(b0, b1); b++) p = Math.Max(p, _power[b]);
+                }
+                else
+                {
+                    // Narrow filter: more columns than bins, so between two bins the level is drawn in between.
+                    double at = (from + perColumn / 2) / _binHz;
+                    int b0 = Clamp((int)at, top), b1 = Clamp(b0 + 1, top);
+                    double w = Math.Max(0, Math.Min(1, at - b0));
+                    p = _power[b0] + (_power[b1] - _power[b0]) * w;
+                }
+                db[x] = 10 * Math.Log10(p + 1);
+            }
+
+            // One quiet level for the whole line: the middle of it, smoothed a little from line to line. Inside the
+            // filter the noise is most of the picture and a station a narrow stripe, so the middle is the noise.
+            var sorted = (double[])db.Clone();
+            Array.Sort(sorted);
+            double noise = sorted[sorted.Length / 2];
+            _noise = double.IsNaN(_noise) ? noise : _noise + 0.2 * (noise - _noise);
+            var line = new int[Columns];
+            for (int x = 0; x < Columns; x++)
+            {
+                double v = NoiseAt + (db[x] - _noise) / DbAcross;
+                line[x] = Palette[(int)(Math.Max(0, Math.Min(1, v)) * 255)];
+            }
+            lock (_lines)
+            {
+                _lines.Enqueue(line);
+                while (_lines.Count > Rows) _lines.Dequeue();
+            }
+        }
+
+        static int Clamp(int b, int top) { return b < 0 ? 0 : b >= top ? top - 1 : b; }
+
+        // THE FILTER FROM THE SOUND, for a radio that cannot be asked: inside the filter there is the band's noise,
+        // outside it next to nothing. So: the quietest tenth of 100-4000 Hz is "outside"; the longest stretch more
+        // than 10 dB over that is the filter; and its edges are where the sound falls 6 dB under the middle of that
+        // stretch - the same 6 dB edges the makers quote a filter's width by.
+        void MeasureFilter()
+        {
+            double[] slow;
+            lock (_averageGate) slow = (double[])_slow.Clone();
+            int first = Math.Max(1, (int)(100 / _binHz)), last = slow.Length - 1;
+            if (last - first < 20) return;
+            var db = new double[slow.Length];
+            for (int b = 0; b < slow.Length; b++) db[b] = 10 * Math.Log10(slow[b] + 1);
+            var part = new double[last - first + 1];
+            Array.Copy(db, first, part, 0, part.Length);
+            Array.Sort(part);
+            double outside = part[part.Length / 10];
+
+            int runFrom, runTo;
+            if (!LongestRunOver(db, first, last, outside + 10, out runFrom, out runTo)) { Forget(); return; }
+            // The first stretch takes in the filter's skirts too, so its middle is too low and its 6 dB edges too
+            // wide. Tightened again from the new middle until the edges stop moving (measured 2026-11-22 on a made-up
+            // 400 Hz filter: once gave 700 Hz, tightened gives the 400).
+            double middle = double.NaN;
+            for (int round = 0; round < 8; round++)
+            {
+                var inside = new double[runTo - runFrom + 1];
+                Array.Copy(db, runFrom, inside, 0, inside.Length);
+                Array.Sort(inside);
+                middle = inside[inside.Length / 2];
+                if (middle - outside < 15) { Forget(); return; }      // no clear filter shape: noise all across, or silence
+                int from, to;
+                if (!LongestRunOver(db, first, last, middle - 6, out from, out to)) { Forget(); return; }
+                bool same = from == runFrom && to == runTo;
+                runFrom = from; runTo = to;
+                if (same) break;
+            }
+
+            double lowHz = (runFrom - 0.5) * _binHz, highHz = (runTo + 0.5) * _binHz;
+            if (highHz - lowHz < 40 || highHz - lowHz > 3800) { Forget(); return; }
+            lock (_averageGate) { _measuredLow = lowHz; _measuredHigh = highHz; }
+        }
+
+        void Forget() { lock (_averageGate) { _measuredLow = _measuredHigh = double.NaN; } }
+
+        // The longest run of bins over the level, a gap of up to 3 bins bridged (a hole in the noise is not an edge).
+        static bool LongestRunOver(double[] db, int first, int last, double level, out int from, out int to)
+        {
+            from = to = -1;
+            int start = -1, end = -1, gap = 0;
+            for (int b = first; b <= last + 1; b++)
+            {
+                bool over = b <= last && db[b] > level;
+                if (over)
+                {
+                    if (start < 0) start = b;
+                    end = b; gap = 0;
+                }
+                else if (start >= 0 && (++gap > 3 || b > last))
+                {
+                    if (to < 0 || end - start > to - from) { from = start; to = end; }
+                    start = -1; gap = 0;
+                }
+            }
+            return from >= 0;
+        }
+
+        /// <summary>The note of the station nearest noteHz (within reachHz), standing at least 6 dB over the
+        /// filter's noise in the last half second; NaN when there is none - then the click itself is used.</summary>
+        public double FindStation(double noteHz, double reachHz)
+        {
+            double[] recent; double binHz; double low, high;
+            lock (_averageGate) { if (_recent == null) return double.NaN; recent = (double[])_recent.Clone(); binHz = _binHz; }
+            lock (_spanGate) { low = _lowHz; high = _highHz; }
+            int top = recent.Length;
+            int s0 = Clamp((int)(low / binHz), top), s1 = Clamp((int)(high / binHz), top);
+            if (s1 - s0 < 2) return double.NaN;
+            var span = new double[s1 - s0 + 1];
+            Array.Copy(recent, s0, span, 0, span.Length);
+            Array.Sort(span);
+            double floor = span[span.Length / 2];
+
+            int b0 = Clamp((int)((noteHz - reachHz) / binHz), top), b1 = Clamp((int)((noteHz + reachHz) / binHz), top);
+            int best = -1;
+            for (int b = b0; b <= b1; b++) if (best < 0 || recent[b] > recent[best]) best = b;
+            if (best <= 0 || best >= top - 1 || recent[best] < 4 * floor) return double.NaN;
+            // The top of the peak between the bins, from the bin and its two neighbours.
+            double l = Math.Log(recent[best - 1] + 1), c = Math.Log(recent[best] + 1), r = Math.Log(recent[best + 1] + 1);
+            double d = l - 2 * c + r;
+            double shift = d < 0 ? Math.Max(-0.5, Math.Min(0.5, 0.5 * (l - r) / d)) : 0;
+            return (best + shift) * binHz;
+        }
+
+        // SMOOTH (his report, 2026-11-22: "not smooth enough"). The sound comes in 100 ms blocks, so the lines are
+        // made 5 at a time, and they used to go on screen as they came - a jump of 5, then nothing. Now they are let
+        // out one at a time on a steady clock, on every frame the screen draws (see the window's OnSpectrumFrame),
+        // kept about LagLines behind the sound so there is always one ready; the clock runs up to a fifth faster or
+        // slower to hold that distance, so it never stops and never jumps.
+        //
+        // AND THE PICTURE IS NEVER COPIED. It is a ring: each new line is written over the oldest row (Head), and
+        // the window shows the bitmap twice, one above the other, moved so Head is at the top. One row is written
+        // per line instead of the whole 280 x 900 picture.
+        const double LagLines = LinesPerSecond * 0.15;
+        double _credit;
+
+        /// <summary>The row the newest line is in; the window puts this row at the top.</summary>
+        public int Head { get; private set; }
+
+        /// <summary>On the window's thread, every frame: lets out the lines due in `seconds`. True when the picture moved.</summary>
+        public bool Paint(double seconds)
+        {
+            if (_clear)
+            {
+                // A new span: the lines made to the old one are thrown away with the old picture.
+                _clear = false;
+                lock (_lines) _lines.Clear();
+                for (int i = 0; i < _pixels.Length; i++) _pixels[i] = Palette[0];
+                Bitmap.WritePixels(new Int32Rect(0, 0, Columns, Rows), _pixels, Columns * 4, 0);
+                _credit = 0;
+                return true;
+            }
+
+            int waiting;
+            lock (_lines)
+            {
+                // Far behind (the window was busy, or just opened): skip to the newest, keep the usual distance.
+                while (_lines.Count > LinesPerSecond + LagLines) _lines.Dequeue();
+                waiting = _lines.Count;
+            }
+            double ease = Math.Max(0.8, Math.Min(1.2, 1 + 0.2 * (waiting - LagLines) / LagLines));
+            _credit += Math.Max(0, Math.Min(0.1, seconds)) * LinesPerSecond * ease;
+            int due = (int)_credit;
+            if (due == 0) return false;
+            _credit -= due;
+            if (waiting == 0) { _credit = Math.Min(_credit, 1); return false; }
+
+            bool moved = false;
+            for (int i = 0; i < due; i++)
+            {
+                int[] line;
+                lock (_lines) { if (_lines.Count == 0) break; line = _lines.Dequeue(); }
+                Head = (Head - 1 + Rows) % Rows;
+                Bitmap.WritePixels(new Int32Rect(0, Head, Columns, 1), line, Columns * 4, 0);
+                moved = true;
+            }
+            return moved;
         }
     }
 }
