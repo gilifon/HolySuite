@@ -4058,6 +4058,18 @@ namespace HolyLogger.Properties {
                 this["RttySnap"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool CwAutoSnap {
+            get {
+                return ((bool)(this["CwAutoSnap"]));
+            }
+            set {
+                this["CwAutoSnap"] = value;
+            }
+        }
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
