@@ -468,7 +468,6 @@ namespace HolyLogger
         // ONLY THE IC-7610 SO FAR: it is the only radio whose guide was read for this. Any other radio gets the width
         // measured from the sound (see CwFilterSpectrum.MeasureFilter).
         System.Windows.Threading.DispatcherTimer _cwFilterAskTimer;
-        int _cwFilterAsks;
 
         void StartCwFilterAsk()
         {
@@ -477,8 +476,35 @@ namespace HolyLogger
                 _cwFilterAskTimer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
                 _cwFilterAskTimer.Tick += (s, e) => AskRadioCwFilter();
             }
-            _cwFilterAsks = 0;
+            _cwPitchToRadio = true;      // his pitch goes to the radio on the first tick the radio can take it
+            if (!_cwPitchHooked)
+            {
+                _cwPitchHooked = true;
+                // Changed in Options: sent again, on the next tick.
+                CwDecodeWindow.PitchChanged += () => _cwPitchToRadio = true;
+            }
             _cwFilterAskTimer.Start();
+        }
+
+        // HIS PITCH TO THE RADIO (his request, 2026-11-22). The radio centres its CW filter on its OWN pitch, the
+        // waterfall's red line is the pitch in Options - on his radio 750 against 700, so the line sat 55 Hz off the
+        // middle of a 300 Hz filter and a station snapped to it sat near the filter's edge. So the pitch in Options
+        // is sent to the radio: when the window opens, and again whenever it is changed in Options. Not every
+        // second - a turn of the radio's own pitch knob is his, and is not undone.
+        // IC-7610 CI-V Reference Guide: 14 09 "Send/read CW pitch (5 Hz steps)", 0000 = 300 Hz, 0128 = 600 Hz,
+        // 0255 = 900 Hz - the same command the waterfall reads it with. A pitch outside 300-900 Hz is not sent.
+        volatile bool _cwPitchToRadio;
+        bool _cwPitchHooked;
+
+        void SendCwPitchToRadio(string icom)
+        {
+            _cwPitchToRadio = false;
+            int pitch = Properties.Settings.Default.CwPitchHz;
+            if (pitch < 300 || pitch > 900) return;
+            int level = (int)Math.Round((pitch - 300) * 255 / 600.0);
+            string bcd = (level / 100).ToString("00") + " " + (level % 100).ToString("00");
+            TrySendOmniRigCustomCommand("FE FE " + icom + " E0 14 09 " + bcd + " FD");
+            // read back on the next tick, like every second, so the waterfall centres on it
         }
 
         void StopCwFilterAsk()
@@ -509,10 +535,13 @@ namespace HolyLogger
                 string icom = GetIcomCivAddress(rigType);
                 if (icom == null) return;
 
+                if (_cwPitchToRadio) { SendCwPitchToRadio(icom); return; }
+
                 // The radio echoes the 7 bytes sent, then answers (see BuildCwSpeedReadCommand).
                 bool echo = IcomEchoesCommands(rigType) != false;
-                if (_cwFilterAsks++ % 5 == 0)
-                    TrySendOmniRigCustomCommand("FE FE " + icom + " E0 14 09 FD", (echo ? 7 : 0) + 9, string.Empty);
+                // The pitch every second too (his choice, 2026-11-22; it was every 5th): a turn of the radio's pitch
+                // knob re-centres the waterfall within a second.
+                TrySendOmniRigCustomCommand("FE FE " + icom + " E0 14 09 FD", (echo ? 7 : 0) + 9, string.Empty);
                 TrySendOmniRigCustomCommand("FE FE " + icom + " E0 1A 03 FD", (echo ? 7 : 0) + 8, string.Empty);
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
