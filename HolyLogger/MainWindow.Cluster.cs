@@ -73,6 +73,44 @@ namespace HolyLogger
                 OnCollectionChanged(new System.Collections.Specialized.NotifyCollectionChangedEventArgs(
                     System.Collections.Specialized.NotifyCollectionChangedAction.Reset));
             }
+
+            // Makes the content equal to `target` (same items, same order) by removing, moving and
+            // inserting only the rows that differ, so the rows already on screen stay where they are.
+            // A Reset empties the table and draws every row again - on a busy band that is several
+            // times a second (user, 2026-11-22). Returns false, changing nothing, when more than
+            // maxChanges rows come or go: then one Reset is cheaper than that many single events.
+            public bool SyncTo(IList<T> target, int maxChanges)
+            {
+                var wanted = new HashSet<T>(target);
+                var present = new HashSet<T>(Items);
+                int changes = Items.Count(x => !wanted.Contains(x)) + target.Count(x => !present.Contains(x));
+                if (changes > maxChanges) return false;
+                if (changes == 0 && Items.SequenceEqual(target)) return true;
+
+                for (int i = Count - 1; i >= 0; i--)
+                    if (!wanted.Contains(this[i])) RemoveAt(i);
+
+                for (int i = 0; i < target.Count; i++)
+                {
+                    if (i < Count && ReferenceEquals(this[i], target[i])) continue;
+                    int j = IndexOf(target[i]);
+                    if (j >= 0) Move(j, i);
+                    else Insert(i, target[i]);
+                }
+                while (Count > target.Count) RemoveAt(Count - 1);
+                return true;
+            }
+        }
+
+        // Set only while new spots from the feed are being shown: the rows already in the table are
+        // then kept and only the new and leaving ones change (see RefreshClusterVisibleSpots).
+        bool _clusterRefreshKeepRows = false;
+
+        private void RefreshClusterVisibleSpotsForNewSpots()
+        {
+            _clusterRefreshKeepRows = true;
+            try { RefreshClusterVisibleSpots(); }
+            finally { _clusterRefreshKeepRows = false; }
         }
         // While the mouse hovers a band checkbox, the cluster temporarily shows ONLY that band's
         // spots (table + map), as if it were the active band; cleared when the mouse leaves.
@@ -4199,7 +4237,7 @@ namespace HolyLogger
                             PlayUnconfirmedSpotAlert();
                     }
 
-                    RefreshClusterVisibleSpots();
+                    RefreshClusterVisibleSpotsForNewSpots();
                 }));
             }
             catch (System.Exception swallowed) { Log.Swallow(swallowed); }
@@ -5198,12 +5236,22 @@ namespace HolyLogger
             // One pass over the log builds an O(1) lookup set; the old per-spot IsClusterCallsignInLog
             // scanned the whole log for EVERY spot (500 spots x 11k QSOs per refresh, on the UI thread).
             var loggedDxCalls = BuildLoggedDxCallSet();
+            bool inLogChanged = false;
             foreach (var item in filtered)
             {
-                item.IsInLog = loggedDxCalls.Contains((item.DXCallsign ?? string.Empty).Trim());
+                bool inLog = loggedDxCalls.Contains((item.DXCallsign ?? string.Empty).Trim());
+                if (item.IsInLog != inLog) inLogChanged = true;
+                item.IsInLog = inLog;
             }
 
-            clusterVisibleSpots.ReplaceAll(filtered);   // one Reset event, one DataGrid layout pass
+            // New spots from the feed: keep the rows already shown and change only the ones that come
+            // or go. Everything else (a filter clicked, the log changed, a row's colour changed) still
+            // redraws the whole table, because IsInLog and the other colour flags do not tell an
+            // existing row to repaint itself - only a Reset does.
+            bool keptRows = _clusterRefreshKeepRows && !inLogChanged
+                            && clusterVisibleSpots.SyncTo(filtered, 40);
+            if (!keptRows)
+                clusterVisibleSpots.ReplaceAll(filtered);   // one Reset event, one DataGrid layout pass
 
             UpdateClusterFrequencyHighlight();
 
