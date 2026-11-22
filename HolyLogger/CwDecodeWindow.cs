@@ -462,17 +462,9 @@ namespace HolyLogger
             };
             clearBtn.Click += (s, e) => ClearEverything();
 
-            // TUNE (his request, 2026-10-17): the station Plain is reading, moved to his pitch.
-            // Green and next to the window's name (his choice): it is the one key that does something to
-            // the radio, not to the text.
-            var tuneBtn = BarButton("Tune", "Moves the radio so the station being read is heard at your pitch (set in Options > General).");
-            tuneBtn.Background = TuneGreen;
-            tuneBtn.Foreground = Brushes.White;
-            tuneBtn.Margin = new Thickness(10, 0, 0, 0);
-            tuneBtn.VerticalAlignment = VerticalAlignment.Center;
-            tuneBtn.Style = TuneStyle();
-            System.Windows.Shell.WindowChrome.SetIsHitTestVisibleInChrome(tuneBtn, true);
-            tuneBtn.Click += (s, e) => TuneToPitch();
+            // NO TUNE KEY ANY MORE (2026-11-22, his decision). It moved the station being read to his pitch; a click on
+            // the filter waterfall does that for the station HE chooses, and Auto does it for one near his pitch. Its
+            // check that the radio really moved the right way went with them (CheckTheMove).
 
             var clearPanel = new StackPanel
             {
@@ -567,7 +559,6 @@ namespace HolyLogger
             var icon = BuildIcon();
             DockPanel.SetDock(icon, Dock.Left);
             DockPanel.SetDock(titleText, Dock.Left);
-            DockPanel.SetDock(tuneBtn, Dock.Left);
 
             // THE GEAR (his request, 2026-10-20): the decoder's settings - pitch, hiding the grey letters,
             // the input device - are in Options > General, and Tools > Options > General was too far away.
@@ -597,38 +588,55 @@ namespace HolyLogger
             gearBtn.Click += (s, e) => { var open = OpenSettings; if (open != null) open(); };
             DockPanel.SetDock(gearBtn, Dock.Left);
 
+            // AUTO (his request, 2026-11-22): after the gear, the same on/off switch as RTTY's Snap. On, a station heard
+            // steadily near his pitch is moved onto it by itself - see AutoSnap. Off unless he turns it on: it moves
+            // the radio, and so where he transmits.
+            const string autoTip = "On: a station heard steadily within 50 Hz of your pitch is moved onto it by itself (the red line in the waterfall).\nOff: only a click on the waterfall moves the radio.";
+            try { _autoSnap = Properties.Settings.Default.CwAutoSnap; }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+            var autoSwitch = new System.Windows.Controls.Primitives.ToggleButton
+            {
+                IsChecked = _autoSnap,
+                VerticalAlignment = VerticalAlignment.Center,
+                Style = Application.Current.Resources["ToggleSwitchStyle"] as Style,
+                ToolTip = autoTip
+            };
+            System.Windows.Shell.WindowChrome.SetIsHitTestVisibleInChrome(autoSwitch, true);
+            autoSwitch.Click += (s, e) =>
+            {
+                _autoSnap = autoSwitch.IsChecked == true;
+                _autoSince = DateTime.MinValue;
+                try
+                {
+                    Properties.Settings.Default.CwAutoSnap = _autoSnap;
+                    SettingsFlush.RequestSave();
+                }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
+            };
+            var autoLabel = new TextBlock
+            {
+                Text = "Auto tune",   // his name for it, 2026-11-22
+                FontSize = 16,
+                FontWeight = FontWeights.Bold,
+                Foreground = Brushes.Black,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 6, 0),
+                ToolTip = autoTip
+            };
+            System.Windows.Shell.WindowChrome.SetIsHitTestVisibleInChrome(autoLabel, true);
+            var autoPanel = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(10, 0, 0, 0) };
+            autoPanel.Children.Add(autoLabel);
+            autoPanel.Children.Add(autoSwitch);
+            DockPanel.SetDock(autoPanel, Dock.Left);
+
             var bar = new DockPanel { LastChildFill = false };
             bar.Children.Add(right);
             bar.Children.Add(icon);
             bar.Children.Add(titleText);
             bar.Children.Add(gearBtn);
-            bar.Children.Add(tuneBtn);
+            bar.Children.Add(autoPanel);
 
             return new Border { Height = 32, Child = bar, Background = CwKeyBrush };
-        }
-
-        static readonly Brush TuneGreen = Frozen(Color.FromRgb(0x2E, 0x7D, 0x32));
-        static readonly Brush TuneGreenHover = Frozen(Color.FromRgb(0x43, 0xA0, 0x47));
-
-        // The plain button look would paint its own grey over the green on hover; this keeps it green.
-        static Style TuneStyle()
-        {
-            var face = new FrameworkElementFactory(typeof(Border));
-            face.Name = "face";
-            face.SetValue(Border.BackgroundProperty, new TemplateBindingExtension(Control.BackgroundProperty));
-            face.SetValue(Border.CornerRadiusProperty, new CornerRadius(3));
-            face.SetValue(Border.PaddingProperty, new TemplateBindingExtension(Control.PaddingProperty));
-            var text = new FrameworkElementFactory(typeof(ContentPresenter));
-            text.SetValue(ContentPresenter.HorizontalAlignmentProperty, HorizontalAlignment.Center);
-            text.SetValue(ContentPresenter.VerticalAlignmentProperty, VerticalAlignment.Center);
-            face.AppendChild(text);
-            var template = new ControlTemplate(typeof(Button)) { VisualTree = face };
-            var hover = new Trigger { Property = UIElement.IsMouseOverProperty, Value = true };
-            hover.Setters.Add(new Setter(Border.BackgroundProperty, TuneGreenHover, "face"));
-            template.Triggers.Add(hover);
-            var style = new Style(typeof(Button));
-            style.Setters.Add(new Setter(Control.TemplateProperty, template));
-            return style;
         }
 
         internal static Style GearStyle()
@@ -758,7 +766,8 @@ namespace HolyLogger
         // Measured 2026-10-21 (Bar harness, widest speed "38 WPM   1000 Hz"): the bar needs 503 px with no reader
         // buttons and 739 with the four developer ones; plus the 3 px blue edge each side and a little air.
         // Since the filter waterfall (2026-11-22): its panel plus room for about 25 letters of text beside it.
-        const double NormalMinWidth = 600, DevMinWidth = 757;
+        // Auto (2026-11-22) took the bar to 566 px (harness): the developer buttons add 236 to that.
+        const double NormalMinWidth = 600, DevMinWidth = 820;
         UIElement _whichFrame;
 
         void ToggleDeveloperMode()
@@ -1402,6 +1411,54 @@ namespace HolyLogger
             if (Math.Abs(off) < 5) { SayTune("On the station"); return; }
             string why = ShiftRadio(off);
             SayTune(why ?? "Moved " + Math.Round(Math.Abs(off)).ToString("N0") + " Hz");
+            if (why != null) return;
+            _autoHoldUntil = DateTime.UtcNow.AddSeconds(3);   // his choice stands; Auto waits
+            CheckTheMove(off, _specPitchHz);
+        }
+
+        // ---- AUTO: snapping onto a station near his pitch by itself (his request, 2026-11-22) ----
+        //
+        // Four times a second (from UpdateSpectrumSpan). A station counts when it stands 6 dB over the filter's
+        // noise within AutoReachHz of his pitch (the strongest, if there are two) and has stayed within 10 Hz of
+        // where it was for AutoSteadySeconds - a burst of noise or a station passing through does not move the radio.
+        // Then the radio is moved once, as if clicked, when the station is more than AutoMinHz off.
+        //
+        // NOT WHILE WE TRANSMIT, nor for AutoAfterTxSeconds after: the sound then is our own, or just ending.
+        // NO CHASING: after each move Auto waits AutoHoldSeconds. In a QSO the two stations are often a little apart;
+        // without the wait it would jump from one to the other every over, and with it his transmit frequency.
+        // A click holds it off for 3 s too, so it does not undo what he just chose.
+        const double AutoReachHz = 50, AutoMinHz = 10, AutoSteadySeconds = 1.0, AutoAfterTxSeconds = 3, AutoHoldSeconds = 10;
+        bool _autoSnap;
+        double _autoCandidateHz = double.NaN;
+        DateTime _autoSince = DateTime.MinValue, _autoHoldUntil = DateTime.MinValue;
+
+        void AutoSnap()
+        {
+            if (!_autoSnap || _spectrum == null || ShiftRadio == null) return;
+            DateTime now = DateTime.UtcNow;
+            // _txLastMs is kept by the capture thread (TransmittingNow, every block): the last moment we sent.
+            bool sending = KeyerTransmitting || RadioTransmitting
+                        || _txClock.Elapsed.TotalMilliseconds - _txLastMs < AutoAfterTxSeconds * 1000;
+            if (sending || now < _autoHoldUntil) { _autoCandidateHz = double.NaN; return; }
+
+            double found = _spectrum.FindStation(_specPitchHz, AutoReachHz);
+            if (double.IsNaN(found)) { _autoCandidateHz = double.NaN; return; }
+            if (double.IsNaN(_autoCandidateHz) || Math.Abs(found - _autoCandidateHz) > 10)
+            {
+                _autoCandidateHz = found;      // a new one: it has to stay put for a while first
+                _autoSince = now;
+                return;
+            }
+            _autoCandidateHz = found;
+            if ((now - _autoSince).TotalSeconds < AutoSteadySeconds) return;
+
+            double off = found - _specPitchHz;
+            if (Math.Abs(off) <= AutoMinHz) return;   // already on it
+            string why = ShiftRadio(off);
+            _autoCandidateHz = double.NaN;
+            _autoHoldUntil = now.AddSeconds(why == null ? AutoHoldSeconds : 5);
+            SayTune(why ?? "Auto " + Math.Round(Math.Abs(off)).ToString("N0") + " Hz");
+            if (why == null) CheckTheMove(off, _specPitchHz);
         }
 
         long _wfBase;                                  // waterfall sample count when the readers were made
@@ -1741,7 +1798,7 @@ namespace HolyLogger
             UpdateLamp();
             UpdateSpeed();
             // The filter and the dial, 4 times a second; the picture itself moves on every frame (OnSpectrumFrame).
-            if (_spectrum != null && ++_spectrumTicks % 5 == 0) UpdateSpectrumSpan();
+            if (_spectrum != null && ++_spectrumTicks % 5 == 0) { UpdateSpectrumSpan(); AutoSnap(); }
         }
 
         void FlushPendingText()
@@ -1840,36 +1897,28 @@ namespace HolyLogger
             UpdateSpeed();
         }
 
-        // The note Plain hears, minus his pitch, is how far to move. Two seconds later the note is read
-        // again: if it went further from the pitch, this radio tunes the other way round - put right at
-        // once, and remembered (WentWrongWay).
-        void TuneToPitch()
+        // DID THE STATION COME ONTO THE PITCH? (Was the Tune key's own check; the key went on 2026-11-22, his decision,
+        // and the check came here, for the click and Auto.) Two seconds after a move of `off` Hz the waterfall is looked
+        // at again: a station on his pitch - it came our way. None there, but one at pitch + 2 x off - the radio went the
+        // other way: this radio tunes the other way round, which is put right at once and remembered (WentWrongWay),
+        // so every later move, and the waterfall's left and right, are right. Neither - the station stopped, or it is
+        // not clear: left alone.
+        void CheckTheMove(double off, int pitch)
         {
-            var decoder = _decoder;
-            if (ShiftRadio == null) { SayTune("No radio"); return; }
-            if (decoder == null || !decoder.SignalPresent || decoder.ToneHz <= 0) { SayTune("No station"); return; }
-            int pitch = 700;
-            try { pitch = Properties.Settings.Default.CwPitchHz; }
-            catch (Exception swallowed) { Log.Swallow(swallowed); }
-            double heard = decoder.ToneHz, off = heard - pitch;
-            if (Math.Abs(off) < 10) { SayTune("On " + pitch + " Hz"); return; }
-            string why = ShiftRadio(off);
-            if (why != null) { SayTune(why); return; }
-            SayTune("Moved " + Math.Round(Math.Abs(off)).ToString("N0") + " Hz");
-
             if (_tuneCheck != null) _tuneCheck.Stop();
             _tuneCheck = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
             _tuneCheck.Tick += (s, e) =>
             {
                 _tuneCheck.Stop();
-                var d = _decoder;
-                if (d == null || !d.SignalPresent || d.ToneHz <= 0) return;
-                double after = d.ToneHz;
-                if (Math.Abs(after - pitch) <= Math.Abs(off) * 0.5) return;          // it came our way
-                if (Math.Abs(after - pitch) < Math.Abs(off) * 1.5) return;          // not clear - leave it
+                if (_spectrum == null || ShiftRadio == null) return;
+                double reach = Math.Max(15, Math.Abs(off) * 0.5);
+                if (!double.IsNaN(_spectrum.FindStation(pitch, reach))) return;              // it came our way
+                double away = _spectrum.FindStation(pitch + 2 * off, reach);
+                if (double.IsNaN(away)) return;                                              // not clear - leave it
                 if (WentWrongWay != null) WentWrongWay();
-                string again = ShiftRadio(after - pitch);
-                SayTune(again ?? "Moved " + Math.Round(Math.Abs(after - pitch)).ToString("N0") + " Hz");
+                string again = ShiftRadio(away - pitch);
+                SayTune(again ?? "Moved " + Math.Round(Math.Abs(away - pitch)).ToString("N0") + " Hz");
+                _autoHoldUntil = DateTime.UtcNow.AddSeconds(AutoHoldSeconds);
             };
             _tuneCheck.Start();
         }
@@ -2754,6 +2803,10 @@ namespace HolyLogger
             int best = -1;
             for (int b = b0; b <= b1; b++) if (best < 0 || recent[b] > recent[best]) best = b;
             if (best <= 0 || best >= top - 1 || recent[best] < 4 * floor) return double.NaN;
+            // A real peak, not the side of a station just outside the reach: the strongest bin at the edge of the
+            // reach with a stronger one beyond it is that other station's slope (found 2026-11-22 when the wrong-way
+            // check took the side of a station 40 Hz off for one on the pitch).
+            if ((best == b0 && recent[best - 1] > recent[best]) || (best == b1 && recent[best + 1] > recent[best])) return double.NaN;
             // The top of the peak between the bins, from the bin and its two neighbours.
             double l = Math.Log(recent[best - 1] + 1), c = Math.Log(recent[best] + 1), r = Math.Log(recent[best + 1] + 1);
             double d = l - 2 * c + r;
