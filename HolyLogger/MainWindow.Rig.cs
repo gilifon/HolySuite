@@ -1727,6 +1727,27 @@ namespace HolyLogger
                             splitOffsetKhz = _splitWantedKhz ?? (((double)Rig.GetTxFrequency() - (double)Rig.GetRxFrequency()) / 1000.0);
                         else if (splitOn == false)
                             splitOffsetKhz = SplitOffsetIfSwitchedOn(mode);
+
+                        // Split lasts only while the main frequency stays near where it was started: a
+                        // small nudge to follow a drifting station is normal, but a move of more than
+                        // the Options distance (5 kHz as delivered) means he has left that station, and
+                        // split goes off (his request). While split is still being set up the radio
+                        // passes through frequencies of its own, so nothing is judged then.
+                        if (splitOn == true && _splitWantedKhz == null)
+                        {
+                            if (_splitAnchorKhz == null) _splitAnchorKhz = khz;
+                            else if (Math.Abs(khz - _splitAnchorKhz.Value) > Math.Max(1,
+                                     string.Equals(mode, "CW", StringComparison.OrdinalIgnoreCase)
+                                         ? Properties.Settings.Default.SplitCwLeaveKhz
+                                         : Properties.Settings.Default.SplitLeaveKhz))
+                            {
+                                _splitAnchorKhz = null;
+                                TurnSplitOffIfOn();
+                                splitOn = false;
+                                splitOffsetKhz = SplitOffsetIfSwitchedOn(mode);
+                            }
+                        }
+                        if (splitOn != true && _splitWantedKhz == null) _splitAnchorKhz = null;
                     }
                 }
                 catch (Exception swallowed)
@@ -1833,6 +1854,7 @@ namespace HolyLogger
 
         // Looks again after the radio has had time to settle and, if the transmit VFO is not where it
         // was told to go, writes it again - up to three times.
+        private double? _splitAnchorKhz;   // the main frequency when split was seen to start
         private double? _splitWantedKhz;   // set from the press of SPLIT until the radio has settled on it
 
         private void EnforceSplitOffset(double wantedKhz, int attempt)

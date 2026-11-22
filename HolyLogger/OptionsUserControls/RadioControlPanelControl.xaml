@@ -9,7 +9,38 @@
 
     <!-- 950: the band table runs in two column-groups side by side (924) inside the folder's frame. -->
     <StackPanel HorizontalAlignment="Left" Width="950">
-        <TextBlock Text="Radio Control Panel" FontSize="18" FontWeight="Bold" Margin="0,0,0,6"/>
+        <Grid>
+            <TextBlock Text="Radio Control Panel" FontSize="18" FontWeight="Bold" Margin="0,0,0,6"/>
+            <!-- A LITTLE WATERFALL IN FRONT OF THE WORDS (his request, 2026-10-23: the button was easy to miss).
+                 Drawn here, like the menu icons: a dark screen with a few stations as bright streaks under a
+                 spectrum line - what the radio's scope shows, which is what this button sets. -->
+            <Button x:Name="Btn_SpectrumWidths" FontSize="16"
+                    Height="32" Width="280" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,0,0,0"
+                    Background="#1565C0" Foreground="White" BorderBrush="#0D47A1"
+                    Click="Btn_SpectrumWidths_Click">
+                <StackPanel Orientation="Horizontal">
+                    <Border Width="30" Height="22" CornerRadius="2" BorderBrush="#BBDEFB" BorderThickness="1" Margin="0,0,8,0" ClipToBounds="True">
+                        <Border.Background>
+                            <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                <GradientStop Color="#0A1A4A" Offset="0"/>
+                                <GradientStop Color="#020818" Offset="1"/>
+                            </LinearGradientBrush>
+                        </Border.Background>
+                        <Canvas Width="28" Height="20">
+                            <Polyline Points="0,6 4,6 5,2 6,6 11,6 12,3 13,6 17,6 18,1 19,6 23,6 24,4 25,6 28,6"
+                                      Stroke="#80D8FF" StrokeThickness="1"/>
+                            <Rectangle Canvas.Left="4.5" Canvas.Top="8" Width="1.6" Height="12" Fill="#FFD600"/>
+                            <Rectangle Canvas.Left="11.5" Canvas.Top="8" Width="1.6" Height="12" Fill="#FFAB00"/>
+                            <Rectangle Canvas.Left="17.5" Canvas.Top="8" Width="2" Height="12" Fill="#FFFFFF"/>
+                            <Rectangle Canvas.Left="23.5" Canvas.Top="8" Width="1.6" Height="12" Fill="#FFC400"/>
+                            <Rectangle Canvas.Left="8" Canvas.Top="11" Width="1" Height="9" Fill="#304FFE" Opacity="0.7"/>
+                            <Rectangle Canvas.Left="20.5" Canvas.Top="13" Width="1" Height="7" Fill="#304FFE" Opacity="0.7"/>
+                        </Canvas>
+                    </Border>
+                    <TextBlock Text="Spectrum width manager" VerticalAlignment="Center"/>
+                </StackPanel>
+            </Button>
+        </Grid>
 
         <!-- TWO FOLDERS, the way Statistics has them: the ordinary frequencies, and the ones used while
              Activity on the main window is WWFF. The same layout in both. -->
@@ -97,76 +128,56 @@
             </StackPanel>
         </Border>
 
-        <!-- A LITTLE WATERFALL IN FRONT OF THE WORDS (his request, 2026-10-23: the button was easy to miss).
-             Drawn here, like the menu icons: a dark screen with a few stations as bright streaks under a
-             spectrum line - what the radio's scope shows, which is what this button sets. -->
-        <Button x:Name="Btn_SpectrumWidths" FontSize="16"
-                Height="32" Width="280" HorizontalAlignment="Left" Margin="0,14,0,0"
-                Background="#1565C0" Foreground="White" BorderBrush="#0D47A1"
-                Click="Btn_SpectrumWidths_Click">
-            <StackPanel Orientation="Horizontal">
-                <Border Width="30" Height="22" CornerRadius="2" BorderBrush="#BBDEFB" BorderThickness="1" Margin="0,0,8,0" ClipToBounds="True">
-                    <Border.Background>
-                        <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                            <GradientStop Color="#0A1A4A" Offset="0"/>
-                            <GradientStop Color="#020818" Offset="1"/>
-                        </LinearGradientBrush>
-                    </Border.Background>
-                    <Canvas Width="28" Height="20">
-                        <Polyline Points="0,6 4,6 5,2 6,6 11,6 12,3 13,6 17,6 18,1 19,6 23,6 24,4 25,6 28,6"
-                                  Stroke="#80D8FF" StrokeThickness="1"/>
-                        <Rectangle Canvas.Left="4.5" Canvas.Top="8" Width="1.6" Height="12" Fill="#FFD600"/>
-                        <Rectangle Canvas.Left="11.5" Canvas.Top="8" Width="1.6" Height="12" Fill="#FFAB00"/>
-                        <Rectangle Canvas.Left="17.5" Canvas.Top="8" Width="2" Height="12" Fill="#FFFFFF"/>
-                        <Rectangle Canvas.Left="23.5" Canvas.Top="8" Width="1.6" Height="12" Fill="#FFC400"/>
-                        <Rectangle Canvas.Left="8" Canvas.Top="11" Width="1" Height="9" Fill="#304FFE" Opacity="0.7"/>
-                        <Rectangle Canvas.Left="20.5" Canvas.Top="13" Width="1" Height="7" Fill="#304FFE" Opacity="0.7"/>
-                    </Canvas>
-                </Border>
-                <TextBlock Text="Spectrum width manager" VerticalAlignment="Center"/>
-            </StackPanel>
-        </Button>
 
-        <!-- SPLIT RANGE (his request): the split box on the panel moves the radio's other VFO only
-             inside this window, kHz above the main frequency. 5 to 10 is what DX stations usually
-             listen on. -->
-        <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
-            <TextBlock FontSize="16" VerticalAlignment="Center"><Run FontWeight="Bold" Text="Split"/><Run Text=" range on the panel (not CW):  from"/></TextBlock>
-            <TextBox x:Name="TB_SplitFrom" Width="50" Height="30" FontSize="16" MaxLength="2" Margin="8,0,8,0"
-                     HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
-                     PreviewTextInput="SplitBox_PreviewTextInput" LostFocus="SplitBox_LostFocus"/>
-            <TextBlock Text="to" FontSize="16" VerticalAlignment="Center"/>
-            <TextBox x:Name="TB_SplitTo" Width="50" Height="30" FontSize="16" MaxLength="2" Margin="8,0,8,0"
-                     HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
-                     PreviewTextInput="SplitBox_PreviewTextInput" LostFocus="SplitBox_LostFocus"/>
-            <TextBlock Text="kHz above the main frequency" FontSize="16" VerticalAlignment="Center"/>
-        </StackPanel>
-
-        <!-- One notch of the mouse wheel over the split box. -->
-        <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
-            <TextBlock FontSize="16" VerticalAlignment="Center"><Run FontWeight="Bold" Text="Split"/><Run Text=" mouse wheel step (not CW):"/></TextBlock>
-            <RadioButton x:Name="RB_Step01" Content="0.1 kHz" Tag="0.1" FontSize="16" Margin="14,0,0,0" VerticalContentAlignment="Center" Checked="SplitStep_Checked"/>
-            <RadioButton x:Name="RB_Step05" Content="0.5 kHz" Tag="0.5" FontSize="16" Margin="14,0,0,0" VerticalContentAlignment="Center" Checked="SplitStep_Checked"/>
-            <RadioButton x:Name="RB_Step1" Content="1 kHz" Tag="1" FontSize="16" Margin="14,0,0,0" VerticalContentAlignment="Center" Checked="SplitStep_Checked"/>
-        </StackPanel>
-
-        <!-- The same two settings for CW, where split is worked much closer to the main frequency. -->
-        <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
-            <TextBlock FontSize="16" VerticalAlignment="Center"><Run FontWeight="Bold" Text="Split"/><Run Text=" range in CW:  from"/></TextBlock>
-            <TextBox x:Name="TB_SplitCwFrom" Width="50" Height="30" FontSize="16" MaxLength="2" Margin="8,0,8,0"
-                     HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
-                     PreviewTextInput="SplitBox_PreviewTextInput" LostFocus="SplitCwBox_LostFocus"/>
-            <TextBlock Text="to" FontSize="16" VerticalAlignment="Center"/>
-            <TextBox x:Name="TB_SplitCwTo" Width="50" Height="30" FontSize="16" MaxLength="2" Margin="8,0,8,0"
-                     HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
-                     PreviewTextInput="SplitBox_PreviewTextInput" LostFocus="SplitCwBox_LostFocus"/>
-            <TextBlock Text="kHz above the main frequency" FontSize="16" VerticalAlignment="Center"/>
-        </StackPanel>
-        <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
-            <TextBlock FontSize="16" VerticalAlignment="Center"><Run FontWeight="Bold" Text="Split"/><Run Text=" mouse wheel step in CW:"/></TextBlock>
-            <RadioButton x:Name="RB_CwStep01" Content="0.1 kHz" Tag="0.1" FontSize="16" Margin="14,0,0,0" VerticalContentAlignment="Center" Checked="SplitCwStep_Checked"/>
-            <RadioButton x:Name="RB_CwStep05" Content="0.5 kHz" Tag="0.5" FontSize="16" Margin="14,0,0,0" VerticalContentAlignment="Center" Checked="SplitCwStep_Checked"/>
-            <RadioButton x:Name="RB_CwStep1" Content="1 kHz" Tag="1" FontSize="16" Margin="14,0,0,0" VerticalContentAlignment="Center" Checked="SplitCwStep_Checked"/>
+        <!-- SPLIT (his request): one small table instead of a sentence per setting. Each row is a
+             group of modes - SSB and the others, then CW - with the range the offset box on the panel
+             moves the radio's other VFO in (kHz above the main frequency) and how far one notch of the
+             mouse wheel moves it. 5 to 10 is what DX stations usually listen on; CW works closer in. -->
+        <!-- Framed like the three folders above: a tab carrying the title, and a frame under it, in light blue. -->
+        <StackPanel Margin="0,18,0,0" HorizontalAlignment="Left">
+            <Border HorizontalAlignment="Left" Background="#D6E9FB" BorderBrush="{DynamicResource AccentBrush}"
+                    BorderThickness="1,1,1,0" CornerRadius="6,6,0,0" Padding="20,7,20,7" Panel.ZIndex="1" Margin="0,0,0,-1">
+                <TextBlock Text="Split button configuration" FontSize="16" FontWeight="Bold"/>
+            </Border>
+            <Border Background="#D6E9FB" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1" Padding="8,10,8,10">
+                <Grid HorizontalAlignment="Left">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Mode" FontSize="16" FontWeight="Bold" VerticalAlignment="Center" Margin="4,3,12,3"/>
+                    <TextBlock Grid.Row="0" Grid.Column="1" Text="From (kHz up)" FontSize="16" FontWeight="Bold" HorizontalAlignment="Center" TextAlignment="Center" VerticalAlignment="Center" Margin="4,3,12,3"/>
+                    <TextBlock Grid.Row="0" Grid.Column="2" Text="To (kHz up)" FontSize="16" FontWeight="Bold" HorizontalAlignment="Center" TextAlignment="Center" VerticalAlignment="Center" Margin="4,3,12,3"/>
+                    <TextBlock Grid.Row="0" Grid.Column="3" Text="Mouse wheel step (kHz)" FontSize="16" FontWeight="Bold" VerticalAlignment="Center" Margin="4,3,12,3"/>
+                    <TextBlock Grid.Row="1" Grid.Column="0" Text="SSB and others" Foreground="#1565C0" FontWeight="Bold" FontSize="16" VerticalAlignment="Center" Margin="4,3,12,3"/>
+                    <TextBox Grid.Row="1" Grid.Column="1" x:Name="TB_SplitFrom" Width="50" Height="30" FontSize="16" MaxLength="2" Margin="4,3,4,3" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" PreviewTextInput="SplitBox_PreviewTextInput" LostFocus="SplitBox_LostFocus"/>
+                    <TextBox Grid.Row="1" Grid.Column="2" x:Name="TB_SplitTo" Width="50" Height="30" FontSize="16" MaxLength="2" Margin="4,3,4,3" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" PreviewTextInput="SplitBox_PreviewTextInput" LostFocus="SplitBox_LostFocus"/>
+                    <StackPanel Grid.Row="1" Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
+                        <RadioButton x:Name="RB_Step01" Content="0.1" Tag="0.1" FontSize="16" Margin="0,0,14,0" VerticalContentAlignment="Center" Checked="SplitStep_Checked"/>
+                        <RadioButton x:Name="RB_Step05" Content="0.5" Tag="0.5" FontSize="16" Margin="0,0,14,0" VerticalContentAlignment="Center" Checked="SplitStep_Checked"/>
+                        <RadioButton x:Name="RB_Step1" Content="1" Tag="1" FontSize="16" Margin="0,0,14,0" VerticalContentAlignment="Center" Checked="SplitStep_Checked"/>
+                    </StackPanel>
+                    <TextBlock Grid.Row="2" Grid.Column="0" Text="CW" FontSize="16" Foreground="#D32F2F" FontWeight="Bold" VerticalAlignment="Center" Margin="4,3,12,3"/>
+                    <TextBox Grid.Row="2" Grid.Column="1" x:Name="TB_SplitCwFrom" Width="50" Height="30" FontSize="16" MaxLength="2" Margin="4,3,4,3" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" PreviewTextInput="SplitBox_PreviewTextInput" LostFocus="SplitCwBox_LostFocus"/>
+                    <TextBox Grid.Row="2" Grid.Column="2" x:Name="TB_SplitCwTo" Width="50" Height="30" FontSize="16" MaxLength="2" Margin="4,3,4,3" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" PreviewTextInput="SplitBox_PreviewTextInput" LostFocus="SplitCwBox_LostFocus"/>
+                    <StackPanel Grid.Row="2" Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
+                        <RadioButton x:Name="RB_CwStep01" Content="0.1" Tag="0.1" FontSize="16" Margin="0,0,14,0" VerticalContentAlignment="Center" Checked="SplitCwStep_Checked"/>
+                        <RadioButton x:Name="RB_CwStep05" Content="0.5" Tag="0.5" FontSize="16" Margin="0,0,14,0" VerticalContentAlignment="Center" Checked="SplitCwStep_Checked"/>
+                        <RadioButton x:Name="RB_CwStep1" Content="1" Tag="1" FontSize="16" Margin="0,0,14,0" VerticalContentAlignment="Center" Checked="SplitCwStep_Checked"/>
+                    </StackPanel>
+                    <TextBlock Grid.Row="0" Grid.Column="4" Text="Split ends if main moves more than (kHz)" FontSize="16" FontWeight="Bold" TextWrapping="Wrap" MaxWidth="210" VerticalAlignment="Center" Margin="4,3,4,3"/>
+                    <TextBox x:Name="TB_SplitLeave" Grid.Row="1" Grid.Column="4" Width="50" Height="30" FontSize="16" MaxLength="2" Margin="4,3,4,3" HorizontalAlignment="Left" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" PreviewTextInput="SplitBox_PreviewTextInput" LostFocus="SplitLeave_LostFocus"/>
+                    <TextBox x:Name="TB_SplitCwLeave" Grid.Row="2" Grid.Column="4" Width="50" Height="30" FontSize="16" MaxLength="2" Margin="4,3,4,3" HorizontalAlignment="Left" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" PreviewTextInput="SplitBox_PreviewTextInput" LostFocus="SplitCwLeave_LostFocus"/>
+                </Grid>
+            </Border>
         </StackPanel>
     </StackPanel>
 </UserControl>
