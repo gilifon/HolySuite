@@ -92,6 +92,7 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
         <!-- Type a frequency, press Enter, the radio goes there. -->
@@ -217,7 +218,7 @@
              NEGATIVE MARGINS ON PURPOSE: the outer Grid holds everything 8px in from the window,
              and the blue is meant to reach the window's own edge on both sides and along the bottom,
              so it is pulled back out by exactly that 8. Its top is flush with the divider. -->
-        <Border Grid.Row="3" Grid.RowSpan="3" Background="{DynamicResource FormBg}"
+        <Border Grid.Row="3" Grid.RowSpan="4" Background="{DynamicResource FormBg}"
                 Margin="-8,0,-8,-8"/>
 
         <!-- SSB, AM and CW - one row, filled in by BuildButtons the same way ButtonGrid's cells are.
@@ -279,7 +280,7 @@
                 <ColumnDefinition/>
                 <ColumnDefinition/>
             </Grid.ColumnDefinitions>
-            <ToggleButton x:Name="SplitButton" Grid.Column="0" Content="SPLIT"
+            <ToggleButton x:Name="SplitButton" ToolTipService.Placement="Top" Grid.Column="0" Content="SPLIT"
                           Style="{StaticResource PanelToggleStyle}" Margin="4,4,2,4"
                           Click="SplitButton_Click"
                           ToolTip="Split: transmit on the radio's other VFO. The box shows how far above (or below) the main frequency that is, in kHz."/>
@@ -290,7 +291,7 @@
                 </Grid.ColumnDefinitions>
                 <!-- A real box: type the offset and press Enter, or roll the wheel over it (1 kHz a
                      notch). Read-only, and showing a dash, while split is off. -->
-                <TextBox x:Name="SplitOffsetBox" Height="34" Margin="2,4,4,4" VerticalAlignment="Center"
+                <TextBox x:Name="SplitOffsetBox" ToolTipService.Placement="Top" Height="34" Margin="2,4,4,4" VerticalAlignment="Center"
                          Text="&#x2014;" FontSize="18" FontWeight="Bold" MaxLength="6"
                          HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
                          Cursor="ScrollNS"
@@ -300,11 +301,32 @@
                          KeyDown="SplitOffsetBox_KeyDown"
                          PreviewMouseWheel="SplitOffsetBox_PreviewMouseWheel"
                          LostFocus="SplitOffsetBox_LostFocus"/>
-                <TextBlock Grid.Column="1" Text="kHz/UP" FontSize="14" FontWeight="Bold"
+                <TextBlock Grid.Column="1" Text="kHz/UP" FontSize="16" FontWeight="Bold"
                            VerticalAlignment="Center" Margin="0,0,6,0"
                            Foreground="Black"/>
             </Grid>
         </Grid>
+        </Border>
+
+        <!-- THE OTHER VFO'S FREQUENCY: a second framed row that exists only while split is on. It is
+             Collapsed otherwise, and because the window sizes itself to its content the panel gets
+             taller when split goes on and returns to its old height when split goes off. -->
+        <Border x:Name="SplitFreqRow" Grid.Row="6" Margin="2,4,2,0" Padding="4,2,4,2" CornerRadius="8"
+                BorderThickness="1" BorderBrush="#9E9D24" Background="#FFEB3B" Visibility="Collapsed"
+                ToolTip="The frequency the radio transmits on while split is on.">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Text="TX" FontSize="16" FontWeight="Bold" Foreground="Black"
+                           VerticalAlignment="Center" Margin="4,0,0,0"/>
+                <TextBlock x:Name="SplitFreqText" Grid.Column="1" Text="" FontSize="18" FontWeight="Bold"
+                           Foreground="Black" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                <TextBlock Grid.Column="2" Text="kHz" FontSize="16" FontWeight="Bold" Foreground="Black"
+                           VerticalAlignment="Center" Margin="0,0,4,0"/>
+            </Grid>
         </Border>
     </Grid>
 </Window>
