@@ -63,6 +63,28 @@ namespace HolyLogger.OptionsUserControls
             if (Math.Abs(step - 0.1) < 0.001) RB_Step01.IsChecked = true;
             else if (Math.Abs(step - 0.5) < 0.001) RB_Step05.IsChecked = true;
             else RB_Step1.IsChecked = true;
+            LoadCwSplitSettings();
+        }
+
+        private void LoadCwSplitSettings()
+        {
+            var s = Properties.Settings.Default;
+            TB_SplitCwFrom.Text = s.SplitCwRangeFromKhz.ToString(CultureInfo.InvariantCulture);
+            TB_SplitCwTo.Text = s.SplitCwRangeToKhz.ToString(CultureInfo.InvariantCulture);
+            double step = s.SplitCwStepKhz;
+            if (Math.Abs(step - 0.1) < 0.001) RB_CwStep01.IsChecked = true;
+            else if (Math.Abs(step - 0.5) < 0.001) RB_CwStep05.IsChecked = true;
+            else RB_CwStep1.IsChecked = true;
+        }
+
+        private void SplitCwStep_Checked(object sender, RoutedEventArgs e)
+        {
+            double step;
+            var rb = sender as RadioButton;
+            if (rb == null || !double.TryParse((string)rb.Tag, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out step)) return;
+            if (Math.Abs(Properties.Settings.Default.SplitCwStepKhz - step) < 0.0001) return;
+            Properties.Settings.Default.SplitCwStepKhz = step;
+            Properties.Settings.Default.Save();
         }
 
         private void SplitStep_Checked(object sender, RoutedEventArgs e)
@@ -585,6 +607,28 @@ namespace HolyLogger.OptionsUserControls
             {
                 s.SplitRangeFromKhz = from;
                 s.SplitRangeToKhz = to;
+                s.Save();
+            }
+        }
+
+        // Same rules as the general range: whole kHz 1 to 99, From never above To.
+        private void SplitCwBox_LostFocus(object sender, RoutedEventArgs e)
+        {
+            var s = Properties.Settings.Default;
+            int from, to;
+            if (!int.TryParse(TB_SplitCwFrom.Text, NumberStyles.None, CultureInfo.InvariantCulture, out from) || from < 1 || from > 99) from = s.SplitCwRangeFromKhz;
+            if (!int.TryParse(TB_SplitCwTo.Text, NumberStyles.None, CultureInfo.InvariantCulture, out to) || to < 1 || to > 99) to = s.SplitCwRangeToKhz;
+            if (from > to)
+            {
+                from = s.SplitCwRangeFromKhz;
+                to = s.SplitCwRangeToKhz;
+            }
+            TB_SplitCwFrom.Text = from.ToString(CultureInfo.InvariantCulture);
+            TB_SplitCwTo.Text = to.ToString(CultureInfo.InvariantCulture);
+            if (from != s.SplitCwRangeFromKhz || to != s.SplitCwRangeToKhz)
+            {
+                s.SplitCwRangeFromKhz = from;
+                s.SplitCwRangeToKhz = to;
                 s.Save();
             }
         }
