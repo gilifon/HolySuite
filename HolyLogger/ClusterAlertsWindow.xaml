@@ -18,7 +18,7 @@
         </Grid.RowDefinitions>
 
         <TextBlock Grid.Row="0" FontSize="16" TextWrapping="Wrap" Margin="0,0,0,10">
-            <Run Text="Type a callsign on the empty line at the bottom. When one of these is spotted you hear the alert sound and the spot is framed in purple. If it is on a band you are not showing, it is pinned at the top of the spots table. Clear Any Mode to be told about that callsign only on the modes ticked in the cluster window."/>
+            <Run Text="Type a callsign on the empty line at the bottom. When one of these is spotted you hear the alert sound and the spot is framed in purple. If it is on a band you are not showing, it is pinned at the top of the spots table. Leave Mode on Any, or pick one mode to be told about that callsign on that mode only."/>
         </TextBlock>
 
         <DataGrid Grid.Row="1" x:Name="GRD_Calls"
@@ -26,7 +26,7 @@
                   CanUserAddRows="False" CanUserDeleteRows="True" CanUserResizeRows="False"
                   CanUserSortColumns="False" CanUserReorderColumns="False"
                   SelectionMode="Single" SelectionUnit="FullRow"
-                  GridLinesVisibility="All" FontSize="16" RowHeight="26"
+                  GridLinesVisibility="All" FontSize="16" RowHeight="30"
                   Background="{DynamicResource GridRowBg}" Foreground="{DynamicResource TextBrush}"
                   BorderBrush="#1565C0" BorderThickness="2"
                   CellEditEnding="Calls_CellEditEnding"
@@ -118,21 +118,23 @@
                     </DataGridTextColumn.ElementStyle>
                 </DataGridTextColumn>
 
-                <!-- ANY MODE (user, 2026-11-21): ticked - how every line starts - the callsign is
-                     alerted whatever mode it is spotted on. Cleared, it is alerted only on the modes
-                     ticked in the CLUSTER window. A plain CheckBox in a template column, so one click
-                     turns it over; a DataGridCheckBoxColumn needs the cell put into edit first. -->
-                <DataGridTemplateColumn Width="100" CanUserResize="False" SortMemberPath="AnyMode">
+                <!-- MODE (user, 2026-11-22): which mode this callsign is wanted on. "Any" - how every
+                     line starts - alerts whatever it is spotted on; pick CW and it alerts on CW alone,
+                     whether or not CW is ticked in the cluster window. A plain ComboBox in a template
+                     column, so one click opens it; a DataGridComboBoxColumn needs the cell put into
+                     edit first. The list comes from the window (ModeChoices). -->
+                <DataGridTemplateColumn Width="100" CanUserResize="False" SortMemberPath="Mode">
                     <DataGridTemplateColumn.Header>
-                        <TextBlock Text="Any Mode" HorizontalAlignment="Center" VerticalAlignment="Center"
+                        <TextBlock Text="Mode" HorizontalAlignment="Center" VerticalAlignment="Center"
                                    TextAlignment="Center"
-                                   ToolTip="Ticked: alert on any mode. Cleared: alert only on the modes ticked in the cluster window."/>
+                                   ToolTip="Any: alert on every mode. One mode: alert only when the callsign is spotted on it."/>
                     </DataGridTemplateColumn.Header>
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
-                            <CheckBox IsChecked="{Binding AnyMode, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                      HorizontalAlignment="Center" VerticalAlignment="Center"
-                                      ToolTip="Ticked: alert on any mode. Cleared: alert only on the modes ticked in the cluster window."/>
+                            <ComboBox ItemsSource="{Binding ModeChoices, RelativeSource={RelativeSource AncestorType=Window}}"
+                                      SelectedItem="{Binding Mode, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                      FontSize="16" Margin="2,1,2,1" VerticalContentAlignment="Center"
+                                      ToolTip="Any: alert on every mode. One mode: alert only when the callsign is spotted on it."/>
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>

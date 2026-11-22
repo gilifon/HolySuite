@@ -5553,10 +5553,10 @@ namespace HolyLogger
         // typed in now also catches the spots that arrived before it was typed.
         internal void SetClusterAlertCallsigns(IEnumerable<string> calls)
         {
-            SetClusterAlertCallsigns(calls, GetClusterAlertModeLimitedCallsigns());
+            SetClusterAlertCallsigns(calls, GetClusterAlertCallModes());
         }
 
-        internal void SetClusterAlertCallsigns(IEnumerable<string> calls, IEnumerable<string> modeLimited)
+        internal void SetClusterAlertCallsigns(IEnumerable<string> calls, IDictionary<string, string> callModes)
         {
             var list = new List<string>();
             var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -5567,73 +5567,85 @@ namespace HolyLogger
                 list.Add(call);
             }
 
-            // Only callsigns still on the list: a call taken off takes its "Any Mode" answer with it,
-            // so putting it back later starts from the plain any-mode watch everybody gets.
-            var limited = new List<string>();
-            var limitedSeen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            foreach (string c in (modeLimited ?? Enumerable.Empty<string>()))
-            {
-                string call = (c ?? string.Empty).Trim().ToUpperInvariant();
-                if (call.Length == 0 || !limitedSeen.Add(call)) continue;
-                if (seen.Contains(call)) limited.Add(call);
-            }
+            // Only callsigns still on the list, and only the ones asking for one mode: a call taken off
+            // takes its answer with it, so putting it back later starts from the plain any-mode watch
+            // everybody gets.
+            var pairs = new List<string>();
+            var pairsSeen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (callModes != null)
+                foreach (var kv in callModes)
+                {
+                    string call = (kv.Key ?? string.Empty).Trim().ToUpperInvariant();
+                    string mode = (kv.Value ?? string.Empty).Trim().ToUpperInvariant();
+                    if (call.Length == 0 || mode.Length == 0) continue;
+                    if (string.Equals(mode, ClusterAlertAnyMode, StringComparison.OrdinalIgnoreCase)) continue;
+                    if (!seen.Contains(call) || !pairsSeen.Add(call)) continue;
+                    pairs.Add(call + "=" + mode);
+                }
 
             Properties.Settings.Default.ClusterAlertCallsigns = string.Join(",", list);
-            Properties.Settings.Default.ClusterAlertCallsignsModeLimited = string.Join(",", limited);
+            Properties.Settings.Default.ClusterAlertCallsignModes = string.Join(",", pairs);
             try { Properties.Settings.Default.Save(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
 
             _clusterAlertCalls = null;   // rebuilt on the next match
-            _clusterAlertModeLimited = null;
+            _clusterAlertCallModes = null;
             RemarkClusterAlertSpots();
             UpdateClusterAlertsCount();   // the number on the bell follows the list
         }
 
-        // ── Alerts: "Any Mode" per callsign ──────────────────────────────────────────
+        // ── Alerts: the mode each watched callsign is wanted on ──────────────────────
         // A watched callsign normally reaches the operator whatever mode it is spotted on - that is what
         // a watch is for. But a man who only works SSB does not want his watched call ringing on FT8
-        // (4X1ZQ, 2026-11-21), so each line of the list has an "Any Mode" box. Ticked (how every line
-        // starts, and how the list behaved before the box existed) means any mode. Unticked means that
-        // callsign only counts when its mode is one of the modes ticked in the CLUSTER window - the same
-        // boxes that decide what the table shows, not the alert modes in this window.
+        // (4X1ZQ, 2026-11-21), so every line of the list carries a mode: "Any", or one of the modes the
+        // cluster knows. "Any" is how a line starts and how the list behaved before the column existed.
+        // A line asking for CW rings on CW and on nothing else - and it rings even when CW is unticked
+        // in the cluster window, because the line itself already says which mode is wanted.
         //
-        // Kept as a second comma-separated line listing the UNTICKED callsigns, so an empty setting -
-        // which is what every existing installation has - means exactly what it meant before: any mode.
-        HashSet<string> _clusterAlertModeLimited = null;
+        // Kept as a second comma-separated line of CALL=MODE pairs, holding only the lines that ask for
+        // one mode; an empty setting - what every existing installation has - means Any throughout.
+        internal const string ClusterAlertAnyMode = "Any";
+        Dictionary<string, string> _clusterAlertCallModes = null;   // identity base -> mode, upper case
 
-        internal List<string> GetClusterAlertModeLimitedCallsigns()
+        // The pairs as they are stored: keyed by the callsign as it is written on the list, for the
+        // Alerts window to fill its boxes from.
+        internal Dictionary<string, string> GetClusterAlertCallModes()
         {
-            var list = new List<string>();
-            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            string raw = Properties.Settings.Default.ClusterAlertCallsignsModeLimited ?? string.Empty;
+            var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            string raw = Properties.Settings.Default.ClusterAlertCallsignModes ?? string.Empty;
             foreach (string part in raw.Split(new[] { ',', ';', '\n', '\r', '\t', ' ' }, StringSplitOptions.RemoveEmptyEntries))
             {
-                string call = part.Trim().ToUpperInvariant();
-                if (call.Length == 0 || !seen.Add(call)) continue;
-                list.Add(call);
+                int eq = part.IndexOf('=');
+                if (eq <= 0) continue;
+                string call = part.Substring(0, eq).Trim().ToUpperInvariant();
+                string mode = part.Substring(eq + 1).Trim().ToUpperInvariant();
+                if (call.Length == 0 || mode.Length == 0) continue;
+                map[call] = mode;
             }
-            return list;
+            return map;
         }
 
         // Identity bases, like the watch list itself, so 4Z5SL/M answers for 4Z5SL here too.
-        private HashSet<string> GetClusterAlertModeLimitedSet()
+        private Dictionary<string, string> GetClusterAlertCallModeSet()
         {
-            var set = _clusterAlertModeLimited;
-            if (set == null)
+            var map = _clusterAlertCallModes;
+            if (map == null)
             {
-                set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                foreach (string call in GetClusterAlertModeLimitedCallsigns())
-                    set.Add(CallsignIdentity.Base(call));
-                _clusterAlertModeLimited = set;
+                map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var kv in GetClusterAlertCallModes())
+                    map[CallsignIdentity.Base(kv.Key)] = kv.Value;
+                _clusterAlertCallModes = map;
             }
-            return set;
+            return map;
         }
 
-        private bool IsClusterAlertCallModeLimited(string callsign)
+        // The mode this watched callsign is wanted on, or null for any mode.
+        private string ClusterAlertCallMode(string callsign)
         {
-            if (string.IsNullOrWhiteSpace(callsign)) return false;
-            var set = GetClusterAlertModeLimitedSet();
-            if (set.Count == 0) return false;
-            return set.Contains(CallsignIdentity.Base(callsign.Trim()));
+            if (string.IsNullOrWhiteSpace(callsign)) return null;
+            var map = GetClusterAlertCallModeSet();
+            if (map.Count == 0) return null;
+            string mode;
+            return map.TryGetValue(CallsignIdentity.Base(callsign.Trim()), out mode) ? mode : null;
         }
 
         // ── Alerts: the Mode alert boxes ─────────────────────────────────────────────
@@ -5685,14 +5697,17 @@ namespace HolyLogger
         // A watched callsign OR a ticked mode. IsAlertCallsign carries both, so everything that
         // frames, pins and rings for a watched callsign does the same for a ticked mode.
         //
-        // A watched callsign with its "Any Mode" box cleared counts only on the modes the cluster
-        // window is showing; on any other mode it is an ordinary spot and the table's own mode filter
-        // deals with it, exactly as if it had never been watched.
+        // A watched callsign asking for one mode counts on that mode only; on any other it is an
+        // ordinary spot the table's own filters deal with, exactly as if it had never been watched.
         private bool IsClusterAlertSpot(string callsign, string mode)
         {
-            if (IsClusterAlertCallsign(callsign)
-                && (!IsClusterAlertCallModeLimited(callsign) || IsClusterModeEnabled(mode)))
-                return true;
+            if (IsClusterAlertCallsign(callsign))
+            {
+                string wanted = ClusterAlertCallMode(callsign);
+                if (string.IsNullOrEmpty(wanted)) return true;
+                if (string.Equals(wanted, (mode ?? string.Empty).Trim(), StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
 
             return IsClusterAlertMode(mode);
         }
