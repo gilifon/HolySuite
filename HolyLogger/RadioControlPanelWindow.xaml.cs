@@ -533,9 +533,53 @@ namespace HolyLogger
             else SplitOffsetBox.Foreground = System.Windows.Media.Brushes.Gray;
             SplitOffsetBox.ToolTip = "Wheel or type: " + SplitFrom + " to " + SplitTo + " kHz above the main frequency, " + SplitStep.ToString("0.#", CultureInfo.InvariantCulture) + " kHz a notch. Range and step are set under Options.";
 
+            // The other VFO's frequency, in its own row, only while split is on.
+            bool showTx = _splitOn == true && _rigKhz > 0;
+            SplitFreqRow.Visibility = showTx ? Visibility.Visible : Visibility.Collapsed;
+            if (showTx) SplitFreqText.Text = (_rigKhz + offsetKhz).ToString("0.000", CultureInfo.InvariantCulture);
+            SetTxBlink(showTx && _transmitting == true);
+
             // Never rewritten under the user's fingers while they type.
             if (!SplitOffsetBox.IsKeyboardFocused)
                 SplitOffsetBox.Text = _splitOn != null ? OffsetText(offsetKhz) : "\u2014";
+        }
+
+        // While the radio is transmitting in split, the TX row blinks yellow / red: that is the frequency
+        // the signal is going out on, and it is not the one on the main display.
+        private System.Windows.Threading.DispatcherTimer _txBlinkTimer;
+        private bool _txBlinkRed;
+
+        private void SetTxBlink(bool on)
+        {
+            if (on)
+            {
+                if (_txBlinkTimer == null)
+                {
+                    _txBlinkTimer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(400) };
+                    _txBlinkTimer.Tick += (s, e) => PaintTxRow(!_txBlinkRed);
+                }
+                if (!_txBlinkTimer.IsEnabled)
+                {
+                    PaintTxRow(true);
+                    _txBlinkTimer.Start();
+                }
+            }
+            else
+            {
+                if (_txBlinkTimer != null) _txBlinkTimer.Stop();
+                PaintTxRow(false);
+            }
+        }
+
+        private void PaintTxRow(bool red)
+        {
+            _txBlinkRed = red;
+            SplitFreqRow.Background = new System.Windows.Media.SolidColorBrush(
+                (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(red ? "#E53935" : "#FFEB3B"));
+            var text = red ? System.Windows.Media.Brushes.White : System.Windows.Media.Brushes.Black;
+            SplitFreqText.Foreground = text;
+            foreach (var child in ((Grid)SplitFreqRow.Child).Children.OfType<TextBlock>())
+                child.Foreground = text;
         }
 
         private static string OffsetText(double khz)
