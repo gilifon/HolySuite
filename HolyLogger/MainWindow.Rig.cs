@@ -1722,9 +1722,11 @@ namespace HolyLogger
                         if (splitState == (OmniRig.RigParamX)PM_SPLITON) splitOn = true;
                         else if (splitState == (OmniRig.RigParamX)PM_SPLITOFF) splitOn = false;
                         if (splitOn == true)
-                            splitOffsetKhz = ((double)Rig.GetTxFrequency() - (double)Rig.GetRxFrequency()) / 1000.0;
+                            // While split is being switched on the radio passes through 0 and its own +5 on the
+                            // way (A=B, then its own offset); the box shows what was asked for, not that.
+                            splitOffsetKhz = _splitWantedKhz ?? (((double)Rig.GetTxFrequency() - (double)Rig.GetRxFrequency()) / 1000.0);
                         else if (splitOn == false)
-                            splitOffsetKhz = SplitOffsetIfSwitchedOn();
+                            splitOffsetKhz = SplitOffsetIfSwitchedOn(mode);
                     }
                 }
                 catch (Exception swallowed)
@@ -1772,18 +1774,13 @@ namespace HolyLogger
             return rxHz == b && rxHz != a;
         }
 
-        // What the box shows (in grey) while split is off: where the other VFO would be used - its
-        // present offset when that is already inside the From..To window, otherwise the From value,
-        // exactly what switching split on would do.
-        private double SplitOffsetIfSwitchedOn()
+        // What the box shows (in grey) while split is off: the From value of the mode in use (CW has its
+        // own), which is exactly where switching split on will put the other VFO.
+        private double SplitOffsetIfSwitchedOn(string mode)
         {
-            int from = Math.Max(1, Properties.Settings.Default.SplitRangeFromKhz);
-            int to = Math.Max(from, Properties.Settings.Default.SplitRangeToKhz);
-            long rx = Rig.GetRxFrequency();
-            if (rx <= 0) return from;
-            long other = OtherVfoIsA(rx) ? Rig.FreqA : Rig.FreqB;
-            double off = (other - rx) / 1000.0;
-            return (off < from - 0.0001 || off > to + 0.0001) ? from : off;
+            bool cw = string.Equals(mode, "CW", StringComparison.OrdinalIgnoreCase);
+            int from = Math.Max(1, cw ? Properties.Settings.Default.SplitCwRangeFromKhz : Properties.Settings.Default.SplitRangeFromKhz);
+            return from;
         }
 
         /// <summary>Switch split on or off. Switching on first moves the other VFO into the From..To window, so it never starts on a leftover frequency far away.</summary>
@@ -1802,15 +1799,83 @@ namespace HolyLogger
                     long rx = Rig.GetRxFrequency();
                     if (rx <= 0) return;
                     bool otherIsA = OtherVfoIsA(rx);
-                    long other = otherIsA ? Rig.FreqA : Rig.FreqB;
-                    double offKhz = (other - rx) / 1000.0;
-                    if (offKhz < fromKhz - 0.0001 || offKhz > toKhz + 0.0001)
-                    {
-                        int hz = (int)(rx + (long)fromKhz * 1000);
-                        if (otherIsA) Rig.FreqA = hz; else Rig.FreqB = hz;
-                    }
+                    // Always starts at the From value: a leftover frequency on the other VFO (say +5
+                    // from an earlier SSB split) is no guide for this one.
+                    double offKhz = fromKhz;
+
+                    // The other VFO must be in the SAME MODE as the main one, and the radio's mode
+                    // commands only touch the VFO that is selected - writing its frequency leaves its old
+                    // mode as it was. "A=B" (pmVfoEqual) copies the main VFO to the other one, mode
+                    // included, so it goes first; the frequency is written after it.
+                    if ((_writeableParamsCache & PM_VFOEQUAL) != 0)
+                        Rig.Vfo = (OmniRig.RigParamX)PM_VFOEQUAL;
+
+                    int hz = (int)Math.Round(rx + offKhz * 1000.0);
+
+                    // THE RADIO MUST NOT HAVE THE LAST WORD (his observation: the radio went to +1 and
+                    // at once to +5 - it put the other VFO back to a frequency of its own). So split goes on
+                    // first, the frequency is written after it, and then the radio is asked what it
+                    // really holds; if it is not the wanted offset the frequency is written again.
                     Rig.Split = (OmniRig.RigParamX)PM_SPLITON;
+                    // The log showed the radio's other VFO coming back to its OLD frequency about a
+                    // second after split went on, whatever was written in that first second (the IC-7610
+                    // has Main and Sub bands, not A and B, and brings the Sub band up when split starts).
+                    // So the frequency is written once that has settled, and checked again after it.
+                    EnforceSplitOffset(offKhz, 0);
                 }
+            }
+            catch (Exception swallowed)
+            {
+                Log.Swallow(swallowed);
+                _writeableParamsCache = -1;
+            }
+        }
+
+        // Looks again after the radio has had time to settle and, if the transmit VFO is not where it
+        // was told to go, writes it again - up to three times.
+        private double? _splitWantedKhz;   // set from the press of SPLIT until the radio has settled on it
+
+        private void EnforceSplitOffset(double wantedKhz, int attempt)
+        {
+            _splitWantedKhz = wantedKhz;
+            var timer = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromMilliseconds(1200) };
+            timer.Tick += (s, e) =>
+            {
+                timer.Stop();
+                bool again = false;
+                try
+                {
+                    if (Rig == null || Rig.Status != OmniRig.RigStatusX.ST_ONLINE) return;
+                    if (Rig.Split != (OmniRig.RigParamX)PM_SPLITON) return;   // he switched it off meanwhile
+                    long rx = Rig.GetRxFrequency();
+                    double now = ((double)Rig.GetTxFrequency() - rx) / 1000.0;
+                    if (attempt > 0 && Math.Abs(now - wantedKhz) < 0.05) return;
+                    if (attempt >= 4) return;
+                    int hz = (int)Math.Round(rx + wantedKhz * 1000.0);
+                    if (OtherVfoIsA(rx)) Rig.FreqA = hz; else Rig.FreqB = hz;
+                    again = true;
+                    EnforceSplitOffset(wantedKhz, attempt + 1);
+                }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
+                finally
+                {
+                    if (!again)
+                    {
+                        _splitWantedKhz = null;
+                        UpdateRadioPanel();
+                    }
+                }
+            };
+            timer.Start();
+        }
+
+        /// <summary>Switch split off if it is on; does nothing otherwise.</summary>
+        internal void TurnSplitOffIfOn()
+        {
+            try
+            {
+                if (!RigCanSplit() || Rig.Status != OmniRig.RigStatusX.ST_ONLINE) return;
+                if (Rig.Split == (OmniRig.RigParamX)PM_SPLITON) Rig.Split = (OmniRig.RigParamX)PM_SPLITOFF;
             }
             catch (Exception swallowed)
             {

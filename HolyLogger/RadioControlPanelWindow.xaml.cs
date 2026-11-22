@@ -514,8 +514,11 @@ namespace HolyLogger
         private bool? _splitOn;
         private double _splitOffsetKhz;
 
-        private static int SplitFrom { get { return Math.Max(1, Properties.Settings.Default.SplitRangeFromKhz); } }
-        private static int SplitTo { get { return Math.Max(SplitFrom, Properties.Settings.Default.SplitRangeToKhz); } }
+        // CW has its own range and step (his request: 1 to 5 kHz, 0.1 a notch as delivered); every
+        // other mode uses the general ones. The panel's mode is the radio's own, as last reported.
+        private bool SplitIsCw { get { return string.Equals(_mode, "CW", StringComparison.OrdinalIgnoreCase); } }
+        private int SplitFrom { get { return Math.Max(1, SplitIsCw ? Properties.Settings.Default.SplitCwRangeFromKhz : Properties.Settings.Default.SplitRangeFromKhz); } }
+        private int SplitTo { get { return Math.Max(SplitFrom, SplitIsCw ? Properties.Settings.Default.SplitCwRangeToKhz : Properties.Settings.Default.SplitRangeToKhz); } }
 
         public void ShowSplit(bool rigOnline, bool canSplit, bool? splitOn, double offsetKhz)
         {
@@ -548,11 +551,11 @@ namespace HolyLogger
         }
 
         // One wheel notch, in kHz: 0.1, 0.5 or 1, chosen on the Options page.
-        private static double SplitStep
+        private double SplitStep
         {
             get
             {
-                double step = Properties.Settings.Default.SplitStepKhz;
+                double step = SplitIsCw ? Properties.Settings.Default.SplitCwStepKhz : Properties.Settings.Default.SplitStepKhz;
                 return step > 0.05 && step <= 1.0 ? step : 1.0;
             }
         }
@@ -739,6 +742,10 @@ namespace HolyLogger
             // activation. 6m and up keep FM: it is normal there, and Sukkot is worked that way.
             bool hf = band.HighKhz <= 30000;
             if (hf && !IsHfMode(mode)) mode = _lastHfMode;
+
+            // A new band, a new conversation: whatever the other VFO was doing on the old band says
+            // nothing about this one, so split goes back OFF before the radio moves (his request).
+            _main.TurnSplitOffIfOn();
             _main.TuneRadioToKhz(band.FrequencyFor(mode, _main.ActivityFrequencySet), mode);
         }
 
@@ -748,6 +755,10 @@ namespace HolyLogger
             string mode = (string)button.Tag;
 
             button.IsChecked = _rigOnline && string.Equals(mode, _mode, StringComparison.OrdinalIgnoreCase);
+
+            // A new mode on the main band leaves the other band behind in the old one, so split goes
+            // OFF first, the same as for a band button (his request).
+            _main.TurnSplitOffIfOn();
 
             _mode = mode;
             if (IsHfMode(mode)) _lastHfMode = mode.ToUpperInvariant();

@@ -3869,6 +3869,42 @@ namespace HolyLogger.Properties {
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("1")]
+        public int SplitCwRangeFromKhz {
+            get {
+                return ((int)(this["SplitCwRangeFromKhz"]));
+            }
+            set {
+                this["SplitCwRangeFromKhz"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("5")]
+        public int SplitCwRangeToKhz {
+            get {
+                return ((int)(this["SplitCwRangeToKhz"]));
+            }
+            set {
+                this["SplitCwRangeToKhz"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("0.1")]
+        public double SplitCwStepKhz {
+            get {
+                return ((double)(this["SplitCwStepKhz"]));
+            }
+            set {
+                this["SplitCwStepKhz"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("False")]
         public bool RadioPanelMinimized {
             get {
