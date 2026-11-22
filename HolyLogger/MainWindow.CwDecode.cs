@@ -96,6 +96,7 @@ namespace HolyLogger
                 cwDecodeWindow.Closed += (s, args) =>
                 {
                     cwDecodeWindow = null;
+                    StopCwFilterAsk();
                     // Closed by him, it stays closed - next time and in CW; closed by the program (leaving CW,
                     // or the program going), it comes back.
                     if (!_isShutdownCleanupDone && !_cwDecodeClosingByProgram) RememberCwDecodeOpen(false);
@@ -104,7 +105,10 @@ namespace HolyLogger
                 cwDecodeWindow.ShiftRadio = ShiftRigForPitch;
                 cwDecodeWindow.WentWrongWay = TuneWentWrongWay;
                 cwDecodeWindow.OpenSettings = OpenOptionsOnCwDecoder;
+                cwDecodeWindow.DialHz = CwDialHz;
+                cwDecodeWindow.CwSide = CwSideNow;
                 cwDecodeWindow.Show();
+                StartCwFilterAsk();
                 RememberCwDecodeOpen(true);
                 TurnOnSideToneToPc();
             }
@@ -451,6 +455,135 @@ namespace HolyLogger
                 return -1;
             }
             finally { _pcSoundReply = null; }
+        }
+
+        // ---- THE FILTER WATERFALL'S QUESTIONS TO THE RADIO (2026-11-22) -----------------------------------------
+        //
+        // The CW window's filter waterfall is as wide as the radio's filter and centred on the radio's own CW pitch.
+        // Both are asked of the radio once a second while the window is open, from the maker's own table
+        // (IC-7610 CI-V Reference Guide, IC-7610_ENG_CI-V_4):
+        //   1A 03  "Send/read the selected IF filter width" - in CW 00-09 = 50-500 Hz in 50 Hz steps,
+        //          10-40 = 600 Hz-3.6 kHz in 100 Hz steps. The answer FE FE E0 <radio> 1A 03 dd FD.
+        //   14 09  "Send/read CW pitch (5 Hz steps)" - 0000 = 300 Hz, 0128 = 600 Hz, 0255 = 900 Hz.
+        // ONLY THE IC-7610 SO FAR: it is the only radio whose guide was read for this. Any other radio gets the width
+        // measured from the sound (see CwFilterSpectrum.MeasureFilter).
+        System.Windows.Threading.DispatcherTimer _cwFilterAskTimer;
+        int _cwFilterAsks;
+
+        void StartCwFilterAsk()
+        {
+            if (_cwFilterAskTimer == null)
+            {
+                _cwFilterAskTimer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+                _cwFilterAskTimer.Tick += (s, e) => AskRadioCwFilter();
+            }
+            _cwFilterAsks = 0;
+            _cwFilterAskTimer.Start();
+        }
+
+        void StopCwFilterAsk()
+        {
+            if (_cwFilterAskTimer != null) _cwFilterAskTimer.Stop();
+        }
+
+        static bool IsIc7610(string rigType)
+        {
+            string name = System.Text.RegularExpressions.Regex.Replace(rigType ?? string.Empty, "[^A-Za-z0-9]", string.Empty);
+            return name.StartsWith("IC7610", StringComparison.OrdinalIgnoreCase);
+        }
+
+        void AskRadioCwFilter()
+        {
+            try
+            {
+                if (cwDecodeWindow == null) { StopCwFilterAsk(); return; }
+                if (!IsCatLive()) return;
+                // Not while sending: a question on the wire in the middle of a message competes with it.
+                if (CwDecodeWindow.KeyerTransmitting || CwDecodeWindow.RadioTransmitting) return;
+                if (DateTime.UtcNow - lastCwSendUtc < TimeSpan.FromSeconds(3)) return;
+
+                string rigType = NormalizeRigType(Rig.RigType);
+                if (!IsIc7610(rigType)) return;
+                int mode = (int)Rig.Mode;
+                if (mode != PM_CW_U && mode != PM_CW_L) return;
+                string icom = GetIcomCivAddress(rigType);
+                if (icom == null) return;
+
+                // The radio echoes the 7 bytes sent, then answers (see BuildCwSpeedReadCommand).
+                bool echo = IcomEchoesCommands(rigType) != false;
+                if (_cwFilterAsks++ % 5 == 0)
+                    TrySendOmniRigCustomCommand("FE FE " + icom + " E0 14 09 FD", (echo ? 7 : 0) + 9, string.Empty);
+                TrySendOmniRigCustomCommand("FE FE " + icom + " E0 1A 03 FD", (echo ? 7 : 0) + 8, string.Empty);
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        // From OmniRigEngine_CustomReply, on OmniRig's thread: the answers to 1A 03 and 14 09, addressed to us (E0
+        // in the TO place, which tells the answer from the echo of the question).
+        void CwFilterReplyArrived(object reply)
+        {
+            if (cwDecodeWindow == null) return;
+            byte[] b = ReplyBytes(reply);
+            if (b == null) return;
+            for (int i = 0; i + 7 < b.Length; i++)
+            {
+                if (b[i] != 0xFE || b[i + 1] != 0xFE || b[i + 2] != 0xE0) continue;
+                if (b[i + 4] == 0x1A && b[i + 5] == 0x03 && b[i + 7] == 0xFD)
+                {
+                    int d = Bcd(b[i + 6]);
+                    int hz = d < 0 ? 0 : d <= 9 ? (d + 1) * 50 : d <= 40 ? 600 + (d - 10) * 100 : 0;
+                    if (hz > 0) Dispatcher.BeginInvoke(new Action(() => { if (cwDecodeWindow != null) cwDecodeWindow.RadioFilter(hz); }));
+                    return;
+                }
+                if (i + 8 < b.Length && b[i + 4] == 0x14 && b[i + 5] == 0x09 && b[i + 8] == 0xFD)
+                {
+                    int hi = Bcd(b[i + 6]), lo = Bcd(b[i + 7]);
+                    int level = hi < 0 || lo < 0 ? -1 : hi * 100 + lo;
+                    if (level < 0 || level > 255) return;
+                    int pitch = (int)(Math.Round((300 + level * 600 / 255.0) / 5) * 5);
+                    Dispatcher.BeginInvoke(new Action(() => { if (cwDecodeWindow != null) cwDecodeWindow.RadioPitch(pitch); }));
+                    return;
+                }
+            }
+        }
+
+        // Two decimal digits in one byte, or -1 when it is not that.
+        static int Bcd(byte value)
+        {
+            int high = value >> 4, low = value & 0x0F;
+            return high > 9 || low > 9 ? -1 : high * 10 + low;
+        }
+
+        /// <summary>The radio's dial in Hz, for the filter waterfall's ruler; 0 when there is no radio.</summary>
+        internal double CwDialHz()
+        {
+            if (!IsCatLive()) return 0;
+            try
+            {
+                int f = Rig.Freq;
+                if (f <= 0) f = Rig.FreqA;
+                return f > 0 ? f : 0;
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); return 0; }
+        }
+
+        /// <summary>+1 when the radio hears CW on the upper side, -1 on the lower, 0 when not known - worked out as
+        /// ShiftRigForPitch does, so the waterfall and the move it makes always agree.</summary>
+        internal int CwSideNow()
+        {
+            if (!IsCatLive()) return 0;
+            try
+            {
+                int mode = (int)Rig.Mode;
+                bool upper;
+                if (mode == PM_CW_U) upper = true;
+                else if (mode == PM_CW_L) upper = false;
+                else return 0;
+                if (Properties.Settings.Default.SwapCwSideband) upper = !upper;
+                if (_tuneTheOtherWay) upper = !upper;
+                return upper ? 1 : -1;
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); return 0; }
         }
 
         static void RememberCwDecodeOpen(bool open)
