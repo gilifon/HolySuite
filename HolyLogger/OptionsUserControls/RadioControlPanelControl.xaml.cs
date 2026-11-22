@@ -64,6 +64,8 @@ namespace HolyLogger.OptionsUserControls
             else if (Math.Abs(step - 0.5) < 0.001) RB_Step05.IsChecked = true;
             else RB_Step1.IsChecked = true;
             LoadCwSplitSettings();
+            TB_SplitLeave.Text = Properties.Settings.Default.SplitLeaveKhz.ToString(CultureInfo.InvariantCulture);
+            TB_SplitCwLeave.Text = Properties.Settings.Default.SplitCwLeaveKhz.ToString(CultureInfo.InvariantCulture);
         }
 
         private void LoadCwSplitSettings()
@@ -629,6 +631,33 @@ namespace HolyLogger.OptionsUserControls
             {
                 s.SplitCwRangeFromKhz = from;
                 s.SplitCwRangeToKhz = to;
+                s.Save();
+            }
+        }
+
+        // Whole kHz, 1 to 99; anything else goes back to what was saved.
+        private void SplitLeave_LostFocus(object sender, RoutedEventArgs e)
+        {
+            var s = Properties.Settings.Default;
+            int v;
+            if (!int.TryParse(TB_SplitLeave.Text, NumberStyles.None, CultureInfo.InvariantCulture, out v) || v < 1 || v > 99) v = s.SplitLeaveKhz;
+            TB_SplitLeave.Text = v.ToString(CultureInfo.InvariantCulture);
+            if (v != s.SplitLeaveKhz)
+            {
+                s.SplitLeaveKhz = v;
+                s.Save();
+            }
+        }
+
+        private void SplitCwLeave_LostFocus(object sender, RoutedEventArgs e)
+        {
+            var s = Properties.Settings.Default;
+            int v;
+            if (!int.TryParse(TB_SplitCwLeave.Text, NumberStyles.None, CultureInfo.InvariantCulture, out v) || v < 1 || v > 99) v = s.SplitCwLeaveKhz;
+            TB_SplitCwLeave.Text = v.ToString(CultureInfo.InvariantCulture);
+            if (v != s.SplitCwLeaveKhz)
+            {
+                s.SplitCwLeaveKhz = v;
                 s.Save();
             }
         }
