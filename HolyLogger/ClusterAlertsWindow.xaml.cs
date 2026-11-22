@@ -81,18 +81,31 @@ namespace HolyLogger
             finally { _loading = false; }
         }
 
-        // The saved list, with each line's Any Mode box. The settings keep only the callsigns whose box
-        // is CLEARED, so a list written before the box existed comes back ticked throughout.
+        // The saved list, with each line's Mode box. The settings keep only the lines that ask for one
+        // mode, so a list written before the column existed comes back on "Any" throughout.
         private void LoadRows()
         {
             if (_main != null)
             {
-                var limited = new HashSet<string>(_main.GetClusterAlertModeLimitedCallsigns(),
-                                                  StringComparer.OrdinalIgnoreCase);
+                var modes = _main.GetClusterAlertCallModes();
                 foreach (string call in _main.GetClusterAlertCallsigns())
-                    Add(new AlertCall { Call = call, AnyMode = !limited.Contains(call.Trim()) });
+                {
+                    string mode;
+                    if (!modes.TryGetValue(call.Trim(), out mode)) mode = MainWindow.ClusterAlertAnyMode;
+                    Add(new AlertCall { Call = call, Mode = NameOfMode(mode) });
+                }
             }
             EnsureTrailingEmptyLine();
+        }
+
+        // The stored mode is upper case; the box offers the words as they are written in it.
+        private static string NameOfMode(string stored)
+        {
+            string m = (stored ?? string.Empty).Trim();
+            if (m.Length == 0) return MainWindow.ClusterAlertAnyMode;
+            foreach (string known in AlertModes)
+                if (string.Equals(known, m, StringComparison.OrdinalIgnoreCase)) return known;
+            return MainWindow.ClusterAlertAnyMode;
         }
 
         // A LINE IS ALWAYS WAITING AT THE BOTTOM, the same way the Favorite Channels window keeps one.
@@ -149,8 +162,8 @@ namespace HolyLogger
         {
             if (_loading) return;
 
-            // The box is saved the moment it is clicked, like a tick in the mode boxes below.
-            if (e.PropertyName == "AnyMode")
+            // The box is saved the moment it is picked, like a tick in the mode boxes below.
+            if (e.PropertyName == "Mode")
             {
                 SaveList();
                 return;
@@ -181,9 +194,9 @@ namespace HolyLogger
         // as "write in it", which in a window whose whole purpose is typing is one click too many.
         private void Calls_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
-            // The Any Mode box turns itself over on a click; putting its cell into edit here would only
-            // get in the way of it.
-            if (FindParentCheckBox(e.OriginalSource as DependencyObject) != null) return;
+            // The Mode box opens on a click of its own; putting its cell into edit here would only get
+            // in the way of it.
+            if (FindParentModeBox(e.OriginalSource as DependencyObject) != null) return;
 
             var cell = FindParentCell(e.OriginalSource as DependencyObject);
             if (cell == null || cell.IsEditing) return;
@@ -207,11 +220,11 @@ namespace HolyLogger
             return from as DataGridCell;
         }
 
-        private static CheckBox FindParentCheckBox(DependencyObject from)
+        private static ComboBox FindParentModeBox(DependencyObject from)
         {
-            while (from != null && !(from is CheckBox) && !(from is DataGridCell))
+            while (from != null && !(from is ComboBox) && !(from is DataGridCell))
                 from = VisualTreeHelper.GetParent(from);
-            return from as CheckBox;
+            return from as ComboBox;
         }
 
         // The grid commits the cell AFTER this event, so the save is queued behind it - reading the
@@ -329,6 +342,12 @@ namespace HolyLogger
         // The cluster window's own mode boxes, in its order: the word above, the box below it.
         private static readonly string[] AlertModes = { "SSB", "CW", "FT8", "DIGI", "RTTY", "FM", "AM" };
 
+        // What the Mode box on each line offers: "Any" first, then the same modes in the same order.
+        public IEnumerable<string> ModeChoices
+        {
+            get { return new[] { MainWindow.ClusterAlertAnyMode }.Concat(AlertModes).ToList(); }
+        }
+
         // A tick is saved the moment it is made, like an edit in the callsign table.
         private void BuildModeBoxes()
         {
@@ -376,7 +395,7 @@ namespace HolyLogger
         {
             if (_loading || _main == null) return;
             var list = new List<string>();
-            var modeLimited = new List<string>();
+            var modes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var row in _calls)
             {
@@ -384,9 +403,12 @@ namespace HolyLogger
                 if (call.Length == 0) continue;
                 if (!seen.Add(call)) continue;
                 list.Add(call);
-                if (!row.AnyMode) modeLimited.Add(call);
+
+                string mode = (row.Mode ?? string.Empty).Trim();
+                if (mode.Length > 0 && !string.Equals(mode, MainWindow.ClusterAlertAnyMode, StringComparison.OrdinalIgnoreCase))
+                    modes[call] = mode;
             }
-            _main.SetClusterAlertCallsigns(list, modeLimited);
+            _main.SetClusterAlertCallsigns(list, modes);
         }
 
         // One row of the grid. The setter does the tidying (trim + upper) so a callsign typed in
@@ -395,18 +417,19 @@ namespace HolyLogger
         // as the callsign is written rather than at some later moment nobody can predict.
         public sealed class AlertCall : INotifyPropertyChanged
         {
-            // ANY MODE. Every line starts ticked, which is how the watch list behaved before this box
-            // existed: the callsign is alerted whatever mode it is spotted on. Cleared, it is alerted
-            // only on the modes ticked in the CLUSTER window.
-            private bool _anyMode = true;
-            public bool AnyMode
+            // THE MODE THIS CALLSIGN IS WANTED ON. "Any" - how every line starts, and how the watch list
+            // behaved before the column existed - alerts whatever it is spotted on. One mode alerts on
+            // that mode alone, whether or not the cluster window is showing it.
+            private string _mode = MainWindow.ClusterAlertAnyMode;
+            public string Mode
             {
-                get { return _anyMode; }
+                get { return _mode; }
                 set
                 {
-                    if (_anyMode == value) return;
-                    _anyMode = value;
-                    Raise("AnyMode");
+                    string v = string.IsNullOrWhiteSpace(value) ? MainWindow.ClusterAlertAnyMode : value.Trim();
+                    if (_mode == v) return;
+                    _mode = v;
+                    Raise("Mode");
                 }
             }
 
