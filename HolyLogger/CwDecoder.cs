@@ -129,6 +129,11 @@ namespace HolyLogger
         // at all is printed over three minutes of band noise on beacons.wav, at eight, four or one.
         const int MorseScoreToOpen = 4;
         const int MorseScoreToKeep = 3;
+        internal static double FastDitMs = 40;             // 30 WPM - his choice; 28 WPM measured no better
+        internal static int FastMorseScoreToOpen = 10;
+        internal static double MostWpmShown = 28;          // his decision: faster than this is never shown (see EmitLetter)
+        internal static bool FastShownWhenProved = true;    // ...unless the Morse test has already passed
+        bool _lastLetterTooFast;                            // the last letter was dropped for speed - so is its word gap     // 13 (never above 30 WPM) lost real 40 WPM tests
 
         // How much louder the note must be with the key down than with it up before the keying is
         // believed. Twice is modest for a real signal - a key takes the tone away entirely - and far
@@ -330,6 +335,14 @@ namespace HolyLogger
         int _morseScore;
         double _onLevel, _offLevel;         // how loud the note is with the key down, and up
         readonly StringBuilder _held = new StringBuilder();
+        readonly List<long> _heldFrame = new List<long>();     // when each held character was read
+
+        // ONLY THE STATION'S OWN LETTERS COME OUT OF HOLDING (his report, 2026-11-23: an empty frequency
+        // printed "AEEEEBS S FMIW' I J H..."). Letters read while it was not yet clear this is Morse are held
+        // back - and when the gate opened, ALL of them came out at once, minutes of noise with them. Now only
+        // what was read in the last few seconds before the gate opened is let out: the start of the station
+        // that opened it. Older held letters were noise.
+        internal static double HeldTextKeptSeconds = 3;     // measured 2026-11-23: 3 s best (6 and 10 let more noise out)
         bool _letterPending;
         bool _wordPending;
 
@@ -422,7 +435,7 @@ namespace HolyLogger
             _morseScore = 0;
             _heldLone = null; _atWordStart = true;
             _onLevel = 0; _offLevel = 0;
-            _held.Clear();
+            _held.Clear(); _heldFrame.Clear();
             _letterPending = false; _wordPending = false;
             SignalPresent = false;
             ToneHz = 0;
@@ -1159,7 +1172,12 @@ namespace HolyLogger
 
             // Harder to open than to keep open, so a fade or one bad character does not shut the
             // decoder up in the middle of a callsign.
-            _looksLikeMorse = wasOpen ? _morseScore >= MorseScoreToKeep : _morseScore >= MorseScoreToOpen;
+            // VERY FAST "MORSE" MUST PROVE ITSELF LONGER (his report, 2026-11-23: an empty frequency printed
+            // letters). Measured on 10 minutes of his own radio's empty band: the crackles that opened this gate
+            // read as 45-50 WPM - a dit of 25-30 ms, near the fastest this decoder believes - while the real
+            // stations ran 46-52 ms. Sending that fast is rare; crackles are never anything else.
+            int toOpen = _ditMs < FastDitMs ? FastMorseScoreToOpen : MorseScoreToOpen;
+            _looksLikeMorse = wasOpen ? _morseScore >= MorseScoreToKeep : _morseScore >= toOpen;
 
             if (_looksLikeMorse && !wasOpen) ReleaseHeldText();
         }
@@ -1242,9 +1260,9 @@ namespace HolyLogger
             // as "P L AI S IR": every letter right, a space thrown in between most of them.
             if (_wordPending && !_letterPending && _stateMs >= _ditMs * 5.0)
             {
-                var gap = WordGapTimed;
+                var gap = _lastLetterTooFast ? null : WordGapTimed;
                 if (gap != null) gap();
-                Output(" ");
+                if (!_lastLetterTooFast) Output(" ");
                 _wordPending = false;
             }
         }
@@ -1298,7 +1316,7 @@ namespace HolyLogger
             _morseScore = 0;
             _heldLone = null; _atWordStart = true;
             _onLevel = 0; _offLevel = 0;
-            _held.Clear();
+            _held.Clear(); _heldFrame.Clear();
         }
 
         void EmitLetter()
@@ -1372,6 +1390,13 @@ namespace HolyLogger
             // Clear splits changed no word on any bench; looser ones only invented. A word with one
             // letter recovered is usually still wrong somewhere else, and a pattern with no clear
             // pause in it was never two letters that could be told apart.
+            // NOTHING FASTER THAN 28 WPM IS SHOWN - his decision, 2026-11-23 ("prevent more than 28 wpm to be
+            // considered as a signal we want to decode and simply ignore it"). Measured on 15 minutes of his own
+            // radio on an empty spot: the decode window showed about 2,000 letters of noise, 97% of them read
+            // faster than 35 WPM (crackles look like very fast dits). Real stations he works send slower.
+            _lastLetterTooFast = Wpm > MostWpmShown && !(FastShownWhenProved && _looksLikeMorse);
+            if (_lastLetterTooFast) return;
+
             string letter;
             if (FromMorseTable.TryGetValue(pattern, out letter))
             {
@@ -1499,15 +1524,29 @@ namespace HolyLogger
             if (_looksLikeMorse) { Raise(text); return; }
 
             _held.Append(text);
-            if (_held.Length > MostHeldBack) _held.Remove(0, _held.Length - MostHeldBack);
+            for (int i = 0; i < text.Length; i++) _heldFrame.Add(_frameCount);
+            if (_held.Length > MostHeldBack)
+            {
+                int drop = _held.Length - MostHeldBack;
+                _held.Remove(0, drop);
+                _heldFrame.RemoveRange(0, drop);
+            }
         }
 
         void ReleaseHeldText()
         {
             if (_held.Length == 0) return;
             string text = _held.ToString();
+            if (HeldTextKeptSeconds > 0 && _heldFrame.Count == text.Length)
+            {
+                long oldest = _frameCount - (long)(HeldTextKeptSeconds * 1000.0 / FrameMilliseconds);
+                int first = 0;
+                while (first < _heldFrame.Count && _heldFrame[first] < oldest) first++;
+                text = text.Substring(first).TrimStart();
+            }
             _held.Clear();
-            Raise(text);
+            _heldFrame.Clear();
+            if (text.Length > 0) Raise(text);
         }
 
         void Raise(string text)
