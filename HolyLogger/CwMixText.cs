@@ -70,6 +70,37 @@ namespace HolyLogger
             public string SplitSeen;                 // on a word's first letter: the word as it read when last looked at for 5NN, QSB ...
             public LineBreak Break;                  // a new transmission: Text is " " (a word gap), Run is empty
             public double GapSeconds, GapEnd;        // on the network's word gap: the silence before GapEnd, its next letter
+            public bool Sent;                        // our own sending (AddSent) - never judged, replaced or greyed
+        }
+
+        // OUR OWN SENDING IN THE ROWS (his request, 2026-11-23): the letters drawn under our cyan marks, with their
+        // word gaps, on a line of their own in the cyan of the marks (darker, to read on white). Settled from the
+        // start, so the network's readings never replace or grey them, and never judged as callsigns.
+        static readonly Brush SentInk = Frozen(Color.FromRgb(0xC0, 0x00, 0xC0));     // bright purple - his choice
+        bool _inSent;
+        double _lastSentT = double.NaN;   // our last sent letter: network letters before it belong above our line
+
+        /// <summary>A letter we sent (or " " between our words), at t on the readers' clock.</summary>
+        public void AddSent(string text, double t)
+        {
+            if (string.IsNullOrEmpty(text)) return;
+            if (text == " ")
+            {
+                if (!_inSent || _entries.Count == 0 || _entries[_entries.Count - 1].Text == " ") return;
+                var gap = new Entry { Text = " ", T = double.NaN, Run = new Run(" "), Settled = true, Sent = true };
+                _paragraph.Inlines.Add(gap.Run);
+                _entries.Add(gap);
+                _changed = true;
+                return;
+            }
+            if (!_inSent && _entries.Count > 0) AddBreak();       // our over starts a line of its own
+            _inSent = true;
+            _breakNext = true;                                     // and whoever answers starts the next one
+            _lastSentT = t;
+            var e = new Entry { Text = text, T = t, Run = new Run(text) { Foreground = SentInk, FontWeight = FontWeights.Bold }, Settled = true, Sent = true };
+            _paragraph.Inlines.Add(e.Run);
+            _entries.Add(e);
+            _changed = true;
         }
 
         readonly RichTextBox _box;
@@ -146,7 +177,7 @@ namespace HolyLogger
             _netWaiting.Clear();
             _netGaps.Clear();
             _seen.Clear();
-            _breakNext = false; _handOver = false; _newLetter = false;
+            _breakNext = false; _handOver = false; _newLetter = false; _inSent = false; _lastSentT = double.NaN;
             _lastLetterT = double.NaN; _lastNote = 0; _lastWpm = 0;
             QrzLookup.ForgetAll();
             _changed = true;
@@ -171,6 +202,7 @@ namespace HolyLogger
             }
             else
             {
+                _inSent = false;
                 if (NewTransmission(t, note, wpm)) AddBreak();
                 _breakNext = Array.IndexOf(ProsignHandOver, text) >= 0;
                 _handOver = false;
@@ -271,6 +303,9 @@ namespace HolyLogger
             var letters = new List<KeyValuePair<string, double>>();
             foreach (var n in net)
                 if (n.Key == " ") _netGaps.Add(n.Value); else letters.Add(n);
+            // The network reads late: letters from before our own sending would land under our line - they are dropped
+            // (Plain's reading of that stretch stays as it is).
+            if (!double.IsNaN(_lastSentT)) letters.RemoveAll(n => n.Value <= _lastSentT);
             _netGaps.Sort();
             while (_netGaps.Count > 0 && _netGaps[0] < to - 60) _netGaps.RemoveAt(0);
 
@@ -450,7 +485,7 @@ namespace HolyLogger
             while (first > 0 && _entries[first - 1].Text != " ") first--;     // from the start of a word
             for (int i = first; i < _entries.Count; )
             {
-                if (_entries[i].Text == " " || IsProsign(_entries[i])) { i++; continue; }
+                if (_entries[i].Text == " " || _entries[i].Sent || IsProsign(_entries[i])) { i++; continue; }
                 int j = i;
                 while (j < _entries.Count && _entries[j].Text != " " && !IsProsign(_entries[j])) j++;
                 if (j < _entries.Count) i = SplitWord(i, j);   // only a word already closed
@@ -547,7 +582,7 @@ namespace HolyLogger
             int i = 0;
             while (i < _entries.Count)
             {
-                if (_entries[i].Text == " ") { i++; continue; }
+                if (_entries[i].Text == " " || _entries[i].Sent) { i++; continue; }
                 // A PROSIGN IS A WORD OF ITS OWN, as in CwDecodedText: "LY2PX<AR>" came in glued (no gap heard
                 // before the <AR>) and the call lost its patch.
                 if (IsProsign(_entries[i]))

@@ -689,7 +689,14 @@ namespace HolyLogger
             if (c == ' ')
             {
                 // A run of spaces is one word gap, measured from the end of the last letter.
-                if (_afterLetter) _nextStartMs += (CwSendMonitorWindow.WordGapUnits - CwSendMonitorWindow.LetterGapUnits) * unit;
+                if (_afterLetter)
+                {
+                    _nextStartMs += (CwSendMonitorWindow.WordGapUnits - CwSendMonitorWindow.LetterGapUnits) * unit;
+                    // The word gap too, so the decode window's rows can show our words apart (his request, 2026-11-23).
+                    var gapSent = LetterSent;
+                    if (gapSent != null)
+                        try { gapSent(" ", 0); } catch (Exception swallowed) { Log.Swallow(swallowed); }
+                }
                 _afterLetter = false;
                 return;
             }

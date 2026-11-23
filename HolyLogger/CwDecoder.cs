@@ -433,7 +433,7 @@ namespace HolyLogger
             _boundaryMs = 104.0;
             _looksLikeMorse = false;
             _morseScore = 0;
-            _heldLone = null; _atWordStart = true;
+            _heldLone = null; _atWordStart = true; _heldTimed = null; _timedAtWordStart = true;
             _onLevel = 0; _offLevel = 0;
             _held.Clear(); _heldFrame.Clear();
             _letterPending = false; _wordPending = false;
@@ -1260,11 +1260,44 @@ namespace HolyLogger
             // as "P L AI S IR": every letter right, a space thrown in between most of them.
             if (_wordPending && !_letterPending && _stateMs >= _ditMs * 5.0)
             {
-                var gap = _lastLetterTooFast ? null : WordGapTimed;
+                // A lone E or T held back for the window, and now a word gap: it was noise. Dropped, and its
+                // gap with it (same rule as the text below it, see IsLoneNoiseLetter).
+                bool loneDropped = _heldTimed != null;
+                _heldTimed = null;
+                var gap = _lastLetterTooFast || loneDropped ? null : WordGapTimed;
                 if (gap != null) gap();
+                _timedAtWordStart = true;
                 if (!_lastLetterTooFast) Output(" ");
                 _wordPending = false;
             }
+        }
+
+        // THE WINDOW'S LETTERS GET THE LONE-E-OR-T RULE TOO (his report, 2026-11-23: "E E5" after LZ2KV
+        // stopped). The decode window takes every letter through LetterTimed, the moment it is read, so the
+        // rule that keeps a stray E or T out of the text never reached it. Now a lone E or T at the start of a
+        // word waits here for the next letter: one comes in the same word - both go out; a word gap comes -
+        // it was noise and goes nowhere.
+        string _heldTimed;
+        long _heldTimedStart, _heldTimedEnd;
+        bool _timedAtWordStart = true;
+
+        void RaiseTimed(string letter, long start, long end)
+        {
+            var timed = LetterTimed;
+            if (_heldTimed != null)
+            {
+                string held = _heldTimed;
+                _heldTimed = null;
+                if (timed != null) timed(held, _heldTimedStart, _heldTimedEnd);
+            }
+            else if (_timedAtWordStart && IsLoneNoiseLetter(letter))
+            {
+                _heldTimed = letter; _heldTimedStart = start; _heldTimedEnd = end;
+                _timedAtWordStart = false;
+                return;
+            }
+            _timedAtWordStart = false;
+            if (timed != null) timed(letter, start, end);
         }
 
         // The signal has gone - the station stopped, or it faded into the noise. Whatever marks were
@@ -1314,7 +1347,7 @@ namespace HolyLogger
             _wordPending = false;
             _looksLikeMorse = false;
             _morseScore = 0;
-            _heldLone = null; _atWordStart = true;
+            _heldLone = null; _atWordStart = true; _heldTimed = null; _timedAtWordStart = true;
             _onLevel = 0; _offLevel = 0;
             _held.Clear(); _heldFrame.Clear();
         }
@@ -1400,8 +1433,7 @@ namespace HolyLogger
             string letter;
             if (FromMorseTable.TryGetValue(pattern, out letter))
             {
-                var timed = LetterTimed;
-                if (timed != null) timed(letter, _letterStartFrame * _hopSamples, _letterEndFrame * _hopSamples);
+                RaiseTimed(letter, _letterStartFrame * _hopSamples, _letterEndFrame * _hopSamples);
                 Output(letter);
             }
         }
