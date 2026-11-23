@@ -629,12 +629,46 @@ namespace HolyLogger
             autoPanel.Children.Add(autoSwitch);
             DockPanel.SetDock(autoPanel, Dock.Left);
 
+            // HIS PITCH ON THE BAR (his request, 2026-11-23): the pitch set in Options, in a framed white box with a
+            // short red line before it - the same red as the line that marks it in both waterfalls. A click opens the
+            // settings, where it is changed; it follows the change at once (OnPitchChanged).
+            _pitchText = new TextBlock
+            {
+                FontSize = 16,
+                FontWeight = FontWeights.Bold,
+                Foreground = Brushes.Black,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            var pitchMark = new Rectangle { Width = 3, Height = 16, Fill = Brushes.Red, Margin = new Thickness(0, 0, 6, 0), VerticalAlignment = VerticalAlignment.Center };
+            var pitchRow = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+            pitchRow.Children.Add(pitchMark);
+            pitchRow.Children.Add(_pitchText);
+            var pitchBox = new Border
+            {
+                Child = pitchRow,
+                Background = Brushes.White,
+                BorderBrush = GroupEdgeBrush,
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(4),
+                Padding = new Thickness(7, 1, 8, 1),
+                Margin = new Thickness(14, 0, 0, 0),
+                Height = 26,
+                VerticalAlignment = VerticalAlignment.Center,
+                Cursor = System.Windows.Input.Cursors.Hand,
+                ToolTip = "Your CW pitch, set in Options (the red line in the waterfalls). Click to change it."
+            };
+            System.Windows.Shell.WindowChrome.SetIsHitTestVisibleInChrome(pitchBox, true);
+            pitchBox.MouseLeftButtonUp += (s, e) => { var open = OpenSettings; if (open != null) open(); };
+            DockPanel.SetDock(pitchBox, Dock.Left);
+            ShowPitchOnBar();
+
             var bar = new DockPanel { LastChildFill = false };
             bar.Children.Add(right);
             bar.Children.Add(icon);
             bar.Children.Add(titleText);
             bar.Children.Add(gearBtn);
             bar.Children.Add(autoPanel);
+            bar.Children.Add(pitchBox);
 
             return new Border { Height = 32, Child = bar, Background = CwKeyBrush };
         }
@@ -1082,10 +1116,22 @@ namespace HolyLogger
             return "What the decoders hear: time runs right to left, the note up (300 to 1000 Hz). The dotted green line is the note being read; the short red lines at the edges mark your pitch, " + pitchHz + " Hz.\nUnder it, the letters Plain made of it.";
         }
 
+        TextBlock _pitchText;
+
+        void ShowPitchOnBar()
+        {
+            if (_pitchText == null) return;
+            int pitch = 700;
+            try { pitch = Properties.Settings.Default.CwPitchHz; }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+            _pitchText.Text = "Pitch " + pitch + " Hz";
+        }
+
         void OnPitchChanged()
         {
             Dispatcher.BeginInvoke(new Action(() =>
             {
+                ShowPitchOnBar();
                 PlacePitchMarks();
                 ApplyMixHide();
             }));
