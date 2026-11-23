@@ -918,6 +918,7 @@ namespace HolyLogger
             decoder.LetterTimed += OnPlainLetterTimed;
             decoder.WordGapTimed += OnPlainWordGap;
             _plainRate = _recorder.ActualSampleRate;
+            _readerSeconds = 0;      // the new reader's clock starts here, like Plain's letter times
             _decoder = decoder;
 
             // NET IS NO LONGER RUN (2026-10-03, his decision). Verified correct, but trained only on clean
@@ -979,7 +980,7 @@ namespace HolyLogger
 
         void ClearEverything()
         {
-            lock (_pendingGate) { _pendingPlain.Clear(); _pendingNetwork.Clear(); _pendingElement.Clear(); _pendingDeep.Clear(); _pendingPlainTimed.Clear(); _pendingNetTimed.Clear(); _pendingCovered.Clear(); }
+            lock (_pendingGate) { _pendingPlain.Clear(); _pendingNetwork.Clear(); _pendingElement.Clear(); _pendingDeep.Clear(); _pendingPlainTimed.Clear(); _pendingNetTimed.Clear(); _pendingCovered.Clear(); _pendingSent.Clear(); }
             _timeLine.Clear();
             _timeLine.Show();
             _mix.Clear();
@@ -1569,10 +1570,20 @@ namespace HolyLogger
         // keyer as it finishes each one (LetterSent), or laid out from the CAT text at the speed (CatCwSent).
         static readonly System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<double, string>> _txLetters =
             new System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<double, string>>();
+        static readonly System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<double, string>> _sentForRows =
+            new System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<double, string>>();
+        readonly System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<string, double>> _pendingSent =
+            new System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<string, double>>();
+        double _readerSeconds;     // how much sound the readers have been given - their clock, as Plain's letter times
 
         /// <summary>A letter we send, at `midMs` on the transmit clock (TxClockMs) - the middle of its marks.</summary>
         public static void TxLetter(string letter, double midMs)
         {
+            // OUR SENT TEXT IN THE ROWS TOO (his request, 2026-11-23): the same letters as under the cyan marks, and
+            // the word gaps between them, in their own colour. Queued here; OnSamples hands each one on when its
+            // moment has come (a CAT text is laid out ahead), stamped with the readers' clock.
+            lock (_sentForRows) _sentForRows.Add(new System.Collections.Generic.KeyValuePair<double, string>(midMs, letter));
+            if (letter == " ") return;    // a word gap: nothing to draw under the marks
             lock (_txLetters)
             {
                 int at = _txLetters.Count;
@@ -1606,7 +1617,11 @@ namespace HolyLogger
                 foreach (char c in text.ToUpperInvariant())
                 {
                     string pattern;
-                    if (c == ' ') at += (CwSendMonitorWindow.WordGapUnits - CwSendMonitorWindow.LetterGapUnits) * unitMs;
+                    if (c == ' ')
+                    {
+                        TxLetter(" ", at);    // for the rows only (see TxLetter)
+                        at += (CwSendMonitorWindow.WordGapUnits - CwSendMonitorWindow.LetterGapUnits) * unitMs;
+                    }
                     else if (CwSendMonitorWindow.TryGetMorse(c, out pattern))
                     {
                         double letterStart = at;
@@ -1724,6 +1739,23 @@ namespace HolyLogger
             catch (Exception swallowed) { Log.Swallow(swallowed); }
             if (_strip != null) _strip.NoteHz = decoder.SignalPresent ? decoder.ToneHz : 0;   // the dotted line on the strip
 
+            // Our sent letters whose moment has come go to the rows, on the readers' clock (see TxLetter).
+            int rate = _recorder.ActualSampleRate;
+            if (rate > 0) _readerSeconds += count / (double)rate;
+            double nowTx = TxClockMs;
+            lock (_sentForRows)
+            {
+                int due = 0;
+                while (due < _sentForRows.Count && _sentForRows[due].Key <= nowTx) due++;
+                if (due > 0)
+                {
+                    lock (_pendingGate)
+                        for (int i = 0; i < due; i++)
+                            _pendingSent.Add(new System.Collections.Generic.KeyValuePair<string, double>(_sentForRows[i].Value, _readerSeconds));
+                    _sentForRows.RemoveRange(0, due);
+                }
+            }
+
             // Only copied here; the reading itself runs on the new decoder's own thread.
             var element = _element;
             if (element != null)
@@ -1804,7 +1836,7 @@ namespace HolyLogger
         void FlushPendingText()
         {
             string plain, network, element, deepText;
-            System.Collections.Generic.KeyValuePair<string, double>[] plainTimed, netTimed;
+            System.Collections.Generic.KeyValuePair<string, double>[] plainTimed, netTimed, sent;
             System.Collections.Generic.KeyValuePair<double, double>[] covered;
             lock (_pendingGate)
             {
@@ -1814,6 +1846,8 @@ namespace HolyLogger
                 netTimed = _pendingNetTimed.ToArray();
                 _pendingPlainTimed.Clear();
                 _pendingNetTimed.Clear();
+                sent = _pendingSent.ToArray();
+                _pendingSent.Clear();
                 plain = _pendingPlain.ToString();
                 network = _pendingNetwork.ToString();
                 element = _pendingElement.ToString();
@@ -1852,6 +1886,7 @@ namespace HolyLogger
                 _mix.AddNet(e.Key, e.Key == " " ? e.Value : e.Value - netEarly);   // a gap is timed at its middle
             }
             foreach (var c in covered) _mix.Covered(c.Key - netEarly, c.Value - netEarly);
+            foreach (var s in sent) _mix.AddSent(s.Key, s.Value);      // our own sending, in its own colour
 
             // With one reader on show it writes into the top box; in Both the plain decoder has the
             // top box and the new one the box under it.
@@ -1928,7 +1963,11 @@ namespace HolyLogger
             if (_tuneSay != null && DateTime.UtcNow < _tuneSayUntil) { _speedText.Text = _tuneSay; return; }
             _tuneSay = null;
             var decoder = _decoder;
-            if (decoder == null || !decoder.SignalPresent)
+            // No speed while it is only crackles (his report, 2026-11-23: "50 WPM" on an empty band). Noise reads as
+            // the fastest Morse there is; above 28 WPM the speed is shown only once real Morse has been proved -
+            // the same line the letters use (CwDecoder.MostWpmShown).
+            if (decoder == null || !decoder.SignalPresent
+                || (decoder.Wpm > CwDecoder.MostWpmShown && !decoder.ProvedMorse))
             {
                 _speedText.Text = string.Empty;
                 return;
