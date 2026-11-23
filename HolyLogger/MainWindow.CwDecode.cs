@@ -465,8 +465,11 @@ namespace HolyLogger
         //   1A 03  "Send/read the selected IF filter width" - in CW 00-09 = 50-500 Hz in 50 Hz steps,
         //          10-40 = 600 Hz-3.6 kHz in 100 Hz steps. The answer FE FE E0 <radio> 1A 03 dd FD.
         //   14 09  "Send/read CW pitch (5 Hz steps)" - 0000 = 300 Hz, 0128 = 600 Hz, 0255 = 900 Hz.
-        // ONLY THE IC-7610 SO FAR: it is the only radio whose guide was read for this. Any other radio gets the width
-        // measured from the sound (see CwFilterSpectrum.MeasureFilter).
+        // THE RADIOS WHOSE GUIDE WAS READ FOR THIS - the same two commands, the same numbers (2026-11-23, his request
+        // after his IC-7300 showed "BW ~250", the "~" meaning measured): IC-7610 (IC-7610_ENG_CI-V_4), IC-7300MK2
+        // (its CI-V Reference Guide, p. 19 and the command table) and IC-9700 (its CI-V Reference Guide). The IC-7300
+        // goes with its MK2. Copies in his Downloads\Radio Manuals. The IC-705 guide was not found: the IC-705 and
+        // every other radio get the width measured from the sound (see CwFilterSpectrum.MeasureFilter).
         System.Windows.Threading.DispatcherTimer _cwFilterAskTimer;
 
         void StartCwFilterAsk()
@@ -512,10 +515,12 @@ namespace HolyLogger
             if (_cwFilterAskTimer != null) _cwFilterAskTimer.Stop();
         }
 
-        static bool IsIc7610(string rigType)
+        static bool ReadsCwFilterFromRadio(string rigType)
         {
             string name = System.Text.RegularExpressions.Regex.Replace(rigType ?? string.Empty, "[^A-Za-z0-9]", string.Empty);
-            return name.StartsWith("IC7610", StringComparison.OrdinalIgnoreCase);
+            return name.StartsWith("IC7610", StringComparison.OrdinalIgnoreCase)
+                || name.StartsWith("IC7300", StringComparison.OrdinalIgnoreCase)
+                || name.StartsWith("IC9700", StringComparison.OrdinalIgnoreCase);
         }
 
         void AskRadioCwFilter()
@@ -529,9 +534,21 @@ namespace HolyLogger
                 if (DateTime.UtcNow - lastCwSendUtc < TimeSpan.FromSeconds(3)) return;
 
                 string rigType = NormalizeRigType(Rig.RigType);
-                if (!IsIc7610(rigType)) return;
                 int mode = (int)Rig.Mode;
                 if (mode != PM_CW_U && mode != PM_CW_L) return;
+
+                // Kenwood and Yaesu: their own words, answered in text ending ";" (see AsciiFilterFamily).
+                _asciiFilterFamily = AsciiFilterFamily(rigType);
+                if (_asciiFilterFamily != null)
+                {
+                    if (_cwPitchToRadio) { SendCwPitchAscii(_asciiFilterFamily); return; }
+                    string pitchAsk = _asciiFilterFamily == "TS590" ? null : _asciiFilterFamily.StartsWith("TS") ? "PT;" : "KP;";
+                    if (pitchAsk != null) TrySendOmniRigCustomCommand(pitchAsk, 0, ";");
+                    TrySendOmniRigCustomCommand(_asciiFilterFamily == "TS590" ? "FW;" : _asciiFilterFamily.StartsWith("TS") ? "SL0;" : "SH0;", 0, ";");
+                    return;
+                }
+
+                if (!ReadsCwFilterFromRadio(rigType)) return;
                 string icom = GetIcomCivAddress(rigType);
                 if (icom == null) return;
 
@@ -547,6 +564,72 @@ namespace HolyLogger
             catch (Exception swallowed) { Log.Swallow(swallowed); }
         }
 
+        // ---- KENWOOD AND YAESU (2026-11-23, his request "please check other radios as well") ----------------------
+        //
+        // Each from the maker's own command guide, copies in his Downloads\Radio Manuals; every table read off the
+        // page itself, not the text copy (its columns slip). Only the CW column, and only asked in CW.
+        //   TS-590S/SG  FW;  -> FWnnnn;  the DSP filter width in Hz (CW: 50 ... 2500). No pitch command (menu only).
+        //   TS-890S     SL0; -> SL0nn;   passband width ID, CW column (p. 61); PT; -> PTnnn; 000-160 = 300-1100 Hz, 5 Hz steps
+        //   TS-990S     SL0; -> SL0nn;   main band, CW column (p. 52);        PT; -> PTnnn; 000-080 = 300-1100 Hz, 10 Hz steps
+        //   FTDX10, FTDX101  SH0; -> SH00nn;  Table 3 CW column;  KP; -> KPnn; 00-75 = 300-1050 Hz, 10 Hz steps
+        //   FT-991A, FT-891  SH0; -> SH0nn;   CW (Narrow/Wide) columns, one list by number; same KP
+        // ID 00 on the Yaesus is "default" - its width is not in the table, so it is left to the measuring.
+        static readonly int[] Ts890CwWidth = { 50, 80, 100, 150, 200, 250, 300, 350, 400, 450, 500, 600, 700, 800, 900, 1000, 1500, 2000, 2500 };
+        static readonly int[] Ts990CwWidth = { 50, 80, 100, 150, 200, 250, 300, 400, 500, 600, 1000, 1500, 2000, 2500 };
+        static readonly int[] FtdxCwWidth = { 0, 50, 100, 150, 200, 250, 300, 350, 400, 450, 500, 600, 800, 1200, 1400, 1700, 2000, 2400, 3000 };
+        static readonly int[] Ft991CwWidth = { 0, 50, 100, 150, 200, 250, 300, 350, 400, 450, 500, 800, 1200, 1400, 1700, 2000, 2400, 3000 };
+        volatile string _asciiFilterFamily;
+
+        // TS590 / TS890 / TS990 / FTDX / FT991, or null for a radio whose guide was not read for this.
+        static string AsciiFilterFamily(string rigType)
+        {
+            string n = System.Text.RegularExpressions.Regex.Replace(rigType ?? string.Empty, "[^A-Za-z0-9]", string.Empty).ToUpperInvariant();
+            if (n.StartsWith("TS590")) return "TS590";
+            if (n.StartsWith("TS890")) return "TS890";
+            if (n.StartsWith("TS990")) return "TS990";
+            if (n.StartsWith("FTDX10")) return "FTDX";      // FTDX10 and FTDX101 alike
+            if (n.StartsWith("FT991") || n.StartsWith("FT891")) return "FT991";
+            return null;
+        }
+
+        // His pitch to the radio, as SendCwPitchToRadio does for the Icoms.
+        void SendCwPitchAscii(string family)
+        {
+            _cwPitchToRadio = false;
+            int pitch = Properties.Settings.Default.CwPitchHz;
+            if (family == "TS890" && pitch >= 300 && pitch <= 1100) TrySendOmniRigCustomCommand("PT" + ((pitch - 300) / 5).ToString("000") + ";");
+            else if (family == "TS990" && pitch >= 300 && pitch <= 1100) TrySendOmniRigCustomCommand("PT" + ((pitch - 300) / 10).ToString("000") + ";");
+            else if ((family == "FTDX" || family == "FT991") && pitch >= 300 && pitch <= 1050) TrySendOmniRigCustomCommand("KP" + ((pitch - 300) / 10).ToString("00") + ";");
+        }
+
+        // A Kenwood or Yaesu answer: true when it was one of ours.
+        bool CwFilterAsciiReply(byte[] b)
+        {
+            string family = _asciiFilterFamily;
+            if (family == null) return false;
+            string s = System.Text.Encoding.ASCII.GetString(b);
+            var m = System.Text.RegularExpressions.Regex.Match(s, family == "TS590" ? @"FW(\d{4});"
+                                                                : family.StartsWith("TS") ? @"SL0(\d\d);"
+                                                                : family == "FTDX" ? @"SH00(\d\d);" : @"SH0(\d\d);");
+            if (m.Success)
+            {
+                int v = int.Parse(m.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture);
+                int[] table = family == "TS890" ? Ts890CwWidth : family == "TS990" ? Ts990CwWidth : family == "FTDX" ? FtdxCwWidth : family == "FT991" ? Ft991CwWidth : null;
+                int hz = table == null ? v : v < table.Length ? table[v] : 0;
+                if (hz > 0) Dispatcher.BeginInvoke(new Action(() => { if (cwDecodeWindow != null) cwDecodeWindow.RadioFilter(hz); }));
+                return true;
+            }
+            m = System.Text.RegularExpressions.Regex.Match(s, family.StartsWith("TS") ? @"PT(\d{3});" : @"KP(\d\d);");
+            if (m.Success && family != "TS590")
+            {
+                int v = int.Parse(m.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture);
+                int pitch = family == "TS890" ? 300 + v * 5 : 300 + v * 10;
+                Dispatcher.BeginInvoke(new Action(() => { if (cwDecodeWindow != null) cwDecodeWindow.RadioPitch(pitch); }));
+                return true;
+            }
+            return false;
+        }
+
         // From OmniRigEngine_CustomReply, on OmniRig's thread: the answers to 1A 03 and 14 09, addressed to us (E0
         // in the TO place, which tells the answer from the echo of the question).
         void CwFilterReplyArrived(object reply)
@@ -554,6 +637,7 @@ namespace HolyLogger
             if (cwDecodeWindow == null) return;
             byte[] b = ReplyBytes(reply);
             if (b == null) return;
+            if (CwFilterAsciiReply(b)) return;
             for (int i = 0; i + 7 < b.Length; i++)
             {
                 if (b[i] != 0xFE || b[i + 1] != 0xFE || b[i + 2] != 0xE0) continue;
