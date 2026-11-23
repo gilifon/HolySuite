@@ -3295,6 +3295,62 @@ namespace HolyLogger
             return string.Join(",", list);
         }
 
+        // LoTW MAY TAKE AS LONG AS IT NEEDS (2026-11-23). A friend's 30,000-QSO log hit the old fixed limit
+        // of 5 minutes on the WHOLE download: the ARRL button's press ended as "Stopped - no changes were
+        // made" and threw away the 433 credits it already had. We cannot know how much LoTW has to send,
+        // so there is no limit on the total time - only on SILENCE: 5 minutes without one byte from LoTW
+        // (still waiting for it to start, or stalled in the middle) means LoTW stopped answering. Every
+        // byte that arrives starts the 5 minutes again.
+        //
+        // The user's Stop stays an OperationCanceledException; silence is a TimeoutException, so the two
+        // can never be reported alike. The HttpClient passed in must have an infinite Timeout. Runs off
+        // the UI thread (the caller wraps it in Task.Run); onChunk is called there with each piece of text.
+        internal static readonly TimeSpan LotwSilenceLimit = TimeSpan.FromMinutes(5);
+
+        internal static async Task<string> FetchLotw(System.Net.Http.HttpClient http, string url,
+                                                     System.Threading.CancellationToken userCt, Action<string> onChunk)
+        {
+            using (var silence = new System.Threading.CancellationTokenSource(LotwSilenceLimit))
+            using (var both = System.Threading.CancellationTokenSource.CreateLinkedTokenSource(userCt, silence.Token))
+            {
+                try
+                {
+                    using (var resp = await http.GetAsync(url, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, both.Token).ConfigureAwait(false))
+                    using (var stream = await resp.Content.ReadAsStreamAsync().ConfigureAwait(false))
+                    // On .NET 4.8 a read that is already waiting does not look at a token, so closing the
+                    // stream is what ends it - on Stop, or after 5 minutes of silence.
+                    using (both.Token.Register(() => { try { stream.Dispose(); } catch { } }))
+                    using (var reader = new System.IO.StreamReader(stream, System.Text.Encoding.UTF8))
+                    {
+                        silence.CancelAfter(LotwSilenceLimit);
+                        var sb = new System.Text.StringBuilder();
+                        char[] buf = new char[16384];
+                        int n;
+                        while ((n = await reader.ReadAsync(buf, 0, buf.Length).ConfigureAwait(false)) > 0)
+                        {
+                            silence.CancelAfter(LotwSilenceLimit);
+                            userCt.ThrowIfCancellationRequested();
+                            string chunk = new string(buf, 0, n);
+                            sb.Append(chunk);
+                            onChunk?.Invoke(chunk);
+                        }
+                        // A closed stream can read as a normal end, so a cut-off reply must not pass as whole.
+                        userCt.ThrowIfCancellationRequested();
+                        if (silence.IsCancellationRequested) throw new TimeoutException("LoTW sent nothing for 5 minutes.");
+                        return sb.ToString();
+                    }
+                }
+                catch (Exception ex) when (userCt.IsCancellationRequested && !(ex is OperationCanceledException))
+                {
+                    throw new OperationCanceledException(userCt);
+                }
+                catch (Exception ex) when (!userCt.IsCancellationRequested && silence.IsCancellationRequested && !(ex is TimeoutException))
+                {
+                    throw new TimeoutException("LoTW sent nothing for 5 minutes.");
+                }
+            }
+        }
+
         // The granted countries as the ARRL last sent them are kept per STATION CALLSIGN in the synced
         // arrl_granted table (DataAccess.EnsureArrlGrantedTable): a credit belongs to the station, every
         // log signed with it shares them, and every computer in Google Drive Sync gets them.
@@ -3367,17 +3423,17 @@ namespace HolyLogger
 
                 _uiPhase = "asking LoTW for the DXCC credits";
                 // Off the UI thread, request and all - see BTN_CheckLotw_Click for why on .NET 4.8.
-                Func<string, Task<string>> fetch = u => Task.Run(async () =>
+                // No limit on the total time, only on silence (FetchLotw).
+                Func<string, Action<string>, Task<string>> fetch = (u, onChunk) => Task.Run(async () =>
                 {
                     using (var handler = new System.Net.Http.HttpClientHandler
                     {
                         AutomaticDecompression = System.Net.DecompressionMethods.GZip | System.Net.DecompressionMethods.Deflate
                     })
-                    using (var http = new System.Net.Http.HttpClient(handler) { Timeout = TimeSpan.FromSeconds(300) })
-                    using (var resp = await http.GetAsync(u, ct).ConfigureAwait(false))
-                        return await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
+                    using (var http = new System.Net.Http.HttpClient(handler) { Timeout = System.Threading.Timeout.InfiniteTimeSpan })
+                        return await FetchLotw(http, u, ct, onChunk).ConfigureAwait(false);
                 }, ct);
-                string body = await fetch(url);
+                string body = await fetch(url, null);
 
                 // ONE LOGIN, SEVERAL DXCC AWARD ACCOUNTS (2026-11-21, his: 4Z5SL, 4X2XMAS, 4Z73SL - all
                 // Israel, so the 'entity' parameter cannot tell them apart). LoTW then answers with a list
@@ -3405,7 +3461,7 @@ namespace HolyLogger
                     }
                     Log.Warn("ARRL DXCC credits: several DXCC accounts; asking for account " + mine.Groups[1].Value
                              + " (" + mine.Groups[3].Value + ").");
-                    body = await fetch(url + "&ac_acct=" + Uri.EscapeDataString(mine.Groups[1].Value));
+                    body = await fetch(url + "&ac_acct=" + Uri.EscapeDataString(mine.Groups[1].Value), null);
                 }
 
                 // A failed query comes back as a web page; the ADIF end-of-header is what proves it is
@@ -3467,17 +3523,38 @@ namespace HolyLogger
                 var seen = new HashSet<string>(credits.Select(c => c.Date + "|" + c.Dxcc + "|" + c.Band.ToUpperInvariant() + "|" + c.ModeGroup),
                                                StringComparer.OrdinalIgnoreCase);
                 int lotwQsls = 0;
+                // When LoTW stops answering here, the credits the ARRL record already gave are still
+                // kept and saved (2026-11-23: a friend's press lost 433 of them this way).
+                string reportFailed = null;
+                try
+                {
                 foreach (string own in OwnCallsForActiveLog())
                 {
                     ct.ThrowIfCancellationRequested();
-                    TB_LotwLoadingText.Text = "Reading the credits on your LoTW confirmations"
-                                            + (string.IsNullOrEmpty(own) ? "…" : " (" + own + ")…");
+                    string waitText = "Reading the credits on your LoTW confirmations"
+                                    + (string.IsNullOrEmpty(own) ? "…" : " (" + own + ")…");
+                    TB_LotwLoadingText.Text = waitText;
                     TB_LotwLoadingSub.Text = "LoTW builds this report before sending it, so it can take a while.";
+                    // How much has arrived, so a long download is seen to be moving.
+                    var progress = (IProgress<int>)new Progress<int>(n =>
+                        TB_LotwLoadingSub.Text = $"Received {n:N0} confirmations so far.");
+                    int eorCount = 0;
+                    string carry = string.Empty;
+                    var lastShown = System.Diagnostics.Stopwatch.StartNew();
                     string rep = await fetch("https://lotw.arrl.org/lotwuser/lotwreport.adi"
                                              + "?login=" + Uri.EscapeDataString(user)
                                              + "&password=" + Uri.EscapeDataString(pass)
                                              + (string.IsNullOrEmpty(own) ? "" : "&qso_owncall=" + Uri.EscapeDataString(own))
-                                             + "&qso_query=1&qso_qsl=yes&qso_qsldetail=yes&qso_qslsince=1970-01-01");
+                                             + "&qso_query=1&qso_qsl=yes&qso_qsldetail=yes&qso_qslsince=1970-01-01",
+                                             chunk =>
+                                             {
+                                                 string hay = carry + chunk;
+                                                 for (int i = hay.IndexOf("<eor>", StringComparison.OrdinalIgnoreCase); i >= 0;
+                                                      i = hay.IndexOf("<eor>", i + 5, StringComparison.OrdinalIgnoreCase))
+                                                     eorCount++;
+                                                 carry = hay.Length >= 4 ? hay.Substring(hay.Length - 4) : hay;
+                                                 if (lastShown.ElapsedMilliseconds >= 300) { lastShown.Restart(); progress.Report(eorCount); }
+                                             });
                     int e2 = rep.IndexOf("<eoh>", StringComparison.OrdinalIgnoreCase);
                     if (e2 < 0) { Log.Warn("ARRL DXCC credits: the LoTW report for '" + own + "' had no ADIF (" + rep.Length + " chars)."); continue; }
                     foreach (string rec in rep.Substring(e2 + 5).Split(new[] { "<eor>", "<EOR>", "<Eor>" }, StringSplitOptions.None))
@@ -3502,7 +3579,24 @@ namespace HolyLogger
                         if (seen.Add(c.Date + "|" + c.Dxcc + "|" + c.Band.ToUpperInvariant() + "|" + c.ModeGroup)) credits.Add(c);
                     }
                 }
+                }
+                catch (Exception ex) when (!(ex is OperationCanceledException))
+                {
+                    reportFailed = ex is TimeoutException ? "LoTW stopped answering for 5 minutes" : "LoTW did not send the report (" + ex.Message + ")";
+                    Log.Warn("ARRL DXCC credits: the LoTW confirmations report failed after " + lotwQsls + " QSL(s): " + ex.Message
+                             + " Keeping the " + credits.Count + " credit(s) already read.");
+                }
                 Log.Warn($"ARRL DXCC credits: {fromRecord} from the DXCC record, {credits.Count - fromRecord} more from {lotwQsls} LoTW confirmation(s).");
+
+                // Nothing read and the report failed: that is not "no credits", so nothing is saved -
+                // a stored list must not be replaced by an empty one.
+                if (reportFailed != null && credits.Count == 0)
+                {
+                    ShowLotwSpinner(false);
+                    HolyMessageBox.Show($"{reportFailed}, so no credits were read.\n\nNothing was changed. Please try again later.",
+                        "ARRL Granted DXCC", HolyMsgType.Warning, this);
+                    return;
+                }
 
                 // NOT ONLY THE OPEN LOG. A credit belongs to the station, not to a log, so every log
                 // signed with the same station callsign is searched - the open one, and its siblings.
@@ -3585,7 +3679,18 @@ namespace HolyLogger
                 // THE GRANTED COUNTRIES THEMSELVES ARE KEPT TOO, so a country counts in the ARRL folder
                 // even when its QSO is not in HolyLogger at all (logged before HolyLogger was used).
                 var grantedCodes = credits.Select(c => c.Dxcc).Distinct().ToList();
-                dal?.SetArrlGranted(ArrlStationCall(), credits.Count, grantedCodes);
+                int creditsToStore = credits.Count;
+                if (reportFailed != null)
+                {
+                    // Only part of the answer came: it may only ADD to what an earlier, whole press stored.
+                    var before = ReadArrlGranted();
+                    if (before != null)
+                    {
+                        grantedCodes = grantedCodes.Union(before.Codes).ToList();
+                        creditsToStore = Math.Max(creditsToStore, before.Credits);
+                    }
+                }
+                dal?.SetArrlGranted(ArrlStationCall(), creditsToStore, grantedCodes);
                 Log.Warn($"ARRL DXCC credits: {credits.Count} received ({grantedCodes.Count} countries), {matched} matched in "
                          + $"{1 + otherLogs.Count} log(s), {changed} QSO(s) changed.");
 
@@ -3600,8 +3705,9 @@ namespace HolyLogger
                         : $"The ARRL has granted you {credits.Count:N0} DXCC credits, for {grantedCodes.Count:N0} countries.\n\n" +
                           $"{matched:N0} of them were found in your logs and marked." +
                           (notHere == 1 ? "\n\n1 is for a QSO that is not in HolyLogger. Its country still counts in this folder."
-                           : notHere > 1 ? $"\n\n{notHere:N0} are for QSOs that are not in HolyLogger. Their countries still count in this folder." : ""),
-                    "ARRL Granted DXCC", HolyMsgType.Info, this);
+                           : notHere > 1 ? $"\n\n{notHere:N0} are for QSOs that are not in HolyLogger. Their countries still count in this folder." : "")
+                        + (reportFailed == null ? "" : $"\n\n{reportFailed}, so the credits on your LoTW confirmations were not read. Please try again later."),
+                    "ARRL Granted DXCC", reportFailed == null ? HolyMsgType.Info : HolyMsgType.Warning, this);
             }
             catch (OperationCanceledException)
             {
@@ -3725,7 +3831,9 @@ namespace HolyLogger
                 })
                 using (var http = new System.Net.Http.HttpClient(handler))
                 {
-                http.Timeout = TimeSpan.FromSeconds(300);   // large accounts can take a while server-side
+                // Large accounts can take a while server-side: no limit on the total time, only on
+                // silence (FetchLotw).
+                http.Timeout = System.Threading.Timeout.InfiniteTimeSpan;
 
                 foreach (string own in ownCalls)
                 {
@@ -3778,7 +3886,6 @@ namespace HolyLogger
 
                     var got = await Task.Run(async () =>
                     {
-                        var sb = new System.Text.StringBuilder();
                         int eor = 0;
                         // Progress<T> posts to the UI thread at Normal priority, which OUTRANKS Render.
                         // Reporting on every 16 KB chunk of a large report therefore floods the dispatcher
@@ -3786,19 +3893,10 @@ namespace HolyLogger
                         // the spinner stops, which is the other way a working download looks stuck. Five
                         // updates a second is plenty for a human to read.
                         var lastReport = System.Diagnostics.Stopwatch.StartNew();
-                        using (var resp = await http.GetAsync(url, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false))
-                        using (var stream = await resp.Content.ReadAsStreamAsync().ConfigureAwait(false))
-                        using (var reader = new System.IO.StreamReader(stream, System.Text.Encoding.UTF8))
+                        string carry = string.Empty;   // last 4 chars, to catch an <eor> split across reads
+                        string body = await FetchLotw(http, url, ct, chunk =>
                         {
-                            char[] buf = new char[16384];
-                            string carry = string.Empty;   // last 4 chars, to catch an <eor> split across reads
-                            int n;
-                            while ((n = await reader.ReadAsync(buf, 0, buf.Length).ConfigureAwait(false)) > 0)
-                            {
-                                ct.ThrowIfCancellationRequested();
-                                sb.Append(buf, 0, n);
-
-                                string hay = carry + new string(buf, 0, n);
+                                string hay = carry + chunk;
                                 int idx = 0;
                                 while ((idx = hay.IndexOf("<eor>", idx, StringComparison.OrdinalIgnoreCase)) >= 0)
                                 {
@@ -3817,8 +3915,7 @@ namespace HolyLogger
                                             : $"Downloaded {eor:N0} confirmations from LoTW…",
                                         "Reading the confirmations LoTW is sending back."));
                                 }
-                            }
-                        }
+                        }).ConfigureAwait(false);
                         // The throttle can swallow the last chunk's update, so the final figure is always
                         // reported - the number left on screen must be the one that actually arrived.
                         reporter.Report((
@@ -3826,7 +3923,7 @@ namespace HolyLogger
                                 ? $"Downloaded {soFar + eor:N0} confirmations from LoTW… ({thisCall})"
                                 : $"Downloaded {eor:N0} confirmations from LoTW…",
                             "Reading the confirmations LoTW is sending back."));
-                        return (body: sb.ToString(), eor: eor);
+                        return (body: body, eor: eor);
                     }, ct);
 
                     adifOne = got.body;
