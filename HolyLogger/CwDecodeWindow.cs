@@ -1610,6 +1610,7 @@ namespace HolyLogger
         const double CatStartMs = 150;
         static double _catUntilMs = double.NegativeInfinity;
         static readonly object _catGate = new object();
+        static char _catLastChar = '\0';   // the last character of the last CAT text, for the space between messages
 
         // OUR OWN LETTERS UNDER OUR CYAN MARKS (his idea, 2026-10-21: "print letters below the cyan signs as we do
         // for receiving"): each letter we send, at the middle of its marks on the transmit clock - from the COM
@@ -1629,7 +1630,7 @@ namespace HolyLogger
             // the word gaps between them, in their own colour. Queued here; OnSamples hands each one on when its
             // moment has come (a CAT text is laid out ahead), stamped with the readers' clock.
             lock (_sentForRows) _sentForRows.Add(new System.Collections.Generic.KeyValuePair<double, string>(midMs, letter));
-            if (letter == " ") return;    // a word gap: nothing to draw under the marks
+            if (letter == " " || letter == "\n") return;    // a word gap or a new message: nothing to draw under the marks
             lock (_txLetters)
             {
                 int at = _txLetters.Count;
@@ -1659,6 +1660,15 @@ namespace HolyLogger
             double now = _txClock.Elapsed.TotalMilliseconds;
             lock (_catGate)
             {
+                // A NEW MESSAGE STARTS ON A NEW LINE in the rows (his request, 2026-11-23: F5 then F6
+                // read "...4Z5SL K4Z4DX DE..."; he wants each message on its own line, as the decoding
+                // breaks lines). New = the last text has finished; a keyer piece that follows on while
+                // the last is still going is the same message and stays on its line.
+                bool newMessage = now + CatStartMs >= _catUntilMs;
+                if (newMessage && _catLastChar != '\0')
+                    TxLetter("\n", now + CatStartMs);   // rows only: nothing is drawn under the marks
+                _catLastChar = text[text.Length - 1];
+
                 double at = Math.Max(now + CatStartMs, _catUntilMs);
                 foreach (char c in text.ToUpperInvariant())
                 {

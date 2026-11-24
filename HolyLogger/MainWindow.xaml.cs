@@ -3823,12 +3823,17 @@ namespace HolyLogger
                 // height had to be guessed at again, with the Save button falling off the bottom when
                 // the guess was low. Let it measure itself and it cannot be got wrong.
                 SizeToContent = SizeToContent.Height,
-                ResizeMode = ResizeMode.NoResize,
+
+                // WIDER BY HAND FOR A LONG MACRO (his request, 2026-11-23): the box grows with the
+                // window, and the width is remembered. Never narrower than it opens.
+                ResizeMode = ResizeMode.CanResize,
+                MinWidth = 560,
                 WindowStartupLocation = WindowStartupLocation.CenterOwner,
                 ShowInTaskbar = false,
                 Owner = this,
                 Icon = Icon
             };
+            WindowBounds.Attach(dialog, "CwTextEdit");
 
             TextBox nameBox = null;
             TextBox askingNameBox = null;
@@ -4140,7 +4145,10 @@ namespace HolyLogger
             tb.TextChanged += (s, e) => refreshPreview();
             refreshPreview();
 
-            var marks = BuildCwMacroLegend();
+            // CLICK A MACRO TO PUT IT IN (his request, 2026-11-23: "I do not want to type"). It goes
+            // into the macro box last used, at its cursor, over anything selected there.
+            tb.GotFocus += (s, e) => { previewFrom = tb; refreshPreview(); };
+            var marks = BuildCwMacroLegend(token => InsertCwMacroToken(previewFrom ?? tb, token));
             Grid.SetRow(marks, 4);
             Grid.SetColumnSpan(marks, 3);
             grid.Children.Add(marks);
@@ -4264,7 +4272,7 @@ namespace HolyLogger
         // WHAT MAY BE PUT IN A MESSAGE, listed where the message is written. Both spellings of each
         // are shown: the single character, and the long form for a man who writes his messages the
         // way N1MM writes them.
-        private static UIElement BuildCwMacroLegend()
+        private static UIElement BuildCwMacroLegend(Action<string> insert = null)
         {
             var pairs = new[]
             {
@@ -4274,6 +4282,7 @@ namespace HolyLogger
                 new[] { "$  or  {EXCH}",   "the rest of your sent exchange  (contest mode)" },
                 new[] { "{ZONE}",          "your CQ zone" },
                 new[] { "{SENTRST}",       "the RST you are sending" },
+                new[] { "{SENTRSTCUT}",    "the same, with 9 sent as N  (599 = 5NN)" },
                 new[] { "{GRID}",          "your My Locator" },
                 new[] { "{GRIDSQUARE}",    "his DX Locator" },
                 new[] { "{NAME}",          "his Name" },
@@ -4303,6 +4312,17 @@ namespace HolyLogger
                 Grid.SetColumn(mark, 0);
                 grid.Children.Add(mark);
 
+                // The long form when there is one ("*  or  {MYCALL}" puts in {MYCALL}), else the mark.
+                if (insert != null)
+                {
+                    string shown = pairs[i][0];
+                    int brace = shown.IndexOf('{');
+                    string token = brace >= 0 ? shown.Substring(brace) : shown.Trim();
+                    mark.Cursor = System.Windows.Input.Cursors.Hand;
+                    mark.ToolTip = "Click to put " + token + " in the macro";
+                    mark.MouseLeftButtonUp += (s, e) => { insert(token); e.Handled = true; };
+                }
+
                 var meaning = new TextBlock
                 {
                     Text = pairs[i][1],
@@ -4316,6 +4336,30 @@ namespace HolyLogger
             }
 
             return grid;
+        }
+
+        // Puts a macro mark into a macro box at its cursor (over any selection), with a space
+        // either side where it would otherwise run into a word. Refused quietly past the box's
+        // length limit, rather than cutting the macro in half.
+        private static void InsertCwMacroToken(TextBox box, string token)
+        {
+            if (box == null || string.IsNullOrEmpty(token)) return;
+            string text = box.Text ?? string.Empty;
+            int start = Math.Min(Math.Max(0, box.SelectionStart), text.Length);
+            int length = Math.Min(box.SelectionLength, text.Length - start);
+            string before = text.Substring(0, start);
+            string after = text.Substring(start + length);
+
+            string put = token;
+            if (before.Length > 0 && !before.EndsWith(" ")) put = " " + put;
+            if (after.Length > 0 && !after.StartsWith(" ")) put = put + " ";
+
+            string result = before + put + after;
+            if (box.MaxLength > 0 && result.Length > box.MaxLength) { System.Media.SystemSounds.Beep.Play(); return; }
+
+            box.Text = result;
+            box.Focus();
+            box.CaretIndex = before.Length + put.Length;
         }
 
         // THE MACROS. The same four N1MM leans on hardest, written the way N1MM writes them so a
@@ -4358,8 +4402,14 @@ namespace HolyLogger
         // selected. Outside one there is no serial and no exchange - and rather than key a gap where
         // a number should have been, the send is refused and says why (see DescribeCwMacroProblem).
         //
-        // Cut numbers - N1MM's {SENTRSTCUT}, where 9 becomes N - are NOT here. Nothing in this
-        // program decides that today, and guessing at it would put wrong characters on air.
+        // {SENTRSTCUT} - N1MM's macro of the same name: the RST sent with 9 as N, so 599 goes out as
+        // 5NN, the way CW operators send it (his request, 2026-11-23). Only 9: an RST has no 0, and
+        // N for 9 is the one cut every operator reads.
+        internal static string CutNumbers(string rst)
+        {
+            return (rst ?? string.Empty).Replace('9', 'N');
+        }
+
         internal string ExpandCwMacros(string text)
         {
             if (string.IsNullOrEmpty(text)) return text;
@@ -4373,6 +4423,7 @@ namespace HolyLogger
                 .Replace("#", SentSerialForMacro())
                 .Replace("$", SentExchangeForMacro())
                 .Replace("{ZONE}", MyZoneForMacro())
+                .Replace("{SENTRSTCUT}", CutNumbers(SentRstForMacro()))
                 .Replace("{SENTRST}", SentRstForMacro())
                 .Replace("{GRIDSQUARE}", HisGridForMacro())
                 .Replace("{GRID}", MyGridForMacro())
@@ -4458,6 +4509,7 @@ namespace HolyLogger
                 .Replace("{CALL}", his)
                 .Replace("{EXCH}", exchange)
                 .Replace("{ZONE}", zone)
+                .Replace("{SENTRSTCUT}", rst.StartsWith("[") ? rst : CutNumbers(rst))
                 .Replace("{SENTRST}", rst)
                 .Replace("{GRIDSQUARE}", hisGrid)
                 .Replace("{GRID}", myGrid)
@@ -4593,7 +4645,7 @@ namespace HolyLogger
             if (UsesCwMacro(text, "{ZONE}") && MyZoneForMacro().Length == 0)
                 return "your Station Callsign has no CQ zone in the country file";
 
-            if (UsesCwMacro(text, "{SENTRST}") && SentRstForMacro().Length == 0)
+            if (UsesCwMacro(text, "{SENTRST}", "{SENTRSTCUT}") && SentRstForMacro().Length == 0)
                 return "the RST you are sending is empty";
 
             if (UsesCwMacro(text, "{GRID}") && MyGridForMacro().Length == 0)
@@ -6303,7 +6355,11 @@ namespace HolyLogger
                 return;
             }
 
-            string command = BuildCwSendCommand(rigType, cwText);
+            // Too long for one command: the first piece now, the rest after it (StartMsgPieces).
+            StopMsgPieces();
+            List<string> pieces = SplitLongCwText(rigType, cwText);
+            string command = pieces != null ? BuildCwChunkCommand(rigType, pieces[0])
+                                            : BuildCwSendCommand(rigType, cwText);
 
             if (command == null)
             {
@@ -6332,10 +6388,111 @@ namespace HolyLogger
             pendingVoiceMessageDeadlineUtc = DateTime.UtcNow.AddSeconds(30);
             WatchMessageEnd();
 
+            // The rest of a long text, handed over piece by piece - see SplitLongCwText.
+            if (pieces != null) StartMsgPieces(rigType, pieces);
+
             if (isCqButton) CwKeyboardWindow.RememberCq(RxFrequencyHz());
 
             ShowCwSendMonitor(cwText);
             RunCwMacroActions(logsQso, wipesForm);
+        }
+
+        // ── A LONG MSG TEXT GOES IN PIECES (his bug, 2026-11-23) ─────────────────────────────
+        //
+        // One CAT command carries at most 30 characters on an Icom (its CI-V reference: "Send CW
+        // messages, up to 30 characters") and 24 on Kenwood/Elecraft. A Msg button used to send its
+        // whole text as ONE command, cut to that length - and on the Icom the 00 byte in front of the
+        // text counts too, so a 42-letter macro went out as 31 bytes and the IC-7610 answered NG:
+        // nothing was keyed at all (his log, 23:07-23:08). The keyer window never had this problem:
+        // it hands the radio 12 characters at a time, each piece just before the last one ends. The
+        // Msg buttons now do the same, with the same piece size, cut at spaces, and the same lead.
+        // Text short enough for one command still goes as one command, exactly as before.
+        private readonly Queue<string> _msgPieces = new Queue<string>();
+        private string _msgPiecesRig;
+        private DateTime _msgPiecesBusyUntil = DateTime.MinValue;
+        private System.Windows.Threading.DispatcherTimer _msgPiecesTimer;
+        private static readonly TimeSpan MsgPiecesLead = TimeSpan.FromSeconds(0.6);   // the keyer's Lead
+
+        // Null when the text fits in one command; otherwise the pieces, in order.
+        private static List<string> SplitLongCwText(string rigType, string text)
+        {
+            string safe = new string((text ?? string.Empty).ToUpper().Where(c => c >= ' ' && c <= 'Z').ToArray());
+            int oneCommand = KeyedByKyCommand(rigType) ? KyTextLimit
+                           : IcomCwAddress(rigType) != null ? IcomCwTextLimit - 1   // the 00 byte counts
+                           : int.MaxValue;
+            if (safe.Length <= oneCommand) return null;
+
+            int size = CwChunkSizeFor(rigType);
+            var pieces = new List<string>();
+            int pos = 0;
+            while (pos < safe.Length)
+            {
+                int take = Math.Min(size, safe.Length - pos);
+                if (take == size && pos + take < safe.Length)
+                {
+                    int lastSpace = safe.LastIndexOf(' ', pos + take - 1, take);
+                    if (lastSpace > pos) take = lastSpace - pos + 1;
+                }
+                pieces.Add(safe.Substring(pos, take));
+                pos += take;
+            }
+            return pieces;
+        }
+
+        private static TimeSpan CwKeyingTime(string text, double wpm)
+        {
+            if (wpm < 5) wpm = 5;
+            return TimeSpan.FromSeconds(CwSendMonitorWindow.ComputeTotalUnits(text) * 1.2 / wpm);
+        }
+
+        // The first piece has just gone out; the rest follow on a short tick.
+        private void StartMsgPieces(string rigType, List<string> pieces)
+        {
+            _msgPieces.Clear();
+            for (int i = 1; i < pieces.Count; i++) _msgPieces.Enqueue(pieces[i]);
+            _msgPiecesRig = rigType;
+            _msgPiecesBusyUntil = DateTime.UtcNow + CwKeyingTime(pieces[0], CwWpmNow());
+            if (_msgPieces.Count == 0) return;
+
+            if (_msgPiecesTimer == null)
+            {
+                _msgPiecesTimer = new System.Windows.Threading.DispatcherTimer
+                {
+                    Interval = TimeSpan.FromMilliseconds(100)
+                };
+                _msgPiecesTimer.Tick += (s, e) => SendNextMsgPiece();
+            }
+            if (!_msgPiecesTimer.IsEnabled) _msgPiecesTimer.Start();
+        }
+
+        private void SendNextMsgPiece()
+        {
+            try
+            {
+                if (_msgPieces.Count == 0) { _msgPiecesTimer.Stop(); return; }
+                DateTime now = DateTime.UtcNow;
+                if (now + MsgPiecesLead < _msgPiecesBusyUntil) return;   // the radio still has enough
+
+                string piece = _msgPieces.Dequeue();
+                string command = BuildCwChunkCommand(_msgPiecesRig, piece);
+                if (command == null || !TrySendOmniRigCustomCommand(command))
+                {
+                    StopMsgPieces();   // the rest would only key half a message
+                    return;
+                }
+
+                DateTime from = _msgPiecesBusyUntil > now ? _msgPiecesBusyUntil : now;
+                _msgPiecesBusyUntil = from + CwKeyingTime(piece, CwWpmNow());
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); StopMsgPieces(); }
+        }
+
+        // Stop pressed, or another message started: nothing more of this one goes out.
+        private void StopMsgPieces()
+        {
+            _msgPieces.Clear();
+            _msgPiecesBusyUntil = DateTime.MinValue;
+            if (_msgPiecesTimer != null) _msgPiecesTimer.Stop();
         }
 
         // Opens (or replaces) the CW sending monitor window for the given text. The cursor does not
@@ -9308,10 +9465,27 @@ namespace HolyLogger
                 cwTxOffSinceUtc = DateTime.MinValue;
                 OnCwTransmitEnded();
             }
+            else if (activeVoiceMessageNumber.HasValue && txOn)
+            {
+                // KEYING AGAIN: the silence that was being timed is over. Without this the time of the
+                // FIRST gap in a message was kept, so once it was half a second old any later short
+                // break-in gap between letters read as the end, and the sending window closed in the
+                // middle of the message (his report, 2026-11-23 - "after the first 5NN"). It hid while
+                // the end was looked for only on rig events; the 5-times-a-second look found it.
+                cwTxOffSinceUtc = DateTime.MinValue;
+            }
             else if (activeVoiceMessageNumber.HasValue && !txOn)
             {
                 // TOO SOON TO BE OVER, at a speed no station exceeds.
                 if (DateTime.UtcNow < cwMonitorEarliestDoneUtc) return;
+
+                // NOR WHILE A LONG MESSAGE STILL HAS PIECES TO GO, or the radio has not yet keyed the
+                // last one handed over - see StartMsgPieces.
+                if (_msgPieces.Count > 0 || DateTime.UtcNow < _msgPiecesBusyUntil)
+                {
+                    cwTxOffSinceUtc = DateTime.MinValue;
+                    return;
+                }
 
                 // AND THE SILENCE HAS TO LAST. With full break-in the radio is off air between every
                 // character, so "not transmitting" on its own means nothing - the first gap past the
@@ -9355,6 +9529,7 @@ namespace HolyLogger
 
         private void ClearVoiceMessageState()
         {
+            StopMsgPieces();   // a stopped long message sends none of its remaining pieces
             pendingVoiceMessageNumber = null;
             activeVoiceMessageNumber = null;
             pendingVoiceMessageDeadlineUtc = DateTime.MinValue;
