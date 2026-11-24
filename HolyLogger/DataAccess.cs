@@ -128,6 +128,7 @@ namespace HolyLogger
                     }
 
                     con = opening;
+                    BigChangeWatch.Attach(con);   // names the code behind 1,000+ QSO changes at once (Log.cs)
                     if (attempt > 0)
                         Log.Warn("The log database opened on attempt " + (attempt + 1)
                                  + " - it was busy or read-only until then.");

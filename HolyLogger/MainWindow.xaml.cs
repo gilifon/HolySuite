@@ -1511,6 +1511,9 @@ namespace HolyLogger
             SyncDiary.Start();
             RefreshSyncCloud();
 
+            // Writes every freeze of the window, HolyLogger's own busy signs, and what ran (Log.cs).
+            FreezeWatch.Start(Dispatcher);
+
             // The country count, skipped during the start, worked out now the window is up.
             var countries = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
             countries.Tick += (sender2, args2) =>
@@ -3114,6 +3117,7 @@ namespace HolyLogger
         private void ShowLogLoadingOverlay(bool show)
         {
             if (LogLoadingOverlay == null) return;
+            FreezeWatch.BusyScreen(show, LogLoadingText?.Text);
             LogLoadingOverlay.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
             if (show)
             {
@@ -10118,6 +10122,7 @@ namespace HolyLogger
             if (UploadProgressBox != null)
                 UploadProgressBox.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
             L_UploadProgress.Visibility = visibility;
+            FreezeWatch.Spinner(show, Convert.ToString(L_UploadProgress.Content));
             SetSpinnerRunning(show && !_importStopping);
             if (!show && UploadProgressSpinner != null)
                 UploadProgressSpinner.Visibility = Visibility.Collapsed;
