@@ -60,11 +60,15 @@ namespace HolyLogger
         {
             _timer = new Timer(_ =>
             {
-                FlushSafe();
-                DumpIfDueSafe();
-                PullSafe();
+                // each named for the freeze lines while it runs (FreezeWatch in Log.cs)
+                using (FreezeWatch.Job("Google Drive: writing + sending the diary (" + DiaryMegabytes() + " MB)")) FlushSafe();
+                using (FreezeWatch.Job("Google Drive: sending this computer's logs")) DumpIfDueSafe();
+                using (FreezeWatch.Job("Google Drive: reading the other computers' diaries")) PullSafe();
                 if (_ticks++ % 5 == 0)
-                    Task.Run(() => SnapshotIfDueSafe());   // its own thread: it can take minutes
+                    Task.Run(() =>   // its own thread: it can take minutes
+                    {
+                        using (FreezeWatch.Job("Google Drive: whole copy of the log")) SnapshotIfDueSafe();
+                    });
             }, null, TimeSpan.FromSeconds(10), TimeSpan.FromMinutes(1));
         }
 
@@ -75,6 +79,16 @@ namespace HolyLogger
             try { _timer?.Dispose(); } catch (Exception swallowed) { Log.Swallow(swallowed); }
             _timer = null;
             FlushSafe(TimeSpan.FromSeconds(10));
+        }
+
+        private static string DiaryMegabytes()
+        {
+            try
+            {
+                var f = new FileInfo(DiaryPath());
+                return f.Exists ? (f.Length / (1024 * 1024)).ToString() : "0";
+            }
+            catch (Exception) { return "?"; }
         }
 
         public static void FlushSafe(TimeSpan? uploadLimit = null)
