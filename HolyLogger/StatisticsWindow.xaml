@@ -456,6 +456,7 @@
                                                    Margin="0,0,18,0" VerticalAlignment="Center"
                                                    Foreground="{DynamicResource MutedTextBrush}"/>
                                         <TextBlock Grid.Row="0" Grid.Column="1" x:Name="TB_SumTotalQsls" FontSize="16"
+                                                   MouseLeftButtonUp="ArrlNumber_Click"
                                                    FontWeight="Bold" Margin="0,0,0,0" VerticalAlignment="Center"
                                                    Foreground="#2E9E4F"/>
 
@@ -464,6 +465,7 @@
                                                    ToolTip="Confirmations that matched a QSO in the log open now, and carry the LoTW tick"
                                                    Foreground="{DynamicResource MutedTextBrush}"/>
                                         <TextBlock Grid.Row="1" Grid.Column="1" x:Name="TB_SumMatchedInLog" FontSize="16"
+                                                   MouseLeftButtonUp="ArrlNumber_Click"
                                                    FontWeight="Bold" Margin="0,0,0,0" VerticalAlignment="Center"
                                                    Foreground="#2E9E4F"/>
 

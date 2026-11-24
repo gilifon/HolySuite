@@ -3709,6 +3709,10 @@ Environment.NewLine +
                     "[codes] TEXT NOT NULL DEFAULT '', " +
                     "[downloaded_utc] nvarchar(30) NOT NULL DEFAULT '')", con))
                     cmd.ExecuteNonQuery();
+                // 2026-11-24: the credits themselves (call, date, time, band, mode, country, award), as
+                // JSON, so the folder can list them and set them beside the log's own credit marks. Synced
+                // with the row like the rest; an older HolyLogger leaves the field it does not know alone.
+                AddColToTable("arrl_granted", "credit_list", "TEXT NOT NULL DEFAULT ''");
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
         }
@@ -3718,6 +3722,7 @@ Environment.NewLine +
             public string StationCall, DownloadedUtc;
             public int Credits;
             public List<int> Codes = new List<int>();
+            public string CreditList = "";   // JSON; empty when the list was saved by an older version
         }
 
         // The row for this station callsign (any spelling: 4Z5SL/6 finds 4Z5SL); null when never downloaded.
@@ -3729,7 +3734,7 @@ Environment.NewLine +
             {
                 if (con == null || con.State != ConnectionState.Open) return null;
                 using (var cmd = new SQLiteCommand(
-                    "SELECT station_call, credits, codes, downloaded_utc FROM arrl_granted " +
+                    "SELECT station_call, credits, codes, downloaded_utc, credit_list FROM arrl_granted " +
                     "WHERE station_call = @c COLLATE NOCASE ORDER BY downloaded_utc DESC LIMIT 1", con))
                 {
                     cmd.Parameters.AddWithValue("@c", key);
@@ -3741,6 +3746,7 @@ Environment.NewLine +
                             StationCall = rdr.GetString(0),
                             Credits = Convert.ToInt32(rdr.GetValue(1)),
                             DownloadedUtc = rdr.IsDBNull(3) ? "" : rdr.GetString(3),
+                            CreditList = rdr.IsDBNull(4) ? "" : Convert.ToString(rdr.GetValue(4)),
                         };
                         foreach (string p in (rdr.IsDBNull(2) ? "" : rdr.GetString(2)).Split(','))
                             if (int.TryParse(p.Trim(), out int code) && code > 0) row.Codes.Add(code);
@@ -3751,8 +3757,9 @@ Environment.NewLine +
         }
 
         // Replaces this station callsign's row (one row per callsign). The sync triggers send it on.
-        public void SetArrlGranted(string stationCall, int credits, IEnumerable<int> codes)
+        public void SetArrlGranted(string stationCall, int credits, IEnumerable<int> codes, string creditList = "")
         {
+            creditList = creditList ?? string.Empty;
             string key = CallsignIdentity.Base((stationCall ?? string.Empty).Trim()).ToUpperInvariant();
             if (key.Length == 0) return;
             string list = string.Join(",", (codes ?? Enumerable.Empty<int>()).Where(c => c > 0).Distinct().OrderBy(c => c));
@@ -3770,9 +3777,10 @@ Environment.NewLine +
                         if (o != null && o != DBNull.Value) id = Convert.ToInt64(o);
                     }
                     using (var cmd = new SQLiteCommand(id.HasValue
-                        ? "UPDATE arrl_granted SET station_call = @c, credits = @n, codes = @l, downloaded_utc = @a WHERE Id = @id"
-                        : "INSERT INTO arrl_granted (station_call, credits, codes, downloaded_utc) VALUES (@c, @n, @l, @a)", con, tx))
+                        ? "UPDATE arrl_granted SET station_call = @c, credits = @n, codes = @l, downloaded_utc = @a, credit_list = @k WHERE Id = @id"
+                        : "INSERT INTO arrl_granted (station_call, credits, codes, downloaded_utc, credit_list) VALUES (@c, @n, @l, @a, @k)", con, tx))
                     {
+                        cmd.Parameters.AddWithValue("@k", creditList);
                         cmd.Parameters.AddWithValue("@c", key);
                         cmd.Parameters.AddWithValue("@n", credits);
                         cmd.Parameters.AddWithValue("@l", list);
