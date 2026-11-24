@@ -2541,9 +2541,25 @@ namespace HolyLogger
             {
                 bool award = _source == ConfSource.Award;
                 TB_SumMatchedLabel.Text = award ? "Granted QSOs in this log" : "Matched in this log";
-                TB_SumMatchedLabel.ToolTip = award
-                    ? "QSOs in the log open now that carry a DXCC credit granted by the ARRL"
+                // Plain words for both ARRL numbers (user, 2026-11-24): a friend saw 433 above 436 and
+                // asked what each one means. The top one is the ARRL's own count; the second counts every
+                // QSO whose CREDIT_GRANTED field says DXCC, whoever wrote it there (this download, an
+                // imported ADIF file, the QSO editor) - so it can be higher, and only the ARRL's count
+                // is what an award is issued from.
+                const string grantedTip =
+                    "How many DXCC credits the ARRL sent in the last download.\n" +
+                    "This is the ARRL's own count - the one an award is given from.";
+                const string inLogTip =
+                    "How many QSOs in this log are marked as DXCC granted.\n" +
+                    "The mark can come from the ARRL download, from an imported ADIF file,\n" +
+                    "or from the QSO editor - so this number can differ from the ARRL's.";
+                object matchedTip = award
+                    ? inLogTip
                     : "Confirmations that matched a QSO in the log open now, and carry the LoTW tick";
+                TB_SumMatchedLabel.ToolTip = matchedTip;
+                if (TB_SumMatchedInLog != null) TB_SumMatchedInLog.ToolTip = award ? matchedTip : null;
+                if (TB_SumConfirmedLabel != null) TB_SumConfirmedLabel.ToolTip = award ? grantedTip : null;
+                if (TB_SumTotalQsls != null) TB_SumTotalQsls.ToolTip = award ? grantedTip : null;
             }
 
             var dal = DataAccess.GetInstance();
