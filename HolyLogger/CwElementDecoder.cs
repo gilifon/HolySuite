@@ -124,7 +124,9 @@ namespace HolyLogger
 
         // For the research bench only: every letter judged - its dits and dahs, where its last mark
         // ends (reading), its evidence, and whether it was shown.
+#pragma warning disable CS0649 // set only by the research bench tools, never by HolyLogger itself
         internal Action<string, long, double, bool> Judged;
+#pragma warning restore CS0649
         internal bool LastJudgedInWord, LastJudgedPlainHeard;
         internal string TimingNow
         {
@@ -1223,8 +1225,10 @@ namespace HolyLogger
             return g;
         }
 
+#pragma warning disable CS0649 // set only by the research bench tools, never by HolyLogger itself
         internal static Action<string> SpeedDebug;
         internal static Action<string> PathDebug;
+#pragma warning restore CS0649
         internal static bool SpeedByPeriod = false;
         internal static bool WideTiming = false;
         internal static bool SpeedFromEdges = false;
@@ -1304,7 +1308,9 @@ namespace HolyLogger
             }
             return Math.Min(Math.Max(u, 4.0), 35.0);
         }
+#pragma warning disable CS0649 // set only by the research bench tools, never by HolyLogger itself
         internal static double ForceWpm;      // bench only: the true speed, with SpeedFromPlain 2
+#pragma warning restore CS0649
 
         // THE SPEED FROM A MARK AND THE GAP AFTER IT TOGETHER. On a strong station every mark is read a
         // few readings long (the 20 ms pieces and the receiver's tail) and every gap as much short, so
