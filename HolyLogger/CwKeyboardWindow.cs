@@ -4179,6 +4179,7 @@ namespace HolyLogger
                 new[] { "$  or  {EXCH}",   "The rest of your sent exchange. Needs contest mode." },
                 new[] { "{ZONE}",          "Your CQ zone. Works with or without contest mode." },
                 new[] { "{SENTRST}",       "The RST you are sending." },
+                new[] { "{SENTRSTCUT}",    "The same, with 9 sent as N (599 = 5NN)." },
                 new[] { "{GRID}",          "Your My Locator." },
                 new[] { "{GRIDSQUARE}",    "His DX Locator." },
                 new[] { "{NAME}",          "His Name." },

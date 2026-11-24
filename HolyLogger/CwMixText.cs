@@ -84,6 +84,15 @@ namespace HolyLogger
         public void AddSent(string text, double t)
         {
             if (string.IsNullOrEmpty(text)) return;
+
+            // A NEW MESSAGE OF OURS STARTS A NEW LINE (his request, 2026-11-23) - F5 then F6 each on a
+            // line of their own, not run together.
+            if (text == "\n")
+            {
+                if (_inSent && _entries.Count > 0 && _entries[_entries.Count - 1].Break == null) AddBreak();
+                return;
+            }
+
             if (text == " ")
             {
                 if (!_inSent || _entries.Count == 0 || _entries[_entries.Count - 1].Text == " ") return;
