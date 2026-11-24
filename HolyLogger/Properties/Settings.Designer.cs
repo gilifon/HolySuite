@@ -2190,6 +2190,18 @@ namespace HolyLogger.Properties {
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string ClusterColWidthsByHand {
+            get {
+                return ((string)(this["ClusterColWidthsByHand"]));
+            }
+            set {
+                this["ClusterColWidthsByHand"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
         public string LogColumnLayout {
             get {
                 return ((string)(this["LogColumnLayout"]));
