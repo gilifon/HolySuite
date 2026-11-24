@@ -515,7 +515,9 @@ namespace HolyLogger
         // note before going on. The question "is a station there?" is asked with the averages as
         // they stand NOW - the averages of a second ago are exactly what had not yet noticed him.
         internal static bool ReReadOnNewNote = true;
+#pragma warning disable CS0649 // set only by the research bench tools, never by HolyLogger itself
         internal static Action<string> TraceReading;
+#pragma warning restore CS0649
         const int PastReadings = 200;          // 1 s of readings
         const int NewStationBins = 2;          // 50 Hz: nearer is the same station drifting
         internal static double ReReadSeconds = 0.8;
