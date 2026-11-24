@@ -2540,7 +2540,9 @@ namespace HolyLogger
             if (TB_SumMatchedLabel != null)
             {
                 bool award = _source == ConfSource.Award;
-                TB_SumMatchedLabel.Text = award ? "Granted QSOs in this log" : "Matched in this log";
+                // On two lines, so the label column - and the frame - stays narrow (user, 2026-11-24). The
+                // ARRL folder hides the two "New" rows, so the extra line has room.
+                TB_SumMatchedLabel.Text = award ? "Granted QSOs\nin this log" : "Matched in this log";
                 // Plain words for both ARRL numbers (user, 2026-11-24): a friend saw 433 above 436 and
                 // asked what each one means. The top one is the ARRL's own count; the second counts every
                 // QSO whose CREDIT_GRANTED field says DXCC, whoever wrote it there (this download, an
@@ -2548,11 +2550,13 @@ namespace HolyLogger
                 // is what an award is issued from.
                 const string grantedTip =
                     "How many DXCC credits the ARRL sent in the last download.\n" +
-                    "This is the ARRL's own count - the one an award is given from.";
+                    "This is the ARRL's own count - the one an award is given from.\n\n" +
+                    "Click to see the list.";
                 const string inLogTip =
                     "How many QSOs in this log are marked as DXCC granted.\n" +
                     "The mark can come from the ARRL download, from an imported ADIF file,\n" +
-                    "or from the QSO editor - so this number can differ from the ARRL's.";
+                    "or from the QSO editor - so this number can differ from the ARRL's.\n\n" +
+                    "Click to see the QSOs that are on only one side.";
                 object matchedTip = award
                     ? inLogTip
                     : "Confirmations that matched a QSO in the log open now, and carry the LoTW tick";
@@ -2564,6 +2568,10 @@ namespace HolyLogger
 
             var dal = DataAccess.GetInstance();
 
+            // Only the ARRL folder's two numbers open a list; on every other folder they are plain.
+            StyleSummaryNumber(TB_SumTotalQsls, false);
+            StyleSummaryNumber(TB_SumMatchedInLog, false);
+
             if (_source == ConfSource.Award)
             {
                 //   Row 0 = how many credits the ARRL reported on the last download for this log.
@@ -2574,8 +2582,20 @@ namespace HolyLogger
                 // QSOs, not countries: one country can be granted on several QSOs (a band, a mode) - the
                 // countries are the tile's number. "Granted by the ARRL 194" beside "102" read as a contradiction.
                 TB_SumConfirmedLabel.Text = "Granted QSOs";
-                TB_SumTotalQsls.Text = granted == null ? "not checked yet" : granted.Credits.ToString("N0", inv);
+                // The countries on the same line (user, 2026-11-24): "194" alone read as 194 countries.
+                // Plain weight for the bracket, so the frame grows as little as possible.
+                if (granted == null) TB_SumTotalQsls.Text = "not checked yet";
+                else
+                {
+                    TB_SumTotalQsls.Inlines.Clear();
+                    TB_SumTotalQsls.Inlines.Add(new System.Windows.Documents.Run(granted.Credits.ToString("N0", inv)));
+                    TB_SumTotalQsls.Inlines.Add(new System.Windows.Documents.Run(
+                        $" ({granted.Codes.Count.ToString("N0", inv)} {(granted.Codes.Count == 1 ? "country" : "countries")})")
+                        { FontWeight = FontWeights.Normal });
+                }
                 TB_SumMatchedInLog.Text = creditedHere.ToString("N0", inv);
+                StyleSummaryNumber(TB_SumTotalQsls, granted != null);
+                StyleSummaryNumber(TB_SumMatchedInLog, true);
                 TB_SumNewQsls.Text = "—";
                 TB_SumSince.Text = "   (full download)";
                 TB_SumNewCountries.Text = "—";
@@ -2647,6 +2667,247 @@ namespace HolyLogger
                 StyleSummaryLink(LNK_NewQsls, false, muted);
                 StyleSummaryLink(LNK_NewCountries, false, muted);
             }
+        }
+
+        // A summary number that opens a list looks like a link; otherwise it is the plain green figure.
+        private static void StyleSummaryNumber(TextBlock tb, bool clickable)
+        {
+            if (tb == null) return;
+            tb.Foreground = clickable ? new SolidColorBrush(Color.FromRgb(0x15, 0x65, 0xC0))
+                                      : new SolidColorBrush(Color.FromRgb(0x2E, 0x9E, 0x4F));
+            tb.TextDecorations = clickable ? TextDecorations.Underline : null;
+            tb.Cursor = clickable ? Cursors.Hand : null;
+            tb.Tag = clickable ? "link" : null;
+        }
+
+        // The ARRL folder's numbers: the top one opens the ARRL's list, the second the differences.
+        private void ArrlNumber_Click(object sender, MouseButtonEventArgs e)
+        {
+            if (_source != ConfSource.Award || !Equals((sender as TextBlock)?.Tag, "link")) return;
+            ShowArrlCreditsWindow(ReferenceEquals(sender, TB_SumTotalQsls) ? 0 : 2);
+        }
+
+        // One row of the ARRL list window: a credit from the ARRL, or a QSO of this log.
+        private sealed class ArrlListRow
+        {
+            public string Call { get; set; }
+            public string Date { get; set; }
+            public string Time { get; set; }
+            public string Band { get; set; }
+            public string Mode { get; set; }
+            public string Country { get; set; }
+            public BitmapImage Flag { get; set; }
+            public string Credit { get; set; }
+        }
+
+        private static string ShowDate(string d)
+        {
+            d = (d ?? string.Empty).Trim();
+            return d.Length >= 8 && d.Take(8).All(char.IsDigit) ? d.Substring(0, 4) + "-" + d.Substring(4, 2) + "-" + d.Substring(6, 2) : d;
+        }
+
+        private static string ShowTime(string t)
+        {
+            t = (t ?? string.Empty).Replace(":", "").Trim();
+            return t.Length >= 4 && t.Take(4).All(char.IsDigit) ? t.Substring(0, 2) + ":" + t.Substring(2, 2) : t;
+        }
+
+        // The ARRL's credits set beside the log open now: its QSOs, their countries, and which QSO each
+        // credit is (-1: none in this log). Off the UI thread. Used by the list window and the button's
+        // closing message, so both give the same counts.
+        private async Task<(List<QSO> qsos, List<int> codes, int[] picks)> CompareArrlWithLog(List<ArrlCredit> credits)
+        {
+            var qsos = (_allQsos ?? new ObservableCollection<QSO>()).Where(q => q != null).ToList();
+            return await Task.Run(() =>
+            {
+                var codes = qsos.Select(q => BackgroundEntityCode(q)).ToList();
+                var picks = MatchArrlCredits(credits, qsos, codes, System.Threading.CancellationToken.None);
+                return (qsos, codes, picks);
+            });
+        }
+
+        // The folder tabs of the Statistics window (LB_Source in the XAML), for a TabControl: rounded top
+        // corners, each in its own colour, and the selected one drops its bottom edge so it joins the
+        // page under it (user, 2026-11-24).
+        private static Style _arrlFolderTabStyle;
+        private static Style ArrlFolderTabStyle => _arrlFolderTabStyle ?? (_arrlFolderTabStyle = (Style)System.Windows.Markup.XamlReader.Parse(
+            "<Style xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml' TargetType='TabItem'>" +
+            "<Setter Property='Template'><Setter.Value>" +
+            "<ControlTemplate TargetType='TabItem'>" +
+            "<Border x:Name='Bd' Background='{TemplateBinding Background}'" +
+            " BorderBrush='{DynamicResource ThemeBorderBrush}' BorderThickness='1' CornerRadius='7,7,0,0' Margin='2,0,0,0' Padding='14,4'>" +
+            "<ContentPresenter x:Name='Hd' ContentSource='Header' HorizontalAlignment='Center' VerticalAlignment='Center'/>" +
+            "</Border>" +
+            "<ControlTemplate.Triggers><Trigger Property='IsSelected' Value='True'>" +
+            // (the selected header's bold is set in code: a TextBlock header inherits from the TabItem,
+            //  and bold on the TabItem would make the whole page bold)
+            "<Setter Property='Panel.ZIndex' Value='1'/>" +
+            "<Setter TargetName='Bd' Property='BorderBrush' Value='{DynamicResource AccentBrush}'/>" +
+            "<Setter TargetName='Bd' Property='BorderThickness' Value='1,1,1,0'/>" +
+            "<Setter TargetName='Bd' Property='Margin' Value='2,0,0,-3'/>" +
+            "<Setter TargetName='Bd' Property='Padding' Value='14,4,14,7'/>" +
+            "</Trigger></ControlTemplate.Triggers>" +
+            "</ControlTemplate></Setter.Value></Setter></Style>"));
+
+        // THE ARRL'S LIST BESIDE THE LOG (2026-11-24). A friend saw 433 granted QSOs above 436 marked in
+        // his log and wanted to see them, and above all the QSOs that are on only one side - each of those
+        // is a mark missing from the log or one the ARRL does not back. Three tabs: all the ARRL granted,
+        // those with no QSO in this log, and the log's marked QSOs the ARRL's list does not have. Matched
+        // by MatchArrlCredits, the same rule that marks the QSOs.
+        private async void ShowArrlCreditsWindow(int startTab)
+        {
+            var granted = ReadArrlGranted();
+            var credits = ReadArrlCreditList(granted);
+            if (credits.Count == 0)
+            {
+                HolyMessageBox.Show(
+                    granted == null
+                        ? "There is no list from the ARRL yet.\n\nPress \"Get All ARRL Granted DXCC\" to get it."
+                        : "Your last download kept only the countries, not the QSOs.\n\nPress \"Get All ARRL Granted DXCC\" once more to get the list.",
+                    "ARRL Granted DXCC", HolyMsgType.Info, this);
+                return;
+            }
+
+            List<QSO> qsos; List<int> codes; int[] picks;
+            try
+            {
+                var cmp = await CompareArrlWithLog(credits);
+                qsos = cmp.qsos; codes = cmp.codes; picks = cmp.picks;
+            }
+            catch (Exception ex) { Log.Swallow(ex); return; }
+
+            Func<ArrlCredit, ArrlListRow> fromCredit = c =>
+            {
+                string name = EntityNameOf(c.Dxcc);
+                return new ArrlListRow
+                {
+                    Call = c.Call, Date = ShowDate(c.Date), Time = ShowTime(c.Time), Band = c.Band,
+                    Mode = c.Mode.Length > 0 ? c.Mode : c.ModeGroup,
+                    Country = name, Flag = GetFlagImage(name), Credit = c.Credit
+                };
+            };
+            var all = credits.Select(fromCredit).ToList();
+            var onlyArrl = credits.Where((c, n) => picks[n] < 0).Select(fromCredit).ToList();
+
+            var used = new HashSet<int>(picks.Where(p => p >= 0));
+            var onlyLog = new List<ArrlListRow>();
+            for (int i = 0; i < qsos.Count; i++)
+            {
+                var q = qsos[i];
+                if (used.Contains(i) || !HasDxccCredit(q.CreditGranted)) continue;
+                string name = codes[i] > 0 ? EntityNameOf(codes[i]) : string.Empty;
+                onlyLog.Add(new ArrlListRow
+                {
+                    Call = q.DXCall, Date = ShowDate(q.Date), Time = ShowTime(q.Time), Band = q.Band, Mode = q.Mode,
+                    Country = name, Flag = name.Length > 0 ? GetFlagImage(name) : null, Credit = q.CreditGranted
+                });
+            }
+
+            // Each tab in a colour of its own (user, 2026-11-24): the header and the band around the table.
+            Func<List<ArrlListRow>, string, string, Color, TabItem> tab = (rows, title, what, color) =>
+            {
+                var grid = new DataGrid
+                {
+                    AutoGenerateColumns = false,
+                    IsReadOnly = true,
+                    CanUserAddRows = false,
+                    HeadersVisibility = DataGridHeadersVisibility.All,
+                    GridLinesVisibility = DataGridGridLinesVisibility.All,
+                    SelectionMode = DataGridSelectionMode.Single,
+                    FontSize = 16,
+                };
+                grid.ColumnHeaderStyle = MainWindow.BuildLogTableHeaderStyle();
+                ScrollViewer.SetVerticalScrollBarVisibility(grid, ScrollBarVisibility.Auto);
+                ScrollViewer.SetHorizontalScrollBarVisibility(grid, ScrollBarVisibility.Auto);
+                grid.LoadingRow += (s, ev) => ev.Row.Header = (ev.Row.GetIndex() + 1).ToString();
+
+                int countries = rows.Select(r => r.Country).Where(c => !string.IsNullOrEmpty(c)).Distinct(StringComparer.OrdinalIgnoreCase).Count();
+                var baseHeader = new Dictionary<DataGridColumn, string>();
+                Action<string, string, DataGridLength> col = (header, path, width) =>
+                {
+                    var c = new DataGridTextColumn { Binding = new System.Windows.Data.Binding(path), Width = width, SortMemberPath = path };
+                    baseHeader[c] = header;
+                    grid.Columns.Add(c);
+                };
+                col("Call", "Call", 120);
+                col("Date", "Date", 130);
+                col("Time", "Time", 80);
+                col("Band", "Band", 80);
+                col("Mode", "Mode", 95);
+                var img = new FrameworkElementFactory(typeof(Image));
+                img.SetBinding(Image.SourceProperty, new System.Windows.Data.Binding("Flag"));
+                img.SetValue(Image.WidthProperty, 24.0);
+                img.SetValue(Image.HeightProperty, 16.0);
+                grid.Columns.Add(new DataGridTemplateColumn { Header = "", Width = 34, CanUserSort = false, CellTemplate = new DataTemplate { VisualTree = img } });
+                col($"Country ({countries:N0})", "Country", 280);
+                col("Credit", "Credit", new DataGridLength(1, DataGridLengthUnitType.Star));
+
+                // THE SORTING TRIANGLE is written into the header text (as in the Statistics tables), so it
+                // shows whatever the header style. Country first by default, then date and time.
+                Action showArrows = () =>
+                {
+                    foreach (var kv in baseHeader)
+                        kv.Key.Header = kv.Value + (kv.Key.SortDirection == System.ComponentModel.ListSortDirection.Ascending ? " ▲"
+                                                  : kv.Key.SortDirection == System.ComponentModel.ListSortDirection.Descending ? " ▼" : "");
+                };
+                var view = System.Windows.Data.CollectionViewSource.GetDefaultView(rows);
+                view.SortDescriptions.Add(new System.ComponentModel.SortDescription("Country", System.ComponentModel.ListSortDirection.Ascending));
+                view.SortDescriptions.Add(new System.ComponentModel.SortDescription("Date", System.ComponentModel.ListSortDirection.Ascending));
+                view.SortDescriptions.Add(new System.ComponentModel.SortDescription("Time", System.ComponentModel.ListSortDirection.Ascending));
+                grid.ItemsSource = view;
+                baseHeader.Keys.First(c => baseHeader[c].StartsWith("Country")).SortDirection = System.ComponentModel.ListSortDirection.Ascending;
+                showArrows();
+                // The grid sets the new direction after this event, so the headers are redrawn just after.
+                grid.Sorting += (s, ev) => grid.Dispatcher.BeginInvoke(showArrows, System.Windows.Threading.DispatcherPriority.Background);
+
+                var brush = new SolidColorBrush(color);
+                var panel = new DockPanel { Background = brush };
+                var line = new TextBlock { Text = what + $". ({countries:N0} {(countries == 1 ? "country" : "countries")})", FontSize = 16, Margin = new Thickness(6, 6, 0, 8), TextWrapping = TextWrapping.Wrap };
+                DockPanel.SetDock(line, Dock.Top);
+                panel.Children.Add(line);
+                grid.Margin = new Thickness(6, 0, 6, 6);
+                panel.Children.Add(grid);
+                return new TabItem
+                {
+                    Content = panel,
+                    FontSize = 16,
+                    Background = brush,
+                    Style = ArrlFolderTabStyle,
+                    // Two lines, so the tabs stay narrow (user, 2026-11-24).
+                    Header = new TextBlock { Text = title, TextAlignment = TextAlignment.Center },
+                };
+            };
+
+            var tabs = new TabControl { FontSize = 16, Padding = new Thickness(0) };
+            tabs.SetResourceReference(Control.BorderBrushProperty, "AccentBrush");
+            tabs.Items.Add(tab(all, $"All Granted QSOs\n({all.Count:N0})",
+                               "Every QSO the ARRL has granted DXCC credit for", Color.FromRgb(0xF8, 0xD9, 0xA8)));
+            tabs.Items.Add(tab(onlyArrl, $"QSOs only at the ARRL\nand not in this log ({onlyArrl.Count:N0})",
+                               "Granted by the ARRL, but HolyLogger found no matching QSO in this log", Color.FromRgb(0xF6, 0xC6, 0xC6)));
+            tabs.Items.Add(tab(onlyLog, $"QSOs only in this log\nand not in ARRL ({onlyLog.Count:N0})",
+                               "Marked as granted in this log, but not in the ARRL's list", Color.FromRgb(0xC9, 0xDF, 0xF7)));
+            // The selected folder's name in bold, as on the Statistics folders.
+            Action boldSelected = () =>
+            {
+                foreach (TabItem ti in tabs.Items)
+                    if (ti.Header is TextBlock h) h.FontWeight = ti.IsSelected ? FontWeights.Bold : FontWeights.Normal;
+            };
+            tabs.SelectionChanged += (s, ev) => { if (ReferenceEquals(ev.OriginalSource, tabs)) boldSelected(); };
+            tabs.SelectedIndex = Math.Max(0, Math.Min(2, startTab));
+            boldSelected();
+
+            var win = new Window
+            {
+                Title = "ARRL Granted DXCC",
+                Owner = this,
+                Width = 1000,
+                Height = 640,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                ResizeMode = ResizeMode.CanResize,
+                Content = new Border { Padding = new Thickness(10), Child = tabs }
+            };
+            WindowBounds.Attach(win, "ArrlGrantedList");   // remembers its size and place
+            win.ShowDialog();
         }
 
         private static void StyleSummaryLink(System.Windows.Documents.Hyperlink link, bool active, Brush muted)
@@ -3282,10 +3543,80 @@ namespace HolyLogger
         // band and mode group when given), preferring the one whose callsign matches when it is a real
         // callsign. The award list is written into the QSO's own CREDIT_GRANTED, merged with what is
         // there - the field the ARRL folder already reads, and one that syncs with the rest of the QSO.
+        // One granted credit as the ARRL sent it. Kept (as JSON in arrl_granted.credit_list) so the
+        // folder can list them. Time and Mode are only what the reply had; they may be empty.
         private class ArrlCredit
         {
-            public string Date, Band, ModeGroup, Call, Credit;
+            public string Date, Time, Band, Mode, ModeGroup, Call, Credit;
             public int Dxcc;
+        }
+
+        // One credit = one QSO: same day, country, band and mode group (how the two downloads are merged).
+        private static string ArrlCreditKey(ArrlCredit c)
+        {
+            return c.Date + "|" + c.Dxcc + "|" + (c.Band ?? string.Empty).ToUpperInvariant() + "|" + c.ModeGroup;
+        }
+
+        // The credits saved with the granted list; empty when there is none, or it was saved by a version
+        // that kept only the countries.
+        private static List<ArrlCredit> ReadArrlCreditList(DataAccess.ArrlGrantedRow row)
+        {
+            try
+            {
+                if (row != null && !string.IsNullOrWhiteSpace(row.CreditList))
+                {
+                    var list = JsonConvert.DeserializeObject<List<ArrlCredit>>(row.CreditList);
+                    if (list != null)
+                    {
+                        foreach (var c in list)
+                        {
+                            c.Date = c.Date ?? ""; c.Time = c.Time ?? ""; c.Band = c.Band ?? ""; c.Mode = c.Mode ?? "";
+                            c.ModeGroup = c.ModeGroup ?? ""; c.Call = c.Call ?? ""; c.Credit = c.Credit ?? "";
+                        }
+                        return list;
+                    }
+                }
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+            return new List<ArrlCredit>();
+        }
+
+        // WHICH QSO EACH CREDIT IS FOR - one rule for marking the QSOs and for listing the differences.
+        // Same day, same country, then the same band and mode group when the credit names them; of
+        // several that fit, the one with the same callsign. Index into qsos, or -1 when none fits.
+        // codes[i] is the DXCC number of qsos[i] (0 when it has none).
+        private static int[] MatchArrlCredits(IList<ArrlCredit> credits, IList<QSO> qsos, IList<int> codes,
+                                              System.Threading.CancellationToken ct)
+        {
+            var byKey = new Dictionary<string, List<int>>(StringComparer.OrdinalIgnoreCase);
+            for (int i = 0; i < qsos.Count; i++)
+            {
+                if (codes[i] <= 0) continue;
+                string k = (qsos[i].Date ?? string.Empty).Trim() + "|" + codes[i];
+                List<int> l;
+                if (!byKey.TryGetValue(k, out l)) byKey[k] = l = new List<int>();
+                l.Add(i);
+            }
+
+            var result = new int[credits.Count];
+            for (int n = 0; n < credits.Count; n++)
+            {
+                ct.ThrowIfCancellationRequested();
+                var c = credits[n];
+                result[n] = -1;
+                List<int> found;
+                if (!byKey.TryGetValue(c.Date + "|" + c.Dxcc, out found)) continue;
+                var fit = found.Where(i =>
+                              (c.Band.Length == 0 || string.Equals((qsos[i].Band ?? string.Empty).Trim(), c.Band, StringComparison.OrdinalIgnoreCase))
+                           && (c.ModeGroup.Length == 0 || ModeGroupOf(qsos[i].Mode) == c.ModeGroup))
+                          .ToList();
+                if (fit.Count == 0) continue;
+                int pick = fit[0];
+                foreach (int i in fit)
+                    if (CallsignIdentity.Same(qsos[i].DXCall, c.Call)) { pick = i; break; }
+                result[n] = pick;
+            }
+            return result;
         }
 
         private static string ModeGroupOf(string mode)
@@ -3519,8 +3850,10 @@ namespace HolyLogger
                     credits.Add(new ArrlCredit
                     {
                         Date = date.Trim(),
+                        Time = (ExtractAdifField(rec, "TIME_ON") ?? string.Empty).Trim(),
                         Dxcc = dxcc,
                         Band = (ExtractAdifField(rec, "BAND") ?? string.Empty).Trim(),
+                        Mode = (ExtractAdifField(rec, "MODE") ?? string.Empty).Trim(),
                         ModeGroup = (group ?? string.Empty).Trim().ToUpperInvariant(),
                         Call = (ExtractAdifField(rec, "CALL") ?? string.Empty).Trim(),
                         // every record IS a granted DXCC credit, even if the award list is missing
@@ -3586,8 +3919,10 @@ namespace HolyLogger
                         var c = new ArrlCredit
                         {
                             Date = date.Trim(),
+                            Time = (ExtractAdifField(rec, "TIME_ON") ?? string.Empty).Trim(),
                             Dxcc = dxcc,
                             Band = (ExtractAdifField(rec, "BAND") ?? string.Empty).Trim(),
+                            Mode = (ExtractAdifField(rec, "MODE") ?? string.Empty).Trim(),
                             ModeGroup = ModeGroupOf(ExtractAdifField(rec, "MODE")),
                             Call = (ExtractAdifField(rec, "CALL") ?? string.Empty).Trim(),
                             Credit = HasDxccCredit(cg) ? cg.Trim() : "DXCC",
@@ -3609,7 +3944,7 @@ namespace HolyLogger
                 if (reportFailed != null && credits.Count == 0)
                 {
                     ShowLotwSpinner(false);
-                    HolyMessageBox.Show($"{reportFailed}, so no credits were read.\n\nNothing was changed. Please try again later.",
+                    HolyMessageBox.Show($"{reportFailed}, so nothing was read.\n\nNothing was changed. Please try again later.",
                         "ARRL Granted DXCC", HolyMsgType.Warning, this);
                     return;
                 }
@@ -3648,31 +3983,12 @@ namespace HolyLogger
                     // thread - the LoTW matching relies on the same).
                     var codes = qsos.Select(q => BackgroundEntityCode(q)).ToList();
 
-                    // date|entity -> indexes of the QSOs that day with that country
-                    var byKey = new Dictionary<string, List<int>>(StringComparer.OrdinalIgnoreCase);
-                    for (int i = 0; i < qsos.Count; i++)
+                    int[] picks = MatchArrlCredits(credits, qsos, codes, ct);
+                    for (int n = 0; n < credits.Count; n++)
                     {
-                        if (codes[i] <= 0) continue;
-                        string k = (qsos[i].Date ?? string.Empty).Trim() + "|" + codes[i];
-                        List<int> l;
-                        if (!byKey.TryGetValue(k, out l)) byKey[k] = l = new List<int>();
-                        l.Add(i);
-                    }
-
-                    foreach (var c in credits)
-                    {
-                        ct.ThrowIfCancellationRequested();
-                        List<int> found;
-                        if (!byKey.TryGetValue(c.Date + "|" + c.Dxcc, out found)) continue;
-                        var fit = found.Where(i =>
-                                      (c.Band.Length == 0 || string.Equals((qsos[i].Band ?? string.Empty).Trim(), c.Band, StringComparison.OrdinalIgnoreCase))
-                                   && (c.ModeGroup.Length == 0 || ModeGroupOf(qsos[i].Mode) == c.ModeGroup))
-                                  .ToList();
-                        if (fit.Count == 0) continue;
-                        int pick = fit[0];
-                        foreach (int i in fit)
-                            if (CallsignIdentity.Same(qsos[i].DXCall, c.Call)) { pick = i; break; }
-
+                        int pick = picks[n];
+                        if (pick < 0) continue;
+                        var c = credits[n];
                         matched++;
                         long id = qsos[pick].id;
                         string before;
@@ -3695,6 +4011,7 @@ namespace HolyLogger
                 // THE GRANTED COUNTRIES THEMSELVES ARE KEPT TOO, so a country counts in the ARRL folder
                 // even when its QSO is not in HolyLogger at all (logged before HolyLogger was used).
                 var grantedCodes = credits.Select(c => c.Dxcc).Distinct().ToList();
+                var listToStore = new List<ArrlCredit>(credits);
                 int creditsToStore = credits.Count;
                 if (reportFailed != null)
                 {
@@ -3703,27 +4020,49 @@ namespace HolyLogger
                     if (before != null)
                     {
                         grantedCodes = grantedCodes.Union(before.Codes).ToList();
-                        creditsToStore = Math.Max(creditsToStore, before.Credits);
+                        var have = new HashSet<string>(listToStore.Select(ArrlCreditKey), StringComparer.OrdinalIgnoreCase);
+                        foreach (var old in ReadArrlCreditList(before))
+                            if (have.Add(ArrlCreditKey(old))) listToStore.Add(old);
+                        creditsToStore = Math.Max(listToStore.Count, before.Credits);
                     }
                 }
-                dal?.SetArrlGranted(ArrlStationCall(), creditsToStore, grantedCodes);
+                dal?.SetArrlGranted(ArrlStationCall(), creditsToStore, grantedCodes, JsonConvert.SerializeObject(listToStore));
                 Log.Warn($"ARRL DXCC credits: {credits.Count} received ({grantedCodes.Count} countries), {matched} matched in "
                          + $"{1 + otherLogs.Count} log(s), {changed} QSO(s) changed.");
 
                 await ReloadQsosAfterCheck(changed > 0);
-                ShowLotwSpinner(false);
 
-                int notHere = credits.Count - matched;
-                HolyMessageBox.Show(
-                    credits.Count == 0
-                        ? "The ARRL has no granted DXCC credits for this LoTW account.\n\n" +
-                          "Credits only come after you have applied to the ARRL for the DXCC award."
-                        : $"The ARRL has granted you {credits.Count:N0} DXCC credits, for {grantedCodes.Count:N0} countries.\n\n" +
-                          $"{matched:N0} of them were found in your logs and marked." +
-                          (notHere == 1 ? "\n\n1 is for a QSO that is not in HolyLogger. Its country still counts in this folder."
-                           : notHere > 1 ? $"\n\n{notHere:N0} are for QSOs that are not in HolyLogger. Their countries still count in this folder." : "")
-                        + (reportFailed == null ? "" : $"\n\n{reportFailed}, so the credits on your LoTW confirmations were not read. Please try again later."),
-                    "ARRL Granted DXCC", reportFailed == null ? HolyMsgType.Info : HolyMsgType.Warning, this);
+                // THE ANSWER IN PLAIN COUNTS OF QSOs (user, 2026-11-24): "194 DXCC credits" read as 194
+                // countries. The ARRL's QSOs and this log's marked QSOs, then each side's leftovers, worked
+                // out by the same comparison the list window shows.
+                var cmp = await CompareArrlWithLog(listToStore);
+                ShowLotwSpinner(false);
+                int markedHere = cmp.qsos.Count(q => HasDxccCredit(q.CreditGranted));
+                int missingHere = cmp.picks.Count(p => p < 0);
+                var usedHere = new HashSet<int>(cmp.picks.Where(p => p >= 0));
+                int notGrantedHere = cmp.qsos.Where((q, i) => !usedHere.Contains(i) && HasDxccCredit(q.CreditGranted)).Count();
+
+                string msg = listToStore.Count == 0
+                    ? "The ARRL has not granted any of your QSOs yet.\n\n" +
+                      "QSOs are granted only after you apply to the ARRL for the DXCC award."
+                    : $"The ARRL granted {listToStore.Count:N0} QSO{(listToStore.Count == 1 ? "" : "s")} ({grantedCodes.Count:N0} countr{(grantedCodes.Count == 1 ? "y" : "ies")}).\n" +
+                      $"This log has {markedHere:N0} QSO{(markedHere == 1 ? "" : "s")} marked as granted." +
+                      (missingHere == 0 && notGrantedHere == 0 ? "" : "\n") +
+                      (missingHere == 1 ? "\n1 QSO that the ARRL granted is missing from this log."
+                       : missingHere > 1 ? $"\n{missingHere:N0} QSOs that the ARRL granted are missing from this log." : "") +
+                      (notGrantedHere == 1 ? "\n1 QSO in this log is marked as granted, but the ARRL did not grant it."
+                       : notGrantedHere > 1 ? $"\n{notGrantedHere:N0} QSOs in this log are marked as granted, but the ARRL did not grant them." : "");
+                if (reportFailed != null)
+                    msg += $"\n\n{reportFailed}, so not all granted QSOs were read. Please try again later.";
+                var msgType = reportFailed == null ? HolyMsgType.Info : HolyMsgType.Warning;
+
+                if (missingHere > 0 || notGrantedHere > 0)
+                {
+                    if (HolyMessageBox.ShowConfirm(msg, "ARRL Granted DXCC", msgType, this, yesText: "Show them", noText: "OK"))
+                        ShowArrlCreditsWindow(notGrantedHere > 0 ? 2 : 1);
+                }
+                else
+                    HolyMessageBox.Show(msg, "ARRL Granted DXCC", msgType, this);
             }
             catch (OperationCanceledException)
             {
