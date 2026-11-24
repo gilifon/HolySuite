@@ -1,0 +1,50 @@
+﻿<UserControl x:Class="HolyLogger.OptionsUserControls.SplitSettingsControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+        <!-- Framed like the three folders on the Radio Control Panel page: a tab carrying the title, and a frame under it, in light blue. -->
+        <StackPanel Margin="0,0,0,0" HorizontalAlignment="Left">
+            <Border HorizontalAlignment="Left" Background="#D6E9FB" BorderBrush="{DynamicResource AccentBrush}"
+                    BorderThickness="1,1,1,0" CornerRadius="6,6,0,0" Padding="20,7,20,7" Panel.ZIndex="1" Margin="0,0,0,-1">
+                <TextBlock Text="Split button configuration" FontSize="16" FontWeight="Bold"/>
+            </Border>
+            <Border Background="#D6E9FB" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1" Padding="8,10,8,10">
+                <Grid HorizontalAlignment="Left">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Mode" FontSize="16" FontWeight="Bold" VerticalAlignment="Center" Margin="4,3,12,3"/>
+                    <TextBlock Grid.Row="0" Grid.Column="1" Text="From (kHz up)" FontSize="16" FontWeight="Bold" HorizontalAlignment="Center" TextAlignment="Center" VerticalAlignment="Center" Margin="4,3,12,3"/>
+                    <TextBlock Grid.Row="0" Grid.Column="2" Text="To (kHz up)" FontSize="16" FontWeight="Bold" HorizontalAlignment="Center" TextAlignment="Center" VerticalAlignment="Center" Margin="4,3,12,3"/>
+                    <TextBlock Grid.Row="0" Grid.Column="3" Text="Mouse wheel step (kHz)" FontSize="16" FontWeight="Bold" VerticalAlignment="Center" Margin="4,3,12,3"/>
+                    <TextBlock Grid.Row="1" Grid.Column="0" Text="SSB and others" Foreground="#1565C0" FontWeight="Bold" FontSize="16" VerticalAlignment="Center" Margin="4,3,12,3"/>
+                    <TextBox Grid.Row="1" Grid.Column="1" x:Name="TB_SplitFrom" Width="50" Height="30" FontSize="16" MaxLength="2" Margin="4,3,4,3" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" PreviewTextInput="SplitBox_PreviewTextInput" LostFocus="SplitBox_LostFocus"/>
+                    <TextBox Grid.Row="1" Grid.Column="2" x:Name="TB_SplitTo" Width="50" Height="30" FontSize="16" MaxLength="2" Margin="4,3,4,3" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" PreviewTextInput="SplitBox_PreviewTextInput" LostFocus="SplitBox_LostFocus"/>
+                    <StackPanel Grid.Row="1" Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
+                        <RadioButton x:Name="RB_Step01" Content="0.1" Tag="0.1" FontSize="16" Margin="0,0,14,0" VerticalContentAlignment="Center" Checked="SplitStep_Checked"/>
+                        <RadioButton x:Name="RB_Step05" Content="0.5" Tag="0.5" FontSize="16" Margin="0,0,14,0" VerticalContentAlignment="Center" Checked="SplitStep_Checked"/>
+                        <RadioButton x:Name="RB_Step1" Content="1" Tag="1" FontSize="16" Margin="0,0,14,0" VerticalContentAlignment="Center" Checked="SplitStep_Checked"/>
+                    </StackPanel>
+                    <TextBlock Grid.Row="2" Grid.Column="0" Text="CW" FontSize="16" Foreground="#D32F2F" FontWeight="Bold" VerticalAlignment="Center" Margin="4,3,12,3"/>
+                    <TextBox Grid.Row="2" Grid.Column="1" x:Name="TB_SplitCwFrom" Width="50" Height="30" FontSize="16" MaxLength="2" Margin="4,3,4,3" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" PreviewTextInput="SplitBox_PreviewTextInput" LostFocus="SplitCwBox_LostFocus"/>
+                    <TextBox Grid.Row="2" Grid.Column="2" x:Name="TB_SplitCwTo" Width="50" Height="30" FontSize="16" MaxLength="2" Margin="4,3,4,3" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" PreviewTextInput="SplitBox_PreviewTextInput" LostFocus="SplitCwBox_LostFocus"/>
+                    <StackPanel Grid.Row="2" Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
+                        <RadioButton x:Name="RB_CwStep01" Content="0.1" Tag="0.1" FontSize="16" Margin="0,0,14,0" VerticalContentAlignment="Center" Checked="SplitCwStep_Checked"/>
+                        <RadioButton x:Name="RB_CwStep05" Content="0.5" Tag="0.5" FontSize="16" Margin="0,0,14,0" VerticalContentAlignment="Center" Checked="SplitCwStep_Checked"/>
+                        <RadioButton x:Name="RB_CwStep1" Content="1" Tag="1" FontSize="16" Margin="0,0,14,0" VerticalContentAlignment="Center" Checked="SplitCwStep_Checked"/>
+                    </StackPanel>
+                    <TextBlock Grid.Row="0" Grid.Column="4" Text="Split ends if main moves more than (kHz)" FontSize="16" FontWeight="Bold" TextWrapping="Wrap" MaxWidth="210" VerticalAlignment="Center" Margin="4,3,4,3"/>
+                    <TextBox x:Name="TB_SplitLeave" Grid.Row="1" Grid.Column="4" Width="50" Height="30" FontSize="16" MaxLength="2" Margin="4,3,4,3" HorizontalAlignment="Left" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" PreviewTextInput="SplitBox_PreviewTextInput" LostFocus="SplitLeave_LostFocus"/>
+                    <TextBox x:Name="TB_SplitCwLeave" Grid.Row="2" Grid.Column="4" Width="50" Height="30" FontSize="16" MaxLength="2" Margin="4,3,4,3" HorizontalAlignment="Left" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" PreviewTextInput="SplitBox_PreviewTextInput" LostFocus="SplitCwLeave_LostFocus"/>
+                </Grid>
+            </Border>
+        </StackPanel>
+</UserControl>

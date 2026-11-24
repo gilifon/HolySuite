@@ -193,7 +193,7 @@ namespace HolyLogger
             Top = top;
         }
 
-        private static bool IsOnAScreen(double left, double top)
+        internal static bool IsOnAScreen(double left, double top)
         {
             try
             {
@@ -602,6 +602,14 @@ namespace HolyLogger
                 double step = SplitIsCw ? Properties.Settings.Default.SplitCwStepKhz : Properties.Settings.Default.SplitStepKhz;
                 return step > 0.05 && step <= 1.0 ? step : 1.0;
             }
+        }
+
+        // Right-click on SPLIT opens the split settings in a small window of their own (his request: the
+        // whole Options window was slow to open).
+        private void SplitButton_RightClick(object sender, MouseButtonEventArgs e)
+        {
+            e.Handled = true;
+            SplitSettingsWindow.ShowFor(this);
         }
 
         private void SendSplitOffset(double khz)

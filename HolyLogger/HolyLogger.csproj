@@ -315,6 +315,10 @@
     <Compile Include="OptionsUserControls\LotwControl.xaml.cs">
       <DependentUpon>LotwControl.xaml</DependentUpon>
     </Compile>
+    <Compile Include="OptionsUserControls\SplitSettingsControl.xaml.cs">
+      <DependentUpon>SplitSettingsControl.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="SplitSettingsWindow.cs" />
     <Compile Include="OptionsUserControls\RadioControlPanelControl.xaml.cs">
       <DependentUpon>RadioControlPanelControl.xaml</DependentUpon>
       <SubType>Code</SubType>
@@ -657,6 +661,10 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="OptionsUserControls\RadioControlPanelControl.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="OptionsUserControls\SplitSettingsControl.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

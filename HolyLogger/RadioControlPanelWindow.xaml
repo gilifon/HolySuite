@@ -282,8 +282,8 @@
             </Grid.ColumnDefinitions>
             <ToggleButton x:Name="SplitButton" ToolTipService.Placement="Top" Grid.Column="0" Content="SPLIT"
                           Style="{StaticResource PanelToggleStyle}" Margin="4,4,2,4"
-                          Click="SplitButton_Click"
-                          ToolTip="Split: transmit on the radio's other VFO. The box shows how far above (or below) the main frequency that is, in kHz."/>
+                          Click="SplitButton_Click" PreviewMouseRightButtonUp="SplitButton_RightClick"
+                          ToolTip="Split: transmit on the radio's other VFO. The box shows how far above (or below) the main frequency that is, in kHz. Right-click: split settings."/>
             <Grid Grid.Column="1" Grid.ColumnSpan="2">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
