@@ -91,16 +91,36 @@ namespace HolyLogger
             catch (Exception) { return "?"; }
         }
 
+        private static int _sending;
+
+        // uploadLimit given = the program is closing: no making short then (it can take seconds), and the
+        // send is tried even if the timer's own send is still going.
         public static void FlushSafe(TimeSpan? uploadLimit = null)
         {
             try { Flush(); }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
-            try { if (GoogleDrive.UploadDiary(DiaryPath(), uploadLimit ?? TimeSpan.FromSeconds(60))) ReportContact(null); }
+            bool closing = uploadLimit.HasValue;
+            if (!closing)
+            {
+                try { lock (Gate) MakeDiaryShortIfDue(); }
+                catch (Exception ex) { Log.Warn("Sync diary: could not be made short - " + ex.Message); }
+                // the timer comes every minute whether or not the last send has finished
+                if (Interlocked.Exchange(ref _sending, 1) == 1) return;
+            }
+            try
+            {
+                // a slow line gets longer for a big diary: a minute plus a minute per 6 MB
+                long bytes = 0;
+                try { var f = new FileInfo(DiaryPath()); if (f.Exists) bytes = f.Length; } catch (Exception) { }
+                TimeSpan limit = uploadLimit ?? TimeSpan.FromSeconds(60 + bytes / (100 * 1024));
+                if (GoogleDrive.UploadDiary(DiaryPath(), limit)) ReportContact(null);
+            }
             catch (Exception ex)
             {
                 Log.Warn("Google Drive: the diary was not sent - " + ex.Message);
                 ReportContact(ex.Message);
             }
+            finally { if (!closing) Interlocked.Exchange(ref _sending, 0); }
         }
 
         // WHAT THE CLOUD ON THE MAIN WINDOW SHOWS. Only a real answer from Google Drive counts: a diary
@@ -459,50 +479,85 @@ namespace HolyLogger
             {
                 if (!file.Name.EndsWith(".diary", StringComparison.OrdinalIgnoreCase) || file.Name == mine) continue;
                 string readKey = "sync_read_" + file.Name;
+                string genKey = "sync_read_gen_" + file.Name;
                 long.TryParse(dal.GetDbState(readKey), out long offset);
                 if (file.Size < offset) offset = 0;   // shorter than what was read: that diary started again
+                // MADE SHORT on its computer (MakeDiaryShort): a new mark on the Drive file means it is a
+                // new, short diary - read from its start, whatever its length (2026-11-24)
+                string theirGen = file.Gen ?? "";
+                if (theirGen != (dal.GetDbState(genKey) ?? "")) offset = 0;
                 List<string> waiting = dal.ReadWaitingSyncLines(file.Name);
                 if (file.Size == offset && waiting.Count == 0) continue;
 
-                // the lines still waiting for their log first, then what is new in the diary
-                var raws = new List<string>(waiting);
+                // NEVER THE WHOLE DIARY IN MEMORY (2026-11-24): what is new goes to a file on the disk and
+                // is read from there 2,000 lines at a time - a 463 MB diary ran a 32-bit program out of memory.
+                string part = Path.Combine(Folder, "read.diary.part");
+                Directory.CreateDirectory(Folder);
                 long next = offset;
-                if (file.Size > offset)
-                {
-                    byte[] data = GoogleDrive.Download(file.Id, offset, TimeSpan.FromSeconds(120));
-                    int end = Array.LastIndexOf(data, (byte)'\n');
-                    if (end >= 0)
-                    {
-                        raws.AddRange(Encoding.UTF8.GetString(data, 0, end + 1).Split('\n'));
-                        next = offset + end + 1;
-                    }
-                }
-                if (next == offset && waiting.Count == 0) continue;
                 string machine = dal.GetDbState("sync_machine_" + file.Name);
-                var lines = new List<DataAccess.SyncLine>();
-                foreach (string rawLine in raws)
+                bool theyWin = TheyWinTies(file.Name, mine);
+                int applied = 0, older = 0, skipped = 0;
+                var stillWaiting = new List<string>();
+                var batch = new List<DataAccess.SyncLine>();
+                Action apply = () =>
+                {
+                    if (batch.Count == 0) return;
+                    string who = string.IsNullOrEmpty(machine) ? Path.GetFileNameWithoutExtension(file.Name) : machine;
+                    DataAccess.SyncApplyResult r;
+                    lock (Gate)
+                    {
+                        Flush();   // this computer's own latest changes first, so their times are known
+                        r = dal.ApplySyncLines(batch, who, theyWin);
+                    }
+                    applied += r.Applied; older += r.Older; skipped += r.Skipped - r.NoLog.Count;
+                    stillWaiting.AddRange(r.NoLog.Select(l => l.Raw));
+                    if (r.ActiveLogTouched) touched = true;
+                    batch.Clear();
+                };
+                Action<string> take = rawLine =>
                 {
                     string raw = rawLine.Trim();
-                    if (raw.Length == 0) continue;
+                    if (raw.Length == 0) return;
                     DataAccess.SyncLine line = ParseLine(raw, file.Name, ref machine, dal);
-                    if (line != null) lines.Add(line);
-                }
-                if (string.IsNullOrEmpty(machine)) machine = Path.GetFileNameWithoutExtension(file.Name);
-
-                DataAccess.SyncApplyResult r;
-                lock (Gate)
+                    if (line != null) batch.Add(line);
+                    if (batch.Count >= 2000) apply();
+                };
+                try
                 {
-                    Flush();   // this computer's own latest changes first, so their times are known
-                    r = dal.ApplySyncLines(lines, machine, TheyWinTies(file.Name, mine));
+                    // the lines still waiting for their log first, then what is new in the diary
+                    foreach (string w in waiting) take(w);
+                    if (file.Size > offset)
+                    {
+                        // a slow line gets longer for a big diary: two minutes plus a minute per 6 MB
+                        var limit = TimeSpan.FromSeconds(120 + (file.Size - offset) / (100 * 1024));
+                        GoogleDrive.DownloadToFile(file.Id, part, null, limit, offset);
+                        // only whole lines: a line still being written is read next time
+                        long whole = WholeLinesLength(part);
+                        if (whole > 0)
+                        {
+                            using (var fs = new FileStream(part, FileMode.Open, FileAccess.Read))
+                            using (var rd = new StreamReader(new LimitedStream(fs, whole), new UTF8Encoding(false)))
+                            {
+                                string raw;
+                                while ((raw = rd.ReadLine()) != null) take(raw);
+                            }
+                            next = offset + whole;
+                        }
+                    }
+                    if (string.IsNullOrEmpty(machine)) machine = Path.GetFileNameWithoutExtension(file.Name);
+                    apply();
                 }
-                dal.SetWaitingSyncLines(file.Name, r.NoLog.Select(l => l.Raw));
+                finally { try { File.Delete(part); } catch (Exception swallowed) { Log.Swallow(swallowed); } }
+
+                if (next == offset && waiting.Count == 0) continue;
+                dal.SetWaitingSyncLines(file.Name, stillWaiting);
                 dal.SetDbState(readKey, next.ToString());
-                if (r.ActiveLogTouched) touched = true;
+                dal.SetDbState(genKey, theirGen);
                 // the same waiting lines tried again every minute are not told each time
-                if (next != offset || r.Applied > 0)
-                    Log.Warn("Sync: from " + machine + ": " + r.Applied + " change(s) made, " + r.Older
-                             + " older than what is here, " + (r.Skipped - r.NoLog.Count) + " skipped"
-                             + (r.NoLog.Count > 0 ? ", " + r.NoLog.Count + " QSO(s) waiting for their log" : "") + ".");
+                if (next != offset || applied > 0)
+                    Log.Warn("Sync: from " + machine + ": " + applied + " change(s) made, " + older
+                             + " older than what is here, " + skipped + " skipped"
+                             + (stillWaiting.Count > 0 ? ", " + stillWaiting.Count + " QSO(s) waiting for their log" : "") + ".");
             }
 
             if (touched)
@@ -689,11 +744,13 @@ namespace HolyLogger
             try
             {
                 long diaryLength, qsos;
+                string diaryGen;
                 lock (Gate)   // no diary line is written between the length and the copy
                 {
                     Flush();
                     string d = DiaryPath();
                     diaryLength = File.Exists(d) ? new FileInfo(d).Length : 0;
+                    diaryGen = DiaryGen();
                     dal.CopyDatabaseTo(copy);
                 }
 
@@ -703,16 +760,21 @@ namespace HolyLogger
                     foreach (string sql in new[]
                     {
                         "DELETE FROM sync_journal",
-                        "DELETE FROM db_state WHERE key IN ('sync_computer_id', 'sync_computer_machine')",
+                        // the new computer's own diary starts long, never made short
+                        "DELETE FROM db_state WHERE key IN ('sync_computer_id', 'sync_computer_machine', 'sync_diary_gen', 'sync_diary_short_bytes')",
                         "INSERT OR REPLACE INTO db_state (key, value) VALUES ('sync_joined', '1')",
                         "INSERT OR REPLACE INTO db_state (key, value) VALUES ('sync_dump_read_' || @me || '.dump', 'done')",
                         "INSERT OR REPLACE INTO db_state (key, value) VALUES (@k, @v)",
+                        // this computer's diary as it was at the copy: made short later, it is read again
+                        "INSERT OR REPLACE INTO db_state (key, value) VALUES (@gk, @gv)",
                     })
                         using (var cmd = new SQLiteCommand(sql, c))
                         {
                             cmd.Parameters.AddWithValue("@k", "sync_read_" + myDiary);
                             cmd.Parameters.AddWithValue("@me", ComputerId());
                             cmd.Parameters.AddWithValue("@v", diaryLength.ToString());
+                            cmd.Parameters.AddWithValue("@gk", "sync_read_gen_" + myDiary);
+                            cmd.Parameters.AddWithValue("@gv", diaryGen);
                             cmd.ExecuteNonQuery();
                         }
                     using (var cmd = new SQLiteCommand("SELECT count(*) FROM qso", c))
@@ -795,6 +857,198 @@ namespace HolyLogger
                 w.Write(lines);
             }
         }
+
+        // ── KEEPING THE DIARY SHORT (2026-11-24) ─────────────────────────────────────────────────────
+        //
+        // The diary only ever grew. A line is written each time a QSO changes, and carries the WHOLE QSO
+        // as it is then - so only the newest line of a QSO matters, and every older one is out of date.
+        // A user's diary reached 463 MB this way: four times in two days some 20,000-36,000 QSOs were
+        // written again at once (what did it is not known yet - BigChangeWatch in Log.cs will name it).
+        //
+        // So once the diary is past 5 MB and twice the size it was when last made short, it is rewritten
+        // with each QSO, log and ARRL row ONCE - its newest line - and every delete kept (the newest line of
+        // a deleted QSO is its delete). The header line stays first, the logs come next (so a QSO's log is
+        // there before the QSO), then the rest in the order of their newest change. No QSO is lost: what
+        // is left is exactly what a computer reading the whole long diary would end up with.
+        //
+        // The other computers must then read it again from its start, as they would otherwise go on from
+        // the place they had reached in the LONG diary. The new "made short" mark (DiaryGen, a time) goes
+        // onto the Drive file and tells HolyLogger 9.1.12 and later. Older versions start again only when
+        // the file has become shorter than what they had read - nearly always so, as it is made short only
+        // once it has doubled; one that had read less than the short diary's length misses lines until it
+        // is updated.
+        //
+        // It runs on the diary's timer thread, inside Gate, so no line can be written while it works; the
+        // file is read three times from the disk, never held in memory.
+        private const long ShortFromBytes = 5L * 1024 * 1024;
+
+        // The diary's "made short" mark: "" until it is first made short.
+        public static string DiaryGen()
+        {
+            try { return DataAccess.GetInstance()?.GetDbState("sync_diary_gen") ?? ""; }
+            catch (Exception) { return ""; }
+        }
+
+        private static void MakeDiaryShortIfDue()
+        {
+            var dal = DataAccess.GetInstance();
+            if (dal == null) return;
+            string path = DiaryPath();
+            var fi = new FileInfo(path);
+            if (!fi.Exists || fi.Length < ShortFromBytes) return;
+            long.TryParse(dal.GetDbState("sync_diary_short_bytes"), out long lastShort);
+            if (lastShort > 0 && fi.Length < 2 * lastShort) return;
+            MakeDiaryShort(dal, path);
+        }
+
+        private static void MakeDiaryShort(DataAccess dal, string path)
+        {
+            var watch = System.Diagnostics.Stopwatch.StartNew();
+            string tmp = path + ".short";
+            long before = new FileInfo(path).Length;
+            ThreadPriority was = Thread.CurrentThread.Priority;
+            int linesBefore = 0, kept = 0;
+            try
+            {
+                Thread.CurrentThread.Priority = ThreadPriority.BelowNormal;   // the operator is working
+
+                // 1. where the newest line of each QSO, log and ARRL row is
+                var newest = new Dictionary<string, int>();
+                ForEachLine(path, (raw, n) =>
+                {
+                    string what;
+                    string key = KeyOf(raw, out what);
+                    if (key != null) newest[key] = n;
+                    linesBefore = n + 1;
+                });
+
+                // 2. the header, the logs, then the rest - each row once
+                using (var w = new StreamWriter(tmp, false, new UTF8Encoding(false)))
+                {
+                    int done = 0;
+                    ForEachLine(path, (raw, n) =>
+                    {
+                        string what;
+                        string key = KeyOf(raw, out what);
+                        bool header = n == 0 && key == null && raw.Contains("\"diary\"");
+                        if (header || (key != null && what == "log" && newest[key] == n))
+                        {
+                            w.Write(raw); w.Write('\n'); done++;
+                        }
+                    });
+                    ForEachLine(path, (raw, n) =>
+                    {
+                        string what;
+                        string key = KeyOf(raw, out what);
+                        if (key != null && what != "log" && newest[key] == n)
+                        {
+                            w.Write(raw); w.Write('\n'); done++;
+                        }
+                    });
+                    kept = done;
+                }
+
+                // 3. in its place, and the new mark - the other computers read it again from its start
+                File.Replace(tmp, path, null);
+                long after = new FileInfo(path).Length;
+                dal.SetDbState("sync_diary_short_bytes", after.ToString());
+                dal.SetDbState("sync_diary_gen", DateTime.UtcNow.ToString("yyyyMMddHHmmss"));
+                Log.Warn("Sync diary: made short - " + (before / 1048576.0).ToString("0.0") + " MB, " + linesBefore
+                         + " lines -> " + (after / 1048576.0).ToString("0.0") + " MB, " + kept + " lines (each QSO once), in "
+                         + watch.Elapsed.TotalSeconds.ToString("0") + " s.");
+            }
+            finally
+            {
+                Thread.CurrentThread.Priority = was;
+                try { if (File.Exists(tmp)) File.Delete(tmp); } catch (Exception swallowed) { Log.Swallow(swallowed); }
+            }
+        }
+
+        private static void ForEachLine(string path, Action<string, int> each)
+        {
+            using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+            using (var rd = new StreamReader(fs, new UTF8Encoding(false)))
+            {
+                string raw;
+                int n = 0;
+                while ((raw = rd.ReadLine()) != null)
+                {
+                    if (raw.Length > 0) each(raw, n);
+                    n++;
+                }
+            }
+        }
+
+        // "qso|<sync id>" for a diary line (its kind and the row it is about); null for the header or a
+        // line that cannot be read. Lines are written by MakeLines, always starting at, what, op, id, so
+        // the quick pattern nearly always answers; anything else is read as JSON.
+        private static readonly System.Text.RegularExpressions.Regex LineKey = new System.Text.RegularExpressions.Regex(
+            "^\\{\"at\":(?:\"[^\"]*\"|null),\"what\":\"([^\"]+)\",\"op\":\"[^\"]*\",\"id\":\"([^\"]+)\"",
+            System.Text.RegularExpressions.RegexOptions.Compiled);
+
+        private static string KeyOf(string raw, out string what)
+        {
+            what = null;
+            var m = LineKey.Match(raw);
+            if (m.Success) { what = m.Groups[1].Value; return what + "|" + m.Groups[2].Value; }
+            try
+            {
+                using (var jr = new JsonTextReader(new StringReader(raw)) { DateParseHandling = DateParseHandling.None })
+                {
+                    JObject j = JObject.Load(jr);
+                    string w = (string)j["what"], id = (string)j["id"];
+                    if (string.IsNullOrEmpty(w) || string.IsNullOrEmpty(id)) return null;
+                    what = w;
+                    return w + "|" + id;
+                }
+            }
+            catch (Exception) { return null; }
+        }
+
+        // The length of the file up to and with its last '\n' (0 when there is none).
+        private static long WholeLinesLength(string path)
+        {
+            using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read))
+            {
+                long end = fs.Length;
+                var buf = new byte[64 * 1024];
+                while (end > 0)
+                {
+                    int n = (int)Math.Min(buf.Length, end);
+                    fs.Position = end - n;
+                    int got = 0;
+                    while (got < n) { int r = fs.Read(buf, got, n - got); if (r <= 0) break; got += r; }
+                    for (int i = n - 1; i >= 0; i--)
+                        if (buf[i] == (byte)'\n') return end - n + i + 1;
+                    end -= n;
+                }
+                return 0;
+            }
+        }
+
+        // A read-only view of the first `length` bytes of a stream.
+        private sealed class LimitedStream : Stream
+        {
+            private readonly Stream _inner;
+            private long _left;
+            public LimitedStream(Stream inner, long length) { _inner = inner; _left = length; }
+            public override bool CanRead { get { return true; } }
+            public override bool CanSeek { get { return false; } }
+            public override bool CanWrite { get { return false; } }
+            public override long Length { get { throw new NotSupportedException(); } }
+            public override long Position { get { throw new NotSupportedException(); } set { throw new NotSupportedException(); } }
+            public override void Flush() { }
+            public override int Read(byte[] buffer, int offset, int count)
+            {
+                if (_left <= 0) return 0;
+                int n = _inner.Read(buffer, offset, (int)Math.Min(count, _left));
+                _left -= n;
+                return n;
+            }
+            public override long Seek(long offset, SeekOrigin origin) { throw new NotSupportedException(); }
+            public override void SetLength(long value) { throw new NotSupportedException(); }
+            public override void Write(byte[] buffer, int offset, int count) { throw new NotSupportedException(); }
+        }
     }
 
     // ── GOOGLE DRIVE: SIGNING IN, AND SENDING THIS COMPUTER'S DIARY UP ────────────────────────────────
@@ -863,6 +1117,7 @@ namespace HolyLogger
         {
             public string RefreshToken, Email, FolderId, FileId;
             public long UploadedBytes;
+            public string UploadedGen;   // the diary's "made short" mark when it was last sent (null = never made short)
             public DateTime? UploadedUtc;
         }
 
@@ -1028,7 +1283,7 @@ namespace HolyLogger
                     gone = (bool?)j["trashed"] == true;
                 }
                 if (!gone) return;
-                st.FolderId = null; st.FileId = null; st.UploadedBytes = 0;
+                st.FolderId = null; st.FileId = null; st.UploadedBytes = 0; st.UploadedGen = null;
                 Save(st);
                 Log.Warn("Google Drive: the " + FolderName + " folder was deleted; it is found or made again.");
             }
@@ -1038,7 +1293,7 @@ namespace HolyLogger
         public static void ForgetDiaryUpload()
         {
             State st = Load();
-            st.FileId = null; st.UploadedBytes = 0;
+            st.FileId = null; st.UploadedBytes = 0; st.UploadedGen = null;
             Save(st);
         }
 
@@ -1048,26 +1303,54 @@ namespace HolyLogger
         // operator is not signed in or nothing is new. The file's Drive id and the folder's are kept, so a
         // normal send is one request. Runs on the diary's own timer thread, never the window's.
         // true = it was actually sent (Google Drive was reached)
+        //
+        // NEVER THE WHOLE FILE IN MEMORY (2026-11-24). It used to be read into one array and sent as one
+        // request. A user's diary had grown to 463 MB, and in a 32-bit program that array failed with
+        // "out of memory" every minute for days. Now a small diary (under 5 MB) still goes as one request,
+        // and a bigger one goes in Google's resumable way, 8 MB at a time straight from the disk.
+        //
+        // `gen` is the diary's "made short" mark (SyncDiary.DiaryGen). When it changes, the file is sent
+        // the resumable way, which also writes the mark on the Drive file (appProperties "gen") - that is
+        // how the other computers know to read the short diary again from its start.
+        private const long OneRequestBytes = 5L * 1024 * 1024;
+
         public static bool UploadDiary(string path, TimeSpan limit)
         {
             State st = Load();
             if (string.IsNullOrEmpty(st.RefreshToken) || !Registered || !File.Exists(path)) return false;
             long length = new FileInfo(path).Length;
-            if (length == st.UploadedBytes && st.FileId != null) return false;
+            string gen = SyncDiary.DiaryGen();
+            bool genSent = (st.UploadedGen ?? "") == gen;
+            if (length == st.UploadedBytes && st.FileId != null && genSent) return false;
 
             using (var cts = new CancellationTokenSource(limit))
             {
                 CancellationToken ct = cts.Token;
                 if (string.IsNullOrEmpty(st.FolderId)) st.FolderId = FindOrMakeFolder(ct);
-                byte[] data = File.ReadAllBytes(path);
                 for (int attempt = 0; attempt < 2; attempt++)
                 {
                     if (string.IsNullOrEmpty(st.FileId)) st.FileId = FindOrMakeFile(st.FolderId, Path.GetFileName(path), ct);
-                    var req = new HttpRequestMessage(new HttpMethod("PATCH"),
-                        "https://www.googleapis.com/upload/drive/v3/files/" + st.FileId + "?uploadType=media")
-                    { Content = new ByteArrayContent(data) };
-                    req.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("text/plain");
-                    HttpResponseMessage res = Send(req, ct);
+                    HttpResponseMessage res;
+                    if (length < OneRequestBytes && genSent)
+                    {
+                        byte[] data = new byte[length];
+                        using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                        {
+                            int n = 0;
+                            while (n < data.Length) { int r = fs.Read(data, n, data.Length - n); if (r <= 0) break; n += r; }
+                        }
+                        var req = new HttpRequestMessage(new HttpMethod("PATCH"),
+                            "https://www.googleapis.com/upload/drive/v3/files/" + st.FileId + "?uploadType=media")
+                        { Content = new ByteArrayContent(data) };
+                        req.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("text/plain");
+                        res = Send(req, ct);
+                    }
+                    else
+                    {
+                        var props = new JObject { ["machine"] = Environment.MachineName };
+                        if (gen.Length > 0) props["gen"] = gen;
+                        res = SendResumable(st.FileId, path, length, "text/plain", props, ct);
+                    }
                     if (res.StatusCode == HttpStatusCode.NotFound && attempt == 0)
                     {
                         // the file was deleted in Drive (or the folder with it): find or make them again
@@ -1080,6 +1363,7 @@ namespace HolyLogger
                 }
             }
             st.UploadedBytes = length;
+            st.UploadedGen = gen;
             st.UploadedUtc = DateTime.UtcNow;
             Save(st);
             Log.Warn("Google Drive: diary sent (" + length + " bytes).");
@@ -1094,6 +1378,7 @@ namespace HolyLogger
             public DateTime? ModifiedUtc;
             public string Machine;   // the computer that made it (appProperties; diaries from 9.1.4)
             public long? Qsos;       // a whole copy: the QSOs in it; a diary: the QSOs on its computer; null = not said
+            public string Gen;       // a diary: its "made short" mark (from 9.1.12); null = never made short
         }
 
         // The files in the HolyLogger Sync folder: every computer's diary (drive.file still shows them,
@@ -1125,6 +1410,7 @@ namespace HolyLogger
                         {
                             df.Machine = (string)ap["machine"];
                             if (long.TryParse((string)ap["qsos"], out long qn)) df.Qsos = qn;
+                            df.Gen = (string)ap["gen"];
                         }
                         list.Add(df);
                     }
@@ -1169,71 +1455,88 @@ namespace HolyLogger
                 if (string.IsNullOrEmpty(st.FolderId)) { st.FolderId = FindOrMakeFolder(ct); Save(st); }
                 string fileId = FindOrMakeFile(st.FolderId, name, ct, contentType);
                 long total = new FileInfo(path).Length;
+                Check(SendResumable(fileId, path, total, contentType, appProperties, ct));
+            }
+        }
 
-                var init = new HttpRequestMessage(new HttpMethod("PATCH"),
-                    "https://www.googleapis.com/upload/drive/v3/files/" + fileId + "?uploadType=resumable")
-                {
-                    Content = new StringContent(
-                        (appProperties == null ? new JObject() : new JObject { ["appProperties"] = appProperties }).ToString(Formatting.None),
-                        Encoding.UTF8, "application/json")
-                };
-                init.Headers.Add("X-Upload-Content-Type", contentType);
-                init.Headers.Add("X-Upload-Content-Length", total.ToString());
-                Uri session = Check(Send(init, ct)).Headers.Location;
-                if (session == null) throw new Exception("Google Drive gave no upload address.");
+        // The first `total` bytes of the file at `path` into the Drive file `fileId`, 8 MB at a time from
+        // the disk. Only those bytes: the diary may grow while it is being sent, and what comes after is
+        // sent the next time. Returns Google's last answer; an answer that is not a success (404: the
+        // file is gone from Drive) comes back for the caller to deal with.
+        private static HttpResponseMessage SendResumable(string fileId, string path, long total, string contentType,
+                                                         JObject appProperties, CancellationToken ct)
+        {
+            var init = new HttpRequestMessage(new HttpMethod("PATCH"),
+                "https://www.googleapis.com/upload/drive/v3/files/" + fileId + "?uploadType=resumable")
+            {
+                Content = new StringContent(
+                    (appProperties == null ? new JObject() : new JObject { ["appProperties"] = appProperties }).ToString(Formatting.None),
+                    Encoding.UTF8, "application/json")
+            };
+            init.Headers.Add("X-Upload-Content-Type", contentType);
+            init.Headers.Add("X-Upload-Content-Length", total.ToString());
+            HttpResponseMessage started = Send(init, ct);
+            if (!started.IsSuccessStatusCode) return started;
+            Uri session = started.Headers.Location;
+            if (session == null) throw new Exception("Google Drive gave no upload address.");
 
-                const int Piece = 8 * 1024 * 1024;   // a multiple of 256 KB, as Google asks
-                var buf = new byte[Piece];
-                using (var fs = File.OpenRead(path))
+            const int Piece = 8 * 1024 * 1024;   // a multiple of 256 KB, as Google asks
+            var buf = new byte[(int)Math.Min(Piece, Math.Max(total, 1))];
+            HttpResponseMessage res = started;
+            using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+            {
+                long pos = 0;
+                int stuck = 0;
+                while (pos < total)
                 {
-                    long pos = 0;
-                    int stuck = 0;
-                    while (pos < total)
+                    fs.Position = pos;
+                    int n = 0, want = (int)Math.Min(buf.Length, total - pos);
+                    while (n < want) { int r = fs.Read(buf, n, want - n); if (r <= 0) break; n += r; }
+                    if (n < want) throw new Exception("the file became shorter while it was being sent.");
+
+                    for (int attempt = 0; ; attempt++)
                     {
-                        fs.Position = pos;
-                        int n = 0, want = (int)Math.Min(Piece, total - pos);
-                        while (n < want) { int r = fs.Read(buf, n, want - n); if (r <= 0) break; n += r; }
-
-                        HttpResponseMessage res = null;
-                        for (int attempt = 0; ; attempt++)
-                        {
-                            var put = new HttpRequestMessage(HttpMethod.Put, session) { Content = new ByteArrayContent(buf, 0, n) };
-                            put.Content.Headers.ContentRange = new System.Net.Http.Headers.ContentRangeHeaderValue(pos, pos + n - 1, total);
-                            try { res = UploadHttp.SendAsync(put, ct).GetAwaiter().GetResult(); }
-                            catch (Exception) when (attempt < 3 && !ct.IsCancellationRequested) { Thread.Sleep(3000 * (attempt + 1)); continue; }
-                            int code = (int)res.StatusCode;
-                            if (code == 308 || code == 200 || code == 201) break;
-                            if (code >= 500 && attempt < 3) { Thread.Sleep(3000 * (attempt + 1)); continue; }
-                            Check(res);
-                        }
-
-                        if ((int)res.StatusCode != 308) { pos = total; break; }
-                        // "Range: bytes=0-N" = what Google has so far; carry on from there
-                        long had = pos;
-                        if (res.Headers.TryGetValues("Range", out IEnumerable<string> rv))
-                        {
-                            string r = rv.First();
-                            if (long.TryParse(r.Substring(r.LastIndexOf('-') + 1), out long last)) pos = last + 1;
-                        }
-                        stuck = pos == had ? stuck + 1 : 0;
-                        if (stuck >= 3) throw new Exception("Google Drive stopped taking the file.");
+                        var put = new HttpRequestMessage(HttpMethod.Put, session) { Content = new ByteArrayContent(buf, 0, n) };
+                        put.Content.Headers.ContentRange = new System.Net.Http.Headers.ContentRangeHeaderValue(pos, pos + n - 1, total);
+                        try { res = UploadHttp.SendAsync(put, ct).GetAwaiter().GetResult(); }
+                        catch (Exception) when (attempt < 3 && !ct.IsCancellationRequested) { Thread.Sleep(3000 * (attempt + 1)); continue; }
+                        int code = (int)res.StatusCode;
+                        if (code == 308 || code == 200 || code == 201) break;
+                        if (code >= 500 && attempt < 3) { Thread.Sleep(3000 * (attempt + 1)); continue; }
+                        Check(res);
                     }
+
+                    if ((int)res.StatusCode != 308) { pos = total; break; }
+                    // "Range: bytes=0-N" = what Google has so far; carry on from there
+                    long had = pos;
+                    if (res.Headers.TryGetValues("Range", out IEnumerable<string> rv))
+                    {
+                        string r = rv.First();
+                        if (long.TryParse(r.Substring(r.LastIndexOf('-') + 1), out long last)) pos = last + 1;
+                    }
+                    stuck = pos == had ? stuck + 1 : 0;
+                    if (stuck >= 3) throw new Exception("Google Drive stopped taking the file.");
                 }
             }
+            return res;
         }
 
         // The whole file, written to `path` as it arrives (never all in memory), telling `progress`
         // how far it has got: (bytes so far, bytes in all - or -1 when Google did not say).
-        public static void DownloadToFile(string fileId, string path, Action<long, long> progress, TimeSpan limit)
+        // offset > 0: from that byte to the end (a diary read on from where it was left).
+        public static void DownloadToFile(string fileId, string path, Action<long, long> progress, TimeSpan limit, long offset = 0)
         {
             using (var cts = new CancellationTokenSource(limit))
             {
                 CancellationToken ct = cts.Token;
                 var req = new HttpRequestMessage(HttpMethod.Get, "https://www.googleapis.com/drive/v3/files/" + fileId + "?alt=media");
                 req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", AccessToken(ct));
+                if (offset > 0) req.Headers.Range = new System.Net.Http.Headers.RangeHeaderValue(offset, null);
                 using (HttpResponseMessage res = Http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct).GetAwaiter().GetResult())
                 {
                     Check(res);
+                    // a server that ignores the range sends the whole file: what was already read is skipped
+                    long skip = offset > 0 && res.StatusCode == HttpStatusCode.OK ? offset : 0;
                     long total = res.Content.Headers.ContentLength ?? -1;
                     using (Stream s = res.Content.ReadAsStreamAsync().GetAwaiter().GetResult())
                     using (var f = File.Create(path))
@@ -1244,7 +1547,9 @@ namespace HolyLogger
                         while ((n = s.Read(buf, 0, buf.Length)) > 0)
                         {
                             ct.ThrowIfCancellationRequested();
-                            f.Write(buf, 0, n);
+                            int from = 0;
+                            if (skip > 0) { from = (int)Math.Min(skip, n); skip -= from; }
+                            if (n > from) f.Write(buf, from, n - from);
                             done += n;
                             progress?.Invoke(done, total);
                         }
