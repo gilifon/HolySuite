@@ -2317,7 +2317,6 @@ namespace HolyLogger
                 double ready = _columnsMade;
                 double target = ((now - soundStart) * rate / 1000.0 - window / 2.0) / hop - BehindColumns;
                 double dt = Math.Min(250, Math.Max(0, now - _lastFrameMs));
-                double before = _shownAt;
                 if (double.IsNaN(_shownAt) || Math.Abs(target - _shownAt) > 50) _shownAt = target;
                 else
                 {
@@ -2325,12 +2324,10 @@ namespace HolyLogger
                     double most = MaxEase * dt / 10.0;
                     _shownAt = moved + Math.Max(-most, Math.Min(most, (target - moved) * 0.1));
                 }
-                if (_shownAt > ready - 1) { _shownAt = ready - 1; _flowWaited++; }   // never a column not made yet
-                if (!double.IsNaN(before)) _flowStepWorst = Math.Max(_flowStepWorst, Math.Abs((_shownAt - before) - dt / 10.0));
+                if (_shownAt > ready - 1) _shownAt = ready - 1;   // never a column not made yet
                 _lastFrameMs = now;
 
                 Draw(width, height, hop, window, rate, soundStart);
-                LogFrame(now);
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
         }
@@ -2556,36 +2553,6 @@ namespace HolyLogger
                     }
                 }
             }
-        }
-
-        // TEMPORARY, AS BEFORE: with %TEMP%\HolyLogger_cw_flow.on present, every 10 s the strip's own frames -
-        // how many, how many came over 25 ms after the last, the longest gap - go to %TEMP%\HolyLogger_cw_flow.tsv.
-        static readonly bool FlowLogOn = System.IO.File.Exists(System.IO.Path.Combine(System.IO.Path.GetTempPath(), "HolyLogger_cw_flow.on"));
-        double _flowSince, _flowLast, _flowWorst, _flowStepWorst;
-        int _flowFrames, _flowLate, _flowWaited;
-
-        void LogFrame(double now)
-        {
-            if (!FlowLogOn) return;
-            if (_flowLast > 0)
-            {
-                double gap = now - _flowLast;
-                if (gap > 25) _flowLate++;
-                if (gap > _flowWorst) _flowWorst = gap;
-            }
-            _flowLast = now;
-            _flowFrames++;
-            if (_flowSince == 0) _flowSince = now;
-            if (now - _flowSince < 10000) return;
-            try
-            {
-                System.IO.File.AppendAllText(System.IO.Path.Combine(System.IO.Path.GetTempPath(), "HolyLogger_cw_flow.tsv"),
-                    string.Format(System.Globalization.CultureInfo.InvariantCulture,
-                        "strip thread\t{0:F0} ms\t{1} frames\t{2} over 25 ms\tlongest {3:F0} ms\tuneven step up to {4:F2} columns\twaited for sound {5}\n",
-                        now, _flowFrames, _flowLate, _flowWorst, _flowStepWorst, _flowWaited));
-            }
-            catch (Exception swallowed) { Log.Swallow(swallowed); }
-            _flowSince = now; _flowFrames = 0; _flowLate = 0; _flowWorst = 0; _flowStepWorst = 0; _flowWaited = 0;
         }
 
         // The window's end of it: an element that shows what the strip's thread draws.
