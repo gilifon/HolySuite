@@ -150,7 +150,7 @@ namespace HolyLogger
         CwDecodedText _text;
         TextBlock _speedText;
         Ellipse _lamp;
-        Button _plainBtn, _networkBtn, _bothBtn, _newBtn;
+        Button _plainBtn, _networkBtn, _bothBtn;
         CwDecodedText _networkText;
         Border _networkFrame;
         TextBlock _plainLabel, _networkLabel;
@@ -741,7 +741,6 @@ namespace HolyLogger
             PaintChoice(_plainBtn, which == Reader.Plain);
             PaintChoice(_networkBtn, which == Reader.Network);
             PaintChoice(_bothBtn, which == Reader.Both);
-            PaintChoice(_newBtn, which == Reader.New);
             PaintChoice(_deepBtn, which == Reader.Deep);
             PaintChoice(_mixBtn, which == Reader.Mix);
 
