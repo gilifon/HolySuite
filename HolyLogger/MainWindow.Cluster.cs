@@ -1601,8 +1601,9 @@ namespace HolyLogger
             spotsGrid.Columns.Add(modeColumn);
             spotsGrid.Columns.Add(commentColumn);
 
-            // Restore the user's saved column order (order persists across sessions; widths do not).
+            // Restore the user's saved column order, and the widths he set by hand.
             ApplyClusterColumnOrder(spotsGrid);
+            ApplyClusterColWidthsByHand(spotsGrid);
 
             if (clusterVisibleSpots == null)
             {
@@ -3079,7 +3080,11 @@ namespace HolyLogger
                 return;
             }
 
-            EventHandler handler = (s, e) => RequestClusterHeaderAlignmentRefresh();
+            EventHandler handler = (s, e) =>
+            {
+                RememberClusterColumnWidthByHand(s as DataGridColumn);
+                RequestClusterHeaderAlignmentRefresh();
+            };
 
             foreach (var column in columns)
             {
@@ -3103,6 +3108,66 @@ namespace HolyLogger
                     }
                 }
             };
+        }
+
+        // ── Column widths the operator set by hand ────────────────────────────────────────────────
+        // Kept as "DX=95;Comment=210" in ClusterColWidthsByHand, and ONLY for a column he dragged:
+        // a column still at the width it was built with (or still Auto) has no entry, so it keeps
+        // following the program's own default. (The ClusterColWidth* settings written on close were
+        // never read back - and they hold every column's width, dragged or not, so they cannot tell
+        // a choice from a default.)
+        // The width the column was built with, by key - what "not changed by hand" means.
+        readonly Dictionary<string, DataGridLength> clusterColumnBuiltWidths = new Dictionary<string, DataGridLength>(StringComparer.OrdinalIgnoreCase);
+
+        private static Dictionary<string, double> ReadClusterColWidthsByHand()
+        {
+            var map = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
+            string raw = Properties.Settings.Default.ClusterColWidthsByHand ?? string.Empty;
+            foreach (string part in raw.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries))
+            {
+                int eq = part.IndexOf('=');
+                if (eq <= 0) continue;
+                if (double.TryParse(part.Substring(eq + 1), NumberStyles.Float, CultureInfo.InvariantCulture, out double w)
+                    && w >= 20 && w <= 2000)
+                    map[part.Substring(0, eq).Trim()] = w;
+            }
+            return map;
+        }
+
+        // Called while the cluster grid is being built, after the columns have their keys.
+        private void ApplyClusterColWidthsByHand(DataGrid grid)
+        {
+            clusterColumnBuiltWidths.Clear();
+            var saved = ReadClusterColWidthsByHand();
+            foreach (var col in grid.Columns)
+            {
+                if (!clusterColumnKeys.TryGetValue(col, out string key)) continue;
+                clusterColumnBuiltWidths[key] = col.Width;
+                if (col.CanUserResize && saved.TryGetValue(key, out double w))
+                    col.Width = new DataGridLength(w);
+            }
+        }
+
+        private void RememberClusterColumnWidthByHand(DataGridColumn col)
+        {
+            if (col == null || !col.CanUserResize || !col.Width.IsAbsolute) return;
+            if (!clusterColumnKeys.TryGetValue(col, out string key)) return;
+            if (!clusterColumnBuiltWidths.TryGetValue(key, out DataGridLength built)) return;   // still being built
+
+            var map = ReadClusterColWidthsByHand();
+            double w = Math.Round(col.Width.Value, 1);
+            if (built.IsAbsolute && Math.Abs(built.Value - w) < 0.5)
+            {
+                if (!map.Remove(key)) return;   // back at its default: forget it
+            }
+            else
+            {
+                if (map.TryGetValue(key, out double old) && Math.Abs(old - w) < 0.5) return;
+                map[key] = w;
+            }
+            Properties.Settings.Default.ClusterColWidthsByHand = string.Join(";",
+                map.Select(p => p.Key + "=" + p.Value.ToString("0.#", CultureInfo.InvariantCulture)));
+            SettingsFlush.RequestSave();   // fires per pixel while dragging; debounce the disk write
         }
 
         private void RequestClusterHeaderAlignmentRefresh()
@@ -3773,8 +3838,8 @@ namespace HolyLogger
             try { Properties.Settings.Default.Save(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
         }
 
-        // Persists ONLY the column order (comma-separated stable keys, left-to-right). Column widths
-        // are intentionally not saved, so they reset to their defaults each time the window opens.
+        // Persists the column order (comma-separated stable keys, left-to-right). Widths dragged by
+        // hand are kept separately - see ClusterColWidthsByHand.
         private void SaveClusterColumnOrder(DataGrid grid)
         {
             if (grid == null) return;
