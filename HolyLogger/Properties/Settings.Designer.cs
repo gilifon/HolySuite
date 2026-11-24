@@ -3929,6 +3929,30 @@ namespace HolyLogger.Properties {
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("-100000")]
+        public double SplitWindowLeft {
+            get {
+                return ((double)(this["SplitWindowLeft"]));
+            }
+            set {
+                this["SplitWindowLeft"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("-100000")]
+        public double SplitWindowTop {
+            get {
+                return ((double)(this["SplitWindowTop"]));
+            }
+            set {
+                this["SplitWindowTop"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("False")]
         public bool RadioPanelMinimized {
             get {

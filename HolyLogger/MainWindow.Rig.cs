@@ -1733,19 +1733,63 @@ namespace HolyLogger
                         // the Options distance (5 kHz as delivered) means he has left that station, and
                         // split goes off (his request). While split is still being set up the radio
                         // passes through frequencies of its own, so nothing is judged then.
+                        // SPLIT LASTS WHILE "VFO A" STAYS PUT (his rule). VFO A is whichever VFO was the main one
+                        // when split started; it is followed whether it is the one being listened to or not.
+                        // So pressing VFO B to hear the DX station on its own frequency does not end split,
+                        // and VFO B may be tuned as far as he likes - only VFO A moving more than the Options
+                        // distance means he has changed station.
+                        //
+                        // OmniRig does not name the radio's VFOs: its FreqA is "the selected one" and FreqB
+                        // "the other" (IC-7300 file, commands 25 00 / 25 01), and after VFO B is pressed the two
+                        // simply trade values. So which of the two is VFO A is carried along here: when the
+                        // selected frequency jumps onto where the other one was (or the other one onto where
+                        // the selected was) the two have traded places, and VFO A is then the other slot.
                         if (splitOn == true && _splitWantedKhz == null)
                         {
-                            if (_splitAnchorKhz == null) _splitAnchorKhz = khz;
-                            else if (Math.Abs(khz - _splitAnchorKhz.Value) > Math.Max(1,
-                                     string.Equals(mode, "CW", StringComparison.OrdinalIgnoreCase)
-                                         ? Properties.Settings.Default.SplitCwLeaveKhz
-                                         : Properties.Settings.Default.SplitLeaveKhz))
+                            const double same = 0.05;   // kHz: 50 Hz counts as the same frequency
+                            double sel = khz;
+                            double oth = khz + splitOffsetKhz;
+                            double leave = Math.Max(1,
+                                string.Equals(mode, "CW", StringComparison.OrdinalIgnoreCase)
+                                    ? Properties.Settings.Default.SplitCwLeaveKhz
+                                    : Properties.Settings.Default.SplitLeaveKhz);
+                            if (_splitAnchorKhz == null)
                             {
-                                _splitAnchorKhz = null;
-                                TurnSplitOffIfOn();
-                                splitOn = false;
-                                splitOffsetKhz = SplitOffsetIfSwitchedOn(mode);
+                                _splitAnchorKhz = sel;
+                                _splitVfoAIsSelected = true;
+                                _splitLeaveSince = null;
                             }
+                            else
+                            {
+                                bool selectedTookOthers = Math.Abs(sel - _splitPrevSel) > same && Math.Abs(sel - _splitPrevOth) <= same;
+                                bool otherTookSelected = Math.Abs(oth - _splitPrevOth) > same && Math.Abs(oth - _splitPrevSel) <= same;
+                                if (selectedTookOthers || otherTookSelected) _splitVfoAIsSelected = !_splitVfoAIsSelected;
+                            }
+                            _splitPrevSel = sel;
+                            _splitPrevOth = oth;
+
+                            double vfoA = _splitVfoAIsSelected ? sel : oth;
+                            if (Math.Abs(vfoA - _splitAnchorKhz.Value) > leave)
+                            {
+                                // The radio reports the two VFOs one after the other, so for a moment after a
+                                // swap they can look wrong: split goes off only if this lasts.
+                                if (_splitLeaveSince == null)
+                                {
+                                    _splitLeaveSince = DateTime.UtcNow;
+                                    var recheck = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromMilliseconds(900) };
+                                    recheck.Tick += (rs, re) => { recheck.Stop(); UpdateRadioPanel(); };
+                                    recheck.Start();
+                                }
+                                else if ((DateTime.UtcNow - _splitLeaveSince.Value).TotalMilliseconds >= 800)
+                                {
+                                    _splitAnchorKhz = null;
+                                    _splitLeaveSince = null;
+                                    TurnSplitOffIfOn();
+                                    splitOn = false;
+                                    splitOffsetKhz = SplitOffsetIfSwitchedOn(mode);
+                                }
+                            }
+                            else _splitLeaveSince = null;
                         }
                         if (splitOn != true && _splitWantedKhz == null) _splitAnchorKhz = null;
                     }
@@ -1854,6 +1898,9 @@ namespace HolyLogger
 
         // Looks again after the radio has had time to settle and, if the transmit VFO is not where it
         // was told to go, writes it again - up to three times.
+        private bool _splitVfoAIsSelected = true;   // which slot (selected / other) VFO A is in now
+        private double _splitPrevSel, _splitPrevOth;
+        private DateTime? _splitLeaveSince;
         private double? _splitAnchorKhz;   // the main frequency when split was seen to start
         private double? _splitWantedKhz;   // set from the press of SPLIT until the radio has settled on it
 
