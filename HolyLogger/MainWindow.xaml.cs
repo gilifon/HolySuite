@@ -2229,6 +2229,22 @@ namespace HolyLogger
             // The same contact twice over, minutes apart, is almost never a contact - see the method.
             if (!ConfirmNotJustLoggedBeforeSave()) return;
 
+            // TIMED, from here - after the questions, so a question he took ten seconds to answer is not
+            // counted as the program's time. One "SAVE" line per QSO in holylogger.log says how long until
+            // he could type the next callsign, and how long the work queued behind the keyboard took, each
+            // part named. Put back 2026-11-25: the September line was removed once that round was fixed,
+            // and "saving feels slow" could then no longer be answered with numbers.
+            var saveClock = System.Diagnostics.Stopwatch.StartNew();
+            string savedKind = state == State.Edit ? "edit" : "new";   // read now: clearing the form resets it
+            var saveSteps = new StringBuilder();
+            long saveLapAt = 0;
+            void SaveLap(string step)
+            {
+                long at = saveClock.ElapsedMilliseconds;
+                saveSteps.Append(saveSteps.Length == 0 ? "" : ", ").Append(step).Append(' ').Append(at - saveLapAt);
+                saveLapAt = at;
+            }
+
             // SET WHEN THE CONTACT DID NOT REACH THE DATABASE, so the form is left exactly as he typed
             // it instead of being emptied at the end of this method. Telling a man his QSO was not saved
             // and wiping the form in the same breath leaves him with a message and nothing to act on -
@@ -2302,6 +2318,7 @@ namespace HolyLogger
                         Qsos.Insert(0, LastQSO);
                         Properties.Settings.Default.RecentQSOCounter++;
                     }
+                    SaveLap("database + table");
 
                     // dal.Insert returns a fresh object (LastQSO) carrying the new database Id; copy it
                     // back onto qso so the eQSL auto-upload can mark THIS row as sent (without it,
@@ -2310,15 +2327,18 @@ namespace HolyLogger
 
                     // Copy-to-log: mirror this QSO into the active log's copy-target, if configured.
                     CopyLoggedQsoToTargetLog(LastQSO);
+                    SaveLap("copy to log");
 
                     // Tell the other programs, on every broadcast line the operator ticked in the UDP
                     // Ports Manager (nothing is sent if there are none). See MainWindow.UdpSend.cs.
                     BroadcastQsoLogged(LastQSO);
+                    SaveLap("udp");
 
                     // In a contest whose sent exchange is a serial number, advance it for the next QSO.
                     // NOT deferred: the next QSO's exchange must already carry the new number.
                     AdvanceContestSerial();
                     RefreshContestScore();   // Sukkot's total km, with this QSO in it
+                    SaveLap("contest");
 
                     // EVERYTHING ELSE WAITS UNTIL HE CAN TYPE (see afterTyping below).
                     afterTyping.Add(() =>
@@ -2413,6 +2433,7 @@ namespace HolyLogger
                     QsoToUpdate.SAT_NAME = Properties.Settings.Default.SatelliteName;
                 }
                 dal.Update(QsoToUpdate);
+                SaveLap("database");
                 QSO q = Qsos.FirstOrDefault(p => p.id == QsoToUpdate.id);
                 if (q != null)
                 {
@@ -2437,6 +2458,7 @@ namespace HolyLogger
                     q.Distance = QsoToUpdate.Distance;   // measured again by dal.Update
                     QSODataGrid.Items.Refresh();
                 }
+                SaveLap("table");
 
                 // Rebuild worked countries list after edit (callsign/country may have changed).
                 // A walk over the whole log, so it waits until the form is free (afterTyping).
@@ -2468,16 +2490,22 @@ namespace HolyLogger
             ClearMatrix();
             RestoreDataContext();
             DateTime clearedAt = DateTime.UtcNow;
+            SaveLap("form cleared");
+            long readyMs = saveClock.ElapsedMilliseconds;
 
             Dispatcher.BeginInvoke(new Action(() =>
             {
+                long queuedMs = saveClock.ElapsedMilliseconds - readyMs;
+                var later = System.Diagnostics.Stopwatch.StartNew();
                 foreach (Action work in afterTyping)
                 {
                     try { work(); }
                     catch (Exception swallowed) { Log.Swallow(swallowed); }
                 }
+                long workMs = later.ElapsedMilliseconds;
                 ShowNewDXCC(countryJustLogged);
                 UpdateNumOfQSOs();
+                long countsMs = later.ElapsedMilliseconds - workMs;
 
                 // The map back to the home view - unless it is there already (the DX box's own clearing
                 // draws it when the box empties), or the operator has typed far enough that the NEXT
@@ -2485,6 +2513,14 @@ namespace HolyLogger
                 if (!HomeMapJustShown() && _dxMapDrawnAt < clearedAt
                     && (MapControl == null || !MapControl.IsClusterMode))
                     ShowHomeMap();
+                long mapMs = later.ElapsedMilliseconds - workMs - countsMs;
+
+                // queued = the time between the form being cleared and this work starting: the screen
+                // being redrawn, and any keys he pressed meanwhile (those go first, on purpose).
+                Log.Warn("SAVE  QSO (" + savedKind + "): ready to type after " + readyMs + " ms (" + saveSteps
+                         + ") | then " + queuedMs + " ms queued (redraw + his typing) | behind the keyboard "
+                         + later.ElapsedMilliseconds + " ms (cluster + try-again + uploads " + workMs
+                         + ", new country + counts " + countsMs + ", home map " + mapMs + ")");
             }), DispatcherPriority.Background);
         }
 
