@@ -178,7 +178,16 @@ namespace HolyLogger
         /// </summary>
         public bool Start(string deviceName, out string error)
         {
+            return Start(deviceName, PreferredRates, out error);
+        }
+
+        // VOICE WANTS MORE THAN CW. The 8000 a second above is right for a decoder and too dull for a
+        // recorded voice message, which he listens to on his speakers before it goes out (the Audio
+        // Messages window). That caller hands its own list, best first.
+        public bool Start(string deviceName, uint[] preferredRates, out string error)
+        {
             error = null;
+            if (preferredRates == null || preferredRates.Length == 0) preferredRates = PreferredRates;
             lock (_gate)
             {
                 if (_thread != null) { error = "Already listening."; return false; }
@@ -190,7 +199,7 @@ namespace HolyLogger
                 uint openedRate = 0;
                 uint lastResult = 0;
 
-                foreach (uint rate in PreferredRates)
+                foreach (uint rate in preferredRates)
                 {
                     var fmt = new WAVEFORMATEX
                     {

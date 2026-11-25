@@ -347,6 +347,12 @@
     <Compile Include="CwDecodeWindow.cs" />
     <Compile Include="CwDecodedText.cs" />
     <Compile Include="WaveInRecorder.cs" />
+    <Compile Include="AudioMessages.cs" />
+    <Compile Include="AudioMessageManagerWindow.cs" />
+    <Compile Include="WindowsMicLevel.cs" />
+    <Compile Include="MainWindow.AudioMessages.cs">
+      <DependentUpon>MainWindow.xaml</DependentUpon>
+    </Compile>
     <Compile Include="CwDecoder.cs" />
     <Compile Include="CwNeuralNet.cs" />
     <Compile Include="CwNeuralFrontEnd.cs" />
