@@ -806,6 +806,9 @@ namespace HolyLogger
             NewDXCCTimer.Interval = 2500;    // or whatever you need it to be
             NewDXCCTimer.Tick += NewDXCCTimer_Tick;
 
+            // SSB messages from this PC: the keycap pictures follow the PC / radio switch.
+            HookAudioMessages();
+
             // The real end of the constructor. The mark above it ("QRZ login + extra windows") is NOT
             // the last one - the timer window, the copy support, the column layout, the matrix and the
             // azimuth all run after it, and until now nothing timed them.
@@ -5177,7 +5180,12 @@ namespace HolyLogger
             var panel = button != null ? button.Content as StackPanel : null;
             if (panel == null || panel.Children.Count < 2) return;
 
-            if (!(panel.Children[1] is TextBlock keyLine)) return;
+            // The key line shares its row with the SSB source picture (MainWindow.AudioMessages), so it
+            // sits inside a Grid now; the row's own visibility is settled by ShowMessageSourceIcon.
+            TextBlock keyLine = panel.Children[1] as TextBlock;
+            if (keyLine == null && panel.Children[1] is Grid keyRow && keyRow.Children.Count > 0)
+                keyLine = keyRow.Children[0] as TextBlock;
+            if (keyLine == null) return;
 
             // COLLAPSED, NOT EMPTIED. An empty line still takes its height, which left the name sitting
             // in the top half of the button with a gap under it. Out of the layout altogether, the name
@@ -6989,6 +6997,9 @@ namespace HolyLogger
                 // own; otherwise the name IS the key and printing it twice helps nobody.
                 ShowMessageKeyName(button, own.Length > 0 && keysAreOurs ? key : string.Empty);
             }
+
+            // SSB only: the small computer / SD-card picture at the bottom-right.
+            ShowMessageSourceIcon(button, !isCw && !isRtty);
 
             // Swap the entire style so hover/press colours are also correct
             Style cwStyle  = (Style)FindResource("MsgButtonCwStyle");
@@ -9163,6 +9174,13 @@ namespace HolyLogger
                 return;
             }
 
+            // HIS OWN RECORDINGS, played from this PC - see MainWindow.AudioMessages.
+            if (AudioMessages.UsePc)
+            {
+                TriggerPcMessage(messageNumber);
+                return;
+            }
+
             if (!TryGetVoiceCommandProfile(out RadioVoiceCommandProfile profile, out string rigType, out string errorMessage))
             {
                 HolyMessageBox.ShowWarning(errorMessage, "Voice Message", this);
@@ -9234,7 +9252,13 @@ namespace HolyLogger
             string rigType = NormalizeRigType(Rig != null ? Rig.RigType : null);
             string reason;
 
-            if (!Properties.Settings.Default.EnableOmniRigCAT || OmniRigEngine == null || Rig == null)
+            if (AudioMessages.UsePc && !PcMessagesKeyByCat && !IsCwModeActive())
+            {
+                // No CAT needed for these - only SSB.
+                reason = "These buttons play your recordings only in SSB." + gap
+                       + "Set the Mode to SSB.";
+            }
+            else if (!Properties.Settings.Default.EnableOmniRigCAT || OmniRigEngine == null || Rig == null)
             {
                 reason = "OmniRig CAT is not available." + gap
                        + "Tick Enable Omni-Rig CAT in Options > General, and check the radio is "
@@ -9262,7 +9286,7 @@ namespace HolyLogger
             {
                 reason = "This radio (" + rigType + ") has no CAT command for playing a recorded "
                        + "voice message, so HolyLogger cannot start one." + gap
-                       + "Play it from the radio's own memory keys.";
+                       + "Record your messages on this PC instead: Tools > Audio Messages.";
             }
 
             string situation = rigType + "|" + reason;
@@ -9284,6 +9308,9 @@ namespace HolyLogger
                 StopRtty();
                 return true;
             }
+
+            // And a recording from this PC going out.
+            if (_pcMsgNumber != 0 && StopPcMessage()) return true;
 
             int? current = activeVoiceMessageNumber ?? pendingVoiceMessageNumber;
             if (!current.HasValue)
@@ -9331,6 +9358,15 @@ namespace HolyLogger
             rigType = NormalizeRigType(Rig != null ? Rig.RigType : null);
             errorMessage = null;
 
+            // RECORDINGS KEYED BY A COM PORT OR THE RADIO'S VOX NEED NO CAT AT ALL (his request,
+            // 2026-11-25, for old radios) - only SSB, from the radio or from the Mode box.
+            if (AudioMessages.UsePc && !PcMessagesKeyByCat)
+            {
+                if (PcMessagesSendableWithoutCat()) return true;
+                errorMessage = "Voice-message buttons are available only in SSB mode.";
+                return false;
+            }
+
             if (!Properties.Settings.Default.EnableOmniRigCAT || OmniRigEngine == null || Rig == null)
             {
                 errorMessage = "OmniRig CAT is not available.";
@@ -9346,7 +9382,8 @@ namespace HolyLogger
             // THE RADIO IS ASKED FOR ONCE, HERE. VoiceProfileFor is what decides whether this model
             // has a play-back command at all - and on an Icom it also has to reach OmniRig's rig
             // file for the address, which can fail on its own. Either way there is nothing to send.
-            if (string.IsNullOrWhiteSpace(rigType) || VoiceProfileFor(rigType) == null)
+            // NOT ASKED AT ALL when the messages come from this PC: then any radio CAT can key will do.
+            if (!AudioMessages.UsePc && (string.IsNullOrWhiteSpace(rigType) || VoiceProfileFor(rigType) == null))
             {
                 errorMessage = "Playing a recorded voice message by CAT is not supported for this radio model.";
                 return false;
@@ -9545,6 +9582,9 @@ namespace HolyLogger
 
         private void ClearVoiceMessageState()
         {
+            // The radio gone or the row no longer usable: a recording from this PC stops too, and the
+            // transmitter is let go.
+            if (_pcMsgNumber != 0 && _pcMsgKeyedVia == AudioMessages.PttCat) StopPcMessage();
             StopMsgPieces();   // a stopped long message sends none of its remaining pieces
             pendingVoiceMessageNumber = null;
             activeVoiceMessageNumber = null;
@@ -9673,12 +9713,15 @@ namespace HolyLogger
             }
             else
             {
-                PlayCommandsBorder.ToolTip = isVoiceAvailable ? "Play radio voice messages (F5-F8)" : errorMessage;
+                PlayCommandsBorder.ToolTip = !isVoiceAvailable ? errorMessage
+                    : AudioMessages.UsePc ? "Play my recordings from this PC (F5-F8) - right-click for Audio Messages"
+                    : "Play radio voice messages (F5-F8) - right-click for Audio Messages";
             }
 
             if (!isAvailable)
             {
                 ClearVoiceMessageState();
+                if (_pcMsgNumber != 0) StopPcMessage();   // keyed by a port or VOX: the mode left SSB
             }
 
             // THE CW KEYBOARD FOLLOWS THE RADIO. Not in CW, or not there at all, and it goes; in CW
@@ -9851,6 +9894,7 @@ namespace HolyLogger
             // In voice they are the radio's four recorded messages and are meant to read as one set:
             // a green CQ standing beside three lavender ones looks like a fault in the button, not a
             // hint about Enter. Orange still says what is going out, which is the one that matters.
+            isActive = isActive || PcMessageGoingOut(messageNumber);
             button.Background = isActive ? VoiceMessageActiveBrush : VoiceMessageDefaultBrush;
         }
 
@@ -11850,6 +11894,8 @@ namespace HolyLogger
 
             // The keying port is let go first of all: a key left down is a transmitter left on.
             try { ClosePortKeyer(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+            // And a recording from this PC going out lets the transmitter go the same way.
+            try { StopPcMessage(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
             try { CloseRttyKeyer(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }   // and the RTTY one, transmit off
 
             // The last changes into this computer's sync diary before the program goes.
@@ -17167,6 +17213,8 @@ namespace HolyLogger
                 // Refresh the Msg buttons so they switch to/from the CW look immediately on a mode
                 // change (matters when the radio is off, where the mode comes from this dropdown).
                 UpdateMessageButtonLabels();
+                // Recordings keyed without CAT go by this box, so the row is worked out again now.
+                if (AudioMessages.UsePc && !PcMessagesKeyByCat) UpdateVoiceMessageAvailabilityState();
                 // CW and phone live in different parts of a band, so the mode is half of the answer to
                 // "which frequency". Only ever fills an EMPTY box - changing mode with a frequency
                 // already in it leaves that frequency exactly where it is.
@@ -20311,7 +20359,9 @@ namespace HolyLogger
                 else if (IsRttyModeActive())
                     ShowRttyMessageEditDialog(messageNumber);
                 else
-                    ShowMsgButtonRenameDialog(messageNumber);
+                    // SSB: ALWAYS THE AUDIO MESSAGES WINDOW (his rule, 2026-11-25), whichever source is
+                    // chosen - recording, listening, renaming and the PC / radio switch are all there.
+                    OpenAudioMessagesWindow(messageNumber);
             }
         }
     }
