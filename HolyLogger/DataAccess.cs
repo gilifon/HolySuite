@@ -172,18 +172,37 @@ namespace HolyLogger
 
                 // Daily rotating backup, taken before the database is opened or touched in any
                 // way, so even a backup of an already-corrupted-by-us session is impossible.
+                // TIMED, part by part (2026-11-25): opening the database took ~900 ms of the start on
+                // an 11,006-QSO log, more than reading the QSOs, and nothing said which part.
+                var openClock = System.Diagnostics.Stopwatch.StartNew();
+                var openParts = new System.Text.StringBuilder();
+                long openLapAt = 0;
+                Action<string> openLap = part =>
+                {
+                    long at = openClock.ElapsedMilliseconds;
+                    openParts.Append(openParts.Length == 0 ? "" : ", ").Append(part).Append(' ').Append(at - openLapAt);
+                    openLapAt = at;
+                };
+
                 BackupDatabaseDaily();
+                openLap("daily backup");
 
                 // AND IF THE LOG IS NOT THERE AT ALL, IT IS PUT BACK BEFORE ANYTHING ELSE HAPPENS.
                 PutTheLogBackIfItHasGone();
+                openLap("present check");
 
                 OpenWithRetry();
+                openLap("open");
 
                 // The same again for a log that is present but empty - see the note on the method.
                 PutTheLogBackIfItIsEmpty();
+                openLap("empty check");
 
                 BackupBeforeLogsMigration();   // one-time safety copy before the logs-schema upgrade
+                openLap("migration backup");
                 UpdateSchema();
+                openLap("schema");
+                Log.Warn("DATABASE opened in " + openClock.ElapsedMilliseconds + " ms (" + openParts + ")");
 
             }
             catch (Exception e)
@@ -7230,7 +7249,24 @@ Environment.NewLine +
             catch (Exception swallowed) { Log.Swallow(swallowed); return 0; }
         }
 
+        // THE TABLE CHECK RUNS AS ONE SAVE (2026-11-25). It makes about a hundred small writes at every
+        // start - six fixed tables rebuilt, triggers dropped and made again, columns and indexes checked -
+        // and each one used to be its own save, waiting for the disk every time: 562 ms of an 835 ms open
+        // on his PC. Measured on a copy of his log, the six fixed tables alone: 210 ms one by one, 45 ms
+        // as one save. None of the steps below starts a save of its own (checked: no BeginTransaction
+        // anywhere under UpdateSchemaSteps), so nothing nests. If a step throws, the whole check is undone
+        // and the open fails exactly as it did before - the file is left as it was, never half-changed,
+        // and the sync triggers are never left dropped on disk.
         private void UpdateSchema()
+        {
+            using (var tx = con.BeginTransaction())
+            {
+                UpdateSchemaSteps();
+                tx.Commit();
+            }
+        }
+
+        private void UpdateSchemaSteps()
         {
             // The upgrades below may rewrite many QSOs, and every computer runs them for itself - they are
             // not changes the operator made, so they must not land in the diary. The journal's triggers

@@ -615,6 +615,9 @@ namespace HolyLogger
             CredentialStore.RestoreMissing(firstRunOfThisIdentity);
             Log.Step("ctor: credentials restored");
             CredentialStore.Backup();
+            // 2026-11-25: the "LOG READ" mark below covered everything from here, ~2 s on 11,006 QSOs,
+            // while the query itself takes 0.2-0.5 s. These marks split it so the log names the part.
+            Log.Step("ctor: credentials backed up");
 
             // The owner's saved callsign / grid locator / Holyland square (Options > Personal Info) fill the main
             // window's boxes only where they are empty; see ContestHeaderStore.
@@ -671,6 +674,7 @@ namespace HolyLogger
             TB_Comment.IsEnabled = !Properties.Settings.Default.isCommentLocked;
             setLockCommentBtnState();
 
+            Log.Step("ctor: settings put into the boxes");
             try
             {
                 dal = DataAccess.GetInstance();
@@ -696,6 +700,7 @@ namespace HolyLogger
                 System.Windows.Application.Current.Shutdown();
                 return;
             }
+            Log.Step("ctor: database opened");
 
             // A profile brought from another computer: its eQSL accounts go into the database now that
             // it is open (the rest of what it carried was applied at startup - see ProfileManager).
@@ -708,6 +713,7 @@ namespace HolyLogger
                 System.Windows.Application.Current.Shutdown();
                 return;
             }
+            Log.Step("ctor: profile kit + active log chosen");
 
             bool item_found = false;
             foreach (ComboBoxItem item in CB_Mode.Items)
@@ -746,7 +752,8 @@ namespace HolyLogger
 
             TP_Date.Value = DateTime.UtcNow;
             TP_Time.Value = DateTime.UtcNow;
-            
+            Log.Step("ctor: mode, RST, activity list, size, date");
+
             Qsos = dal.GetQSOsForLog(dal.ActiveLogId);
             Log.Step("ctor: LOG READ from the database");
             StartCountryDatabasesInBackground();
