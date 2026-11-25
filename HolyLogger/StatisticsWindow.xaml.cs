@@ -3611,9 +3611,17 @@ namespace HolyLogger
                            && (c.ModeGroup.Length == 0 || ModeGroupOf(qsos[i].Mode) == c.ModeGroup))
                           .ToList();
                 if (fit.Count == 0) continue;
-                int pick = fit[0];
+                // The EXACT call first, then the same station under a stroke (CE0Y/SP9EVP for CE0Y), then
+                // any that fits. A friend's log held CE0Y and CE0Y/SP9EVP on the same day, band and mode;
+                // the ARRL granted CE0Y, but "same station" took the /SP9EVP one because it came first,
+                // and the exact one was listed as marked but not granted (2026-11-25).
+                int pick = -1;
                 foreach (int i in fit)
-                    if (CallsignIdentity.Same(qsos[i].DXCall, c.Call)) { pick = i; break; }
+                    if (string.Equals((qsos[i].DXCall ?? string.Empty).Trim(), c.Call, StringComparison.OrdinalIgnoreCase)) { pick = i; break; }
+                if (pick < 0)
+                    foreach (int i in fit)
+                        if (CallsignIdentity.Same(qsos[i].DXCall, c.Call)) { pick = i; break; }
+                if (pick < 0) pick = fit[0];
                 result[n] = pick;
             }
             return result;
