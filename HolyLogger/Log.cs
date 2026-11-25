@@ -161,7 +161,9 @@ namespace HolyLogger
     {
         private const int TickMs = 250;
         private const long FreezeMs = 2000;
-        private const long FirstStackMs = 3000;
+        // The first stack is read the moment a freeze is noticed. It was read at 3 s, and the freezes of
+        // 2026-11-24 (1.6-3.9 s) mostly ended before that, so they left no stack and no clue.
+        private const long FirstStackMs = FreezeMs;
         private const long SecondStackMs = 15000;
         private const long StillFrozenEveryMs = 10000;
         private const long PauseMs = 2000;
@@ -372,6 +374,7 @@ namespace HolyLogger
                         nextStack = first ? frozenFrom + SecondStackMs : 0;
                         _stacksTaken++;
                         Log.Warn("FREEZE  " + Sec(now - frozenFrom) + " s in, the window's thread is in: " + WindowThreadStack(ui.Thread));
+                        if (first) Log.Warn("FREEZE  programs running now: " + RunningPrograms());
                     }
                     if (now >= nextStill)
                     {
@@ -422,6 +425,34 @@ namespace HolyLogger
         }
 
         // ownOnly: leave out .NET's and SQLite's own frames, so the list is HolyLogger's code.
+        // WHO ELSE IS ON THE PC (2026-11-25). A friend's window froze 45 s inside Windows' accessibility
+        // code (UI Automation): another program was reading HolyLogger's screen, and Windows does not say
+        // which. The names of the programs running at the freeze (names only, no window titles), each once,
+        // with how many copies run, are what can point to it.
+        private static string RunningPrograms()
+        {
+            try
+            {
+                var counts = new System.Collections.Generic.SortedDictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+                foreach (var p in System.Diagnostics.Process.GetProcesses())
+                {
+                    try
+                    {
+                        string name = p.ProcessName;
+                        int n;
+                        counts.TryGetValue(name, out n);
+                        counts[name] = n + 1;
+                    }
+                    catch (Exception) { }
+                    finally { p.Dispose(); }
+                }
+                var parts = new System.Collections.Generic.List<string>();
+                foreach (var kv in counts) parts.Add(kv.Value > 1 ? kv.Key + " x" + kv.Value : kv.Key);
+                return counts.Count + " different: " + string.Join(", ", parts);
+            }
+            catch (Exception ex) { return "(could not be listed: " + ex.GetType().Name + ")"; }
+        }
+
         internal static string Frames(System.Diagnostics.StackTrace st, int max, bool ownOnly = false)
         {
             var parts = new System.Collections.Generic.List<string>();
@@ -469,13 +500,48 @@ namespace HolyLogger
             try
             {
                 if (op == null) return "nothing (idle)";
-                var d = OpMethod?.GetValue(op) as Delegate;
-                if (d == null) return "unknown";
-                var m = d.Method;
-                string owner = d.Target != null ? d.Target.GetType().Name : m.DeclaringType?.Name;
-                return owner + "." + m.Name + " [" + op.Priority + "]";
+                return NameOfWork(op) + " [" + op.Priority + "]";
             }
             catch (Exception) { return "unknown"; }
+        }
+
+        // The name of one piece of work on the window's thread. A timer's work is always WPF's own
+        // DispatcherTimer.FireTick, which says nothing - so for a timer the handlers on its Tick are named
+        // instead, with its interval. Both names come from private fields; if a future .NET renames them
+        // the answer is only less precise, never an error.
+        private static readonly System.Reflection.FieldInfo TimerTick =
+            typeof(System.Windows.Threading.DispatcherTimer).GetField("Tick",
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+
+        internal static string NameOfWork(System.Windows.Threading.DispatcherOperation op)
+        {
+            try
+            {
+                var d = OpMethod?.GetValue(op) as Delegate;
+                if (d == null) return "unknown";
+                var timer = d.Target as System.Windows.Threading.DispatcherTimer;
+                if (timer != null)
+                {
+                    var tick = TimerTick?.GetValue(timer) as Delegate;
+                    if (tick == null) return "a timer (" + timer.Interval.TotalMilliseconds + " ms, its handler unknown)";
+                    var names = new System.Collections.Generic.List<string>();
+                    foreach (var h in tick.GetInvocationList()) names.Add(MethodName(h.Method));
+                    return "timer " + string.Join(" + ", names) + " (every " + timer.Interval.TotalMilliseconds + " ms)";
+                }
+                string owner = d.Target != null ? d.Target.GetType().Name : d.Method.DeclaringType?.Name;
+                return owner + "." + d.Method.Name;
+            }
+            catch (Exception) { return "unknown"; }
+        }
+
+        // A lambda lives in a compiler-made class ("<>c__DisplayClass12_0") whose name says nothing, so
+        // the class it sits inside is named too: MainWindow.<>c__DisplayClass12_0.<StartX>b__0.
+        private static string MethodName(System.Reflection.MethodInfo m)
+        {
+            var t = m.DeclaringType;
+            if (t == null) return m.Name;
+            string owner = t.DeclaringType != null ? t.DeclaringType.Name + "." + t.Name : t.Name;
+            return owner + "." + m.Name;
         }
 
         private static string Sec(long ms)
