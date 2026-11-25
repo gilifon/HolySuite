@@ -70,8 +70,21 @@ namespace HolyLogger
                     if (_path == null) _path = ResolvePath();
                     if (_path.Length == 0) return;
 
+                    // PAST 2 MB THE FILE IS KEPT AS holylogger.prev.log, no longer deleted. It was deleted,
+                    // and on 2026-11-21 that wiped four months of start and freeze lines in one go - the
+                    // very lines that answer "it is slow" and "it froze". One older file is kept, so
+                    // at most 4 MB in all.
                     var fi = new FileInfo(_path);
-                    if (fi.Exists && fi.Length > MaxBytes) fi.Delete();
+                    if (fi.Exists && fi.Length > MaxBytes)
+                    {
+                        try
+                        {
+                            string prev = Path.Combine(Path.GetDirectoryName(_path), "holylogger.prev.log");
+                            File.Delete(prev);
+                            File.Move(_path, prev);
+                        }
+                        catch { fi.Delete(); }   // could not keep it: start fresh, as before
+                    }
                     File.AppendAllText(_path, entry + Environment.NewLine);
                 }
             }

@@ -1163,6 +1163,7 @@
     <Resource Include="Images\flags\ss.png" />
     <Resource Include="Images\flags\st.png" />
     <Resource Include="Images\flags\sv.png" />
+    <Resource Include="Images\flags\sx.png" />
     <Resource Include="Images\flags\sy.png" />
     <Resource Include="Images\flags\sz.png" />
     <Resource Include="Images\flags\tc.png" />
