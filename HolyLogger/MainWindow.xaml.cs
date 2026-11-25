@@ -1364,24 +1364,25 @@ namespace HolyLogger
         // WHICH WORK HELD THE WINDOW. The watch in MainWindow_Loaded says HOW LONG the window could not
         // answer, but not what was running: every start of 2026-09-29 froze 2.4-4.2 s around the paint,
         // and nothing marked the stretch. This times each piece of work the window's thread takes from
-        // its queue, and names any that runs over 150 ms. It watches the first 40 seconds (the late
-        // 1-2 s stalls came at +15 to +35 s) and then unhooks itself. The name comes from a private
-        // field of DispatcherOperation - if a future .NET renames it, the line says "unknown" and
-        // nothing breaks.
-        private static readonly System.Reflection.FieldInfo _dispatcherOpMethod =
-            typeof(DispatcherOperation).GetField("_method",
-                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
-
+        // its queue, and names any that runs long. A timer is named by its own Tick handler (see
+        // FreezeWatch.NameOfWork), not by WPF's FireTick, which said nothing in 66 lines of the log.
+        //
+        // 2026-11-25: it watches the WHOLE run now, not the first 40 seconds - the operator asked about
+        // the program once it runs, and the slow spots there were never measured. First 40 s: over
+        // 150 ms, written as STARTUP. After that: over 250 ms, written as SLOW, so normal use does not
+        // fill the log. The cost: one timestamp per piece of work, no allocation.
         private void StartSlowWorkWatch()
         {
             try
             {
                 var hooks = Dispatcher.Hooks;
-                var running = new Stack<KeyValuePair<DispatcherOperation, System.Diagnostics.Stopwatch>>();
+                var running = new Stack<KeyValuePair<DispatcherOperation, long>>();
+                long startedAt = System.Diagnostics.Stopwatch.GetTimestamp();
+                long freq = System.Diagnostics.Stopwatch.Frequency;
 
                 DispatcherHookEventHandler onStarted = (s, e) =>
-                    running.Push(new KeyValuePair<DispatcherOperation, System.Diagnostics.Stopwatch>(
-                        e.Operation, System.Diagnostics.Stopwatch.StartNew()));
+                    running.Push(new KeyValuePair<DispatcherOperation, long>(
+                        e.Operation, System.Diagnostics.Stopwatch.GetTimestamp()));
 
                 DispatcherHookEventHandler onEnded = (s, e) =>
                 {
@@ -1390,10 +1391,12 @@ namespace HolyLogger
                     {
                         var top = running.Pop();
                         if (top.Key != e.Operation) continue;
-                        long ms = top.Value.ElapsedMilliseconds;
-                        if (ms > 150)
-                            Log.Warn("STARTUP  slow work on the window's thread: " + ms + " ms in "
-                                     + NameOfOperation(e.Operation) + "  [" + e.Operation.Priority + "]  ("
+                        long now = System.Diagnostics.Stopwatch.GetTimestamp();
+                        long ms = (now - top.Value) * 1000 / freq;
+                        bool startup = (now - startedAt) < 40 * freq;
+                        if (ms > (startup ? 150 : 250))
+                            Log.Warn((startup ? "STARTUP" : "SLOW") + "  slow work on the window's thread: " + ms + " ms in "
+                                     + FreezeWatch.NameOfWork(e.Operation) + "  [" + e.Operation.Priority + "]  ("
                                      + Log.SinceLaunch() + ")");
                         break;
                     }
@@ -1402,31 +1405,8 @@ namespace HolyLogger
                 hooks.OperationStarted += onStarted;
                 hooks.OperationCompleted += onEnded;
                 hooks.OperationAborted += onEnded;
-
-                var stop = new DispatcherTimer { Interval = TimeSpan.FromSeconds(40) };
-                stop.Tick += (s, e) =>
-                {
-                    stop.Stop();
-                    hooks.OperationStarted -= onStarted;
-                    hooks.OperationCompleted -= onEnded;
-                    hooks.OperationAborted -= onEnded;
-                };
-                stop.Start();
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
-        }
-
-        private static string NameOfOperation(DispatcherOperation op)
-        {
-            try
-            {
-                var d = _dispatcherOpMethod?.GetValue(op) as Delegate;
-                if (d == null) return "unknown";
-                var m = d.Method;
-                string owner = d.Target != null ? d.Target.GetType().Name : m.DeclaringType?.Name;
-                return owner + "." + m.Name;
-            }
-            catch (Exception) { return "unknown"; }
         }
 
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
