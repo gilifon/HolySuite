@@ -5774,10 +5774,29 @@ namespace HolyLogger
                 return;
             }
 
+            string menu = UsbKeyingMenuName(rigType);
+            string menuWords = menu == null ? "the radio's menu setting for keying from USB" : "\"" + menu + "\" in the radio's menu";
+
             report(byPort
-                ? "VVV sent. If the radio did not transmit, try the other line (DTR / RTS), and check the radio's menu setting for keying from USB."
-                : "VVV sent. If the radio did not transmit, check that BK-IN is on at the radio.",
+                ? "VVV sent. If the radio did not transmit, try the other line (DTR / RTS), and check " + menuWords + "."
+                : "VVV sent. If the radio did not transmit, check that BK-IN is on at the radio. "
+                  + "To key with the mouse, choose Key from and the radio's own USB port, and set " + menuWords + ".",
                 false);
+        }
+
+        // THE MENU ITEM THAT LETS A RADIO KEY CW FROM ITS OWN USB PORT'S DTR / RTS, as the makers' own
+        // CAT references name it (read 2026-11-26): Icom IC-7300MK2 / IC-7610 / IC-9700 "USB Keying (CW)" under
+        // SET > Connectors > USB SEND/Keying; Yaesu FT-991A, FT-891, FTDX10, FTDX101 "PC KEYING";
+        // Kenwood TS-890S its virtual COM port's DTR / RTS set to CW Keying. Null when the documents
+        // name nothing for this radio, and the message then says it in general words.
+        private static string UsbKeyingMenuName(string rigType)
+        {
+            string name = (rigType ?? string.Empty).Trim().ToUpperInvariant();
+            if (name.Length == 0) return null;
+            if (GetIcomCivAddress(rigType) != null) return "USB Keying (CW)";
+            if (IsYaesuKeyer(rigType)) return "PC KEYING";
+            if (name.StartsWith("TS-890") || name.StartsWith("TS890")) return "Virtual COM Port DTR / RTS: CW Keying";
+            return null;
         }
 
         // The first reason nothing can go out, in the order the operator would put them right; null
