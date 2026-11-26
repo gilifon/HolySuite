@@ -69,6 +69,12 @@ namespace HolyLogger
         internal Action<int> SetSpeed { set { _setSpeed = value; } }
         private Action<int> _setSpeed;
 
+        // The key icon pressed and let go with the mouse - see CwKeyboardWindow.MakeHandKey.
+        internal Func<bool> HandKeyDown { set { _handKeyDown = value; } }
+        private Func<bool> _handKeyDown;
+        internal Action HandKeyUp { set { _handKeyUp = value; } }
+        private Action _handKeyUp;
+
         internal CwKeyboardWindow.SpeedRange SpeedRange { set { _speedRange = value; } }
         private CwKeyboardWindow.SpeedRange _speedRange;
 
@@ -82,11 +88,12 @@ namespace HolyLogger
         // The typing box's frame, so the main window can line its right edge up with F8 below it.
         internal FrameworkElement TypingFrame { get { return _frame; } }
 
-        // FROM THE STRIP'S LEFT EDGE TO THE FRAME'S RIGHT EDGE, before the strip exists: the key icon's
-        // margin 10 and width 18, the frame's margin 4, its border 2 + 2, padding 5 + 5 and the box's 190.
-        // The main window places CQ / ANS with it while the program is still loading, so nothing jumps
-        // when the strip arrives. Change any of those numbers below and change this with them.
-        internal const double LeftToFrameRight = 10 + 18 + 4 + 2 + 2 + 5 + 5 + 190;
+        // FROM THE STRIP'S LEFT EDGE TO THE FRAME'S RIGHT EDGE, before the strip exists: the key's
+        // margin 10 and its box (HandKeyWidth), the frame's margin 4, its border 2 + 2, padding 5 + 5
+        // and the box's 190. The main window places CQ / ANS with it while the program is still
+        // loading, so nothing jumps when the strip arrives. Change any of those numbers below and
+        // change this with them.
+        internal const double LeftToFrameRight = 10 + CwKeyboardWindow.HandKeyWidth + 4 + 2 + 2 + 5 + 5 + 190;
 
         private readonly DispatcherTimer _pump;
 
@@ -312,8 +319,13 @@ namespace HolyLogger
                 _wpmText.SetResourceReference(TextBlock.ForegroundProperty, "TextBrush");
             };
 
-            var icon = CwKeyboardWindow.BuildStraightKeyIcon(true, new Thickness(10, 0, 0, 0));
-            ToolTipService.SetToolTip(icon, "The lite CW keyer.");
+            // Black, not the theme's colour: it sits on the key's own light red face in every scheme.
+            var drawnKey = CwKeyboardWindow.BuildStraightKeyIcon(false, new Thickness(10, 0, 0, 0));
+            ToolTipService.SetToolTip(drawnKey, "The lite CW keyer." + Environment.NewLine
+                + "Hold the mouse down on this key to send, like a straight key (CW via COM port).");
+            var icon = CwKeyboardWindow.MakeHandKey((FrameworkElement)drawnKey,
+                                                    () => _handKeyDown != null && _handKeyDown(),
+                                                    () => { if (_handKeyUp != null) _handKeyUp(); });
 
             Children.Add(icon);
             Children.Add(_frame);

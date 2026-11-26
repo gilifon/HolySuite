@@ -546,6 +546,27 @@ namespace HolyLogger.OptionsUserControls
             RttyViaNote.Visibility = problem == null ? Visibility.Collapsed : Visibility.Visible;
         }
 
+        // The Test button: VVV the chosen way, and the answer in the note line - see MainWindow.TestCwVia.
+        // The next change to the choice puts the ordinary note back (ShowCwViaNote).
+        private void BTN_TestCwVia_Click(object sender, RoutedEventArgs e)
+        {
+            var main = Application.Current != null ? Application.Current.MainWindow as MainWindow : null;
+            if (main == null || CwViaNote == null) return;
+
+            try
+            {
+                main.TestCwVia((text, bad) =>
+                {
+                    CwViaNote.Text = text;
+                    CwViaNote.FontWeight = bad ? FontWeights.Bold : FontWeights.Normal;
+                    CwViaNote.Foreground = bad
+                        ? new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0xC6, 0x28, 0x28))
+                        : new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x1B, 0x7F, 0x2E));
+                });
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
         // One short line under the choice: what it means, or what is wrong with it.
         void ShowCwViaNote()
         {

@@ -136,6 +136,12 @@ namespace HolyLogger
         internal Action AskSpeed { set { _askSpeed = value; } }
         private Action _askSpeed;
 
+        // The key icon in the title bar pressed and let go with the mouse - see MakeHandKey.
+        internal Func<bool> HandKeyDown { set { _handKeyDown = value; } }
+        private Func<bool> _handKeyDown;
+        internal Action HandKeyUp { set { _handKeyUp = value; } }
+        private Action _handKeyUp;
+
         // Puts a speed ON the radio - the wheel over the readout, and nothing else. Set after the
         // window is built, like AskSpeed above.
         internal Action<int> SetSpeed { set { _setSpeed = value; } }
@@ -544,6 +550,26 @@ namespace HolyLogger
                 ResizeBorderThickness = new Thickness(6),
                 UseAeroCaptionButtons = false
             });
+
+            // A DOUBLE-CLICK ON THE BAR DOES NOTHING (his rule, 2026-11-26). Windows maximises a window
+            // on a double-click on its caption, and quick presses on the key there did exactly that.
+            // The message is swallowed before Windows acts on it; dragging the bar still moves the window.
+            SourceInitialized += (s, e) =>
+            {
+                try
+                {
+                    var source = System.Windows.Interop.HwndSource.FromHwnd(
+                        new System.Windows.Interop.WindowInteropHelper(this).Handle);
+                    if (source == null) return;
+                    source.AddHook((IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled) =>
+                    {
+                        const int WM_NCLBUTTONDBLCLK = 0x00A3;
+                        if (msg == WM_NCLBUTTONDBLCLK) handled = true;
+                        return IntPtr.Zero;
+                    });
+                }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
+            };
 
             var typeface = new FontFamily("Consolas");
 
@@ -1765,12 +1791,16 @@ namespace HolyLogger
         // there is no such promise, so it takes the theme's own text colour and stays visible in both.
         internal static UIElement BuildStraightKeyIcon(bool themed, Thickness margin)
         {
-            var canvas = new Canvas { Width = 24, Height = 24 };
+            // Transparent rather than empty, so the whole square takes the mouse and not only the shapes.
+            var canvas = new Canvas { Width = 24, Height = 24, Background = Brushes.Transparent };
 
             canvas.Children.Add(Piece(2, 18.5, 20, 3, 1.2, themed));      // base
             canvas.Children.Add(Piece(15.2, 11, 2.6, 7.5, 0, themed));    // upright at the back
-            canvas.Children.Add(Piece(4.5, 10.4, 14, 2.4, 1.2, themed));  // lever arm
             canvas.Children.Add(Piece(6.6, 12.8, 1.8, 5.7, 0, themed));   // contact post under the knob
+
+            // THE LEVER AND KNOB MOVE TOGETHER: pressed, they tip down about the upright, as a real key does.
+            var lever = new Canvas { Width = 24, Height = 24 };
+            lever.Children.Add(Piece(4.5, 10.4, 14, 2.4, 1.2, themed));   // lever arm
 
             var knob = new System.Windows.Shapes.Ellipse
             {
@@ -1781,7 +1811,11 @@ namespace HolyLogger
             if (themed) knob.SetResourceReference(System.Windows.Shapes.Shape.FillProperty, "TextBrush");
             Canvas.SetLeft(knob, 3.6);
             Canvas.SetTop(knob, 6.2);
-            canvas.Children.Add(knob);
+            lever.Children.Add(knob);
+
+            var tip = new RotateTransform(0, 16.5, 11.6);
+            lever.RenderTransform = tip;
+            canvas.Children.Add(lever);
 
             return new Viewbox
             {
@@ -1789,8 +1823,89 @@ namespace HolyLogger
                 Height = 18,
                 Margin = margin,
                 VerticalAlignment = VerticalAlignment.Center,
-                Child = canvas
+                Child = canvas,
+                Tag = tip
             };
+        }
+
+        // THE ICON IS A KEY (his request, 2026-11-26): left button down on it keys the radio, up lets
+        // it go - his straight key, under the mouse. Both answers are asked at the moment of the press,
+        // so a change of radio or of "CW via" is seen at once. down() says whether the line really went
+        // down; when it did not, nothing moves and nothing is held.
+        //
+        // AND IT LOOKS LIKE A KEY TO PRESS (his request, 2026-11-26): the drawing sits in a small
+        // rounded box with a light red face, darker red while held - red because it transmits. The
+        // colours are fixed, not the theme's, so the black drawing reads on it in every scheme.
+        // The icon's own margin moves out onto the box. Returns the box: that is what goes on the bar.
+        private static readonly Brush HandKeyFace = FrozenBrush(Color.FromRgb(0xFF, 0xCC, 0xCC));
+        private static readonly Brush HandKeyFaceDown = FrozenBrush(Color.FromRgb(0xF0, 0x80, 0x80));
+        private static readonly Brush HandKeyEdge = FrozenBrush(Color.FromRgb(0xA0, 0x30, 0x30));
+
+        private static Brush FrozenBrush(Color color)
+        {
+            var brush = new SolidColorBrush(color);
+            brush.Freeze();
+            return brush;
+        }
+
+        // Box edge 1 + padding 3 on each side of the 18 of the drawing.
+        internal const double HandKeyWidth = 1 + 3 + 18 + 3 + 1;
+
+        internal static FrameworkElement MakeHandKey(FrameworkElement icon, Func<bool> down, Action up)
+        {
+            var tip = icon.Tag as RotateTransform;
+            bool held = false;
+
+            var box = new Border
+            {
+                Background = HandKeyFace,
+                BorderBrush = HandKeyEdge,
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(4),
+                Padding = new Thickness(3),
+                Margin = icon.Margin,
+                VerticalAlignment = VerticalAlignment.Center,
+                ToolTip = icon.ToolTip
+            };
+            icon.Margin = new Thickness(0);
+            icon.ClearValue(FrameworkElement.ToolTipProperty);
+            box.Child = icon;
+
+            Action letGo = () =>
+            {
+                if (!held) return;
+                held = false;
+                if (tip != null) tip.Angle = 0;
+                box.Background = HandKeyFace;
+                try { up(); } catch (Exception swallowed) { Log.Swallow(swallowed); }
+            };
+
+            icon = box;
+            icon.Cursor = Cursors.Hand;
+
+            icon.MouseLeftButtonDown += (s, e) =>
+            {
+                e.Handled = true;       // not a drag of the bar, not a click through to it
+                if (held) return;
+                bool keyed = false;
+                try { keyed = down(); } catch (Exception swallowed) { Log.Swallow(swallowed); }
+                if (!keyed) return;
+                held = true;
+                if (tip != null) tip.Angle = -7;
+                box.Background = HandKeyFaceDown;
+                icon.CaptureMouse();    // up anywhere - even off the icon - still lets go
+            };
+
+            icon.MouseLeftButtonUp += (s, e) =>
+            {
+                e.Handled = true;
+                letGo();
+                if (icon.IsMouseCaptured) icon.ReleaseMouseCapture();
+            };
+
+            // The capture lost any other way - Alt+Tab, a window coming up over it - lets go too.
+            icon.LostMouseCapture += (s, e) => letGo();
+            return box;
         }
 
         private static System.Windows.Shapes.Rectangle Piece(double left, double top, double width, double height, double radius, bool themed = false)
@@ -3564,8 +3679,18 @@ namespace HolyLogger
                 ToolTip = "Type here and the radio sends it. Ctrl+K closes this window."
             };
             _titleText.Foreground = Brushes.Black;
-            var keyIcon = BuildStraightKeyIcon();
-            ToolTipService.SetToolTip(keyIcon, "The CW keyer.");
+            var drawnKey = BuildStraightKeyIcon();
+            ToolTipService.SetToolTip(drawnKey, "The CW keyer." + Environment.NewLine
+                + "Hold the mouse down on this key to send, like a straight key (CW via COM port).");
+            var keyIcon = MakeHandKey((FrameworkElement)drawnKey,
+                                      () => _handKeyDown != null && _handKeyDown(),
+                                      () => { if (_handKeyUp != null) _handKeyUp(); });
+
+            // THE BAR IS THE WINDOW'S CAPTION (WindowChrome), and Windows takes every press on it for
+            // itself: the key never heard the mouse, and a quick second press was a double-click on the
+            // caption - the window maximised (he found it, 2026-11-26). The key takes its own presses,
+            // as the gear and the close button do.
+            System.Windows.Shell.WindowChrome.SetIsHitTestVisibleInChrome(keyIcon, true);
             DockPanel.SetDock(keyIcon, Dock.Left);
             DockPanel.SetDock(_titleText, Dock.Left);
             RefreshTitle();

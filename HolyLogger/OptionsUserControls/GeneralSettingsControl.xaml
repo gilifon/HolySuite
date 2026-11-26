@@ -90,8 +90,17 @@
              input device, so a keyer window already open follows it at once. -->
         <GroupBox Header="CW via" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,12,0,0" Width="580" FontSize="16">
             <StackPanel Margin="4,4,4,4">
-                <RadioButton x:Name="RB_CwViaCat" Content="CAT commands" GroupName="CwVia" FontSize="16"
-                             Checked="CwVia_Changed"/>
+                <!-- THE TEST (his request, 2026-11-26): sends VVV the chosen way. On the CAT row, where the
+                     right side was empty, so the frame grows no taller; the answer goes in the note line
+                     under the choice (CwViaNote) - red when nothing could go out, and why. -->
+                <Grid>
+                    <RadioButton x:Name="RB_CwViaCat" Content="CAT commands" GroupName="CwVia" FontSize="16"
+                                 VerticalAlignment="Center" Checked="CwVia_Changed"/>
+                    <Button x:Name="BTN_TestCwVia" Content="Test" Style="{StaticResource GoActionButtonStyle}"
+                            HorizontalAlignment="Right" VerticalAlignment="Center" Width="90" Height="32" FontSize="16"
+                            Click="BTN_TestCwVia_Click"
+                            ToolTip="Sends VVV the way chosen here. Put the radio in CW first."/>
+                </Grid>
                 <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
                     <RadioButton x:Name="RB_CwViaPort" Content="Key from" GroupName="CwVia" FontSize="16"
                                  VerticalAlignment="Center" Checked="CwVia_Changed"/>
