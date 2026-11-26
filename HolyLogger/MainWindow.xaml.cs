@@ -5095,6 +5095,10 @@ namespace HolyLogger
             // The readout follows the radio's own knob from here on - see BuildCwSpeedReadCommand.
             cwKeyboard.AskSpeed = AskRadioCwSpeed;
 
+            // The key icon in its title bar, pressed with the mouse - see HandKeyDown.
+            cwKeyboard.HandKeyDown = HandKeyDown;
+            cwKeyboard.HandKeyUp = HandKeyUp;
+
             // And the wheel over that readout sets it - see SetRadioCwSpeed.
             cwKeyboard.SetSpeed = wpm => SetRadioCwSpeed(rigType, wpm);
 
@@ -5647,6 +5651,19 @@ namespace HolyLogger
             if (DateTime.UtcNow - breakInWarnedUtc < TimeSpan.FromSeconds(30)) return;
             breakInWarnedUtc = DateTime.UtcNow;
 
+            // The answer to the Options test button goes on its own line, beside the button.
+            var testReport = _cwTestReport;
+            _cwTestReport = null;
+            if (testReport != null && DateTime.UtcNow - _cwTestAtUtc < TimeSpan.FromSeconds(10))
+            {
+                try
+                {
+                    testReport("BK-IN is off on the radio, so it beeps but does not transmit. Turn BK-IN on at the radio.", true);
+                    return;
+                }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
+            }
+
             HolyMessageBox.ShowWarning(
                 "BK-IN is off on the radio, so the CW did not go out on the air.\n\n"
                 + "Turn BK-IN on at the radio.",
@@ -5680,8 +5697,138 @@ namespace HolyLogger
             cwLiteKeyer.SpeedRange = (out int low, out int high) =>
                 CwSpeedRange(NormalizeRigType(Rig != null ? Rig.RigType : null), out low, out high);
 
+            cwLiteKeyer.HandKeyDown = HandKeyDown;
+            cwLiteKeyer.HandKeyUp = HandKeyUp;
+
             CwLiteKeyerHost.Content = cwLiteKeyer;
             cwLiteKeyer.KeyerWindowOpen = cwKeyboard != null;
+        }
+
+        // THE KEY ICON AS A STRAIGHT KEY (his request, 2026-11-26). Mouse down on the icon in the keyer
+        // window or on the bar holds the keying line on, mouse up lets it go - the same line his own key
+        // is wired to. COM PORT ONLY for now: with CW via CAT the radio is handed text, and whether any
+        // radio has a CAT command that holds the key down is still to be checked in the makers' manuals.
+        // False - and nothing is keyed - outside CW, or when the port is not there.
+        private bool HandKeyDown()
+        {
+            if (!CwByPort || !IsCwModeActive()) return false;
+            var keyer = PortKeyer();
+            if (keyer == null) return false;
+
+            // Break-in has to be on for the key to transmit, as with any sending from here.
+            if (IsCatLive()) AskIcomBreakInBeforeCw(NormalizeRigType(Rig != null ? Rig.RigType : null));
+            return keyer.HandDown();
+        }
+
+        private void HandKeyUp()
+        {
+            if (portCwKeyer != null) portCwKeyer.HandUp();
+        }
+
+        // -- THE "CW VIA" TEST BUTTON (his request, 2026-11-26) -----------------------------------
+        //
+        // Sends VVV the way every CW from here goes out, with what Options > General has chosen at
+        // that moment (the page saves "CW via" the moment it changes, and CAT on/off too). The radio
+        // transmitting is the proof it works; the words are for when it did not - every reason this
+        // program can SEE, each with the thing to do about it. What it cannot see - the wrong line,
+        // the wiring, the radio's own menu - is named in the line that follows a good send.
+        //
+        // report: where the answer goes, now or a moment later (BK-IN off on an Icom comes back as
+        // the radio's reply to a question, after the send). bad = true paints it red.
+        private Action<string, bool> _cwTestReport;
+        private DateTime _cwTestAtUtc = DateTime.MinValue;
+
+        internal void TestCwVia(Action<string, bool> report)
+        {
+            string trouble = null;
+            try { trouble = CwTestTrouble(); }
+            catch (Exception ex) { trouble = "The test could not run: " + ex.Message; }
+
+            if (trouble != null) { report(trouble, true); return; }
+
+            bool byPort = CwByPort;
+            string rigType = NormalizeRigType(Rig != null ? Rig.RigType : null);
+
+            // Asked afresh for the test, and its answer comes here rather than in a box of its own.
+            _cwTestReport = report;
+            _cwTestAtUtc = DateTime.UtcNow;
+            lastCwSendUtc = DateTime.MinValue;
+            breakInWarnedUtc = DateTime.MinValue;
+
+            bool sent;
+            try { sent = SendCwChunkToRadio("VVV"); }
+            catch (Exception swallowed) { Log.Swallow(swallowed); sent = false; }
+
+            if (!sent)
+            {
+                report(byPort
+                    ? "VVV could not be sent on the port. Unplug the keying cable, plug it back in and press Test again."
+                    : "The radio did not take the CW command. Close any other program that uses the radio's CAT, and press Test again.",
+                    true);
+                return;
+            }
+
+            report(byPort
+                ? "VVV sent. If the radio did not transmit, try the other line (DTR / RTS), and check the radio's menu setting for keying from USB."
+                : "VVV sent. If the radio did not transmit, check that BK-IN is on at the radio.",
+                false);
+        }
+
+        // The first reason nothing can go out, in the order the operator would put them right; null
+        // when VVV may be sent.
+        private string CwTestTrouble()
+        {
+            bool portChosen = string.Equals(Properties.Settings.Default.CwVia, "PORT", StringComparison.OrdinalIgnoreCase);
+
+            if (portChosen)
+            {
+                string port = (Properties.Settings.Default.CwKeyPort ?? string.Empty).Trim();
+                if (port.Length == 0) return "Choose the keying port first.";
+
+                if (PortKeyer() == null)
+                {
+                    // The page itself is Options > General, so the "choose it there" half is dropped.
+                    string why = (portCwKeyerTrouble ?? "The keying port could not be opened.")
+                                 .Replace(" Choose the port in Options > General.", string.Empty);
+                    if (why.EndsWith("is being used by another program.", StringComparison.Ordinal))
+                        why += " Close that program and press Test again.";
+                    return why;
+                }
+
+                if (!IsCwModeActive()) return NotInCwText();
+                return null;
+            }
+
+            if (!Properties.Settings.Default.EnableOmniRigCAT || OmniRigEngine == null || Rig == null)
+                return "CAT is off. Tick Enable Omni-Rig CAT above, then press Test again.";
+
+            if (Rig.Status != OmniRig.RigStatusX.ST_ONLINE)
+                return "The radio is not answering CAT. Check that it is on and its cable is plugged in.";
+
+            string rigType = NormalizeRigType(Rig.RigType);
+            if (!CanKeyCw(rigType))
+                return "This radio (" + rigType + ") cannot send CW by CAT. Choose Key from a COM port instead.";
+
+            if (!IsCwModeActive()) return NotInCwText();
+            return null;
+        }
+
+        // The mode in the words the radio or the Mode box gives it - the same place IsCwModeActive looks.
+        private string NotInCwText()
+        {
+            string mode = null;
+            try
+            {
+                if (IsCatLive()) mode = GetNormalizedRigMode();
+                if (string.IsNullOrEmpty(mode) && CB_Mode != null)
+                    mode = CB_Mode.SelectedItem is ComboBoxItem item ? item.Content as string : CB_Mode.Text;
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+            string where = IsCatLive() ? "The radio" : "The Mode box";
+            return string.IsNullOrWhiteSpace(mode)
+                ? where + " is not on CW. Switch it to CW and press Test again."
+                : where + " is on " + mode.Trim() + ", not CW. Switch it to CW and press Test again.";
         }
 
         // THE RIG IS ASKED EACH TIME, not once when the strip was built: the operator can change

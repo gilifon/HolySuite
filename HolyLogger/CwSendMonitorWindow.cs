@@ -447,6 +447,11 @@ namespace HolyLogger
         // this is a fault, and the watchdog releases it.
         private const int LongestKeyDownMs = 3000;
 
+        // HELD BY HAND, from the key icon, longer is normal - a long dash, a tune-up carrier. Agreed with
+        // him at 20 seconds (2026-11-26); past that the watchdog lets go all the same.
+        private const int LongestHandKeyDownMs = 20000;
+        private volatile bool _handHeld;
+
         // The speeds offered. Slower than 5 WPM nobody sends; faster than 60 the timing itself gets thin.
         public const int SlowestWpm = 5;
         public const int FastestWpm = 60;
@@ -609,6 +614,26 @@ namespace HolyLogger
             }
             Release();
             _wake.Set();
+        }
+
+        // THE KEY ICON PRESSED WITH THE MOUSE (his request, 2026-11-26): the line held on for as long as
+        // the button is down, exactly as his straight key holds it. Refused while a text is going out -
+        // two hands on one line would cut each other's elements. The watchdog still lets go after
+        // LongestKeyDownMs, so a mouse that never comes up cannot leave the transmitter on.
+        public bool HandDown()
+        {
+            if (_closing || Busy) return false;
+            _handHeld = true;
+            Press(_stopGen);
+            if (!_down) _handHeld = false;
+            return _down;
+        }
+
+        public void HandUp()
+        {
+            if (Busy) return;       // the line belongs to the text now, not to the mouse
+            _handHeld = false;
+            Release();
         }
 
         public void Dispose()
@@ -800,8 +825,10 @@ namespace HolyLogger
         private void Watch()
         {
             if (!_down) return;
-            if (DateTime.UtcNow.Ticks - _downSinceTicks < TimeSpan.FromMilliseconds(LongestKeyDownMs).Ticks) return;
+            int limit = _handHeld ? LongestHandKeyDownMs : LongestKeyDownMs;
+            if (DateTime.UtcNow.Ticks - _downSinceTicks < TimeSpan.FromMilliseconds(limit).Ticks) return;
             Log.Warn("CW keying on " + PortName + ": key held down too long - released by the watchdog.");
+            _handHeld = false;
             Stop();
         }
     }
