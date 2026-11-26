@@ -200,15 +200,31 @@ namespace HolyLogger
                 rows.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
                 _keycaps[n] = new ContentControl { Margin = new Thickness(0, 3, 10, 3), VerticalAlignment = VerticalAlignment.Center };
+                // "Rename / Button" on two lines (his request, 2026-11-26) - it renames the keycap beside
+                // it. Taller than the other buttons, by the same amount above and below, so the row's
+                // buttons stay centred on one line.
                 var renameBtn = SmallButton("Rename");
+                renameBtn.Content = new TextBlock
+                {
+                    Text = "Rename\nButton", TextAlignment = TextAlignment.Left,   // both lines start together (his request)
+                    LineStackingStrategy = LineStackingStrategy.BlockLineHeight, LineHeight = 18
+                };
+                renameBtn.Height = 42;
+                renameBtn.Margin = new Thickness(0, 2, 0, 2);
+                renameBtn.VerticalAlignment = VerticalAlignment.Center;
                 renameBtn.Click += (s, e) => { if (_rename != null) _rename(msg); ShowNames(); };
                 _record[n] = SmallButton("Record");
+                _record[n].Background = RecordYellow;   // his colours, 2026-11-26
                 _record[n].Click += (s, e) => RecordClicked(msg);
                 _play[n] = SmallButton("Play");
+                _play[n].Background = PlayLightRed;
+                _play[n].Foreground = KeyInk;
                 _play[n].Click += (s, e) => PlayClicked(msg);
                 // CLEAR, NOT DELETE (2026-11-26): the file is his now, chosen by him and kept where he
                 // put it, so this only takes it off the key. The file stays on the disk.
                 _delete[n] = SmallButton("Clear");
+                _delete[n].Background = ClearBlue;
+                _delete[n].Foreground = Brushes.White;
                 _delete[n].Click += (s, e) => ClearClicked(msg);
                 _lengths[n] = new TextBlock { MinWidth = 62, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(8, 0, 0, 0) };
 
@@ -877,7 +893,7 @@ namespace HolyLogger
                 bool recordingThis = _recordingN == n;
                 _record[n].IsEnabled = _recordingN == 0 || recordingThis;
                 _record[n].Content = recordingThis ? Face(StopIcon(), "Stop", true) : Face(MicIcon(), "Record", _record[n].IsEnabled);
-                _record[n].Foreground = recordingThis ? Brushes.Firebrick : ThemeManager.Brush("TextBrush");
+                _record[n].Foreground = recordingThis ? Brushes.Firebrick : KeyInk;
                 _play[n].IsEnabled = has && _recordingN == 0;
                 _play[n].Content = _playingN == n ? Face(StopIcon(), "Stop", true) : Face(PlayIcon(), "Play", _play[n].IsEnabled);
                 _delete[n].IsEnabled = AudioMessages.FilePath(n).Length > 0 && _recordingN == 0;
@@ -891,6 +907,14 @@ namespace HolyLogger
         static readonly Brush MicRed = Frozen(Color.FromRgb(0xC6, 0x28, 0x28));
         static readonly Brush PlayGreen = Frozen(Color.FromRgb(0x2E, 0x7D, 0x32));
         static readonly Brush StopInk = Frozen(Color.FromRgb(0x44, 0x44, 0x44));
+
+        // THE THREE BUTTON COLOURS (his request, 2026-11-26): Record yellow, Play light red, Clear
+        // white on blue. Fixed colours, so the writing on the first two is fixed dark too - the theme's
+        // text colour is light in dark mode and would vanish on yellow.
+        static readonly Brush RecordYellow = Frozen(Color.FromRgb(0xFF, 0xE6, 0x5C));
+        static readonly Brush PlayLightRed = Frozen(Color.FromRgb(0xFF, 0x8A, 0x8A));
+        static readonly Brush ClearBlue = Frozen(Color.FromRgb(0x15, 0x65, 0xC0));
+        static readonly Brush KeyInk = Frozen(Color.FromRgb(0x22, 0x22, 0x22));
 
         static UIElement MicIcon()
         {
