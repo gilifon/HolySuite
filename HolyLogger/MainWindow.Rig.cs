@@ -1307,10 +1307,9 @@ namespace HolyLogger
         }
 
         // In manual mode (and whenever CAT is off) the LED is hidden and this white box stands in its
-        // place. The wheel has to work on what is on the screen, so it works here too: it moves the
-        // number the operator is going to log, and - if a radio is connected at all - moves the radio
-        // with it. Its base is what the BOX says, not what the radio says: in manual mode the box is
-        // the one the operator is working with, and the two need not agree.
+        // place. The wheel works on it too, but it moves only the number the operator is going to log -
+        // never the radio. Its base is what the BOX says, not what the radio says: in manual mode the
+        // box is the one the operator is working with, and the two need not agree.
         private readonly FrequencyWheel _noCatWheel = new FrequencyWheel();
 
         private void FreqNoCat_PreviewMouseWheel(object sender, System.Windows.Input.MouseWheelEventArgs e)
@@ -1349,12 +1348,10 @@ namespace HolyLogger
             _noCatZoneX = e.GetPosition(TB_FreqNoCat).X;
             ShowNoCatWheelZone();
 
-            // And the radio, when there is one listening.
-            if (Properties.Settings.Default.EnableOmniRigCAT && OmniRigEngine != null && Rig != null
-                && Rig.Status == OmniRig.RigStatusX.ST_ONLINE)
-            {
-                QueueWheelTune(target.Value);
-            }
+            // NEVER THE RADIO. This box is on screen in Manual mode or with CAT off, and Manual means
+            // the operator's number and the radio go their own ways: the radio's knob does not move
+            // this box, so this box does not move the radio either. It used to tune the radio as well
+            // when one was connected; he ruled that out (2026-11-26).
         }
 
         /// <summary>
