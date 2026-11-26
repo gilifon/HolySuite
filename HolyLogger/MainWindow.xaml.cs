@@ -12304,8 +12304,6 @@ namespace HolyLogger
         private void UpdateFreqLed()
         {
             if (FreqLedLive == null || FreqLedGhost == null) return;
-            // While the user is typing in the inline editor, leave the display alone.
-            if (TB_FreqLedEdit != null && TB_FreqLedEdit.Visibility == Visibility.Visible) return;
 
             // The LED display is only valid when the frequency comes live from the rig — i.e. CAT is
             // enabled AND the selected rig is online. Whenever it isn't (CAT disabled, no rig defined,
@@ -12537,73 +12535,11 @@ namespace HolyLogger
             UpdateBandPickAvailability();
         }
 
-        // Click the LED to edit. Show an inline TextBox pre-filled with the current kHz value.
-        private void FreqLed_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
-        {
-            string raw = (TB_Frequency.Text ?? string.Empty).Trim();
-            string editVal = string.Empty;
-            if (double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out double mhz) && mhz > 0)
-            {
-                long hz = (long)Math.Round(mhz * 1000000.0);
-                editVal = (hz / 1000).ToString(CultureInfo.InvariantCulture) + "." + (hz % 1000).ToString("D3", CultureInfo.InvariantCulture);
-            }
-
-            FreqLedGhost.Visibility = Visibility.Collapsed;
-            FreqLedLive.Visibility = Visibility.Collapsed;
-            TB_FreqLedEdit.Text = editVal;
-            TB_FreqLedEdit.Visibility = Visibility.Visible;
-            TB_FreqLedEdit.Focus();
-            TB_FreqLedEdit.SelectAll();
-        }
-
-        // Commit the inline edit: the editor is in kHz; convert back to MHz for TB_Frequency so the
-        // stored format (and every consumer of it) stays exactly as before.
-        private void CommitFreqLedEdit()
-        {
-            TB_FreqLedEdit.Visibility = Visibility.Collapsed;
-            FreqLedGhost.Visibility = Visibility.Visible;
-            FreqLedLive.Visibility = Visibility.Visible;
-
-            string txt = (TB_FreqLedEdit.Text ?? string.Empty).Trim();
-            if (double.TryParse(txt, NumberStyles.Float, CultureInfo.InvariantCulture, out double kHz) && kHz > 0)
-            {
-                double mhz = kHz / 1000.0;
-                TB_Frequency.Text = mhz.ToString("0.0#####", CultureInfo.InvariantCulture);
-            }
-            UpdateFreqLed();
-        }
-
-        private void TB_FreqLedEdit_KeyDown(object sender, KeyEventArgs e)
-        {
-            if (e.Key == Key.Enter)
-            {
-                CommitFreqLedEdit();
-                e.Handled = true;
-                return;
-            }
-            if (e.Key == Key.Escape)
-            {
-                TB_FreqLedEdit.Visibility = Visibility.Collapsed;
-                FreqLedGhost.Visibility = Visibility.Visible;
-                FreqLedLive.Visibility = Visibility.Visible;
-                UpdateFreqLed();
-                e.Handled = true;
-                return;
-            }
-            // Allow only digits and a single decimal point.
-            bool isDigit = (e.Key >= Key.D0 && e.Key <= Key.D9) || (e.Key >= Key.NumPad0 && e.Key <= Key.NumPad9);
-            bool isDot = e.Key == Key.OemPeriod || e.Key == Key.Decimal;
-            if (isDot && TB_FreqLedEdit.Text.IndexOf('.') > -1) { e.Handled = true; return; }
-            if (!isDigit && !isDot && e.Key != Key.Back && e.Key != Key.Delete &&
-                e.Key != Key.Left && e.Key != Key.Right && e.Key != Key.Tab)
-                e.Handled = true;
-        }
-
-        private void TB_FreqLedEdit_LostFocus(object sender, RoutedEventArgs e)
-        {
-            if (TB_FreqLedEdit.Visibility == Visibility.Visible)
-                CommitFreqLedEdit();
-        }
+        // NO EDITING OVER THE LED. The LED shows only while the radio is on CAT, and then the frequency
+        // is what the radio says - there is nothing to type. It used to open an editor on a click; a
+        // typed number did not tune the radio, it only put a different frequency in the log until the
+        // radio next moved, and a click that closed the right-click menu opened it by mistake (removed
+        // 2026-11-26). To change frequency with CAT on: the radio's knob, or the mouse wheel on the LED.
 
         private void TB_Frequency_KeyDown(object sender, KeyEventArgs e)
         {
@@ -15971,14 +15907,11 @@ namespace HolyLogger
             }
         }
 
-        // True while the caret is in one of the two frequency editors - the no-CAT box, or the inline
-        // editor over the LED. Both treat Esc as "undo this edit", which only reaches them if the
-        // window-wide Esc stands aside.
+        // True while the caret is in the no-CAT frequency box. It treats Esc as "undo this edit", which
+        // only reaches it if the window-wide Esc stands aside.
         private bool IsEditingFrequency()
         {
-            return (TB_FreqNoCat != null && TB_FreqNoCat.IsKeyboardFocused)
-                || (TB_FreqLedEdit != null && TB_FreqLedEdit.IsKeyboardFocused
-                    && TB_FreqLedEdit.Visibility == Visibility.Visible);
+            return TB_FreqNoCat != null && TB_FreqNoCat.IsKeyboardFocused;
         }
 
         // Central handler for the application-wide function keys. Returns true if the key was handled.
