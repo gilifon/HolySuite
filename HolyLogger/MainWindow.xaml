@@ -1149,9 +1149,15 @@
                      takes the radio's sound off the USB line; Play sends a recording on the air the way
                      the Msg buttons do. Centred over the Msg frame by AlignQsoAudioBar, measured, not
                      guessed; the 462 is only where it starts before that runs. -->
-                <StackPanel x:Name="QsoAudioBar" Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center"
-                            Margin="462,0,0,0" Visibility="Collapsed"
-                            SizeChanged="QsoAudioBar_SizeChanged" IsVisibleChanged="QsoAudioBar_IsVisibleChanged">
+                <!-- ONE FRAME ROUND BOTH (his request, 2026-11-26), so they read as one group. To keep the
+                     menu row exactly as tall as before, the buttons went from 26 to 22 high and the frame
+                     (1 + 2 + 22 + 2 + 1 = 28) gives back 1 px top and bottom with its negative margin: it
+                     takes 26 in the layout, the same as the buttons alone did. -->
+                <Border x:Name="QsoAudioBar" HorizontalAlignment="Left" VerticalAlignment="Center"
+                        Margin="462,-1,0,-1" Visibility="Collapsed" Padding="3,2,3,2"
+                        BorderBrush="Black" BorderThickness="1" CornerRadius="6" SnapsToDevicePixels="True"
+                        SizeChanged="QsoAudioBar_SizeChanged" IsVisibleChanged="QsoAudioBar_IsVisibleChanged">
+                <StackPanel Orientation="Horizontal">
                     <!-- REC QSO WHITE ON BLUE, PLAY WHITE ON GREEN (his design, 2026-11-26). While one is
                          working, its second word gives way to a black square - the stop sign
                          (PaintQsoAudioBar). Their own template: the Windows one paints a pale blue over
@@ -1162,7 +1168,7 @@
                         <Style x:Key="QsoBarButtonStyle" TargetType="Button">
                             <Setter Property="FontSize" Value="16"/>
                             <Setter Property="FontWeight" Value="SemiBold"/>
-                            <Setter Property="Height" Value="26"/>
+                            <Setter Property="Height" Value="22"/>
                             <Setter Property="Width" Value="100"/>
                             <Setter Property="Foreground" Value="White"/>
                             <Setter Property="Cursor" Value="Hand"/>
@@ -1190,12 +1196,13 @@
                         </Style>
                     </StackPanel.Resources>
                     <Button x:Name="Btn_QsoRecord" Content="REC QSO" Style="{StaticResource QsoBarButtonStyle}"
-                            Background="#1565C0" BorderBrush="#0D47A1" Click="QsoRecord_Click"
+                            Background="#1565C0" BorderBrush="#1565C0" Click="QsoRecord_Click"
                             ToolTip="Record the radio's sound. Press again to stop."/>
                     <Button x:Name="Btn_QsoPlay" Content="PLAY" Style="{StaticResource QsoBarButtonStyle}" Margin="8,0,0,0"
-                            Background="#2E7D32" BorderBrush="#1B5E20" Click="QsoPlay_Click"
+                            Background="#2E7D32" BorderBrush="#2E7D32" Click="QsoPlay_Click"
                             ToolTip="Send a recording on the air. Esc stops it."/>
                 </StackPanel>
+                </Border>
 
                 <!-- SATELLITE MODE IS ON. Nothing else on the main window said so, and the operator
                      could work a whole session without knowing every QSO was being marked as a

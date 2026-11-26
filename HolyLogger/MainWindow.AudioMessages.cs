@@ -489,10 +489,12 @@ namespace HolyLogger
                 bool ssb = !IsCwModeActive() && !IsRttyModeActive();
                 bool recording = _qsoRec != null;
                 bool playing = _pcMsgNumber == QsoPlayNumber || _qsoListenPlayer != null;
-                QsoAudioBar.Visibility = (ssb || recording || playing) ? Visibility.Visible : Visibility.Collapsed;
-
                 bool canRecord = _radioSoundCardPresent || recording;
                 bool canPlay = _radioSoundOutPresent || playing;
+
+                // No button to show, no frame either - an empty frame would sit there meaning nothing.
+                QsoAudioBar.Visibility = (ssb || recording || playing) && (canRecord || canPlay)
+                                         ? Visibility.Visible : Visibility.Collapsed;
                 Btn_QsoRecord.Visibility = canRecord ? Visibility.Visible : Visibility.Collapsed;
                 Btn_QsoPlay.Visibility = canPlay ? Visibility.Visible : Visibility.Collapsed;
                 Btn_QsoPlay.Margin = canRecord ? new Thickness(8, 0, 0, 0) : new Thickness(0);
@@ -557,7 +559,8 @@ namespace HolyLogger
                 double left = frameLeft + (PlayCommandsBorder.ActualWidth - QsoAudioBar.ActualWidth) / 2;
                 if (left < 0) left = 0;
                 if (Math.Abs(left - QsoAudioBar.Margin.Left) < 0.5) return;
-                QsoAudioBar.Margin = new Thickness(left, 0, 0, 0);
+                var m = QsoAudioBar.Margin;   // top and bottom stay as the XAML set them (the -1s)
+                QsoAudioBar.Margin = new Thickness(left, m.Top, m.Right, m.Bottom);
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
         }
@@ -934,6 +937,106 @@ namespace HolyLogger
     {
         int _choice;
 
+        // ── HOW EACH BUTTON LOOKS (his design, 2026-11-26) ──────────────────────────────────────────
+        //
+        // Transmit: light red, with a radiating mast. Listen: light green, with a speaker. Cancel: white
+        // on blue. Anything else (the Save window's two) a plain light grey. Icon and words centred in the
+        // button, like Cancel (his request). Drawn here, not image files: they take the text colour and stay
+        // sharp at any screen scaling. Their own template, so the mouse only lightens a button's own colour
+        // instead of Windows painting its pale blue over it.
+        internal enum Look { Plain, Transmit, Listen, Cancel }
+
+        static Look LookOf(string text, bool isCancel)
+        {
+            if (isCancel) return Look.Cancel;
+            if (text.StartsWith("Transmit", StringComparison.OrdinalIgnoreCase)) return Look.Transmit;
+            if (text.StartsWith("Listen", StringComparison.OrdinalIgnoreCase)) return Look.Listen;
+            return Look.Plain;
+        }
+
+        static Brush Frozen(string hex)
+        {
+            var b = (Brush)new BrushConverter().ConvertFromString(hex);
+            b.Freeze();
+            return b;
+        }
+
+        static readonly Brush DarkInk = Frozen("#222222");
+
+        static ControlTemplate _template;
+        static ControlTemplate ChoiceTemplate
+        {
+            get
+            {
+                if (_template == null)
+                    _template = (ControlTemplate)System.Windows.Markup.XamlReader.Parse(
+                        "<ControlTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation'"
+                      + " xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml' TargetType='Button'>"
+                      + "<Grid SnapsToDevicePixels='True'>"
+                      + "<Border Background='{TemplateBinding Background}' BorderBrush='{TemplateBinding BorderBrush}' BorderThickness='1' CornerRadius='5'/>"
+                      + "<Border x:Name='Shade' Background='White' Opacity='0' CornerRadius='5' Margin='1'/>"
+                      + "<ContentPresenter Margin='{TemplateBinding Padding}' HorizontalAlignment='{TemplateBinding HorizontalContentAlignment}' VerticalAlignment='Center'/>"
+                      + "</Grid>"
+                      + "<ControlTemplate.Triggers>"
+                      + "<Trigger Property='IsMouseOver' Value='True'><Setter TargetName='Shade' Property='Opacity' Value='0.3'/></Trigger>"
+                      + "<Trigger Property='IsPressed' Value='True'><Setter TargetName='Shade' Property='Background' Value='Black'/><Setter TargetName='Shade' Property='Opacity' Value='0.12'/></Trigger>"
+                      + "</ControlTemplate.Triggers>"
+                      + "</ControlTemplate>");
+                return _template;
+            }
+        }
+
+        // A mast with waves going out both sides - "on the air".
+        static UIElement TransmitIcon(Brush ink)
+        {
+            var c = new Canvas { Width = 24, Height = 24 };
+            c.Children.Add(Stroke("M12,11 L8,22 M12,11 L16,22 M9.1,19 L14.9,19", ink));
+            c.Children.Add(Stroke("M8.2,5.6 A5,5 0 0 0 8.2,12.4 M15.8,5.6 A5,5 0 0 1 15.8,12.4", ink));
+            c.Children.Add(Stroke("M5.2,2.8 A9,9 0 0 0 5.2,15.2 M18.8,2.8 A9,9 0 0 1 18.8,15.2", ink));
+            c.Children.Add(new Ellipse { Width = 4, Height = 4, Fill = ink, Margin = new Thickness(10, 7, 0, 0) });
+            return new Viewbox { Width = 22, Height = 22, Child = c };
+        }
+
+        // A loudspeaker with two sound waves - "in my speakers".
+        static UIElement SpeakerIcon(Brush ink)
+        {
+            var c = new Canvas { Width = 24, Height = 24 };
+            c.Children.Add(new Path { Data = Geometry.Parse("M3,9 L7,9 L12,4.5 L12,19.5 L7,15 L3,15 Z"), Fill = ink });
+            c.Children.Add(Stroke("M15,9 A4.2,4.2 0 0 1 15,15", ink));
+            c.Children.Add(Stroke("M17.6,6 A8,8 0 0 1 17.6,18", ink));
+            return new Viewbox { Width = 22, Height = 22, Child = c };
+        }
+
+        // The button's words, with LAST in bold wherever it appears (his request) - it is the name of a
+        // file, and the eye should find it.
+        static TextBlock Words(string text, Brush ink)
+        {
+            var tb = new TextBlock { Foreground = ink, VerticalAlignment = VerticalAlignment.Center };
+            const string bold = "LAST";
+            int at = 0;
+            while (true)
+            {
+                int i = text.IndexOf(bold, at, StringComparison.Ordinal);
+                if (i < 0) { if (at < text.Length) tb.Inlines.Add(new System.Windows.Documents.Run(text.Substring(at))); break; }
+                if (i > at) tb.Inlines.Add(new System.Windows.Documents.Run(text.Substring(at, i - at)));
+                tb.Inlines.Add(new System.Windows.Documents.Run(bold) { FontWeight = FontWeights.Bold });
+                at = i + bold.Length;
+            }
+            return tb;
+        }
+
+        static Path Stroke(string data, Brush ink)
+        {
+            return new Path
+            {
+                Data = Geometry.Parse(data),
+                Stroke = ink,
+                StrokeThickness = 1.9,
+                StrokeStartLineCap = PenLineCap.Round,
+                StrokeEndLineCap = PenLineCap.Round
+            };
+        }
+
         QsoAudioChoiceWindow(string title, string key, int defaultChoice, string[] choices)
         {
             Title = title;
@@ -961,13 +1064,44 @@ namespace HolyLogger
 
         Button Choice(string text, int value, bool isDefault, bool isCancel)
         {
+            Look look = LookOf(text, isCancel);
+            // EVERY BUTTON IN A FINE BLACK FRAME with rounded corners (his request): one pixel, the same
+            // round corners as the face.
+            Brush back, ink;
+            Brush border = Brushes.Black;
+            switch (look)
+            {
+                case Look.Transmit: back = Frozen("#FFCDD2"); ink = DarkInk; break;
+                case Look.Listen:   back = Frozen("#C8E6C9"); ink = DarkInk; break;
+                case Look.Cancel:   back = Frozen("#1565C0"); ink = Brushes.White; break;
+                default:            back = Frozen("#E8E8E8"); ink = DarkInk; break;
+            }
+
+            TextBlock words = Words(text, ink);
+            object content = words;
+            var align = HorizontalAlignment.Center;
+            if (look == Look.Transmit || look == Look.Listen)
+            {
+                var row = new StackPanel { Orientation = Orientation.Horizontal };
+                row.Children.Add(look == Look.Transmit ? TransmitIcon(ink) : SpeakerIcon(ink));
+                words.Margin = new Thickness(12, 0, 0, 0);
+                row.Children.Add(words);
+                content = row;
+            }
+
             var b = new Button
             {
-                Content = text,
-                MinWidth = 220,
-                Height = 34,
-                Padding = new Thickness(12, 0, 12, 0),
+                Content = content,
+                Template = ChoiceTemplate,
+                Background = back,
+                BorderBrush = border,
+                Foreground = ink,
+                MinWidth = 240,
+                Height = 38,
+                Padding = new Thickness(16, 0, 16, 0),
+                HorizontalContentAlignment = align,
                 Margin = new Thickness(0, 0, 0, 8),
+                Cursor = System.Windows.Input.Cursors.Hand,
                 IsDefault = isDefault,
                 IsCancel = isCancel
             };
