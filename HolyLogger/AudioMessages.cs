@@ -64,6 +64,10 @@ namespace HolyLogger
             // Where Save As and Browse open next time: the folder he last saved to or picked from.
             public string LastFolder { get; set; } = string.Empty;
 
+            // The same for the Record / Play buttons over the Msg keys - their own folder, so saving a
+            // QSO does not move where the Msg recordings open.
+            public string QsoFolder { get; set; } = string.Empty;
+
             // THE KEYS' NAMES WHILE THEY PLAY PC FILES (his request, 2026-11-26). The radio's memory
             // keeps its own names (VoiceMsgLabelsJson); these are a second set, so switching the source
             // switches the names. Null until first used, when they start as copies of the radio names.
@@ -130,7 +134,18 @@ namespace HolyLogger
                 File.WriteAllText(ConfigPath, JsonConvert.SerializeObject(Settings, Formatting.Indented));
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+            // The PLAY button over the Msg keys shows only when the card to the radio is there.
+            var saved = SettingsSaved;
+            if (saved != null)
+            {
+                try { saved(); }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
+            }
         }
+
+        /// <summary>Raised after the settings were written - for example, a new sound card to the radio.</summary>
+        public static event Action SettingsSaved;
 
         /// <summary>True: the Msg buttons play the recordings on this PC. False: the radio's own memory.</summary>
         public static bool UsePc

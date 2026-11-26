@@ -1144,6 +1144,59 @@
                            Margin="677,0,6,0" VerticalAlignment="Center"
                            FontWeight="Bold" Foreground="{DynamicResource TextBrush}" FontSize="20" IsHitTestVisible="False" Visibility="Collapsed"/>
 
+                <!-- RECORD AND PLAY (his design, 2026-11-26): in SSB the bar over the four Msg buttons is
+                     empty (CQ / ANS and the CW typing line belong to CW), so these two sit there. Record
+                     takes the radio's sound off the USB line; Play sends a recording on the air the way
+                     the Msg buttons do. Centred over the Msg frame by AlignQsoAudioBar, measured, not
+                     guessed; the 462 is only where it starts before that runs. -->
+                <StackPanel x:Name="QsoAudioBar" Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center"
+                            Margin="462,0,0,0" Visibility="Collapsed"
+                            SizeChanged="QsoAudioBar_SizeChanged" IsVisibleChanged="QsoAudioBar_IsVisibleChanged">
+                    <!-- REC QSO WHITE ON BLUE, PLAY WHITE ON GREEN (his design, 2026-11-26). While one is
+                         working, its second word gives way to a black square - the stop sign
+                         (PaintQsoAudioBar). Their own template: the Windows one paints a pale blue over
+                         any colour on mouse-over, and white text vanished in it; here the mouse only
+                         lightens the button's own colour. Fixed width, so nothing jumps when the square
+                         replaces the word. -->
+                    <StackPanel.Resources>
+                        <Style x:Key="QsoBarButtonStyle" TargetType="Button">
+                            <Setter Property="FontSize" Value="16"/>
+                            <Setter Property="FontWeight" Value="SemiBold"/>
+                            <Setter Property="Height" Value="26"/>
+                            <Setter Property="Width" Value="100"/>
+                            <Setter Property="Foreground" Value="White"/>
+                            <Setter Property="Cursor" Value="Hand"/>
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="Button">
+                                        <Grid SnapsToDevicePixels="True">
+                                            <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                                                    BorderThickness="1" CornerRadius="4"/>
+                                            <Border x:Name="Shade" Background="White" Opacity="0" CornerRadius="4" Margin="1"/>
+                                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Grid>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="Shade" Property="Opacity" Value="0.18"/>
+                                            </Trigger>
+                                            <Trigger Property="IsPressed" Value="True">
+                                                <Setter TargetName="Shade" Property="Background" Value="Black"/>
+                                                <Setter TargetName="Shade" Property="Opacity" Value="0.2"/>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                    </StackPanel.Resources>
+                    <Button x:Name="Btn_QsoRecord" Content="REC QSO" Style="{StaticResource QsoBarButtonStyle}"
+                            Background="#1565C0" BorderBrush="#0D47A1" Click="QsoRecord_Click"
+                            ToolTip="Record the radio's sound. Press again to stop."/>
+                    <Button x:Name="Btn_QsoPlay" Content="PLAY" Style="{StaticResource QsoBarButtonStyle}" Margin="8,0,0,0"
+                            Background="#2E7D32" BorderBrush="#1B5E20" Click="QsoPlay_Click"
+                            ToolTip="Send a recording on the air. Esc stops it."/>
+                </StackPanel>
+
                 <!-- SATELLITE MODE IS ON. Nothing else on the main window said so, and the operator
                      could work a whole session without knowing every QSO was being marked as a
                      satellite contact. Right-aligned rather than placed beside the clock: the clock is
