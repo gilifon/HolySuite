@@ -134,7 +134,12 @@ namespace HolyLogger
 
             if (!AudioMessages.HasRecording(n))
             {
-                if (HolyMessageBox.ShowConfirm("Msg " + n + " has no recording yet.\n\nOpen Audio Messages to record it?",
+                // No file chosen, or the chosen one is gone (moved, deleted, a USB stick taken out).
+                string chosen = AudioMessages.FilePath(n);
+                string why = chosen.Length == 0
+                    ? "Msg " + n + " has no sound file yet."
+                    : "The sound file of Msg " + n + " is not there any more:\n" + chosen;
+                if (HolyMessageBox.ShowConfirm(why + "\n\nOpen Audio Messages to record or choose one?",
                                                "Voice Message", HolyMsgType.Info, this))
                     OpenAudioMessagesWindow(n);
                 return;

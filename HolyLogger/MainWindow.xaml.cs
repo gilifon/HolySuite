@@ -3503,7 +3503,8 @@ namespace HolyLogger
             string key = "F" + (messageNumber + 4);
             var dialog = new Window
             {
-                Title = "Name Msg " + messageNumber + " (" + key + ")",
+                Title = "Name Msg " + messageNumber + " (" + key + ")"
+                        + (AudioMessages.UsePc ? " - PC files" : " - radio memory"),
                 Width = 340,
                 SizeToContent = SizeToContent.Height,
                 ResizeMode = ResizeMode.NoResize,
@@ -4918,6 +4919,10 @@ namespace HolyLogger
         // writes depends on the mode the name was given (or is being given) in.
         private static string MsgButtonLabel(int messageNumber, bool isCw)
         {
+            // SSB NAMES FOLLOW THE SOURCE (his request, 2026-11-26): one set while the keys play PC
+            // files, another while they play the radio's memory - see AudioMessages.PcName.
+            if (!isCw && AudioMessages.UsePc) return AudioMessages.PcName(messageNumber);
+
             string setting = isCw ? CwKeyboardWindow.MsgLabelsSettingFor(CwKeyboardWindow.MsgAnswerSetOn)
                                   : CwKeyboardWindow.VoiceMsgLabelsSetting;
             string[] labels = CwKeyboardWindow.ReadLabels(setting, 4);
@@ -4930,6 +4935,7 @@ namespace HolyLogger
         private static void SaveMsgButtonLabel(int messageNumber, string label, bool isCw)
         {
             if (messageNumber < 1 || messageNumber > 4) return;
+            if (!isCw && AudioMessages.UsePc) { AudioMessages.SetPcName(messageNumber, label); return; }
 
             string setting = isCw ? CwKeyboardWindow.MsgLabelsSettingFor(CwKeyboardWindow.MsgAnswerSetOn)
                                   : CwKeyboardWindow.VoiceMsgLabelsSetting;

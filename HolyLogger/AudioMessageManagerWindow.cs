@@ -112,6 +112,7 @@ namespace HolyLogger
         readonly Button[] _record = new Button[AudioMessages.Count + 1];
         readonly Button[] _play = new Button[AudioMessages.Count + 1];
         readonly Button[] _delete = new Button[AudioMessages.Count + 1];
+        readonly TextBox[] _files = new TextBox[AudioMessages.Count + 1];
 
         WaveInRecorder _mic;
         WindowsMicLevel _micLevel;
@@ -192,7 +193,7 @@ namespace HolyLogger
             // ── THE FOUR MESSAGES ───────────────────────────────────────────────────────────────────
             page.Children.Add(Heading("Messages", 14));
             var rows = new Grid();
-            for (int c = 0; c < 6; c++) rows.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            for (int c = 0; c < 8; c++) rows.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             for (int n = 1; n <= AudioMessages.Count; n++)
             {
                 int msg = n;
@@ -205,9 +206,24 @@ namespace HolyLogger
                 _record[n].Click += (s, e) => RecordClicked(msg);
                 _play[n] = SmallButton("Play");
                 _play[n].Click += (s, e) => PlayClicked(msg);
-                _delete[n] = SmallButton("Delete");
-                _delete[n].Click += (s, e) => DeleteClicked(msg);
-                _lengths[n] = new TextBlock { MinWidth = 90, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6, 0, 0, 0) };
+                // CLEAR, NOT DELETE (2026-11-26): the file is his now, chosen by him and kept where he
+                // put it, so this only takes it off the key. The file stays on the disk.
+                _delete[n] = SmallButton("Clear");
+                _delete[n].Click += (s, e) => ClearClicked(msg);
+                _lengths[n] = new TextBlock { MinWidth = 62, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(8, 0, 0, 0) };
+
+                // THE FILE THIS KEY PLAYS, and Browse to choose another (his design, 2026-11-26).
+                _files[n] = new TextBox
+                {
+                    Width = 250, Height = 30, IsReadOnly = true, VerticalContentAlignment = VerticalAlignment.Center,
+                    Margin = new Thickness(6, 3, 0, 3), IsTabStop = false
+                };
+                var browse = new Button
+                {
+                    Content = FolderIcon(), Width = 36, Height = 30, Margin = new Thickness(4, 3, 0, 3),
+                    ToolTip = "Choose the sound file for this key"
+                };
+                browse.Click += (s, e) => BrowseClicked(msg);
 
                 Put(rows, _keycaps[n], n - 1, 0);
                 Put(rows, renameBtn, n - 1, 1);
@@ -215,9 +231,11 @@ namespace HolyLogger
                 Put(rows, _play[n], n - 1, 3);
                 Put(rows, _delete[n], n - 1, 4);
                 Put(rows, _lengths[n], n - 1, 5);
+                Put(rows, _files[n], n - 1, 6);
+                Put(rows, browse, n - 1, 7);
             }
             page.Children.Add(rows);
-            _status = Muted("Play sends the recording to your speakers, so you can hear it before it goes on the air.");
+            _status = Muted("Play sends the sound to your speakers, so you can hear it before it goes on the air.");
             _status.Margin = new Thickness(0, 6, 0, 0);
             page.Children.Add(_status);
 
@@ -344,7 +362,7 @@ namespace HolyLogger
 
         static Button SmallButton(string text)
         {
-            return new Button { Content = text, MinWidth = 104, Height = 30, Padding = new Thickness(8, 0, 8, 0), Margin = new Thickness(6, 3, 0, 3) };
+            return new Button { Content = text, MinWidth = 0, Height = 30, Padding = new Thickness(8, 0, 8, 0), Margin = new Thickness(6, 3, 0, 3) };
         }
 
         static RadioButton SourceChoice(UIElement icon, string text)
@@ -637,10 +655,6 @@ namespace HolyLogger
                 HolyMessageBox.ShowWarning("The microphone cannot be opened. Choose another device above.", "Audio Messages", this);
                 return;
             }
-            if (AudioMessages.HasRecording(n)
-                && !HolyMessageBox.ShowConfirm(Shown(n) + " already has a recording.\n\nRecord over it?", "Audio Messages", HolyMsgType.Warning, this))
-                return;
-
             lock (_captureGate)
             {
                 _captured = new List<short>(AudioMessages.MaxSeconds * 22050);
@@ -673,11 +687,111 @@ namespace HolyLogger
             }
             if (AudioMessages.Settings.TrimSilence) samples = AudioMessages.TrimSilence(samples, rate);
 
-            if (AudioMessages.Save(n, samples, rate))
-                _status.Text = Shown(n) + " recorded, " + (samples.Length / (double)rate).ToString("0.0") + " s. Press Play to hear it.";
-            else
-                _status.Text = Shown(n) + " could not be saved.";
+            // SAVE AS - HE NAMES IT AND PUTS IT WHERE HE WANTS (his design, 2026-11-26). Cancel drops the
+            // recording, and the key keeps the file it had.
+            var dialog = new Microsoft.Win32.SaveFileDialog
+            {
+                Title = "Save the recording of " + Shown(n),
+                Filter = "Sound files (*.wav)|*.wav",
+                DefaultExt = ".wav",
+                AddExtension = true,
+                OverwritePrompt = true,
+                FileName = SuggestedName(n),
+            };
+            string folder = StartFolder(n);
+            if (folder != null) dialog.InitialDirectory = folder;
+
+            if (dialog.ShowDialog(this) != true)
+            {
+                _status.Text = "The recording was not kept.";
+                return;
+            }
+
+            string path = dialog.FileName;
+            if (_playingN != 0) StopPlaying();      // never write over a file that is playing
+            if (!AudioMessages.Save(path, samples, rate))
+            {
+                _status.Text = "The recording could not be saved to " + path;
+                return;
+            }
+            RememberFolder(path);
+            AudioMessages.SetFile(n, path);
+            _status.Text = Shown(n) + " recorded, " + (samples.Length / (double)rate).ToString("0.0") + " s. Press Play to hear it.";
             ShowLengths();
+        }
+
+        void BrowseClicked(int n)
+        {
+            if (_recordingN != 0) return;
+            var dialog = new Microsoft.Win32.OpenFileDialog
+            {
+                Title = "Choose the sound file for " + Shown(n),
+                Filter = "Sound files (*.wav)|*.wav",
+                CheckFileExists = true,
+            };
+            string folder = StartFolder(n);
+            if (folder != null) dialog.InitialDirectory = folder;
+            if (dialog.ShowDialog(this) != true) return;
+
+            short[] samples; int rate;
+            if (!AudioMessages.Load(dialog.FileName, out samples, out rate))
+            {
+                HolyMessageBox.ShowWarning("This file cannot be played.\n\nChoose a WAV file in 16-bit PCM.", "Audio Messages", this);
+                return;
+            }
+            if (_playingN == n) StopPlaying();
+            RememberFolder(dialog.FileName);
+            AudioMessages.SetFile(n, dialog.FileName);
+            _status.Text = Shown(n) + " now plays " + System.IO.Path.GetFileName(dialog.FileName) + ".";
+            ShowLengths();
+        }
+
+        void ClearClicked(int n)
+        {
+            if (AudioMessages.FilePath(n).Length == 0) return;
+            if (_playingN == n) StopPlaying();
+            AudioMessages.SetFile(n, null);
+            _status.Text = Shown(n) + " has no file now. The file itself was not deleted.";
+            ShowLengths();
+        }
+
+        // The name Save As offers: the key's own name, or Msg1 to Msg4.
+        string SuggestedName(int n)
+        {
+            string name = _buttonName != null ? (_buttonName(n) ?? string.Empty).Trim() : string.Empty;
+            if (name.Length == 0) name = "Msg" + n;
+            foreach (char c in System.IO.Path.GetInvalidFileNameChars()) name = name.Replace(c, '_');
+            return name + ".wav";
+        }
+
+        // Where Save As and Browse open: the folder of this key's file, else the last one he used, else
+        // the program's own AudioMessages folder.
+        static string StartFolder(int n)
+        {
+            try
+            {
+                string current = AudioMessages.FilePath(n);
+                if (current.Length > 0)
+                {
+                    string dir = System.IO.Path.GetDirectoryName(current);
+                    if (System.IO.Directory.Exists(dir)) return dir;
+                }
+                string last = AudioMessages.Settings.LastFolder;
+                if (!string.IsNullOrEmpty(last) && System.IO.Directory.Exists(last)) return last;
+                System.IO.Directory.CreateDirectory(AudioMessages.Folder);
+                return AudioMessages.Folder;
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); return null; }
+        }
+
+        static void RememberFolder(string path)
+        {
+            try
+            {
+                AudioMessages.Settings.LastFolder = System.IO.Path.GetDirectoryName(path) ?? string.Empty;
+                AudioMessages.SaveSettings();
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
         }
 
         void PlayClicked(int n)
@@ -717,17 +831,6 @@ namespace HolyLogger
             ShowButtons();
         }
 
-        void DeleteClicked(int n)
-        {
-            if (!AudioMessages.HasRecording(n)) return;
-            if (!HolyMessageBox.ShowConfirm("Delete the recording of " + Shown(n) + "?", "Audio Messages", HolyMsgType.Warning, this))
-                return;
-            if (_playingN == n) StopPlaying();
-            AudioMessages.Delete(n);
-            _status.Text = Shown(n) + " deleted.";
-            ShowLengths();
-        }
-
         // ── SHOWING ─────────────────────────────────────────────────────────────────────────────────
 
         string Shown(int n)
@@ -750,8 +853,18 @@ namespace HolyLogger
             for (int n = 1; n <= AudioMessages.Count; n++)
             {
                 double secs = AudioMessages.LengthSeconds(n);
-                _lengths[n].Text = secs > 0 ? secs.ToString("0.0") + " s" : "empty";
+                _lengths[n].Text = secs > 0 ? secs.ToString("0.0") + " s" : string.Empty;   // no file: the empty box says it
                 _lengths[n].Foreground = secs > 0 ? ThemeManager.Brush("TextBrush") : ThemeManager.Brush("MutedTextBrush");
+
+                // The file's name in the box, the whole path when the mouse rests on it. A chosen file
+                // that is no longer there is shown in red, so he sees why the key will not play.
+                string path = AudioMessages.FilePath(n);
+                bool there = AudioMessages.HasRecording(n);
+                _files[n].Text = path.Length == 0 ? string.Empty : System.IO.Path.GetFileName(path);
+                _files[n].ToolTip = path.Length == 0 ? "No file - record one, or choose one with the folder button"
+                                  : there ? path : path + "\n(the file is not there any more)";
+                _files[n].Foreground = path.Length > 0 && !there ? Brushes.Firebrick : ThemeManager.Brush("TextBrush");
+                if (path.Length > 0 && !there) _lengths[n].Text = "missing";
             }
             ShowButtons();
         }
@@ -767,7 +880,7 @@ namespace HolyLogger
                 _record[n].Foreground = recordingThis ? Brushes.Firebrick : ThemeManager.Brush("TextBrush");
                 _play[n].IsEnabled = has && _recordingN == 0;
                 _play[n].Content = _playingN == n ? Face(StopIcon(), "Stop", true) : Face(PlayIcon(), "Play", _play[n].IsEnabled);
-                _delete[n].IsEnabled = has && _recordingN == 0;
+                _delete[n].IsEnabled = AudioMessages.FilePath(n).Length > 0 && _recordingN == 0;
             }
         }
 
@@ -785,6 +898,18 @@ namespace HolyLogger
             g.Children.Add(new Path { Data = Geometry.Parse("M4,0.5 H8 A2,2 0 0 1 10,2.5 V7.5 A2,2 0 0 1 8,9.5 H4 A2,2 0 0 1 2,7.5 V2.5 A2,2 0 0 1 4,0.5 Z"), Fill = MicRed });
             g.Children.Add(new Path { Data = Geometry.Parse("M0.75,6.5 V7.5 A5.25,5 0 0 0 11.25,7.5 V6.5 M6,12.5 V15 M3,15.25 H9"), Stroke = MicRed, StrokeThickness = 1.5 });
             return g;
+        }
+
+        // An open folder, for Browse.
+        static UIElement FolderIcon()
+        {
+            return new Path
+            {
+                Data = Geometry.Parse("M0.5,2.5 H5.5 L7,4 H14.5 V13.5 H0.5 Z M0.5,6 H14.5"),
+                Stroke = Frozen(Color.FromRgb(0x8D, 0x6E, 0x00)), StrokeThickness = 1.2,
+                Fill = Frozen(Color.FromRgb(0xFF, 0xD5, 0x4F)), Width = 15, Height = 14,
+                HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center
+            };
         }
 
         static UIElement PlayIcon()
