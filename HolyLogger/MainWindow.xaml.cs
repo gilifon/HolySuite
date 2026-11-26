@@ -7076,6 +7076,7 @@ namespace HolyLogger
             UpdateMessageButtonLabel(Btn_Msg3, 3, isCw, isRtty);
             UpdateMessageButtonLabel(Btn_Msg4, 4, isCw, isRtty);
             PaintMsgSetToggle(isCw);
+            PaintQsoAudioBar();
         }
 
         // -- CQ / ANS: WHICH SET THE FOUR SEND IN CW --------------------------------------------
@@ -9471,6 +9472,9 @@ namespace HolyLogger
 
             // And a recording from this PC going out.
             if (_pcMsgNumber != 0 && StopPcMessage()) return true;
+
+            // And PLAY's Listen to LAST / file - only in the speakers, but Esc stops it the same way.
+            if (StopQsoListen()) return true;
 
             int? current = activeVoiceMessageNumber ?? pendingVoiceMessageNumber;
             if (!current.HasValue)
@@ -15982,14 +15986,19 @@ namespace HolyLogger
                 // ClearBtn_Click deliberately leaves the frequency alone, so what the operator had just
                 // typed survived and looked as though Esc had accepted it. F9 still clears the form from
                 // anywhere, including from inside these boxes.
+                //
+                // A TRANSMISSION GOING OUT COMES FIRST (2026-11-26): Esc stops it even with the caret in
+                // a frequency box - before, the box took Esc and the transmitter stayed on. Once nothing
+                // is going out, the next Esc undoes the frequency edit as before.
+                if (key == Key.Escape && StopActiveMessageTransmission())
+                    return true;
+
                 if (key == Key.Escape && IsEditingFrequency())
                     return false;
 
-                // Esc also aborts a message transmission in progress (SSB voice or CW) — the same as
-                // pressing the sending F-key again. If nothing is being transmitted it clears the entry
-                // form as before. (F9 keeps its clear-only behaviour.)
-                if (key == Key.Escape && StopActiveMessageTransmission())
-                    return true;
+                // Esc also aborts a message transmission in progress (SSB voice or CW, a Msg key or the
+                // Play button) — the same as pressing the sending key again. If nothing is being
+                // transmitted it clears the entry form as before. (F9 keeps its clear-only behaviour.)
                 ClearBtn_Click(null, null);
                 return true;
             }
