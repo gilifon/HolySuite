@@ -5067,7 +5067,7 @@ namespace HolyLogger
                 // The WPM readout in its title bar shows what speeds this radio will accept: a
                 // number read back from it that could not be one is dropped rather than shown, and
                 // the wheel over it stops at both ends of the same range.
-                (out int low, out int high) => CwSpeedRange(rigType, out low, out high),
+                (out int low, out int high) => KeyerSpeedRange(rigType, out low, out high),
 
                 // What {LOG} and {WIPE} in a button's text do when that button is pressed.
                 LogQsoFromCwMacro,
@@ -5498,13 +5498,18 @@ namespace HolyLogger
             return false;
         }
 
-        // What this radio will accept, so the keyer can hold its own box to the same range.
+        // THE RANGE THE READOUT AND ITS WHEEL KEEP TO. From a port with a speed of our own (no CAT to
+        // read the radio's), as slow and as fast as anybody sends by hand; otherwise the radio's own.
+        private void KeyerSpeedRange(string rigType, out int low, out int high)
+        {
+            if (CwByPort && !PortFollowsRadio) { low = PortWpmWithoutCat; high = PortWpmWithoutCat; return; }
+            CwSpeedRange(rigType, out low, out high);
+        }
+
+        // What this radio will accept - always the RADIO'S range, since the speed commands are built
+        // from it (an Icom level is scaled over it), whichever way the CW itself goes.
         internal static void CwSpeedRange(string rigType, out int low, out int high)
         {
-            // FROM A PORT THE SPEED IS OURS, not the radio's, and it goes as slow and as fast as
-            // anybody sends by hand.
-            if (CwByPortSetting()) { low = PortCwKeyer.SlowestWpm; high = PortCwKeyer.FastestWpm; return; }
-
             string name = (rigType ?? string.Empty).Trim();
 
             if (IsYaesuKeyer(name))            { low = WpmYaesuLow;    high = WpmYaesuHigh;    return; }
@@ -5578,8 +5583,9 @@ namespace HolyLogger
         // wire in the middle of a message competes with the text going out on it.
         private void AskRadioCwSpeed()
         {
-            // From a port the radio's knob means nothing: the readout is HolyLogger's own speed.
-            if (CwByPort) { ShowCwPortSpeed(); return; }
+            // From a port the readout is the fixed 20 - unless the port follows the radio's knob
+            // (PortFollowsRadio), and then the radio is asked exactly as for CAT keying.
+            if (CwByPort && !PortFollowsRadio) { ShowCwPortSpeed(); return; }
 
             if (!IsCatLive()) return;
 
@@ -5695,7 +5701,7 @@ namespace HolyLogger
             // see SetRadioCwSpeed. The rig is read at the moment it is turned, not now.
             cwLiteKeyer.SetSpeed = wpm => SetRadioCwSpeed(NormalizeRigType(Rig != null ? Rig.RigType : null), wpm);
             cwLiteKeyer.SpeedRange = (out int low, out int high) =>
-                CwSpeedRange(NormalizeRigType(Rig != null ? Rig.RigType : null), out low, out high);
+                KeyerSpeedRange(NormalizeRigType(Rig != null ? Rig.RigType : null), out low, out high);
 
             cwLiteKeyer.HandKeyDown = HandKeyDown;
             cwLiteKeyer.HandKeyUp = HandKeyUp;
@@ -5889,15 +5895,34 @@ namespace HolyLogger
 
         private bool CwByPort { get { return CwByPortSetting(); } }
 
-        // HolyLogger's own keyer speed, the one setting that has always been called that.
-        private static int CwPortWpm
+        // ONE SPEED, WHICHEVER WAY THE CW GOES (his request, 2026-11-26: VVV by CAT and VVV from COM4
+        // came out at two speeds). With CAT up and a radio whose speed can be read, the port keys at
+        // the RADIO'S speed - the knob on the radio, the same number CAT keying uses - and the wheel
+        // over the readout turns the radio. Only without that does HolyLogger keep a speed of its own.
+        private bool PortFollowsRadio
         {
             get
             {
-                int wpm = 20;
-                try { wpm = Properties.Settings.Default.CwKeyerWpm; }
-                catch (Exception swallowed) { Log.Swallow(swallowed); }
-                return Math.Max(PortCwKeyer.SlowestWpm, Math.Min(PortCwKeyer.FastestWpm, wpm <= 0 ? 20 : wpm));
+                try
+                {
+                    if (!IsCatLive()) return false;
+                    int length; string end;
+                    return BuildCwSpeedReadCommand(NormalizeRigType(Rig != null ? Rig.RigType : null), out length, out end) != null;
+                }
+                catch (Exception swallowed) { Log.Swallow(swallowed); return false; }
+            }
+        }
+
+        // The speed the port keys at: the radio's (see PortFollowsRadio), else a FIXED 20 WPM (his rule,
+        // 2026-11-26) - with no CAT there is no radio speed to follow, and the wheel does not move it.
+        internal const int PortWpmWithoutCat = 20;
+
+        private int CwPortWpm
+        {
+            get
+            {
+                int wpm = PortFollowsRadio && cwRadioWpm > 0 ? cwRadioWpm : PortWpmWithoutCat;
+                return Math.Max(PortCwKeyer.SlowestWpm, Math.Min(PortCwKeyer.FastestWpm, wpm));
             }
         }
 
@@ -6011,30 +6036,14 @@ namespace HolyLogger
             UpdateVoiceMessageButtonHighlight();
         }
 
-        // The readout shows HolyLogger's own speed: nothing to ask the radio.
+        // The readout shows the port's fixed 20 (no CAT): nothing to ask the radio.
         private void ShowCwPortSpeed()
         {
             int wpm = CwPortWpm;
-            cwRadioWpm = wpm;
+            if (portCwKeyer != null) portCwKeyer.Wpm = wpm;
             if (cwKeyboard != null) cwKeyboard.ShowSpeed(wpm);
             if (cwLiteKeyer != null) cwLiteKeyer.ShowSpeed(wpm);
             if (cwSendMonitor != null) cwSendMonitor.UpdateWpm(wpm);
-        }
-
-        // The wheel over the readout sets it - and a message already going out changes speed from its
-        // next character, as it does on a radio when the knob is turned.
-        private void SetCwPortSpeed(int wpm)
-        {
-            wpm = Math.Max(PortCwKeyer.SlowestWpm, Math.Min(PortCwKeyer.FastestWpm, wpm));
-            try
-            {
-                Properties.Settings.Default.CwKeyerWpm = wpm;
-                Properties.Settings.Default.Save();
-            }
-            catch (Exception swallowed) { Log.Swallow(swallowed); }
-
-            if (portCwKeyer != null) portCwKeyer.Wpm = wpm;
-            ShowCwPortSpeed();
         }
 
         /// <summary>
@@ -6150,7 +6159,8 @@ namespace HolyLogger
 
         private void SetRadioCwSpeed(string rigType, int wpm)
         {
-            if (CwByPort) { SetCwPortSpeed(wpm); return; }
+            // No CAT behind the port: the speed is a fixed 20 (CwPortWpm), so the wheel only redraws it.
+            if (CwByPort && !PortFollowsRadio) { ShowCwPortSpeed(); return; }
 
             string command = BuildCwSpeedCommand(rigType, wpm);
             if (command == null) return;
@@ -6212,6 +6222,9 @@ namespace HolyLogger
 
             Dispatcher.BeginInvoke(new Action(() =>
             {
+                // The port keyer follows the knob too, from its next letter - see PortFollowsRadio.
+                if (portCwKeyer != null && CwByPort && PortFollowsRadio) portCwKeyer.Wpm = CwPortWpm;
+
                 if (cwKeyboard != null) cwKeyboard.ShowSpeed(wpm);
                 if (cwLiteKeyer != null) cwLiteKeyer.ShowSpeed(wpm);
 

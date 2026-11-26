@@ -93,7 +93,8 @@
                 <!-- THE TEST (his request, 2026-11-26): sends VVV the chosen way. On the CAT row, where the
                      right side was empty, so the frame grows no taller; the answer goes in the note line
                      under the choice (CwViaNote) - red when nothing could go out, and why. -->
-                <Grid>
+                <!-- As wide as the port row below, so the button's right edge stands over the DTR box's. -->
+                <Grid HorizontalAlignment="Left" Width="{Binding ActualWidth, ElementName=CwPortRow}">
                     <RadioButton x:Name="RB_CwViaCat" Content="CAT commands" GroupName="CwVia" FontSize="16"
                                  VerticalAlignment="Center" Checked="CwVia_Changed"/>
                     <Button x:Name="BTN_TestCwVia" Content="Test" Style="{StaticResource GoActionButtonStyle}"
@@ -101,7 +102,7 @@
                             Click="BTN_TestCwVia_Click"
                             ToolTip="Sends VVV the way chosen here. Put the radio in CW first."/>
                 </Grid>
-                <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                <StackPanel x:Name="CwPortRow" Orientation="Horizontal" HorizontalAlignment="Left" Margin="0,8,0,0">
                     <RadioButton x:Name="RB_CwViaPort" Content="Key from" GroupName="CwVia" FontSize="16"
                                  VerticalAlignment="Center" Checked="CwVia_Changed"/>
                     <!-- A port that appeared while this page was open is bold green - see InitCwViaPicker. -->
