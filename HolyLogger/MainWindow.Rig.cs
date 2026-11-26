@@ -1287,9 +1287,6 @@ namespace HolyLogger
             if (!Properties.Settings.Default.EnableOmniRigCAT) return;
             if (OmniRigEngine == null || Rig == null || Rig.Status != OmniRig.RigStatusX.ST_ONLINE) return;
 
-            // Not while the inline editor is open over the LED: the wheel there belongs to the text.
-            if (TB_FreqLedEdit != null && TB_FreqLedEdit.Visibility == Visibility.Visible) return;
-
             double khz;
             try { khz = (double)Rig.GetRxFrequency() / 1000.0; }
             catch (Exception swallowed) { Log.Swallow(swallowed); return; }
@@ -1499,7 +1496,6 @@ namespace HolyLogger
             {
                 bool wheelTunes = _ledZoneX != null
                                   && FreqLedBezel != null && FreqLedBezel.Visibility == Visibility.Visible
-                                  && (TB_FreqLedEdit == null || TB_FreqLedEdit.Visibility != Visibility.Visible)
                                   && Properties.Settings.Default.EnableOmniRigCAT
                                   && OmniRigEngine != null && Rig != null
                                   && Rig.Status == OmniRig.RigStatusX.ST_ONLINE;
