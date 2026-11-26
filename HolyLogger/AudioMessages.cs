@@ -55,6 +55,19 @@ namespace HolyLogger
             public string PttVia { get; set; } = PttCat;
             public string PttPort { get; set; } = string.Empty;
             public string PttLine { get; set; } = "RTS";
+
+            // THE FILE EACH KEY PLAYS (his request, 2026-11-26): any WAV file he chooses, anywhere -
+            // recorded here and saved where he said, or one he picked with Browse. Index 0 is Msg1.
+            // Null in a settings file from before this, which is how the old msg1-4.wav get adopted.
+            public List<string> MessageFiles { get; set; }
+
+            // Where Save As and Browse open next time: the folder he last saved to or picked from.
+            public string LastFolder { get; set; } = string.Empty;
+
+            // THE KEYS' NAMES WHILE THEY PLAY PC FILES (his request, 2026-11-26). The radio's memory
+            // keeps its own names (VoiceMsgLabelsJson); these are a second set, so switching the source
+            // switches the names. Null until first used, when they start as copies of the radio names.
+            public List<string> PcButtonNames { get; set; }
         }
 
         public const string PttCat = "CAT", PttPort = "PORT", PttVox = "VOX";
@@ -103,6 +116,7 @@ namespace HolyLogger
                     }
                     catch (Exception swallowed) { Log.Swallow(swallowed); }
                     if (_config == null) _config = new Config();
+                    AdoptOldRecordings(_config);
                 }
                 return _config;
             }
@@ -139,11 +153,77 @@ namespace HolyLogger
             if (raise != null) raise();
         }
 
-        public static string FilePath(int n) { return Path.Combine(Folder, "msg" + n + ".wav"); }
+        // Where recordings were kept before he chose his own files (2026-11-25 to 26).
+        static string OldFilePath(int n) { return Path.Combine(Folder, "msg" + n + ".wav"); }
+
+        // RECORDINGS MADE BEFORE THE KEYS HAD FILES OF THEIR OWN are kept: each becomes its key's file,
+        // once. After that an empty entry means he cleared it, and it stays empty.
+        static void AdoptOldRecordings(Config cfg)
+        {
+            if (cfg.MessageFiles != null) { while (cfg.MessageFiles.Count < Count) cfg.MessageFiles.Add(string.Empty); return; }
+            cfg.MessageFiles = new List<string>();
+            bool any = false;
+            for (int n = 1; n <= Count; n++)
+            {
+                string old = OldFilePath(n);
+                bool there = false;
+                try { there = File.Exists(old); } catch (Exception swallowed) { Log.Swallow(swallowed); }
+                cfg.MessageFiles.Add(there ? old : string.Empty);
+                any |= there;
+            }
+            if (any) SaveSettings();
+        }
+
+        // The PC set of names, made on first use as a copy of the radio set so no key goes blank.
+        static List<string> PcNames()
+        {
+            var cfg = Settings;
+            if (cfg.PcButtonNames == null)
+            {
+                cfg.PcButtonNames = new List<string>(CwKeyboardWindow.ReadLabels(CwKeyboardWindow.VoiceMsgLabelsSetting, Count));
+                SaveSettings();
+            }
+            while (cfg.PcButtonNames.Count < Count) cfg.PcButtonNames.Add(string.Empty);
+            return cfg.PcButtonNames;
+        }
+
+        /// <summary>Key n's name while the keys play PC files.</summary>
+        public static string PcName(int n)
+        {
+            if (n < 1 || n > Count) return string.Empty;
+            return (PcNames()[n - 1] ?? string.Empty).Trim();
+        }
+
+        public static void SetPcName(int n, string name)
+        {
+            if (n < 1 || n > Count) return;
+            PcNames()[n - 1] = (name ?? string.Empty).Trim();
+            SaveSettings();
+        }
+
+        /// <summary>The file key n plays, or empty when none is chosen.</summary>
+        public static string FilePath(int n)
+        {
+            var files = Settings.MessageFiles;
+            if (n < 1 || n > Count || files == null || files.Count < n) return string.Empty;
+            return (files[n - 1] ?? string.Empty).Trim();
+        }
+
+        /// <summary>Sets (or, with null / empty, clears) the file key n plays. The file itself is not touched.</summary>
+        public static void SetFile(int n, string path)
+        {
+            if (n < 1 || n > Count) return;
+            var files = Settings.MessageFiles;
+            while (files.Count < Count) files.Add(string.Empty);
+            files[n - 1] = path ?? string.Empty;
+            SaveSettings();
+        }
 
         public static bool HasRecording(int n)
         {
-            try { return File.Exists(FilePath(n)); }
+            string path = FilePath(n);
+            if (path.Length == 0) return false;
+            try { return File.Exists(path); }
             catch (Exception swallowed) { Log.Swallow(swallowed); return false; }
         }
 
@@ -155,20 +235,15 @@ namespace HolyLogger
             return s.Length / (double)rate;
         }
 
-        public static void Delete(int n)
-        {
-            try { if (File.Exists(FilePath(n))) File.Delete(FilePath(n)); }
-            catch (Exception swallowed) { Log.Swallow(swallowed); }
-        }
-
         // ── WAV FILES ──────────────────────────────────────────────────────────────────────────────
 
-        public static bool Save(int n, short[] samples, int rate)
+        /// <summary>Writes a recording to the file he chose.</summary>
+        public static bool Save(string path, short[] samples, int rate)
         {
             try
             {
-                Directory.CreateDirectory(Folder);
-                string path = FilePath(n);
+                string dir = Path.GetDirectoryName(path);
+                if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
                 string temp = path + ".tmp";
                 using (var fs = new FileStream(temp, FileMode.Create, FileAccess.Write))
                 using (var w = new BinaryWriter(fs))
@@ -204,11 +279,16 @@ namespace HolyLogger
         /// </summary>
         public static bool Load(int n, out short[] samples, out int rate)
         {
+            return Load(FilePath(n), out samples, out rate);
+        }
+
+        /// <summary>The same, for any file - Browse asks it whether a file he picked can be played.</summary>
+        public static bool Load(string path, out short[] samples, out int rate)
+        {
             samples = null; rate = 0;
             try
             {
-                string path = FilePath(n);
-                if (!File.Exists(path)) return false;
+                if (string.IsNullOrEmpty(path) || !File.Exists(path)) return false;
                 byte[] b = File.ReadAllBytes(path);
                 if (b.Length < 12 || b[0] != 'R' || b[1] != 'I' || b[2] != 'F' || b[3] != 'F'
                     || b[8] != 'W' || b[9] != 'A' || b[10] != 'V' || b[11] != 'E') return false;
