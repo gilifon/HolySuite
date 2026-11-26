@@ -544,7 +544,7 @@ namespace HolyLogger
             SetResourceReference(BackgroundProperty, "WindowBg");
             System.Windows.Shell.WindowChrome.SetWindowChrome(this, new System.Windows.Shell.WindowChrome
             {
-                CaptionHeight = 32,
+                CaptionHeight = TitleBarHeight,
                 CornerRadius = new CornerRadius(0),
                 GlassFrameThickness = new Thickness(0),
                 ResizeBorderThickness = new Thickness(6),
@@ -1817,10 +1817,13 @@ namespace HolyLogger
             lever.RenderTransform = tip;
             canvas.Children.Add(lever);
 
+            // 23: in its box (edge 1 + padding 2 each side) the key is 29 high, the height of the
+            // CQ / ANS pill beside it on the bar - 16-point text 21.3 + padding 3 + 3 + edge 1 + 1
+            // (his request, 2026-11-26). The same size in the keyer window's bar (TitleBarHeight).
             return new Viewbox
             {
-                Width = 18,
-                Height = 18,
+                Width = HandKeyDrawing,
+                Height = HandKeyDrawing,
                 Margin = margin,
                 VerticalAlignment = VerticalAlignment.Center,
                 Child = canvas,
@@ -1848,8 +1851,12 @@ namespace HolyLogger
             return brush;
         }
 
-        // Box edge 1 + padding 3 on each side of the 18 of the drawing.
-        internal const double HandKeyWidth = 1 + 3 + 18 + 3 + 1;
+        // The keyer window's own title bar - see BuildTitleBar.
+        private const double TitleBarHeight = 40;
+
+        // Box edge 1 + padding 2 on each side of the drawing.
+        internal const double HandKeyDrawing = 23;
+        internal const double HandKeyWidth = 1 + 2 + HandKeyDrawing + 2 + 1;
 
         internal static FrameworkElement MakeHandKey(FrameworkElement icon, Func<bool> down, Action up)
         {
@@ -1862,7 +1869,7 @@ namespace HolyLogger
                 BorderBrush = HandKeyEdge,
                 BorderThickness = new Thickness(1),
                 CornerRadius = new CornerRadius(4),
-                Padding = new Thickness(3),
+                Padding = new Thickness(2),
                 Margin = icon.Margin,
                 VerticalAlignment = VerticalAlignment.Center,
                 ToolTip = icon.ToolTip
@@ -3701,7 +3708,9 @@ namespace HolyLogger
             bar.Children.Add(_titleText);
 
             // The pale cyan of the CW keycaps, so the window is plainly part of the same set.
-            var border = new Border { Height = 32, Child = bar, Background = CwKeyBrush };
+            // 40 high (was 32), so the 29-high key has the same room above it as below (his request,
+            // 2026-11-26). CaptionHeight in the constructor matches it, so the whole bar still drags.
+            var border = new Border { Height = TitleBarHeight, Child = bar, Background = CwKeyBrush };
             _titleBar = border;
             return border;
         }
