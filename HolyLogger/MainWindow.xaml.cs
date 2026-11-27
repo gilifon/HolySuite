@@ -5099,6 +5099,10 @@ namespace HolyLogger
             cwKeyboard.HandKeyDown = HandKeyDown;
             cwKeyboard.HandKeyUp = HandKeyUp;
 
+            // The BK-IN button beside its speed - see AskRadioBreakIn.
+            cwKeyboard.BreakInPress = PressBreakIn;
+            cwKeyboard.ShowBreakIn(_breakInState);
+
             // And the wheel over that readout sets it - see SetRadioCwSpeed.
             cwKeyboard.SetSpeed = wpm => SetRadioCwSpeed(rigType, wpm);
 
@@ -5583,6 +5587,9 @@ namespace HolyLogger
         // wire in the middle of a message competes with the text going out on it.
         private void AskRadioCwSpeed()
         {
+            // The BK-IN button is read on the same beat, whichever way the CW goes.
+            try { AskRadioBreakIn(); } catch (Exception swallowed) { Log.Swallow(swallowed); }
+
             // From a port the readout is the fixed 20 - unless the port follows the radio's knob
             // (PortFollowsRadio), and then the radio is asked exactly as for CAT keying.
             if (CwByPort && !PortFollowsRadio) { ShowCwPortSpeed(); return; }
@@ -5634,20 +5641,119 @@ namespace HolyLogger
         // answers in a shape not expected here can be seen rather than guessed at.
         private DateTime breakInAskedUtc = DateTime.MinValue;
 
-        // True when the reply is Icom's answer to 16 47 saying break-in is OFF.
-        private static bool ReplySaysBreakInOff(object reply)
+        // -- THE BK-IN BUTTON (his request, 2026-11-27) -------------------------------------------
+        //
+        // The radio's break-in, read once a second with the keyer's speed and shown on a button beside
+        // it in the CW Keyer window and on the lite keyer; a press moves the radio to its next setting.
+        // ONLY THE RADIOS WHOSE MAKER DOCUMENTS IT, each read in the maker's own CAT reference:
+        //   Icom IC-7300(MK2), IC-7610, IC-9700 - 16 47, 00 off / 01 semi / 02 full (CI-V guides).
+        //   Kenwood TS-990S - BI, 0 off / 1 semi / 2 full;  TS-890S - BI, 0 off / 1 on;
+        //   TS-590S/SG - VX, which in CW mode is break-in, 0 off / 1 on. (Kenwood: CW mode only.)
+        //   Yaesu FT-891, FT-991A, FTDX10, FTDX101 - BI, 0 off / 1 on.
+        // Any other radio: no button. Not in CW, CAT down, or no answer for 4 s: no button.
+        private int _breakInState = BreakInButton.Unknown;
+        private DateTime _breakInSeenUtc = DateTime.MinValue;
+
+        private static string BreakInFamily(string rigType)
+        {
+            string n = System.Text.RegularExpressions.Regex.Replace(rigType ?? string.Empty, "[^A-Za-z0-9]", string.Empty).ToUpperInvariant();
+            if (GetIcomCivAddress(rigType) != null && (n.Contains("7300") || n.Contains("7610") || n.Contains("9700"))) return "ICOM";
+            if (n.StartsWith("TS990")) return "TS990";
+            if (n.StartsWith("TS890")) return "TS890";
+            if (n.StartsWith("TS590")) return "TS590";
+            if (n.StartsWith("FT891") || n.StartsWith("FT991") || n.StartsWith("FTDX10")) return "YAESU";
+            return null;
+        }
+
+        // The state a reply carries, or Unknown when it is not a break-in answer for this radio.
+        private int BreakInFromReply(object reply)
         {
             byte[] b = ReplyBytes(reply);
-            if (b == null) return false;
+            if (b == null) return BreakInButton.Unknown;
 
-            // Addressed to us (E0 in the TO position), which tells the answer from the echo.
-            for (int i = 0; i + 7 < b.Length; i++)
+            string rigType = Rig != null ? Rig.RigType : null;
+
+            // ANY Icom's answer is read: the ask before a send has always gone to every Icom. The button
+            // itself is only for the documented ones (see where this is called).
+            if (GetIcomCivAddress(rigType) != null)
             {
-                if (b[i] != 0xFE || b[i + 1] != 0xFE || b[i + 2] != 0xE0) continue;
-                if (b[i + 4] != 0x16 || b[i + 5] != 0x47 || b[i + 7] != 0xFD) continue;
-                return b[i + 6] == 0x00;
+                // FE FE E0 <rig> 16 47 dd FD - addressed to us (E0), which tells the answer from the echo.
+                for (int i = 0; i + 7 < b.Length; i++)
+                {
+                    if (b[i] != 0xFE || b[i + 1] != 0xFE || b[i + 2] != 0xE0) continue;
+                    if (b[i + 4] != 0x16 || b[i + 5] != 0x47 || b[i + 7] != 0xFD) continue;
+                    int d = b[i + 6];
+                    return d == 0 ? BreakInButton.Off : d == 1 ? BreakInButton.Semi : d == 2 ? BreakInButton.Full : BreakInButton.Unknown;
+                }
+                return BreakInButton.Unknown;
             }
-            return false;
+
+            string family = BreakInFamily(rigType);
+            if (family == null) return BreakInButton.Unknown;
+
+            string s = System.Text.Encoding.ASCII.GetString(b);
+            var m = System.Text.RegularExpressions.Regex.Match(s, family == "TS590" ? @"VX(\d);" : @"BI(\d);");
+            if (!m.Success) return BreakInButton.Unknown;
+            int v = m.Groups[1].Value[0] - '0';
+            if (family == "TS990") return v == 0 ? BreakInButton.Off : v == 1 ? BreakInButton.Semi : v == 2 ? BreakInButton.Full : BreakInButton.Unknown;
+            return v == 0 ? BreakInButton.Off : v == 1 ? BreakInButton.On : BreakInButton.Unknown;
+        }
+
+        // Asked with the speed, once a second while a keyer shows (AskRadioCwSpeed).
+        private void AskRadioBreakIn()
+        {
+            string rigType = Rig != null ? Rig.RigType : null;
+            string family = IsCatLive() && IsCwModeActive() ? BreakInFamily(rigType) : null;
+
+            // Gone quiet, or nothing to ask: the button goes.
+            if (family == null || DateTime.UtcNow - _breakInSeenUtc > TimeSpan.FromSeconds(4))
+            {
+                if (_breakInState != BreakInButton.Unknown)
+                {
+                    _breakInState = BreakInButton.Unknown;
+                    ShowBreakInOnKeyers();
+                }
+            }
+            if (family == null) return;
+
+            if (family == "ICOM")
+            {
+                string icom = GetIcomCivAddress(NormalizeRigType(rigType));
+                if (icom != null) TrySendOmniRigCustomCommand("FE FE " + icom + " E0 16 47 FD", 15, string.Empty);
+            }
+            else TrySendOmniRigCustomCommand(family == "TS590" ? "VX;" : "BI;", 0, ";");
+        }
+
+        // The button pressed: the radio's next setting, then asked again so the button shows the truth.
+        private void PressBreakIn()
+        {
+            string rigType = Rig != null ? Rig.RigType : null;
+            string family = IsCatLive() ? BreakInFamily(rigType) : null;
+            if (family == null || _breakInState == BreakInButton.Unknown) return;
+
+            bool threeWay = family == "ICOM" || family == "TS990";
+            int now = _breakInState == BreakInButton.Semi ? 1 : _breakInState == BreakInButton.Full ? 2 : _breakInState == BreakInButton.On ? 1 : 0;
+            int next = threeWay ? (now + 1) % 3 : 1 - Math.Min(now, 1);
+
+            string command;
+            if (family == "ICOM")
+            {
+                string icom = GetIcomCivAddress(NormalizeRigType(rigType));
+                if (icom == null) return;
+                command = "FE FE " + icom + " E0 16 47 0" + next + " FD";
+            }
+            else command = (family == "TS590" ? "VX" : "BI") + next + ";";
+
+            bool went = TrySendOmniRigCustomCommand(command);
+            Log.Warn("BK-IN set " + next + " on " + rigType + ": " + command + (went ? "  sent" : "  REFUSED by OmniRig"));
+
+            AskRadioBreakIn();
+        }
+
+        private void ShowBreakInOnKeyers()
+        {
+            if (cwKeyboard != null) cwKeyboard.ShowBreakIn(_breakInState);
+            if (cwLiteKeyer != null) cwLiteKeyer.ShowBreakIn(_breakInState);
         }
 
         private void ShowBreakInOffWarning()
@@ -5704,6 +5810,8 @@ namespace HolyLogger
 
             cwLiteKeyer.HandKeyDown = HandKeyDown;
             cwLiteKeyer.HandKeyUp = HandKeyUp;
+            cwLiteKeyer.BreakInPress = PressBreakIn;
+            cwLiteKeyer.ShowBreakIn(_breakInState);
 
             CwLiteKeyerHost.Content = cwLiteKeyer;
             cwLiteKeyer.KeyerWindowOpen = cwKeyboard != null;
@@ -6227,9 +6335,23 @@ namespace HolyLogger
                                                        : BitConverter.ToString(raw).Replace("-", " ")));
             }
 
-            if (ReplySaysBreakInOff(Reply))
+            // THE RADIO'S BREAK-IN - the BK-IN button's once-a-second read, or the ask before a send.
+            int breakIn = BreakInFromReply(Reply);
+            if (breakIn != BreakInButton.Unknown)
             {
-                Dispatcher.BeginInvoke(new Action(ShowBreakInOffWarning));
+                bool beforeSend = DateTime.UtcNow - breakInAskedUtc < TimeSpan.FromSeconds(3);
+                bool hasButton = BreakInFamily(Rig != null ? Rig.RigType : null) != null;
+                if (hasButton)
+                {
+                    _breakInState = breakIn;
+                    _breakInSeenUtc = DateTime.UtcNow;
+                }
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    if (hasButton) ShowBreakInOnKeyers();
+                    // Only the ask made for a send (or the Options test) counts as "nothing went out".
+                    if (breakIn == BreakInButton.Off && (beforeSend || _cwTestReport != null)) ShowBreakInOffWarning();
+                }));
                 return;
             }
 

@@ -75,6 +75,12 @@ namespace HolyLogger
         internal Action HandKeyUp { set { _handKeyUp = value; } }
         private Action _handKeyUp;
 
+        // The BK-IN button after the speed - see BreakInButton.
+        internal Action BreakInPress { set { _breakInPress = value; } }
+        private Action _breakInPress;
+        private BreakInButton _breakIn;
+        internal void ShowBreakIn(int state) { if (_breakIn != null) _breakIn.Show(state); }
+
         internal CwKeyboardWindow.SpeedRange SpeedRange { set { _speedRange = value; } }
         private CwKeyboardWindow.SpeedRange _speedRange;
 
@@ -327,9 +333,16 @@ namespace HolyLogger
                                                     () => _handKeyDown != null && _handKeyDown(),
                                                     () => { if (_handKeyUp != null) _handKeyUp(); });
 
+            _breakIn = new BreakInButton
+            {
+                Pressed = () => { if (_breakInPress != null) _breakInPress(); },
+                Margin = new Thickness(8, 0, 0, 0)
+            };
+
             Children.Add(icon);
             Children.Add(_frame);
             Children.Add(_wpmBox);
+            Children.Add(_breakIn);
 
             RepaintLine();
 
