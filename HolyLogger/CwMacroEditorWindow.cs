@@ -262,9 +262,10 @@ namespace HolyLogger
             {
                 Text = placeholder,
                 FontSize = 16,
-                Margin = new Thickness(6, 0, 0, 0),
+                FontFamily = new FontFamily("Consolas"),
+                FontWeight = FontWeights.Bold,
                 VerticalAlignment = VerticalAlignment.Center,
-                HorizontalAlignment = HorizontalAlignment.Left,
+                HorizontalAlignment = HorizontalAlignment.Center,
                 IsHitTestVisible = false,
                 Foreground = Brushes.Gray
             };
@@ -284,6 +285,61 @@ namespace HolyLogger
             cell.Children.Add(hint);
 
             return cell;
+        }
+
+        // A NAME BOX DRESSED AS THE KEY IT NAMES (his request, 2026-11-27: "all the button text boxes to look like
+        // the button on the keyer"). The keycap of MsgButtonCwStyle (Themes/Controls.xaml) drawn round the box:
+        // the cyan face with its thin blue edge, the darker bottom edge of a real key, rounded corners - and
+        // the name in the keyer's bold Consolas, centred, so what he types looks as it will on the key. Fixed
+        // colours, like the keycap, which is one colour in every scheme. `content` is the box itself, or the
+        // box with its placeholder; it hands its place in the grid (and the box its margin) to the keycap.
+        private static readonly Brush KeyFaceBrush = FrozenBrush(Color.FromRgb(0x7F, 0xFE, 0xFF));
+        private static readonly Brush KeyEdgeBrush = FrozenBrush(Color.FromRgb(0x00, 0xCC, 0xFF));
+        private static readonly Brush KeyBottomBrush = FrozenBrush(Color.FromRgb(0x00, 0x99, 0xCC));
+
+        private static Brush FrozenBrush(Color colour)
+        {
+            var brush = new SolidColorBrush(colour);
+            brush.Freeze();
+            return brush;
+        }
+
+        private static UIElement AsKeycap(UIElement content, TextBox box)
+        {
+            box.Background = Brushes.Transparent;
+            box.BorderThickness = new Thickness(0);
+            box.Foreground = Brushes.Black;
+            box.FontFamily = new FontFamily("Consolas");
+            box.FontWeight = FontWeights.Bold;
+            box.FontSize = 16;
+            box.TextAlignment = TextAlignment.Center;
+            box.Padding = new Thickness(2, 0, 2, 0);
+            Thickness place = box.Margin;
+            box.Margin = new Thickness(0);
+
+            var face = new Border
+            {
+                CornerRadius = new CornerRadius(5),
+                BorderThickness = new Thickness(1),
+                BorderBrush = KeyEdgeBrush,
+                Background = KeyFaceBrush,
+                SnapsToDevicePixels = true
+            };
+            var key = new Border
+            {
+                CornerRadius = new CornerRadius(5),
+                Background = KeyBottomBrush,
+                Padding = new Thickness(0, 0, 0, 3),
+                Margin = place,
+                SnapsToDevicePixels = true,
+                Child = face
+            };
+            Grid.SetColumn(key, Grid.GetColumn(content));
+            Grid.SetRow(key, Grid.GetRow(content));
+            Grid.SetColumn(content, 0);
+            Grid.SetRow(content, 0);
+            face.Child = content;
+            return key;
         }
 
         private static TextBlock SectionTitle(string text, string note, Thickness margin, params string[] boldInNote)
@@ -393,13 +449,13 @@ namespace HolyLogger
 
                 _offLabels[i] = Cell(offLabels[i], 0, row);
                 _off[i] = Cell(off[i], 1, row, MacroLength);
-                offGrid.Children.Add(_offLabels[i]);
+                offGrid.Children.Add(AsKeycap(_offLabels[i], _offLabels[i]));
                 offGrid.Children.Add(_off[i]);
 
                 _labels[i] = Cell(labels[i], 0, row);
                 _run[i] = Cell(run[i], 1, row, MacroLength);
                 _sp[i] = Cell(sp[i], 2, row, MacroLength);
-                runGrid.Children.Add(_labels[i]);
+                runGrid.Children.Add(AsKeycap(_labels[i], _labels[i]));
                 runGrid.Children.Add(_run[i]);
                 runGrid.Children.Add(_sp[i]);
 
@@ -588,9 +644,9 @@ namespace HolyLogger
                 CwKeyboardWindow.HoldToKeycap(_ansLabels[i], MsgKeycapRoom, null, 11, this, bold: true);
 
                 // WHAT THE KEY SAYS TODAY, greyed out behind an empty name box.
-                cqGrid.Children.Add(WithPlaceholder(_msgLabels[i], "Txt " + (i + 1)));
+                cqGrid.Children.Add(AsKeycap(WithPlaceholder(_msgLabels[i], "Txt " + (i + 1)), _msgLabels[i]));
                 cqGrid.Children.Add(_msgTexts[i]);
-                ansGrid.Children.Add(WithPlaceholder(_ansLabels[i], "Txt " + (i + 1)));
+                ansGrid.Children.Add(AsKeycap(WithPlaceholder(_ansLabels[i], "Txt " + (i + 1)), _ansLabels[i]));
                 ansGrid.Children.Add(_ansTexts[i]);
             }
 
