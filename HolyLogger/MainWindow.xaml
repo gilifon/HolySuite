@@ -1158,7 +1158,8 @@
                         BorderBrush="Black" BorderThickness="1" CornerRadius="6" SnapsToDevicePixels="True"
                         SizeChanged="QsoAudioBar_SizeChanged" IsVisibleChanged="QsoAudioBar_IsVisibleChanged">
                 <StackPanel Orientation="Horizontal">
-                    <!-- REC QSO WHITE ON BLUE, PLAY WHITE ON GREEN (his design, 2026-11-26). While one is
+                    <!-- REC QSO BLACK ON THE MSG KEYS' LAVENDER (#E6CCFF / #9966CC, MsgButtonStyle - his
+                         request 2026-11-27, was white on blue), PLAY WHITE ON GREEN (2026-11-26). While one is
                          working, its second word gives way to a black square - the stop sign
                          (PaintQsoAudioBar). Their own template: the Windows one paints a pale blue over
                          any colour on mouse-over, and white text vanished in it; here the mouse only
@@ -1196,7 +1197,7 @@
                         </Style>
                     </StackPanel.Resources>
                     <Button x:Name="Btn_QsoRecord" Content="REC QSO" Style="{StaticResource QsoBarButtonStyle}"
-                            Background="#1565C0" BorderBrush="#1565C0" Click="QsoRecord_Click"
+                            Background="#E6CCFF" BorderBrush="#9966CC" Foreground="Black" Click="QsoRecord_Click"
                             ToolTip="Record the radio's sound. Press again to stop."/>
                     <Button x:Name="Btn_QsoPlay" Content="PLAY" Style="{StaticResource QsoBarButtonStyle}" Margin="8,0,0,0"
                             Background="#2E7D32" BorderBrush="#2E7D32" Click="QsoPlay_Click"
