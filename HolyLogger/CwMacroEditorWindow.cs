@@ -134,10 +134,12 @@ namespace HolyLogger
             shortcuts.Children.Add(how);
             shortcuts.Children.Add(legend);
             var shortcutsFrame = SetFrame("Shortcuts", shortcuts);
-            // CYAN INSIDE (his request, 2026-11-27): "it is not an editable area" - the white boxes are what he
-            // types in, this is a list he only clicks. Black writing, so it reads on cyan in a dark scheme too.
-            ((Border)((Grid)shortcutsFrame).Children[0]).Background = new SolidColorBrush(Color.FromRgb(0xB2, 0xEB, 0xF2));
-            shortcuts.SetValue(System.Windows.Documents.TextElement.ForegroundProperty, Brushes.Black);
+            // COLOURED INSIDE (his request, 2026-11-27): "it is not an editable area" - the white boxes are what he
+            // types in, this is a list he only clicks. The light blue of the A / K / SFI box on the cluster and of
+            // the main entry form (FormBg, his choice the same night, first cyan), so it follows the colour scheme
+            // and Customize Colors as they do - with the scheme's own writing colour on it.
+            ((Border)((Grid)shortcutsFrame).Children[0]).SetResourceReference(Border.BackgroundProperty, "FormBg");
+            shortcuts.SetResourceReference(System.Windows.Documents.TextElement.ForegroundProperty, "TextBrush");
             shortcutsFrame.Width = ShortcutsWidth - 16;
             shortcutsFrame.VerticalAlignment = VerticalAlignment.Top;
             shortcutsFrame.Margin = new Thickness(0, 16, 16, 0);
