@@ -212,3 +212,45 @@ Click **Stop using current profile**. All your settings stay as they are, and th
 Select the profile and click **Delete**. Only the profile file is deleted.
 
 Everything the profile brought stays as it is: all the settings, the eQSL accounts, Contest Radio Setup and the rest. From then on HolyLogger simply remembers your changes as you make them, with no profile to save them into and no question when you close.
+
+# REC QSO and PLAY
+
+In SSB, two buttons sit in one frame above the four Msg buttons. **REC QSO** records what you hear from the radio. **PLAY** sends a recording on the air, or plays it to you on the computer's speakers.
+
+## When the buttons show
+
+- Both buttons show only in SSB.
+- **REC QSO** shows only when HolyLogger knows where the radio's sound comes in. Open **Options > General**, and in the **Input Device** box choose the radio's device under **Listen to:**. The device must also be plugged in. With **System default** the button stays hidden, because that is usually the computer's own microphone.
+- **PLAY** shows only when the sound card that goes to the radio is chosen in **Tools > Audio Messages** and is plugged in.
+- The buttons come and go by themselves when you plug the cable in or pull it out.
+
+An older radio with no USB works too. Bring its sound to the computer through an interface box (such as a SignaLink) or a cable into the computer's line-in, and choose that device under **Listen to:**.
+
+## Recording a QSO
+
+1. Press **REC QSO**. While it records, the button shows **REC ■**.
+2. Press **REC ■** to stop. A small window opens with three choices.
+
+- **Save As: LAST** keeps it as LAST. The next LAST replaces it.
+- **Save As...** lets you choose a name and a folder. The name starts as the callsign and the UTC date and time.
+- **Cancel** throws the recording away.
+
+A recording stops by itself after 60 minutes.
+
+Recordings are kept in their own folder, **QSO Recordings**, beside your log, next to **Exported Logs**. LAST is always there. **Save As...** can put a recording anywhere you like, and opens there the next time.
+
+## Playing a recording
+
+Press **PLAY**. A small window opens:
+
+- **Transmit LAST** and **Transmit file...** send the recording on the air. They use the same sound card, level and transmit switching as the Msg buttons, all set in **Tools > Audio Messages**.
+- **Listen to LAST** and **Listen to file...** play it only on your speakers, the ones chosen in **Tools > Audio Messages**. The radio stays on receive.
+- **Cancel** closes the window.
+
+While it plays, the button shows **PLAY ■**. Press it again, or press **Esc**, to stop. Esc stops it even while you are typing a frequency.
+
+Only plain WAV files can be played. Every recording HolyLogger makes is one.
+
+## The level on the air
+
+The level of the sound you transmit is set by **Level to the radio** in **Tools > Audio Messages**, the same level the Msg buttons use. Watch the radio's ALC meter while you transmit: raise the level until the ALC just moves, and keep it inside its zone. Too much drive makes your signal wide and distorted.
