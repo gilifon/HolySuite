@@ -142,6 +142,12 @@ namespace HolyLogger
         internal Action HandKeyUp { set { _handKeyUp = value; } }
         private Action _handKeyUp;
 
+        // The BK-IN button in the title bar: pressed, and what the radio says - see BreakInButton.
+        internal Action BreakInPress { set { _breakInPress = value; } }
+        private Action _breakInPress;
+        private BreakInButton _breakIn;
+        internal void ShowBreakIn(int state) { if (_breakIn != null) _breakIn.Show(state); }
+
         // Puts a speed ON the radio - the wheel over the readout, and nothing else. Set after the
         // window is built, like AskSpeed above.
         internal Action<int> SetSpeed { set { _setSpeed = value; } }
@@ -3666,6 +3672,12 @@ namespace HolyLogger
             DockPanel.SetDock(right, Dock.Right);
             right.Children.Add(BuildEsmSelector());
             right.Children.Add(BuildSendModeSelector());
+
+            // The radio's break-in, beside the speed - see BreakInButton.
+            _breakIn = new BreakInButton { Pressed = () => { if (_breakInPress != null) _breakInPress(); } };
+            System.Windows.Shell.WindowChrome.SetIsHitTestVisibleInChrome(_breakIn, true);
+            right.Children.Add(_breakIn);
+
             right.Children.Add(BuildSpeedReadout());
             right.Children.Add(gearBtn);
             right.Children.Add(closeBtn);
@@ -4788,6 +4800,94 @@ namespace HolyLogger
             box.Children.Add(note);
 
             return box;
+        }
+    }
+
+    /// <summary>
+    /// THE RADIO'S BREAK-IN, SHOWN AND CHANGED (his request, 2026-11-27). Green with the setting when
+    /// break-in is on, red and slowly blinking when it is off - then CW sent from here makes only a
+    /// sidetone and nothing goes out. Each press asks the main window for the radio's next setting.
+    /// Hidden while the radio has not said (a radio whose CAT cannot tell, or one not answering).
+    /// One class for the CW Keyer window's bar and the lite keyer on the main bar.
+    /// </summary>
+    internal sealed class BreakInButton : Border
+    {
+        // What the main window tells it: -1 unknown (hidden), 0 off, 1 semi, 2 full, 3 on (a radio
+        // that has only on and off).
+        internal const int Unknown = -1, Off = 0, Semi = 1, Full = 2, On = 3;
+
+        private static readonly Brush OnBrush = FrozenBrush(Color.FromRgb(0x2E, 0x7D, 0x32));
+        private static readonly Brush OffBrush = FrozenBrush(Color.FromRgb(0xC6, 0x28, 0x28));
+
+        private static Brush FrozenBrush(Color color)
+        {
+            var brush = new SolidColorBrush(color);
+            brush.Freeze();
+            return brush;
+        }
+
+        private readonly TextBlock _text;
+        private readonly DispatcherTimer _blink;
+        private int _state = Unknown;
+
+        internal Action Pressed;
+
+        internal BreakInButton()
+        {
+            _text = new TextBlock
+            {
+                FontSize = 16,
+                FontWeight = FontWeights.Bold,
+                Foreground = Brushes.White,
+                VerticalAlignment = VerticalAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Center
+            };
+
+            Child = _text;
+            CornerRadius = new CornerRadius(4);
+            Padding = new Thickness(6, 0, 6, 0);
+            Height = CwKeyboardWindow.HandKeyWidth;      // as high as the red key
+            Margin = new Thickness(0, 0, 10, 0);
+            VerticalAlignment = VerticalAlignment.Center;
+            Cursor = Cursors.Hand;
+            Visibility = Visibility.Collapsed;
+            ToolTip = "The radio's break-in. Click for the next setting." + Environment.NewLine
+                    + "With break-in off, CW sent from here does not go on the air.";
+
+            // SLOW: a second on, a second dimmed - noticed without being a nuisance.
+            _blink = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(1000) };
+            _blink.Tick += (s, e) => Opacity = Opacity > 0.5 ? 0.25 : 1.0;
+
+            MouseLeftButtonDown += (s, e) =>
+            {
+                e.Handled = true;       // on the keyer's bar: not a drag of the window
+                try { if (Pressed != null) Pressed(); }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
+            };
+
+            Unloaded += (s, e) => _blink.Stop();
+            Loaded += (s, e) => { if (_state == Off) _blink.Start(); };
+        }
+
+        internal void Show(int state)
+        {
+            if (state == _state) return;
+            _state = state;
+
+            if (state == Unknown)
+            {
+                _blink.Stop();
+                Opacity = 1.0;
+                Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            _text.Text = state == Off ? "BK-IN OFF" : state == Semi ? "BK-IN SEMI" : state == Full ? "BK-IN FULL" : "BK-IN ON";
+            Background = state == Off ? OffBrush : OnBrush;
+            Visibility = Visibility.Visible;
+
+            if (state == Off) _blink.Start();
+            else { _blink.Stop(); Opacity = 1.0; }
         }
     }
 }
