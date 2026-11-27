@@ -463,6 +463,7 @@ namespace HolyLogger
             if (r != 0 || hwo == IntPtr.Zero)
             {
                 error = r == 4 ? "Another program is using this sound card." : "This sound card cannot be opened.";
+                Log.Warn("VOICE MSG  sound card " + deviceId + " did not open: waveOutOpen code " + r);
                 return null;
             }
 
@@ -484,6 +485,8 @@ namespace HolyLogger
             IntPtr hdr = IntPtr.Zero;
             bool prepared = false;
             int hdrSize = Marshal.SizeOf(typeof(WAVEHDR));
+            string how = "?";                       // how the sound ended, for the log
+            var started = DateTime.UtcNow;
             try
             {
                 pin = GCHandle.Alloc(data, GCHandleType.Pinned);
@@ -493,24 +496,27 @@ namespace HolyLogger
                 var h = new WAVEHDR { lpData = pin.AddrOfPinnedObject(), dwBufferLength = (uint)data.Length };
                 Marshal.StructureToPtr(h, hdr, false);
 
-                if (waveOutPrepareHeader(hwo, hdr, (uint)hdrSize) != 0) return;
+                uint r = waveOutPrepareHeader(hwo, hdr, (uint)hdrSize);
+                if (r != 0) { how = "the sound card refused it (prepare code " + r + ")"; return; }
                 prepared = true;
-                if (waveOutWrite(hwo, hdr, (uint)hdrSize) != 0) return;
+                r = waveOutWrite(hwo, hdr, (uint)hdrSize);
+                if (r != 0) { how = "the sound card refused it (write code " + r + ")"; return; }
 
                 // Done, stopped, or the clip's own length and some to spare - a device that never says
                 // DONE must not keep the radio keyed.
-                var started = DateTime.UtcNow;
+                started = DateTime.UtcNow;
                 while (true)
                 {
-                    if (_stop.WaitOne(20)) break;
+                    if (_stop.WaitOne(20)) { how = "stopped"; break; }
                     var now = (WAVEHDR)Marshal.PtrToStructure(hdr, typeof(WAVEHDR));
-                    if ((now.dwFlags & WHDR_DONE) != 0) break;
-                    if ((DateTime.UtcNow - started).TotalMilliseconds > _maxMs) break;
+                    if ((now.dwFlags & WHDR_DONE) != 0) { how = "played to the end"; break; }
+                    if ((DateTime.UtcNow - started).TotalMilliseconds > _maxMs) { how = "the sound card never said it was done - cut off"; break; }
                 }
             }
-            catch (Exception swallowed) { Log.Swallow(swallowed); }
+            catch (Exception swallowed) { how = "error " + swallowed.GetType().Name; Log.Swallow(swallowed); }
             finally
             {
+                Log.Warn("VOICE MSG  sound out: " + how + " after " + (int)(DateTime.UtcNow - started).TotalMilliseconds + " ms");
                 try { waveOutReset(hwo); } catch (Exception swallowed) { Log.Swallow(swallowed); }
                 if (prepared) try { waveOutUnprepareHeader(hwo, hdr, (uint)hdrSize); } catch (Exception swallowed) { Log.Swallow(swallowed); }
                 try { waveOutClose(hwo); } catch (Exception swallowed) { Log.Swallow(swallowed); }

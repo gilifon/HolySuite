@@ -78,6 +78,7 @@ namespace HolyLogger
                 try
                 {
                     if (!AudioMessages.UsePc) StopPcMessage();
+                    _txAudioOkFor = null;   // switched: the next Msg press asks the radio again
                     UpdateMessageButtonLabels();
                     UpdateVoiceMessageAvailabilityState();
                 }
@@ -137,12 +138,47 @@ namespace HolyLogger
 
         bool PcMessageGoingOut(int n) { return _pcMsgNumber != 0 && _pcMsgNumber == n; }
 
-        void TriggerPcMessage(int n)
+        // ── WHAT A MSG PRESS DID, STEP BY STEP, IN THE LOG (his request, 2026-11-27) ─────────────────
+        //
+        // A friend's radio did not go to transmit when he sent a recording from his PC, and his log had
+        // not one line about it: the press, the checks it passed or failed, the transmit switch and the
+        // sound card were all silent. Every step now leaves a "VOICE MSG" line, so the next log says
+        // where it stopped. Log.Warn is called directly (not through a helper) so each line keeps the
+        // file and line it came from.
+        const string VoiceMsgTag = "VOICE MSG  ";
+
+        // Everything a press depends on, in one line - written once per press.
+        string VoiceMsgState()
         {
+            var sb = new System.Text.StringBuilder();
+            try
+            {
+                sb.Append("from=").Append(AudioMessages.UsePc ? "PC recordings" : "radio memory");
+                sb.Append(" | transmit by=").Append(AudioMessages.PttVia);
+                if (AudioMessages.PttVia == AudioMessages.PttPort)
+                    sb.Append(" (").Append(AudioMessages.Settings.PttPort).Append(' ').Append(AudioMessages.Settings.PttLine).Append(')');
+                sb.Append(" | card to radio=").Append(string.IsNullOrEmpty(AudioMessages.Settings.RadioDevice) ? "(none)" : AudioMessages.Settings.RadioDevice);
+                sb.Append(" | level=").Append((int)Math.Round(AudioMessages.Settings.RadioLevel * 100)).Append('%');
+                sb.Append(" | CAT enabled=").Append(Properties.Settings.Default.EnableOmniRigCAT);
+                sb.Append(" | OmniRig=").Append(Rig == null ? "(none)" : Rig.Status.ToString());
+                sb.Append(" | radio=").Append(NormalizeRigType(Rig != null ? Rig.RigType : null));
+                sb.Append(" | radio mode=").Append(GetNormalizedRigMode() ?? "(none)");
+                sb.Append(" | Mode box=").Append(CB_Mode != null ? CB_Mode.Text : string.Empty);
+                sb.Append(" | buttons available=").Append(_messageSendAvailable);
+            }
+            catch (Exception ex) { sb.Append(" | (reading the state failed: ").Append(ex.GetType().Name).Append(": ").Append(ex.Message).Append(')'); }
+            return sb.ToString();
+        }
+
+        async void TriggerPcMessage(int n)
+        {
+            if (_txAudioChecking) return;   // still asking the radio for the press before this one
+
             // A second press of the one going out stops it; a press of another stops it and sends that.
             if (_pcMsgNumber != 0)
             {
                 int was = _pcMsgNumber;
+                Log.Warn(VoiceMsgTag + "Msg " + n + " pressed while Msg " + was + " is going out - stopping Msg " + was);
                 StopPcMessage();
                 if (was == n) return;
             }
@@ -151,6 +187,8 @@ namespace HolyLogger
             {
                 // No file chosen, or the chosen one is gone (moved, deleted, a USB stick taken out).
                 string chosen = AudioMessages.FilePath(n);
+                Log.Warn(VoiceMsgTag + "Msg " + n + " NOT SENT: no recording - "
+                         + (chosen.Length == 0 ? "no file chosen" : "file missing: " + chosen));
                 string why = chosen.Length == 0
                     ? "Msg " + n + " has no sound file yet."
                     : "The sound file of Msg " + n + " is not there any more:\n" + chosen;
@@ -161,15 +199,20 @@ namespace HolyLogger
             }
 
             if (!RadioCardReady(n, "Voice Message")) return;
+            if (!await RadioTxAudioAllowsSend()) return;
 
             short[] samples; int rate;
             if (!AudioMessages.Load(n, out samples, out rate))
             {
+                Log.Warn(VoiceMsgTag + "Msg " + n + " NOT SENT: the recording cannot be read: " + AudioMessages.FilePath(n));
                 HolyMessageBox.ShowWarning("The recording of Msg " + n + " cannot be read.\n\nRecord it again in Audio Messages.",
                                            "Voice Message", this);
                 return;
             }
 
+            Log.Warn(VoiceMsgTag + "Msg " + n + " recording read: " + AudioMessages.FilePath(n) + " | "
+                     + (samples != null ? samples.Length : 0) + " samples at " + rate + " Hz = "
+                     + (rate > 0 && samples != null ? (samples.Length / (double)rate).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) : "?") + " s");
             SendClipOnAir(samples, rate, n, "Voice Message");
         }
 
@@ -180,13 +223,17 @@ namespace HolyLogger
             string card = AudioMessages.Settings.RadioDevice;
             if (string.IsNullOrEmpty(card))
             {
+                Log.Warn(VoiceMsgTag + "NOT SENT: no sound card to the radio is chosen");
                 if (HolyMessageBox.ShowConfirm("Choose the sound card that goes to the radio first.\n\nOpen Audio Messages?",
                                                title, HolyMsgType.Info, this))
                     OpenAudioMessagesWindow(pointAt);
                 return false;
             }
-            if (!WaveOutPlayer.GetOutputDeviceNames().Contains(card))
+            var outputs = WaveOutPlayer.GetOutputDeviceNames();
+            if (!outputs.Contains(card))
             {
+                Log.Warn(VoiceMsgTag + "NOT SENT: the sound card to the radio (" + card + ") is not connected | sound cards there now: "
+                         + string.Join(", ", outputs));
                 HolyMessageBox.ShowWarning("The sound card to the radio (" + card + ") is not connected.\n\n"
                                          + "Is the radio on, and its USB cable in?", title, this);
                 return false;
@@ -203,6 +250,8 @@ namespace HolyLogger
             string whyNotKeyed;
             if (!KeyRadio(true, out whyNotKeyed))
             {
+                Log.Warn(VoiceMsgTag + (number == QsoPlayNumber ? "PLAY" : "Msg " + number) + " NOT SENT: transmit could not be switched on: "
+                         + (whyNotKeyed ?? "(no reason given)"));
                 HolyMessageBox.ShowWarning((whyNotKeyed ?? "The radio could not be switched to transmit.") + "\n\nNothing was sent.",
                                            title, this);
                 return;
@@ -221,11 +270,15 @@ namespace HolyLogger
 
             if (player == null)
             {
+                Log.Warn(VoiceMsgTag + (number == QsoPlayNumber ? "PLAY" : "Msg " + number) + " NOT SENT: the sound card to the radio ("
+                         + card + ") did not start: " + error + " - back to receive");
                 UnkeyRadio();
                 HolyMessageBox.ShowWarning(error + "\n\nNothing was sent.", title, this);
                 return;
             }
 
+            Log.Warn(VoiceMsgTag + (number == QsoPlayNumber ? "PLAY" : "Msg " + number) + " playing to " + card + " at "
+                     + (int)Math.Round(AudioMessages.Settings.RadioLevel * 100) + "% after a " + PcMsgLeadMs + " ms lead");
             _pcMsgPlayer = player;
             _pcMsgNumber = number;
             UpdateVoiceMessageButtonHighlight();
@@ -255,6 +308,7 @@ namespace HolyLogger
                 if (via == AudioMessages.PttVox)
                 {
                     // Nothing to switch: the radio's VOX hears the message and transmits by itself.
+                    Log.Warn(VoiceMsgTag + "transmit by VOX: HolyLogger switches nothing - the radio's VOX must hear the sound");
                     _pcMsgKeyed = true;
                     _pcMsgKeyedVia = via;
                     return true;
@@ -291,6 +345,7 @@ namespace HolyLogger
                     catch (System.IO.IOException) { sp.Dispose(); whyNot = port + " is not there - is the interface cable plugged in?"; return false; }
 
                     if (rts) sp.RtsEnable = true; else sp.DtrEnable = true;
+                    Log.Warn(VoiceMsgTag + "transmit ON by " + port + " " + (rts ? "RTS" : "DTR") + " (line raised)");
                     _pttPort = sp;
                     _pttUseRts = rts;
                     _pcMsgKeyed = true;
@@ -299,13 +354,23 @@ namespace HolyLogger
                 }
 
                 if (!IsCatLive() || Rig == null) { whyNot = "CAT is not working, so the radio cannot be switched to transmit."; return false; }
+
+                // OmniRig drops a command its rig file has no line for WITHOUT an error, so whether the
+                // file has a transmit line ([pmTx]) is written down first.
+                bool txInFile = false;
+                try { txInFile = ((int)Rig.WriteableParams & PM_TX) != 0; }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
+                Log.Warn(VoiceMsgTag + "transmit ON by CAT: sending OmniRig Tx=TX to " + NormalizeRigType(Rig.RigType)
+                         + " | its rig file " + (txInFile ? "has" : "HAS NO") + " transmit command");
                 Rig.Tx = (OmniRig.RigParamX)PM_TX;
                 _pcMsgKeyed = true;
                 _pcMsgKeyedVia = AudioMessages.PttCat;
+                LogTxReadbackSoon();
                 return true;
             }
             catch (Exception ex)
             {
+                Log.Warn(VoiceMsgTag + "transmit by " + via + " FAILED: " + ex.GetType().Name + ": " + ex.Message);
                 Log.Swallow(ex);
                 UnkeyRadio();
                 whyNot = "The radio could not be switched to transmit.";
@@ -335,6 +400,204 @@ namespace HolyLogger
                 try { if (Rig != null) Rig.Tx = (OmniRig.RigParamX)PM_RX; }
                 catch (Exception swallowed) { Log.Swallow(swallowed); }
             }
+            if (via != null || sp != null)
+                Log.Warn(VoiceMsgTag + "transmit OFF (back to receive) by " + (via ?? "port"));
+        }
+
+        // DID THE RADIO REALLY GO TO TRANSMIT? OmniRig takes Tx=TX and says nothing either way, so
+        // the radio's own state is read a moment later, once OmniRig has polled it, and written down.
+        async void LogTxReadbackSoon()
+        {
+            try
+            {
+                await System.Threading.Tasks.Task.Delay(800);
+                if (Rig == null) { Log.Warn(VoiceMsgTag + "800 ms after transmit ON: no radio to ask"); return; }
+                int tx = (int)Rig.Tx;
+                string said = tx == PM_TX ? "TRANSMIT" : tx == PM_RX ? "RECEIVE" : "unknown (0x" + tx.ToString("X8") + ")";
+                Log.Warn(VoiceMsgTag + "800 ms after transmit ON the radio reports: " + said
+                         + " | OmniRig=" + Rig.Status + " | still sending=" + (_pcMsgNumber != 0));
+            }
+            catch (Exception ex) { Log.Warn(VoiceMsgTag + "reading the radio's transmit state failed: " + ex.GetType().Name + ": " + ex.Message); }
+        }
+
+        // ── WILL THE RADIO PUT THE COMPUTER'S SOUND ON THE AIR? (his request, 2026-11-27) ─────────────
+        //
+        // A friend's IC-7300 went to transmit and sent nothing. In plain USB/LSB the radio takes its
+        // transmit sound from the input chosen in its own menu, and the IC-7300's factory setting is
+        // MIC,ACC - not USB. So while the Msg buttons play from this computer, the radio is ASKED which
+        // input it uses, and when the computer's sound is not among them he is told what to change and
+        // where. Only told: HolyLogger never changes it itself - it is the radio owner's setting, and on
+        // some radios it also decides whether his microphone works in SSB.
+        //
+        // WHEN (his rule, 2026-11-27, changed the same day): ONLY WHEN A Msg BUTTON IS PRESSED to send a
+        // recording from this computer - a user who never uses the buttons is never bothered. Wrong:
+        // the warning, and nothing is sent (it would go out silent). Read again on the next press, so
+        // once he fixes the radio the press just sends. Right (or not askable): not asked again while
+        // the radio stays connected, so later presses do not wait for it.
+        //
+        // ONLY WHEN THE SOUND GOES IN BY THE RADIO'S OWN USB - the card to the radio is the radio's
+        // "USB Audio CODEC". Any other card means an interface box into MIC, ACC or the rear DATA jack,
+        // which is right for those radios, and HolyLogger cannot see which, so nothing is said.
+        //
+        // EACH FROM THE MAKER'S OWN DOCUMENT (copies in his Downloads\Radio Manuals):
+        //   IC-7300    Full Manual A7292-4EX-5: 1A 05 0066 "MOD input connector during DATA OFF"
+        //              (00=MIC, 01=ACC, 02=MIC/ACC, 03=USB); MENU > SET > Connectors > DATA OFF MOD, p. 12-8,
+        //              default MIC,ACC. No MIC+USB choice: on USB the microphone does not work in SSB.
+        //   IC-7300MK2 CI-V Reference Guide p. 9: 1A 05 00 84 DATA OFF MOD
+        //              (00=MIC, 01=USB, 02=ACC, 03=MIC,USB, 04=MIC,ACC, 05=LAN) - its own order, not the IC-7300's.
+        //   IC-7610    CI-V Reference Guide p. 6: 1A 05 00 91 Connectors > MOD Input > DATA OFF MOD, in Set mode
+        //              (00=MIC, 01=ACC, 02=MIC,ACC, 03=USB, 04=MIC,USB, 05=LAN).
+        //   IC-9700    CI-V Reference Guide p. 8: 1A 05 0115 SET > Connectors > MOD Input > DATA OFF MOD, the
+        //              IC-7610's values.
+        //   FTDX101    CAT Reference, Table 2, RADIO SETTING > MODE SSB: EX 01 01 11 SSB MOD SOURCE
+        //              (0: MIC 1: REAR), EX 01 01 12 REAR SELECT (0: DATA 1: USB).
+        //   FTDX10     CAT Reference, Table 2, the same two at EX 01 01 13 and EX 01 01 14.
+        //   FT-991A    CAT Reference: menu 106 SSB MIC SELECT (0: MIC 1: REAR), 109 SSB PORT SELECT (0: DATA 1: USB).
+        // Not here yet: Kenwood, the IC-705, IC-7100, IC-7760 and others - their documents still to be read.
+        sealed class TxAudioItem
+        {
+            public string Path;       // where it is in the radio's menu, in the radio's words
+            public string Ask;        // Icom: the item after 1A 05; Yaesu: the whole read command
+            public string[] Values;   // what each value means, in the radio's words
+            public int[] Good;        // the values that let the USB sound through
+            public string SetTo;      // what to choose
+        }
+
+        sealed class TxAudioRadio
+        {
+            public string Key;        // the start of VoiceModelKey's name for it
+            public string Name;       // as people write it
+            public bool Icom;
+            public string Note;       // said under the advice, or null
+            public TxAudioItem[] Items;
+        }
+
+        static readonly string[] IcomModInputs = { "MIC", "ACC", "MIC,ACC", "USB", "MIC,USB", "LAN" };
+
+        // Order matters where one name starts another: IC7300MK2 before IC7300, FTDX101 before FTDX10.
+        static readonly TxAudioRadio[] TxAudioRadios =
+        {
+            new TxAudioRadio { Key = "IC7300MK2", Name = "IC-7300MK2", Icom = true, Items = new[] { new TxAudioItem {
+                Path = "MENU > SET > Connectors > MOD Input > DATA OFF MOD", Ask = "00 84",
+                Values = new[] { "MIC", "USB", "ACC", "MIC,USB", "MIC,ACC", "LAN" }, Good = new[] { 1, 3 },
+                SetTo = "MIC,USB (or USB)" } } },
+            new TxAudioRadio { Key = "IC7300", Name = "IC-7300", Icom = true,
+                Note = "On the IC-7300 the microphone does not work in SSB while this is USB.",
+                Items = new[] { new TxAudioItem {
+                Path = "MENU > SET > Connectors > DATA OFF MOD", Ask = "00 66",
+                Values = new[] { "MIC", "ACC", "MIC,ACC", "USB" }, Good = new[] { 3 }, SetTo = "USB" } } },
+            new TxAudioRadio { Key = "IC7610", Name = "IC-7610", Icom = true, Items = new[] { new TxAudioItem {
+                Path = "MENU > SET > Connectors > MOD Input > DATA OFF MOD", Ask = "00 91",
+                Values = IcomModInputs, Good = new[] { 3, 4 }, SetTo = "MIC,USB (or USB)" } } },
+            new TxAudioRadio { Key = "IC9700", Name = "IC-9700", Icom = true, Items = new[] { new TxAudioItem {
+                Path = "MENU > SET > Connectors > MOD Input > DATA OFF MOD", Ask = "01 15",
+                Values = IcomModInputs, Good = new[] { 3, 4 }, SetTo = "MIC,USB (or USB)" } } },
+            new TxAudioRadio { Key = "FTDX101", Name = "FTDX101", Icom = false,
+                Note = "While SSB MOD SOURCE is REAR, the microphone does not work in SSB.",
+                Items = new[] {
+                new TxAudioItem { Path = "MENU > RADIO SETTING > MODE SSB > SSB MOD SOURCE", Ask = "EX010111;",
+                                  Values = new[] { "MIC", "REAR" }, Good = new[] { 1 }, SetTo = "REAR" },
+                new TxAudioItem { Path = "MENU > RADIO SETTING > MODE SSB > REAR SELECT", Ask = "EX010112;",
+                                  Values = new[] { "DATA", "USB" }, Good = new[] { 1 }, SetTo = "USB" } } },
+            new TxAudioRadio { Key = "FTDX10", Name = "FTDX10", Icom = false,
+                Note = "While SSB MOD SOURCE is REAR, the microphone does not work in SSB.",
+                Items = new[] {
+                new TxAudioItem { Path = "MENU > RADIO SETTING > MODE SSB > SSB MOD SOURCE", Ask = "EX010113;",
+                                  Values = new[] { "MIC", "REAR" }, Good = new[] { 1 }, SetTo = "REAR" },
+                new TxAudioItem { Path = "MENU > RADIO SETTING > MODE SSB > REAR SELECT", Ask = "EX010114;",
+                                  Values = new[] { "DATA", "USB" }, Good = new[] { 1 }, SetTo = "USB" } } },
+            new TxAudioRadio { Key = "FT991A", Name = "FT-991A", Icom = false,
+                Note = "While SSB MIC SELECT is REAR, the microphone does not work in SSB.",
+                Items = new[] {
+                new TxAudioItem { Path = "MENU 106 SSB MIC SELECT", Ask = "EX106;",
+                                  Values = new[] { "MIC", "REAR" }, Good = new[] { 1 }, SetTo = "REAR" },
+                new TxAudioItem { Path = "MENU 109 SSB PORT SELECT", Ask = "EX109;",
+                                  Values = new[] { "DATA", "USB" }, Good = new[] { 1 }, SetTo = "USB" } } },
+        };
+
+        string _txAudioOkFor;          // read as right (or not askable) on this connection; null = ask on the next press
+        bool _txAudioChecking;
+
+        // From the 5-second timer: the radio went away, so the next press asks again.
+        void ForgetRadioTxAudioWhenOffline()
+        {
+            try { if (!IsCatLive()) _txAudioOkFor = null; }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        // Asked by a Msg press before it sends. False only when the radio ANSWERED with a setting that
+        // will not take the computer's sound - then he has been told what to change. Anything else
+        // (no CAT, a radio not in the list, another sound card, no answer) lets the press send.
+        async System.Threading.Tasks.Task<bool> RadioTxAudioAllowsSend()
+        {
+            try
+            {
+                if (!IsCatLive()) return true;
+                string rigType = NormalizeRigType(Rig.RigType);
+                if (string.Equals(_txAudioOkFor, rigType, StringComparison.OrdinalIgnoreCase)) return true;
+                bool ok = await CheckRadioTxAudio(rigType);
+                if (ok) _txAudioOkFor = rigType;
+                return ok;
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); return true; }
+        }
+
+        async System.Threading.Tasks.Task<bool> CheckRadioTxAudio(string rigType)
+        {
+            _txAudioChecking = true;
+            try
+            {
+                string key = VoiceModelKey(rigType);
+                TxAudioRadio radio = null;
+                foreach (var r in TxAudioRadios)
+                    if (key.StartsWith(r.Key, StringComparison.Ordinal)) { radio = r; break; }
+                if (radio == null)
+                {
+                    Log.Warn(VoiceMsgTag + "radio sound check: " + rigType + " is not in the list of radios HolyLogger knows how to ask");
+                    return true;
+                }
+
+                string card = AudioMessages.Settings.RadioDevice ?? string.Empty;
+                if (card.IndexOf("USB Audio CODEC", StringComparison.OrdinalIgnoreCase) < 0)
+                {
+                    Log.Warn(VoiceMsgTag + "radio sound check: not asked - the card to the radio (" + (card.Length == 0 ? "none" : card)
+                             + ") is not the radio's own USB sound");
+                    return true;
+                }
+
+                string address = radio.Icom ? GetIcomCivAddress(rigType) : null;
+                if (radio.Icom && address == null)
+                {
+                    Log.Warn(VoiceMsgTag + "radio sound check: no CI-V address for " + rigType);
+                    return true;
+                }
+                bool? echo = radio.Icom ? IcomEchoesCommands(rigType) : null;
+
+                var wrong = new System.Collections.Generic.List<string>();
+                foreach (var item in radio.Items)
+                {
+                    int v = radio.Icom
+                        ? await AskRig(Rig, "FE FE " + address + " E0 1A 05 " + item.Ask + " FD", (echo == false ? 0 : 9) + 10, string.Empty, IcomValueOf(item.Ask))
+                        : await AskRig(Rig, item.Ask, 0, ";", AsciiNumberAfter(item.Ask.TrimEnd(';')));
+                    string now = v >= 0 && v < item.Values.Length ? item.Values[v] : v < 0 ? "(no answer)" : "(" + v + ")";
+                    bool good = v >= 0 && Array.IndexOf(item.Good, v) >= 0;
+                    Log.Warn(VoiceMsgTag + "radio sound check: " + radio.Name + " " + item.Path + " = " + now + (good ? " - right" : v < 0 ? "" : " - WRONG"));
+                    if (v < 0) return true;     // no answer: say nothing rather than something wrong
+                    if (!good) wrong.Add(item.Path + "\n    now: " + now + " - set it to: " + item.SetTo);
+                }
+                if (wrong.Count == 0) return true;
+
+                Log.Warn(VoiceMsgTag + "NOT SENT: the radio will not take the sound from this computer - told him what to change");
+                HolyMessageBox.ShowWarning(
+                    "Your " + radio.Name + " will not transmit the sound from this computer in SSB.\n\n"
+                    + "Change this on the radio:\n" + string.Join("\n", wrong)
+                    + (radio.Note != null ? "\n\n" + radio.Note : string.Empty)
+                    + "\n\nNothing was sent.",
+                    "Voice Message", this, fitLongestLine: true);   // a menu path is read whole, not split
+                return false;
+            }
+            catch (Exception ex) { Log.Swallow(ex); return true; }
+            finally { _txAudioChecking = false; }
         }
 
         /// <summary>
@@ -359,6 +622,7 @@ namespace HolyLogger
         {
             var p = _pcMsgPlayer;
             bool was = p != null || _pcMsgKeyed;
+            if (was) Log.Warn(VoiceMsgTag + (_pcMsgNumber == QsoPlayNumber ? "PLAY" : "Msg " + _pcMsgNumber) + " stopped by hand");
             _pcMsgPlayer = null;
             if (p != null) p.Stop();
             EndPcMessage();
@@ -367,6 +631,8 @@ namespace HolyLogger
 
         void EndPcMessage()
         {
+            if (_pcMsgNumber != 0)
+                Log.Warn(VoiceMsgTag + (_pcMsgNumber == QsoPlayNumber ? "PLAY" : "Msg " + _pcMsgNumber) + " ended");
             _pcMsgPlayer = null;
             _pcMsgNumber = 0;
             // ALWAYS BACK TO RECEIVE, whatever happened: a transmitter left on is the one thing that
