@@ -3416,6 +3416,7 @@ namespace HolyLogger
             if (!IsCwModeActive() && IsRttyModeActive()) return;   // RTTY says its own reasons when pressed
 
             e.Handled = true;
+            Log.Warn(VoiceMsgTag + "Msg " + ((sender as Button)?.Tag ?? "?") + " clicked | " + VoiceMsgState());
             ExplainWhyMessageCannotBeSent();
         }
 
@@ -9466,9 +9467,12 @@ namespace HolyLogger
                 return;
             }
 
+            Log.Warn(VoiceMsgTag + "Msg " + messageNumber + " pressed | " + VoiceMsgState());
+
             // RTTY sends its own text by its own road (FSK or AFSK) - see MainWindow.Rtty.
             if (!IsCwModeActive() && IsRttyModeActive())
             {
+                Log.Warn(VoiceMsgTag + "Msg " + messageNumber + " goes to RTTY (the mode is RTTY)");
                 TriggerRttyTextMessage(messageNumber);
                 return;
             }
@@ -9484,6 +9488,7 @@ namespace HolyLogger
 
             if (IsCwModeActive())
             {
+                Log.Warn(VoiceMsgTag + "Msg " + messageNumber + " goes to CW (the mode is CW)");
                 TriggerCwTextMessage(messageNumber);
                 return;
             }
@@ -9497,6 +9502,7 @@ namespace HolyLogger
 
             if (!TryGetVoiceCommandProfile(out RadioVoiceCommandProfile profile, out string rigType, out string errorMessage))
             {
+                Log.Warn(VoiceMsgTag + "Msg " + messageNumber + " NOT SENT (radio memory): " + (errorMessage ?? "no voice commands for " + rigType));
                 HolyMessageBox.ShowWarning(errorMessage, "Voice Message", this);
                 return;
             }
@@ -9527,6 +9533,7 @@ namespace HolyLogger
 
             if (string.IsNullOrWhiteSpace(command))
             {
+                Log.Warn(VoiceMsgTag + "Msg " + messageNumber + " NOT SENT (radio memory): no command for this button on " + rigType);
                 HolyMessageBox.ShowWarning(
                     "No voice message is set for this button on this radio.\n\n"
                     + "HolyLogger knows the commands for some radio models and not for others, and "
@@ -9537,6 +9544,7 @@ namespace HolyLogger
 
             if (!TrySendOmniRigCustomCommand(command))
             {
+                Log.Warn(VoiceMsgTag + "Msg " + messageNumber + " NOT SENT (radio memory): OmniRig did not take " + command);
                 HolyMessageBox.ShowWarning(
                     "Failed to send the voice message to " + rigType + ".\n\n"
                     + "Nothing was sent.\n\n"
@@ -9546,6 +9554,7 @@ namespace HolyLogger
                 return;
             }
 
+            Log.Warn(VoiceMsgTag + "Msg " + messageNumber + " (radio memory) play command sent to " + rigType + ": " + command);
             pendingVoiceMessageNumber = messageNumber;
             activeVoiceMessageNumber = null;
             pendingVoiceMessageDeadlineUtc = DateTime.UtcNow.AddSeconds(30);
@@ -9588,6 +9597,7 @@ namespace HolyLogger
             {
                 // In CW these buttons send CW text, and that path says its own piece with the
                 // radio's name in it. Two answers to one press is one too many.
+                Log.Warn(VoiceMsgTag + "NOT SENT: the Msg buttons are not available (CW)");
                 return;
             }
             else if (!IsVoiceMessageModeActive())
@@ -9604,7 +9614,11 @@ namespace HolyLogger
             }
 
             string situation = rigType + "|" + reason;
-            if (string.Equals(_messageRefusalTold, situation, StringComparison.Ordinal)) return;
+            bool toldBefore = string.Equals(_messageRefusalTold, situation, StringComparison.Ordinal);
+            // In the log EVERY time, even when the screen stays quiet because it was said already.
+            Log.Warn(VoiceMsgTag + "NOT SENT: the Msg buttons are not available: " + reason.Replace(gap, " ")
+                     + (toldBefore ? " (said on screen before - not shown again)" : " (shown on screen)"));
+            if (toldBefore) return;
             _messageRefusalTold = situation;
 
             HolyMessageBox.ShowWarning(reason, "Voice Message", this);
@@ -9928,6 +9942,7 @@ namespace HolyLogger
         private void VoiceMessageAvailabilityTimer_Tick(object sender, EventArgs e)
         {
             ShowRigParams();
+            ForgetRadioTxAudioWhenOffline();   // the next Msg press asks the radio again
         }
 
         // True when sending CW/voice messages to the radio is actually possible (CAT online). The Msg
