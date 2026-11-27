@@ -261,7 +261,7 @@ namespace HolyLogger
                 return false;
             }
             var outputs = WaveOutPlayer.GetOutputDeviceNames();
-            if (!outputs.Contains(card))
+            if (WaveInRecorder.FindDevice(outputs, card) == null)
             {
                 Log.Warn(VoiceMsgTag + "NOT SENT: the sound card to the radio (" + card + ") is not connected | sound cards there now: "
                          + string.Join(", ", outputs));
@@ -760,16 +760,14 @@ namespace HolyLogger
             {
                 string device = Properties.Settings.Default.CwDecodeInputDevice ?? string.Empty;
                 if (device.Trim().Length > 0)
-                    present = WaveInRecorder.GetInputDeviceNames().Exists(
-                        d => string.Equals(d, device, StringComparison.OrdinalIgnoreCase));
+                    present = WaveInRecorder.FindDevice(WaveInRecorder.GetInputDeviceNames(), device) != null;
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
             try
             {
                 string card = AudioMessages.Settings.RadioDevice ?? string.Empty;
                 if (card.Trim().Length > 0)
-                    outPresent = WaveOutPlayer.GetOutputDeviceNames().Exists(
-                        d => string.Equals(d, card, StringComparison.OrdinalIgnoreCase));
+                    outPresent = WaveInRecorder.FindDevice(WaveOutPlayer.GetOutputDeviceNames(), card) != null;
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
             _radioSoundCardPresent = present;
@@ -889,8 +887,7 @@ namespace HolyLogger
 
             // A named device that is not there would quietly record the default one (often the PC's own
             // microphone) - say so instead.
-            if (device.Length > 0 && !WaveInRecorder.GetInputDeviceNames().Exists(
-                    d => string.Equals(d, device, StringComparison.OrdinalIgnoreCase)))
+            if (device.Length > 0 && WaveInRecorder.FindDevice(WaveInRecorder.GetInputDeviceNames(), device) == null)
             {
                 HolyMessageBox.ShowWarning("The radio's sound card (" + device + ") is not connected.\n\n"
                                          + "Is the radio on, and its USB cable in?", "Record", this);

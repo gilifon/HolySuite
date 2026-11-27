@@ -634,10 +634,8 @@ namespace HolyLogger.OptionsUserControls
 
                 string saved = Properties.Settings.Default.CwDecodeInputDevice;
                 CB_CwDecodeDevice.ItemsSource = devices;
-                CB_CwDecodeDevice.SelectedItem =
-                    (!string.IsNullOrWhiteSpace(saved) && devices.Contains(saved, StringComparer.OrdinalIgnoreCase))
-                        ? devices.First(d => string.Equals(d, saved, StringComparison.OrdinalIgnoreCase))
-                        : SystemDefaultDevice;
+                // Also under the new number Windows may have given the card (WaveInRecorder.FindDevice).
+                CB_CwDecodeDevice.SelectedItem = WaveInRecorder.FindDevice(devices, saved) ?? SystemDefaultDevice;
             }
             finally { _loadingCwDecodeDevice = false; }
         }

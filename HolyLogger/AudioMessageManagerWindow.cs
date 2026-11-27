@@ -441,7 +441,7 @@ namespace HolyLogger
             // message played there while the transmitter is keyed sends a dead carrier.
             var radio = new List<string> { ChooseOne };
             radio.AddRange(outputs);
-            if (!string.IsNullOrEmpty(cfg.RadioDevice) && !radio.Contains(cfg.RadioDevice))
+            if (!string.IsNullOrEmpty(cfg.RadioDevice) && WaveInRecorder.FindDevice(radio, cfg.RadioDevice) == null)
                 radio.Add(cfg.RadioDevice);                  // switched off just now: keep his choice in sight
             _cbRadio.ItemsSource = radio;
             _cbRadio.SelectedItem = Pick(radio, cfg.RadioDevice, ChooseOne);
@@ -555,8 +555,8 @@ namespace HolyLogger
 
         static string Pick(List<string> list, string saved, string fallback)
         {
-            if (!string.IsNullOrEmpty(saved) && list.Contains(saved)) return saved;
-            return fallback;
+            // Also under the new number Windows may have given the card (WaveInRecorder.FindDevice).
+            return WaveInRecorder.FindDevice(list, saved) ?? fallback;
         }
 
         void SaveDevices()

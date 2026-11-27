@@ -98,21 +98,60 @@ namespace HolyLogger
             return list;
         }
 
+        // THE SAME SOUND CARD UNDER A NEW NAME (his radio, 2026-11-28). Windows numbers a USB sound card
+        // again when it comes back on another USB port: "Microphone (USB Audio CODEC )" became
+        // "Microphone (3- USB Audio CODEC )", the name saved in the settings matched nothing, and REC QSO
+        // vanished from the main bar (recording would have taken the PC's own microphone). Two names are
+        // the same card when they differ only by that "N- " number. Windows also cuts the names to 31
+        // characters - with the number in, the closing bracket falls off - so the closing bracket and
+        // spaces at the end are not compared either. Used wherever a card is found by its saved name,
+        // in and out alike (WaveOutPlayer too).
+        public static string DeviceKey(string name)
+        {
+            if (name == null) return string.Empty;
+            string key = System.Text.RegularExpressions.Regex.Replace(name, @"\(\d+-\s*", "(");
+            return key.Trim().TrimEnd(')', ' ').ToUpperInvariant();
+        }
+
+        public static bool SameDevice(string a, string b)
+        {
+            if (string.IsNullOrWhiteSpace(a) || string.IsNullOrWhiteSpace(b)) return false;
+            return string.Equals(a, b, StringComparison.OrdinalIgnoreCase) || DeviceKey(a) == DeviceKey(b);
+        }
+
+        // The name in `names` that is the saved one: the exact name first (two radios with the same card
+        // can both be plugged in, "1- USB Audio CODEC" and "2- USB Audio CODEC"), else the one that
+        // differs only by Windows' number. Null when the card is not there.
+        public static string FindDevice(IEnumerable<string> names, string saved)
+        {
+            if (names == null || string.IsNullOrWhiteSpace(saved)) return null;
+            string near = null;
+            foreach (string n in names)
+            {
+                if (string.Equals(n, saved, StringComparison.OrdinalIgnoreCase)) return n;
+                if (near == null && SameDevice(n, saved)) near = n;
+            }
+            return near;
+        }
+
         // The waveIn device id for a saved device name, or WAVE_MAPPER (system default) when the name
-        // is empty or the device is no longer there - the radio may simply be switched off.
+        // is empty or the device is no longer there - the radio may simply be switched off. Found by
+        // FindDevice, so a card Windows has numbered again is still found.
         public static uint ResolveDeviceId(string deviceName)
         {
             if (string.IsNullOrWhiteSpace(deviceName)) return WAVE_MAPPER;
             try
             {
                 uint n = waveInGetNumDevs();
+                var names = new string[n];
                 for (uint i = 0; i < n; i++)
                 {
                     var caps = new WAVEINCAPS();
-                    if (waveInGetDevCaps((IntPtr)i, ref caps, (uint)Marshal.SizeOf(typeof(WAVEINCAPS))) == 0
-                        && string.Equals(caps.szPname, deviceName, StringComparison.OrdinalIgnoreCase))
-                        return i;
+                    if (waveInGetDevCaps((IntPtr)i, ref caps, (uint)Marshal.SizeOf(typeof(WAVEINCAPS))) == 0)
+                        names[i] = caps.szPname;
                 }
+                string found = FindDevice(names, deviceName);
+                if (found != null) return (uint)Array.IndexOf(names, found);
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
             return WAVE_MAPPER;

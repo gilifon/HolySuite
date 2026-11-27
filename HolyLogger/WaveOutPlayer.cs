@@ -92,14 +92,18 @@ namespace HolyLogger
             if (string.IsNullOrWhiteSpace(deviceName)) return WAVE_MAPPER;
             try
             {
+                // Found by WaveInRecorder.FindDevice: a card Windows has numbered again ("3- USB Audio
+                // CODEC") is still the card he chose.
                 uint n = waveOutGetNumDevs();
+                var names = new string[n];
                 for (uint i = 0; i < n; i++)
                 {
                     var caps = new WAVEOUTCAPS();
-                    if (waveOutGetDevCaps((IntPtr)i, ref caps, (uint)Marshal.SizeOf(typeof(WAVEOUTCAPS))) == 0
-                        && string.Equals(caps.szPname, deviceName, StringComparison.OrdinalIgnoreCase))
-                        return i;
+                    if (waveOutGetDevCaps((IntPtr)i, ref caps, (uint)Marshal.SizeOf(typeof(WAVEOUTCAPS))) == 0)
+                        names[i] = caps.szPname;
                 }
+                string found = WaveInRecorder.FindDevice(names, deviceName);
+                if (found != null) return (uint)Array.IndexOf(names, found);
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
             return WAVE_MAPPER;
