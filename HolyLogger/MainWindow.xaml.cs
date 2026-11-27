@@ -5670,10 +5670,9 @@ namespace HolyLogger
                 catch (Exception swallowed) { Log.Swallow(swallowed); }
             }
 
-            HolyMessageBox.ShowWarning(
-                "BK-IN is off on the radio, so the CW did not go out on the air.\n\n"
-                + "Turn BK-IN on at the radio.",
-                "CW Text", this);
+            // NO BOX ANY MORE (his request, 2026-11-27: it disturbed his friends). Only the log says so
+            // for now; a better way to tell the operator nothing went out is still to be found.
+            Log.Warn("BK-IN is off on the radio - the CW did not go out on the air (no message shown).");
         }
 
         // -- THE LITE KEYER ON THE MENU ROW ------------------------------------------------------
