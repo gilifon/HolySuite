@@ -10015,6 +10015,9 @@ namespace HolyLogger
                 return;
             }
 
+            // Audio Messages closes when the radio goes from SSB to another mode.
+            FollowModeWithAudioMessagesWindow();
+
             bool isCw = IsCwModeActive();
             bool isRtty = !isCw && IsRttyModeActive();
             bool isVoiceAvailable = TryGetVoiceMessageAvailability(out _, out string errorMessage);
@@ -17483,6 +17486,8 @@ namespace HolyLogger
                 // Refresh the Msg buttons so they switch to/from the CW look immediately on a mode
                 // change (matters when the radio is off, where the mode comes from this dropdown).
                 UpdateMessageButtonLabels();
+                // Without CAT the mode is this box's, so Audio Messages follows it here too.
+                FollowModeWithAudioMessagesWindow();
                 // Recordings keyed without CAT go by this box, so the row is worked out again now.
                 if (AudioMessages.UsePc && !PcMessagesKeyByCat) UpdateVoiceMessageAvailabilityState();
                 // CW and phone live in different parts of a band, so the mode is half of the answer to
