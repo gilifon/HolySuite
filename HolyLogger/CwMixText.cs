@@ -421,6 +421,18 @@ namespace HolyLogger
             _entries.InsertRange(first, fresh);
             if (fresh.Count > 0 || last >= first) _changed = true;
 
+            // A WORD CUT BY THE STRETCH IS JUDGED AND PAINTED AGAIN, WHOLE (his screen, 2026-11-27: "S5" green and
+            // "3R" plain). A stretch ends at a time, which can fall inside a word: "S5" was replaced by one stretch,
+            // "3R" by the next. The word still read "S53R", so JudgeWords saw it as already judged and the network's
+            // new "3R" were never painted. Forgetting the judgement on the word's first letter repaints all of it.
+            if (fresh.Count > 0 || last >= first)
+                for (int k = first - 1; k >= 0 && _entries[k].Text != " " && !IsProsign(_entries[k]); k--)
+                    if (k == 0 || _entries[k - 1].Text == " " || IsProsign(_entries[k - 1]))
+                    {
+                        _entries[k].Judged = null;
+                        _entries[k].Call = null;
+                    }
+
             JudgeWords();
             if (_hide) ApplyHide();
         }
