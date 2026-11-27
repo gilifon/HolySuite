@@ -504,6 +504,14 @@
                  Height must match shell:WindowChrome.CaptionHeight for drag/snap/double-click-maximize
                  to line up. Only the 3 buttons opt out of the draggable "caption" area. -->
             <Border x:Name="CustomTitleBar" DockPanel.Dock="Top" Height="32" Background="{DynamicResource TitleBarBg}">
+                <Grid>
+                <!-- THE UTC CLOCK, IN THE TITLE BAR (his request, 2026-11-28). It was in the menu row below,
+                     centred over the map, and the CW typing row ran under it once BK-IN joined it. Same size
+                     and the same place across - centred over the map, which spans x=677..right-6 - one row
+                     up. Not hit-testable, so the title bar still drags under it. -->
+                <TextBlock x:Name="L_TitleClock" HorizontalAlignment="Stretch" TextAlignment="Center"
+                           Margin="677,0,6,0" VerticalAlignment="Center"
+                           FontWeight="Bold" Foreground="{DynamicResource TextBrush}" FontSize="20" IsHitTestVisible="False" Visibility="Collapsed"/>
                 <DockPanel LastChildFill="False">
                     <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
                         <Button x:Name="TitleBar_MinimizeBtn" Content="&#xE921;" Style="{StaticResource CaptionButtonStyle}"
@@ -530,6 +538,7 @@
                                    Margin="7,0,0,0" VerticalAlignment="Center" FontSize="16" FontWeight="Bold" Foreground="#E00000"/>
                     </StackPanel>
                 </DockPanel>
+                </Grid>
             </Border>
             <Grid DockPanel.Dock="Top">
             <!-- Menu bar and the callsign lock share one left-aligned row, so the lock sits immediately
@@ -1139,10 +1148,8 @@
             </StackPanel>
             </StackPanel>
 
-                <!-- UTC clock, centred over the map (the map spans x=677..right-6 in the row below). -->
-                <TextBlock x:Name="L_TitleClock" HorizontalAlignment="Stretch" TextAlignment="Center"
-                           Margin="677,0,6,0" VerticalAlignment="Center"
-                           FontWeight="Bold" Foreground="{DynamicResource TextBrush}" FontSize="20" IsHitTestVisible="False" Visibility="Collapsed"/>
+                <!-- (The UTC clock sat here, over the map; since 2026-11-28 it is in the title bar - see
+                     L_TitleClock there. This row ran out of room once the CW typing row gained BK-IN.) -->
 
                 <!-- RECORD AND PLAY (his design, 2026-11-26): in SSB the bar over the four Msg buttons is
                      empty (CQ / ANS and the CW typing line belong to CW), so these two sit there. Record
