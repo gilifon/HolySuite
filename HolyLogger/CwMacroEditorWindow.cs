@@ -54,6 +54,11 @@ namespace HolyLogger
         private CheckBox _qrlOn;
         private TextBox _qrlMinutes;
 
+        // The shortcuts frame on the right, and the macro box a click on a shortcut goes into.
+        private const double ShortcutsWidth = 470;
+        private TextBox _lastMacroBox;
+        private FrameworkElement _generalFrame;
+
         private readonly Func<int, string> _getMsgText;
         private readonly Action<int, string> _setMsgText;
 
@@ -90,9 +95,12 @@ namespace HolyLogger
             // The floor and the ceiling are the same number, so a size restored from an earlier
             // session cannot bring back a window spread across two screens. The height is still his,
             // and still remembered.
-            Width = 1184;
-            MinWidth = 1184;
-            MaxWidth = 1184;
+            //
+            // PLUS THE SHORTCUTS FRAME on the right (his request, 2026-11-27: the list the one-message editor
+            // shows was missing here): ShortcutsWidth more.
+            Width = 1184 + ShortcutsWidth;
+            MinWidth = 1184 + ShortcutsWidth;
+            MaxWidth = 1184 + ShortcutsWidth;
             SetResourceReference(BackgroundProperty, "WindowBg");
             CwKeyboardWindow.UseBigTooltips(this);
 
@@ -101,11 +109,62 @@ namespace HolyLogger
             stack.Children.Add(BuildMsgTable());
             stack.Children.Add(BuildButtons());
 
+            // THE SHORTCUTS, CLICKED IN (his request, 2026-11-27). The same list and the same click as the
+            // one-message editor (MainWindow.BuildCwMacroLegend): a click puts the shortcut into the macro
+            // box he was last in, at its cursor. Only a macro box counts - a NAME box is written on the
+            // keycap, and a shortcut there would show as "{CALL}" on the key.
+            PreviewGotKeyboardFocus += (s, e) =>
+            {
+                var box = e.NewFocus as TextBox;
+                if (box != null && box.MaxLength == MacroLength) _lastMacroBox = box;
+            };
+            var legend = MainWindow.BuildCwMacroLegend(token =>
+            {
+                if (_lastMacroBox == null) { System.Media.SystemSounds.Beep.Play(); return; }
+                MainWindow.InsertCwMacroToken(_lastMacroBox, token);
+            });
+            var shortcuts = new StackPanel();
+            var how = new TextBlock
+            {
+                Text = "Click one to put it in the macro box you are in.",
+                FontSize = 16,
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(0, 0, 0, 8)
+            };
+            shortcuts.Children.Add(how);
+            shortcuts.Children.Add(legend);
+            var shortcutsFrame = SetFrame("Shortcuts", shortcuts);
+            // CYAN INSIDE (his request, 2026-11-27): "it is not an editable area" - the white boxes are what he
+            // types in, this is a list he only clicks. Black writing, so it reads on cyan in a dark scheme too.
+            ((Border)((Grid)shortcutsFrame).Children[0]).Background = new SolidColorBrush(Color.FromRgb(0xB2, 0xEB, 0xF2));
+            shortcuts.SetValue(System.Windows.Documents.TextElement.ForegroundProperty, Brushes.Black);
+            shortcutsFrame.Width = ShortcutsWidth - 16;
+            shortcutsFrame.VerticalAlignment = VerticalAlignment.Top;
+            shortcutsFrame.Margin = new Thickness(0, 16, 16, 0);
+            // ITS TOP ON THE GENERAL AND CONTEST FRAMES' TOP (his request, 2026-11-27), not on the heading
+            // above them. Taken from where the General frame really lands, so it stays right whatever the
+            // heading's wrapping makes its height.
+            stack.LayoutUpdated += (s, e) =>
+            {
+                if (_generalFrame == null || !_generalFrame.IsVisible) return;
+                double top = _generalFrame.TranslatePoint(new Point(0, 0), stack).Y + stack.Margin.Top;
+                if (Math.Abs(shortcutsFrame.Margin.Top - top) > 0.5) shortcutsFrame.Margin = new Thickness(0, top, 16, 0);
+            };
+
+            // DOCKED, NOT A GRID. In a two-column Grid here the tables came out 2156 wide - the wrapping
+            // heading over them stretched to its whole sentence and pushed the shortcuts off the window (his
+            // screen, 2026-11-27). Docked on the right, the tables keep the 1136 they always had: measured on
+            // the real window in a test program (build/uiharness/MacroWin.cs).
+            var both = new DockPanel { LastChildFill = true };
+            DockPanel.SetDock(shortcutsFrame, Dock.Right);
+            both.Children.Add(shortcutsFrame);
+            both.Children.Add(stack);
+
             // Grows to its content but never past the screen - the same rule the keyer's settings window
             // works by, and with twenty-eight rows in here it is not a theoretical one.
             Content = new ScrollViewer
             {
-                Content = stack,
+                Content = both,
                 VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
                 HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
                 MaxHeight = Math.Max(400, SystemParameters.WorkArea.Height - 120)
@@ -381,6 +440,7 @@ namespace HolyLogger
             row3.Children.Add(keys);
 
             var offFrame = SetFrame("General", offGrid);
+            _generalFrame = offFrame;
             Grid.SetColumn(offFrame, 2);
             Grid.SetRow(offFrame, 0);
             row3.Children.Add(offFrame);

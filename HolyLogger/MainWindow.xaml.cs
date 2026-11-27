@@ -4300,7 +4300,7 @@ namespace HolyLogger
         // WHAT MAY BE PUT IN A MESSAGE, listed where the message is written. Both spellings of each
         // are shown: the single character, and the long form for a man who writes his messages the
         // way N1MM writes them.
-        private static UIElement BuildCwMacroLegend(Action<string> insert = null)
+        internal static UIElement BuildCwMacroLegend(Action<string> insert = null)
         {
             var pairs = new[]
             {
@@ -4369,7 +4369,7 @@ namespace HolyLogger
         // Puts a macro mark into a macro box at its cursor (over any selection), with a space
         // either side where it would otherwise run into a word. Refused quietly past the box's
         // length limit, rather than cutting the macro in half.
-        private static void InsertCwMacroToken(TextBox box, string token)
+        internal static void InsertCwMacroToken(TextBox box, string token)
         {
             if (box == null || string.IsNullOrEmpty(token)) return;
             string text = box.Text ?? string.Empty;
