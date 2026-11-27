@@ -118,28 +118,7 @@ namespace HolyLogger
                 var box = e.NewFocus as TextBox;
                 if (box != null && box.MaxLength == MacroLength) _lastMacroBox = box;
             };
-            var legend = MainWindow.BuildCwMacroLegend(token =>
-            {
-                if (_lastMacroBox == null) { System.Media.SystemSounds.Beep.Play(); return; }
-                MainWindow.InsertCwMacroToken(_lastMacroBox, token);
-            });
-            var shortcuts = new StackPanel();
-            var how = new TextBlock
-            {
-                Text = "Click one to put it in the macro box you are in.",
-                FontSize = 16,
-                TextWrapping = TextWrapping.Wrap,
-                Margin = new Thickness(0, 0, 0, 8)
-            };
-            shortcuts.Children.Add(how);
-            shortcuts.Children.Add(legend);
-            var shortcutsFrame = SetFrame("Shortcuts", shortcuts);
-            // COLOURED INSIDE (his request, 2026-11-27): "it is not an editable area" - the white boxes are what he
-            // types in, this is a list he only clicks. The light blue of the A / K / SFI box on the cluster and of
-            // the main entry form (FormBg, his choice the same night, first cyan), so it follows the colour scheme
-            // and Customize Colors as they do - with the scheme's own writing colour on it.
-            ((Border)((Grid)shortcutsFrame).Children[0]).SetResourceReference(Border.BackgroundProperty, "FormBg");
-            shortcuts.SetResourceReference(System.Windows.Documents.TextElement.ForegroundProperty, "TextBrush");
+            var shortcutsFrame = BuildShortcutsFrame(() => _lastMacroBox);
             shortcutsFrame.Width = ShortcutsWidth - 16;
             shortcutsFrame.VerticalAlignment = VerticalAlignment.Top;
             shortcutsFrame.Margin = new Thickness(0, 16, 16, 0);
@@ -342,6 +321,40 @@ namespace HolyLogger
             Grid.SetRow(content, 0);
             face.Child = content;
             return key;
+        }
+
+        // THE SHORTCUTS FRAME, the same in both windows that edit macros here (his request, 2026-11-27): the list
+        // of MainWindow.BuildCwMacroLegend, and a click puts the shortcut into the macro box `target` names - the
+        // one he was last in - at its cursor. A beep if he has not been in one yet.
+        //
+        // COLOURED INSIDE (his request, 2026-11-27): "it is not an editable area" - the white boxes are what he
+        // types in, this is a list he only clicks. The light blue of the A / K / SFI box on the cluster and of
+        // the main entry form (FormBg, his choice the same night, first cyan), so it follows the colour scheme
+        // and Customize Colors as they do - with the scheme's own writing colour on it.
+        private static FrameworkElement BuildShortcutsFrame(Func<TextBox> target)
+        {
+            var legend = MainWindow.BuildCwMacroLegend(token =>
+            {
+                TextBox box = target();
+                if (box == null) { System.Media.SystemSounds.Beep.Play(); return; }
+                MainWindow.InsertCwMacroToken(box, token);
+            });
+            var shortcuts = new StackPanel();
+            var how = new TextBlock
+            {
+                Text = "Click one to put it in the macro box you are in.",
+                FontSize = 16,
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(0, 0, 0, 8)
+            };
+            shortcuts.Children.Add(how);
+            shortcuts.Children.Add(legend);
+            var frame = SetFrame("Shortcuts", shortcuts);
+            ((Border)((Grid)frame).Children[0]).SetResourceReference(Border.BackgroundProperty, "FormBg");
+            shortcuts.SetResourceReference(System.Windows.Documents.TextElement.ForegroundProperty, "TextBrush");
+            frame.Width = ShortcutsWidth - 16;
+            frame.VerticalAlignment = VerticalAlignment.Top;
+            return frame;
         }
 
         private static TextBlock SectionTitle(string text, string note, Thickness margin, params string[] boldInNote)
@@ -836,9 +849,7 @@ namespace HolyLogger
         // a long way from the texts it rewrites; here it fills the boxes in front of him and NOTHING IS
         // SAVED UNTIL SAVE, so Cancel is the undo it never had.
         //
-        // F9 TO F12 ARE LEFT ALONE. There is no standard for them - they are where a man puts the
-        // things only he sends - and writing over them would be the program having an opinion about
-        // his station.
+        // F9 TO F12 WERE LEFT ALONE until 2026-11-27, when the set became his to keep: see StandardRows.
         private UIElement BuildStandardTextsButton()
         {
             var button = new Button
@@ -855,26 +866,248 @@ namespace HolyLogger
                 Padding = new Thickness(12, 4, 12, 4),
                 VerticalAlignment = VerticalAlignment.Center,
                 HorizontalAlignment = HorizontalAlignment.Left,
-                ToolTip = "Fills F1 to F8: the Run macros, the S&P macros, and the names on the keys."
+                ToolTip = "Shows the standard texts for F1 to F12, to accept or change."
             };
 
-            button.Click += (s, e) =>
-            {
-                var said = new StringBuilder();
-                said.Append("This fills F1 to F8 with the standard contest set:\n\n");
-                said.Append("the Run macros, the S&P macros, and the names on the keys.\n\n");
-                said.Append("F9 to F12 are left alone. Whatever those eight rows hold now is replaced - ");
-                said.Append("and nothing is saved until you press Save.");
-
-                if (!HolyMessageBox.ShowConfirm(said.ToString(), "CW Macros", HolyMsgType.Warning, this, 620,
-                                                "Write them", "Leave mine")) return;
-
-                Fill(_labels, CwKeyboardWindow.StandardLabels);
-                Fill(_run, CwKeyboardWindow.StandardTexts);
-                Fill(_sp, CwKeyboardWindow.StandardSpTexts);
-            };
+            // IT SHOWS THEM FIRST, AND THEY CAN BE HIS OWN (his request, 2026-11-27). It used to ask "Write them /
+            // Leave mine" with a sentence about the set and never showed a text; and the set was the program's,
+            // fixed. Now it opens the eight rows, which he can change, and keep as HIS standard for next time.
+            button.Click += (s, e) => ShowStandardTexts();
 
             return button;
+        }
+
+        // HIS OWN STANDARD SET, kept beside HolyLogger's other files of his (as AudioMessages keeps its own):
+        // three lists of twelve - names, Run macros, S&P macros. No file means the program's set.
+        private sealed class StandardSet
+        {
+            public string[] Labels;
+            public string[] Run;
+            public string[] Sp;
+        }
+
+        // ALL TWELVE KEYS (his request, 2026-11-27): it was F1 to F8, because the program's set has texts for
+        // those only. With a standard of his own, F9 to F12 belong in it too.
+        private const int StandardRows = KeyerButtons;
+
+        private static string StandardSetPath
+        {
+            get
+            {
+                var fvi = System.Diagnostics.FileVersionInfo.GetVersionInfo(System.Reflection.Assembly.GetExecutingAssembly().Location);
+                string appData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+                return System.IO.Path.Combine(appData, fvi.CompanyName ?? "HolyLogger", fvi.ProductName ?? "HolyLogger",
+                                              "cw_standard_texts.json");
+            }
+        }
+
+        private static StandardSet ProgramStandard()
+        {
+            return new StandardSet
+            {
+                Labels = TakeAll(CwKeyboardWindow.StandardLabels),
+                Run = TakeAll(CwKeyboardWindow.StandardTexts),
+                Sp = TakeAll(CwKeyboardWindow.StandardSpTexts)
+            };
+        }
+
+        private static string[] TakeAll(string[] from)
+        {
+            var all = new string[StandardRows];
+            for (int i = 0; i < StandardRows; i++) all[i] = from != null && i < from.Length ? from[i] ?? string.Empty : string.Empty;
+            return all;
+        }
+
+        private static StandardSet LoadStandard()
+        {
+            try
+            {
+                if (System.IO.File.Exists(StandardSetPath))
+                {
+                    var mine = Newtonsoft.Json.JsonConvert.DeserializeObject<StandardSet>(System.IO.File.ReadAllText(StandardSetPath));
+                    if (mine != null)
+                        return new StandardSet { Labels = TakeAll(mine.Labels), Run = TakeAll(mine.Run), Sp = TakeAll(mine.Sp) };
+                }
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+            return ProgramStandard();
+        }
+
+        private static bool SameSet(StandardSet a, StandardSet b)
+        {
+            for (int i = 0; i < StandardRows; i++)
+                if (a.Labels[i] != b.Labels[i] || a.Run[i] != b.Run[i] || a.Sp[i] != b.Sp[i]) return false;
+            return true;
+        }
+
+        // THE WINDOW BEHIND THE GREEN BUTTON (his design, 2026-11-27): all the standard macros, in boxes he can
+        // change. He accepts them as they are, or edits and then confirms. CONFIRM writes them into F1 to F12 here
+        // (nothing reaches the keyer until Save, as before) AND makes them the updated standard: the green button
+        // opens with them from then on, all twelve. Until he has one, F9 to F12 open with what he has there now
+        // - the program's set has nothing for them, and a Confirm must not wipe his own texts.
+        private void ShowStandardTexts()
+        {
+            var dialog = new Window
+            {
+                Title = "Standard contest texts",
+                Owner = this,
+                ShowInTaskbar = false,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                SizeToContent = SizeToContent.WidthAndHeight,
+                ResizeMode = ResizeMode.NoResize
+            };
+            dialog.SetResourceReference(BackgroundProperty, "WindowBg");
+
+            var labels = new TextBox[StandardRows];
+            var run = new TextBox[StandardRows];
+            var sp = new TextBox[StandardRows];
+
+            // THE SHORTCUTS HERE TOO (his request, 2026-11-27), so the macros can be written by clicking.
+            TextBox lastBox = null;
+            dialog.PreviewGotKeyboardFocus += (s2, e2) =>
+            {
+                var box = e2.NewFocus as TextBox;
+                if (box != null && box.MaxLength == MacroLength) lastBox = box;
+            };
+            var shortcutsFrame = BuildShortcutsFrame(() => lastBox);
+            shortcutsFrame.Margin = new Thickness(16, 0, 0, 0);
+
+            var grid = new Grid();
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(NameBoxWidth + 10) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(MacroBoxWidth + 10) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(MacroBoxWidth + 10) });
+            for (int r = 0; r <= StandardRows; r++) grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(RowHeight) });
+            grid.Children.Add(Heading("Key", 0, 0));
+            grid.Children.Add(Heading("Button text", 1, 0));
+            grid.Children.Add(Heading("Run macro", 2, 0));
+            grid.Children.Add(Heading("S&P macro", 3, 0));
+            for (int i = 0; i < StandardRows; i++)
+            {
+                int row = i + 1;
+                grid.Children.Add(KeyName("F" + (i + 1), row));
+                labels[i] = Cell(string.Empty, 1, row);
+                run[i] = Cell(string.Empty, 2, row, MacroLength);
+                sp[i] = Cell(string.Empty, 3, row, MacroLength);
+                CwKeyboardWindow.HoldToKeycap(labels[i], CwKeyboardWindow.KeycapRoom, "Consolas", 16, dialog);
+                grid.Children.Add(AsKeycap(labels[i], labels[i]));
+                grid.Children.Add(run[i]);
+                grid.Children.Add(sp[i]);
+            }
+
+            var said = new TextBlock { FontSize = 16, FontWeight = FontWeights.Bold, Margin = new Thickness(0, 8, 0, 0), Visibility = Visibility.Collapsed };
+            said.SetResourceReference(TextBlock.ForegroundProperty, "TextBrush");
+
+            Action<StandardSet> show = set =>
+            {
+                for (int i = 0; i < StandardRows; i++)
+                {
+                    labels[i].Text = set.Labels[i];
+                    run[i].Text = set.Run[i];
+                    sp[i].Text = set.Sp[i];
+                }
+            };
+            Func<StandardSet> read = () =>
+            {
+                var set = new StandardSet { Labels = new string[StandardRows], Run = new string[StandardRows], Sp = new string[StandardRows] };
+                for (int i = 0; i < StandardRows; i++)
+                {
+                    set.Labels[i] = (labels[i].Text ?? string.Empty).Trim();
+                    set.Run[i] = (run[i].Text ?? string.Empty).Trim();
+                    set.Sp[i] = (sp[i].Text ?? string.Empty).Trim();
+                }
+                return set;
+            };
+            bool ownKept = System.IO.File.Exists(StandardSetPath);
+            var opened = LoadStandard();
+            if (!ownKept)
+                for (int i = 8; i < StandardRows; i++)
+                {
+                    opened.Labels[i] = (_labels[i].Text ?? string.Empty).Trim();
+                    opened.Run[i] = (_run[i].Text ?? string.Empty).Trim();
+                    opened.Sp[i] = (_sp[i].Text ?? string.Empty).Trim();
+                }
+
+            // NO LINE SAYING WHOSE TEXTS THESE ARE (his request, 2026-11-27: "remove this line"). The line under
+            // the table shows only if keeping them fails.
+            show(opened);
+
+            var confirm = new Button { Content = "Confirm", FontSize = 16, Height = 32, Width = 110, IsDefault = true };
+            var cancel = new Button { Content = "Cancel", FontSize = 16, Height = 32, Width = 110, IsCancel = true, Margin = new Thickness(10, 0, 0, 0) };
+            confirm.ToolTip = "Puts these into the keys and keeps them as your standard.\nNothing reaches the keyer until you press Save.";
+
+            confirm.Click += (s2, e2) =>
+            {
+                var set = read();
+                try
+                {
+                    System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(StandardSetPath));
+                    System.IO.File.WriteAllText(StandardSetPath,
+                        Newtonsoft.Json.JsonConvert.SerializeObject(set, Newtonsoft.Json.Formatting.Indented));
+                }
+                catch (Exception ex)
+                {
+                    Log.Swallow(ex);
+                    said.Text = "Could not keep them: " + ex.Message;
+                    said.Visibility = Visibility.Visible;
+                    return;
+                }
+                Fill(_labels, set.Labels);
+                Fill(_run, set.Run);
+                Fill(_sp, set.Sp);
+                dialog.DialogResult = true;
+            };
+
+            var buttons = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                Margin = new Thickness(0, 16, 0, 0)
+            };
+            buttons.Children.Add(confirm);
+            buttons.Children.Add(cancel);
+
+            var top = new TextBlock
+            {
+                FontSize = 16,
+                Margin = new Thickness(0, 0, 0, 10),
+                Text = "The standard texts for F1 to F12. Accept them, or change them and then Confirm."
+            };
+            top.SetResourceReference(TextBlock.ForegroundProperty, "TextBrush");
+
+            var table = new StackPanel();
+            table.Children.Add(grid);
+            table.Children.Add(said);
+            // Docked, as in the big window - the table on the left, the shortcuts on its right.
+            var sides = new DockPanel { LastChildFill = true };
+            DockPanel.SetDock(shortcutsFrame, Dock.Right);
+            sides.Children.Add(shortcutsFrame);
+            sides.Children.Add(table);
+            // ITS BOTTOM ON THE F12 BOXES' BOTTOM (his request, 2026-11-28): the frame is drawn down to the lower edge
+            // of the last row, taken from where that box really lands.
+            var frameBorder = (Border)((Grid)shortcutsFrame).Children[0];
+            sides.LayoutUpdated += (s2, e2) =>
+            {
+                TextBox last = sp[StandardRows - 1];
+                if (!last.IsVisible || !shortcutsFrame.IsVisible) return;
+                double bottom = last.TranslatePoint(new Point(0, last.ActualHeight), shortcutsFrame).Y;
+                if (bottom > 0 && Math.Abs(shortcutsFrame.ActualHeight - bottom) > 0.5)
+                {
+                    frameBorder.VerticalAlignment = VerticalAlignment.Stretch;
+                    shortcutsFrame.Height = bottom;
+                }
+            };
+
+            var page = new StackPanel { Margin = new Thickness(16) };
+            page.Children.Add(top);
+            page.Children.Add(sides);
+            // Confirm and Cancel centred on the whole window, not under the table alone (his screen, 2026-11-28).
+            page.Children.Add(buttons);
+            dialog.Content = page;
+
+            CwKeyboardWindow.UseBigTooltips(dialog);
+            WindowBounds.Attach(dialog, "CwStandardTexts");
+            dialog.ShowDialog();
         }
 
         private static void Fill(TextBox[] boxes, string[] texts)
