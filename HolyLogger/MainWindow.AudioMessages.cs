@@ -68,6 +68,37 @@ namespace HolyLogger
             catch (Exception swallowed) { Log.Swallow(swallowed); return null; }
         }
 
+        // ── THE WINDOW GOES WHEN THE RADIO LEAVES SSB (his request, 2026-11-26) ──────────────────────
+        //
+        // These are SSB messages, so the window has nothing to do in CW, RTTY or digital. ON THE CHANGE
+        // ONLY: opened on purpose while the radio is in CW (to record ahead), it stays until the next time
+        // the radio goes from SSB to something else. The mode is the radio's when it answers, else the
+        // Mode box.
+        string _audioWindowLastMode;
+
+        void FollowModeWithAudioMessagesWindow()
+        {
+            try
+            {
+                string mode = null;
+                bool rigOnline = Properties.Settings.Default.EnableOmniRigCAT && OmniRigEngine != null && Rig != null
+                                 && Rig.Status == OmniRig.RigStatusX.ST_ONLINE;
+                if (rigOnline) mode = GetNormalizedRigMode();
+                if (string.IsNullOrEmpty(mode))
+                {
+                    if (CB_Mode != null && CB_Mode.SelectedItem is ComboBoxItem item) mode = item.Content as string;
+                    else if (CB_Mode != null) mode = CB_Mode.Text;
+                }
+                mode = (mode ?? string.Empty).Trim().ToUpperInvariant();
+                if (mode.Length == 0) return;
+
+                bool leftSsb = _audioWindowLastMode == "SSB" && mode != "SSB";
+                _audioWindowLastMode = mode;
+                if (leftSsb && _audioMessagesWindow != null) _audioMessagesWindow.Close();
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
         // Called once the main window is built: the keycap pictures follow the switch.
         void HookAudioMessages()
         {

@@ -338,11 +338,19 @@ namespace HolyLogger
             _tick.Tick += (s, e) => Tick();
 
             Loaded += (s, e) => { StartMic(); _tick.Start(); };
+
+            // A RECORDING STILL RUNNING WHEN THE WINDOW GOES gets its Save As first - while the window is
+            // still there to own that dialog (in Closed it is already gone).
+            Closing += (s, e) =>
+            {
+                if (_recordingN != 0) FinishRecording();
+            };
             Closed += (s, e) =>
             {
                 AudioMessages.SourceChanged -= OnSourceChanged;
                 _tick.Stop();
-                if (_recordingN != 0) FinishRecording();
+                lock (_captureGate) { _captured = null; }
+                _recordingN = 0;
                 StopMic();
                 if (_micLevel != null) { _micLevel.Dispose(); _micLevel = null; }
                 if (_player != null) _player.Stop();
