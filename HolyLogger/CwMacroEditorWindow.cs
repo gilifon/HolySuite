@@ -555,7 +555,9 @@ namespace HolyLogger
         // "Button text" and the row under it - see BuildKeyerTable.
         private const double FrameMarginTop = 10;
         private const double FrameBorderTop = 2;
-        private const double FramePaddingTop = 10;
+        // 13, not 10, since the name sits in its own box across the line (2026-11-27): the box reaches about
+        // 13 below the line, and at 10 it touched the "Button text" heading under it.
+        private const double FramePaddingTop = 13;
         private const double FrameContentTop = FrameMarginTop + FrameBorderTop + FramePaddingTop;
 
         private static FrameworkElement SetFrame(string caption, UIElement inside)
@@ -578,17 +580,32 @@ namespace HolyLogger
                 Text = caption ?? string.Empty,
                 FontSize = 16,
                 FontWeight = FontWeights.Bold,
-                Foreground = blue,
-                Margin = new Thickness(14, 0, 0, 0),
-                Padding = new Thickness(6, 0, 6, 0),
-                HorizontalAlignment = HorizontalAlignment.Left,
-                VerticalAlignment = VerticalAlignment.Top
+                Foreground = blue
             };
-            name.SetResourceReference(TextBlock.BackgroundProperty, "WindowBg");
+
+            // THE NAME IN A SMALL FRAME OF ITS OWN, WHITE INSIDE (his request, 2026-11-27 - first for Shortcuts,
+            // then "the same for all the other frames"). It used to break the line with a patch of window colour,
+            // which hung down into the Shortcuts frame's light blue and looked like a mistake. Now every frame's
+            // name sits in a box with the frame's blue edge, centred on the frame's top line. White, fixed - it
+            // reads the same in every scheme, blue writing on white.
+            var tag = new Border
+            {
+                BorderBrush = blue,
+                BorderThickness = new Thickness(FrameBorderTop),
+                CornerRadius = new CornerRadius(4),
+                Background = Brushes.White,
+                Padding = new Thickness(6, 0, 6, 1),
+                HorizontalAlignment = HorizontalAlignment.Left,
+                VerticalAlignment = VerticalAlignment.Top,
+                IsHitTestVisible = false,
+                Child = name
+            };
+            tag.SizeChanged += (s2, e2) =>
+                tag.Margin = new Thickness(14, FrameMarginTop + FrameBorderTop / 2 - tag.ActualHeight / 2, 0, 0);
 
             var holder = new Grid { VerticalAlignment = VerticalAlignment.Top };
             holder.Children.Add(border);
-            holder.Children.Add(name);
+            holder.Children.Add(tag);
 
             return holder;
         }
