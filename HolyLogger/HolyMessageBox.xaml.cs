@@ -408,12 +408,14 @@ namespace HolyLogger
             string yesText = null, string noText = null,
             string yesBackground = null, string yesForeground = null, string yesBorder = null,
             UIElement picture = null, string messageAfter = null, string heading = null,
-            bool fitLongestLine = false)
+            bool fitLongestLine = false, bool enterSaysNo = false)
         {
             var dlg = new HolyMessageBox(message, title, type, owner, confirm: true, width, picture, messageAfter, heading);
 
             if (!string.IsNullOrWhiteSpace(yesText)) dlg.YesBtn.Content = yesText;
             if (!string.IsNullOrWhiteSpace(noText)) dlg.NoBtn.Content = noText;
+            // enterSaysNo: when Yes does something a stray Enter must not do (transmit, say).
+            if (enterSaysNo) { dlg.YesBtn.IsDefault = false; dlg.NoBtn.IsDefault = true; }
 
             PaintButton(dlg.YesBtn, yesBackground, yesForeground, yesBorder);
             dlg.FitWidthToButtons();   // the words just set may need more room than the text did

@@ -469,6 +469,7 @@ namespace HolyLogger
             public string Name;       // as people write it
             public bool Icom;
             public string Note;       // said under the advice, or null
+            public bool Tested;       // tried on a real radio; untested ones offer Send anyway
             public TxAudioItem[] Items;
         }
 
@@ -486,7 +487,7 @@ namespace HolyLogger
                 Items = new[] { new TxAudioItem {
                 Path = "MENU > SET > Connectors > DATA OFF MOD", Ask = "00 66",
                 Values = new[] { "MIC", "ACC", "MIC,ACC", "USB" }, Good = new[] { 3 }, SetTo = "USB" } } },
-            new TxAudioRadio { Key = "IC7610", Name = "IC-7610", Icom = true, Items = new[] { new TxAudioItem {
+            new TxAudioRadio { Key = "IC7610", Name = "IC-7610", Icom = true, Tested = true /* his, 2026-11-27 */, Items = new[] { new TxAudioItem {
                 Path = "MENU > SET > Connectors > MOD Input > DATA OFF MOD", Ask = "00 91",
                 Values = IcomModInputs, Good = new[] { 3, 4 }, SetTo = "MIC,USB (or USB)" } } },
             new TxAudioRadio { Key = "IC9700", Name = "IC-9700", Icom = true, Items = new[] { new TxAudioItem {
@@ -587,14 +588,28 @@ namespace HolyLogger
                 }
                 if (wrong.Count == 0) return true;
 
-                Log.Warn(VoiceMsgTag + "NOT SENT: the radio will not take the sound from this computer - told him what to change");
-                HolyMessageBox.ShowWarning(
-                    "Your " + radio.Name + " will not transmit the sound from this computer in SSB.\n\n"
+                string said = "Your " + radio.Name + " will not transmit the sound from this computer in SSB.\n\n"
                     + "Change this on the radio:\n" + string.Join("\n", wrong)
-                    + (radio.Note != null ? "\n\n" + radio.Note : string.Empty)
-                    + "\n\nNothing was sent.",
-                    "Voice Message", this, fitLongestLine: true);   // a menu path is read whole, not split
-                return false;
+                    + (radio.Note != null ? "\n\n" + radio.Note : string.Empty);
+
+                if (radio.Tested)
+                {
+                    Log.Warn(VoiceMsgTag + "NOT SENT: the radio will not take the sound from this computer - told him what to change");
+                    HolyMessageBox.ShowWarning(said + "\n\nNothing was sent.",
+                        "Voice Message", this, fitLongestLine: true);   // a menu path is read whole, not split
+                    return false;
+                }
+
+                // NOT YET TRIED ON THIS RADIO (his rule, 2026-11-27): read from the maker's document only, so
+                // a misread item could say "wrong" when it is right. Then he can send anyway - the cost of
+                // a mistake here is one click, not a button that never works. Enter does NOT send.
+                bool anyway = HolyMessageBox.ShowConfirm(
+                    said + "\n\nIf this setting is already right on your radio, press Send anyway.",
+                    "Voice Message", HolyMsgType.Warning, this,
+                    yesText: "Send anyway", noText: "Don't send", fitLongestLine: true, enterSaysNo: true);
+                Log.Warn(VoiceMsgTag + (anyway ? "the radio reads wrong, he chose Send anyway (" + radio.Name + " not yet tested)"
+                                               : "NOT SENT: the radio will not take the sound from this computer - told him what to change"));
+                return anyway;
             }
             catch (Exception ex) { Log.Swallow(ex); return true; }
             finally { _txAudioChecking = false; }
