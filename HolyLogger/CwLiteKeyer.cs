@@ -94,12 +94,25 @@ namespace HolyLogger
         // The typing box's frame, so the main window can line its right edge up with F8 below it.
         internal FrameworkElement TypingFrame { get { return _frame; } }
 
-        // FROM THE STRIP'S LEFT EDGE TO THE FRAME'S RIGHT EDGE, before the strip exists: the key's
-        // margin 10 and its box (HandKeyWidth), the frame's margin 4, its border 2 + 2, padding 5 + 5
-        // and the box's 190. The main window places CQ / ANS with it while the program is still
-        // loading, so nothing jumps when the strip arrives. Change any of those numbers below and
-        // change this with them.
-        internal const double LeftToFrameRight = 10 + CwKeyboardWindow.HandKeyWidth + 4 + 2 + 2 + 5 + 5 + 190;
+        // FROM THE STRIP'S LEFT EDGE TO THE FRAME'S LEFT EDGE, before the strip exists: the key's margin
+        // 10, its box (HandKeyWidth) and the frame's margin 4. And the frame's own border 2 + 2 and
+        // padding 5 + 5 round the box. The main window places CQ / ANS with these while the program is
+        // still loading, so nothing jumps when the strip arrives. Change any of those numbers below and
+        // change these with them.
+        internal const double LeftToFrameLeft = 10 + CwKeyboardWindow.HandKeyWidth + 4;
+        internal const double FrameChrome = 2 + 2 + 5 + 5;
+
+        // THE BOX SPANS THE FOUR MACRO BUTTONS (his request, 2026-11-28): its frame starts where their
+        // frame starts and ends where it ends. The main window works the width out (AlignCwBarToF8) and
+        // keeps it here, so a strip built later is born at the right width. 190 until it is known.
+        internal static double WantedBoxWidth = 190;
+
+        internal static double LeftToFrameRight { get { return LeftToFrameLeft + FrameChrome + WantedBoxWidth; } }
+
+        internal void ApplyBoxWidth()
+        {
+            if (Math.Abs(_box.Width - WantedBoxWidth) >= 0.5) _box.Width = WantedBoxWidth;
+        }
 
         private readonly DispatcherTimer _pump;
 
@@ -180,7 +193,7 @@ namespace HolyLogger
                 Padding = new Thickness(0),
                 Margin = new Thickness(0),
                 VerticalContentAlignment = VerticalAlignment.Center,
-                Width = 190,
+                Width = WantedBoxWidth,
                 ToolTip = "Type here and the radio sends it as you type." + Environment.NewLine
                         + "Escape stops it." + Environment.NewLine + Environment.NewLine
                         + "This line is here while the CW Keyer window is closed."

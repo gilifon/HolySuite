@@ -12948,24 +12948,33 @@ namespace HolyLogger
                 // (his screenshots). The strip's width up to the frame's right edge is fixed, so the
                 // spot where it starts is known before it exists; measured from the real one when it
                 // is there.
-                double span = CwLiteKeyer.LeftToFrameRight;
-                FrameworkElement frame = cwLiteKeyer != null ? cwLiteKeyer.TypingFrame : null;
-                if (frame != null && frame.IsVisible)
-                    span = frame.TranslatePoint(new Point(frame.ActualWidth, 0), CwLiteKeyerHost).X;
-
+                // AND STARTS WHERE THE FOUR START (his request, 2026-11-28): the group moves left until the
+                // box's frame stands over the left edge of the Macro buttons' frame, and the box grows to
+                // reach F8 from there. If CQ / ANS and the key cannot go that far left, the box starts
+                // where they let it and is narrower by that much - its right edge stays on F8.
                 double hostLeft = CwLiteKeyerHost.TranslatePoint(new Point(0, 0), this).X;
                 double f8Right = PlayCommandsBorder.TranslatePoint(new Point(PlayCommandsBorder.ActualWidth, 0), this).X;
 
-                double left = CwBarGroup.Margin.Left + (f8Right - span - hostLeft);
+                double margin = CwBarGroup.Margin.Left;
+                double left = margin + (playLeft - hostLeft - CwLiteKeyer.LeftToFrameLeft);
                 if (left < 0) left = 0;   // no room to reach it: as far left as it goes
-                if (Math.Abs(left - CwBarGroup.Margin.Left) < 0.5) return;
 
+                double playLeft = PlayCommandsBorder.TranslatePoint(new Point(0, 0), this).X;
                 var m = CwBarGroup.Margin;
                 CwBarGroup.Margin = new Thickness(left, m.Top, m.Right, m.Bottom);
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
         }
 
+                double frameLeft = hostLeft + (left - margin) + CwLiteKeyer.LeftToFrameLeft;
+                double box = Math.Max(120, f8Right - frameLeft - CwLiteKeyer.FrameChrome);
+                if (Math.Abs(box - CwLiteKeyer.WantedBoxWidth) >= 0.5)
+                {
+                    CwLiteKeyer.WantedBoxWidth = box;
+                    if (cwLiteKeyer != null) cwLiteKeyer.ApplyBoxWidth();
+                }
+
+                if (Math.Abs(left - margin) < 0.5) return;
         // The gear at the end of the menu line: exactly Tools > Options.
         private void MainSettingsGear_Click(object sender, RoutedEventArgs e)
         {
