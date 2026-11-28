@@ -825,6 +825,12 @@ namespace HolyLogger
         // Between the constructor ending and Loaded firing, WPF creates the real window and lays it
         // out. This mark is the moment the native window exists, so that stretch is no longer one
         // unexplained lump.
+        // Not described to accessibility programs - a friend's 45 s freezes (see NoInsideAutomationPeer).
+        protected override System.Windows.Automation.Peers.AutomationPeer OnCreateAutomationPeer()
+        {
+            return new NoInsideAutomationPeer(this);
+        }
+
         protected override void OnSourceInitialized(EventArgs e)
         {
             base.OnSourceInitialized(e);

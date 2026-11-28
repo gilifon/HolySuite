@@ -682,7 +682,7 @@ namespace HolyLogger
                 Child = clusterOuter
             };
 
-            clusterWindow = new Window
+            clusterWindow = new NoInsideAutomationWindow   // not described to accessibility programs - see that class
             {
                 Title = "Cluster",
                 WindowStyle = WindowStyle.None,
@@ -7364,6 +7364,36 @@ namespace HolyLogger
         // (The old ApplyClusterTableHeaderBackgroundFromSettings is gone: the header style's
         // Background is a DynamicResource on the LogHeaderBg token, so scheme switches and
         // Customize Colors edits repaint it without any re-apply.)
+    }
+
+    // ── NOT DESCRIBED TO ACCESSIBILITY PROGRAMS (2026-11-28) ─────────────────────────────────────────
+    //
+    // A friend's HolyLogger froze for 43-45 s, five times (holylogger-log-21/22, FREEZE lines). Every
+    // stack was the same: Windows' text input (TextStore.GetTextExt) made WPF lay the window out, and
+    // because some program on his PC was listening through UI Automation (the accessibility system),
+    // WPF then walked the whole window's automation tree (AutomationPeer.UpdateSubtree) and told that
+    // program about each change - waiting each time for the other program to answer
+    // (UiaCore RawUiaHostProviderFromHwnd -> WaitForMultipleObjects). Which program it was is not known.
+    //
+    // HolyLogger needs nothing from such programs. So the main window and the cluster window - the two
+    // big trees, with the log and the spot tables - hand out a window peer with NO children: the
+    // window itself is still seen (its title, that it is there), but nothing inside it is walked or
+    // reported, so there is nothing to wait for. The cost: a screen reader cannot read inside these two
+    // windows. He decided to do it and see whether any user has a problem with that.
+    internal sealed class NoInsideAutomationPeer : System.Windows.Automation.Peers.WindowAutomationPeer
+    {
+        public NoInsideAutomationPeer(Window owner) : base(owner) { }
+
+        protected override List<System.Windows.Automation.Peers.AutomationPeer> GetChildrenCore() { return null; }
+    }
+
+    // The cluster window is made in code (GenerateNewClusterWindow), so it is this rather than a Window.
+    internal sealed class NoInsideAutomationWindow : Window
+    {
+        protected override System.Windows.Automation.Peers.AutomationPeer OnCreateAutomationPeer()
+        {
+            return new NoInsideAutomationPeer(this);
+        }
     }
 }
 
