@@ -12959,18 +12959,12 @@ namespace HolyLogger
                 // reach F8 from there. If CQ / ANS and the key cannot go that far left, the box starts
                 // where they let it and is narrower by that much - its right edge stays on F8.
                 double hostLeft = CwLiteKeyerHost.TranslatePoint(new Point(0, 0), this).X;
+                double playLeft = PlayCommandsBorder.TranslatePoint(new Point(0, 0), this).X;
                 double f8Right = PlayCommandsBorder.TranslatePoint(new Point(PlayCommandsBorder.ActualWidth, 0), this).X;
 
                 double margin = CwBarGroup.Margin.Left;
                 double left = margin + (playLeft - hostLeft - CwLiteKeyer.LeftToFrameLeft);
                 if (left < 0) left = 0;   // no room to reach it: as far left as it goes
-
-                double playLeft = PlayCommandsBorder.TranslatePoint(new Point(0, 0), this).X;
-                var m = CwBarGroup.Margin;
-                CwBarGroup.Margin = new Thickness(left, m.Top, m.Right, m.Bottom);
-            }
-            catch (Exception swallowed) { Log.Swallow(swallowed); }
-        }
 
                 double frameLeft = hostLeft + (left - margin) + CwLiteKeyer.LeftToFrameLeft;
                 double box = Math.Max(120, f8Right - frameLeft - CwLiteKeyer.FrameChrome);
@@ -12981,6 +12975,12 @@ namespace HolyLogger
                 }
 
                 if (Math.Abs(left - margin) < 0.5) return;
+                var m = CwBarGroup.Margin;
+                CwBarGroup.Margin = new Thickness(left, m.Top, m.Right, m.Bottom);
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
         // The gear at the end of the menu line: exactly Tools > Options.
         private void MainSettingsGear_Click(object sender, RoutedEventArgs e)
         {
