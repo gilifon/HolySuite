@@ -46,6 +46,7 @@ namespace HolyLogger
         public bool Load(string path, out string error)
         {
             error = null;
+            _packed.Clear();   // a network loaded again: its weights are new arrays, packed afresh when first used
             try
             {
                 using (var r = new BinaryReader(File.OpenRead(path)))
@@ -118,6 +119,13 @@ namespace HolyLogger
                 stack.Push(a);
             }
             _lent.Clear();
+            foreach (var a in _lent4)
+            {
+                Stack<System.Numerics.Vector4[]> st;
+                if (!_spare4.TryGetValue(a.Length, out st)) _spare4[a.Length] = st = new Stack<System.Numerics.Vector4[]>();
+                st.Push(a);
+            }
+            _lent4.Clear();
         }
 
         /// <summary>Spectrogram [t, NBins] (row-major) -> log-probabilities [t', NClass], t' = steps after the front end.</summary>
@@ -214,7 +222,57 @@ namespace HolyLogger
         }
 
         // x [rows][inW], w [outW][inW] (PyTorch's layout) -> [rows][outW]
+        // FOUR AT A TIME, IN THE 64-BIT PROGRAM (2026-11-27): the processor multiplies and adds four numbers in one
+        // go (Vector4, SSE). The weights are packed in fours once, when first used; each input row is packed in fours
+        // here; two rows share each weight load. Measured on his i7 (tools/NetSpeed.cs, 2 processors, one 15 s
+        // window): today's net 1.55 s (32-bit) -> 0.64 s, the bigger net 3.11 s -> 1.08 s. ONLY in 64-bit: the
+        // 32-bit .NET does not do Vector4 four at a time, and there it took 8.8 s instead of 3.1. The sums run in
+        // another order, so the last digits of a float can differ - the letters were checked to be the same.
+        readonly Dictionary<float[], System.Numerics.Vector4[]> _packed = new Dictionary<float[], System.Numerics.Vector4[]>();
+        readonly Dictionary<int, Stack<System.Numerics.Vector4[]>> _spare4 = new Dictionary<int, Stack<System.Numerics.Vector4[]>>();
+        readonly List<System.Numerics.Vector4[]> _lent4 = new List<System.Numerics.Vector4[]>();
+
+        System.Numerics.Vector4[] Pack(float[] a, int n, System.Numerics.Vector4[] into)
+        {
+            for (int k = 0; k < n; k++) into[k] = new System.Numerics.Vector4(a[4 * k], a[4 * k + 1], a[4 * k + 2], a[4 * k + 3]);
+            return into;
+        }
+
         float[] Linear(float[] x, int rows, int inW, float[] w, float[] b, int outW)
+        {
+            if (!Environment.Is64BitProcess || inW % 4 != 0) return LinearPlain(x, rows, inW, w, b, outW);
+            int q = inW / 4;
+            System.Numerics.Vector4[] wv;
+            if (!_packed.TryGetValue(w, out wv)) _packed[w] = wv = Pack(w, w.Length / 4, new System.Numerics.Vector4[w.Length / 4]);
+            Stack<System.Numerics.Vector4[]> st;
+            var xv = _spare4.TryGetValue(rows * q, out st) && st.Count > 0 ? st.Pop() : new System.Numerics.Vector4[rows * q];
+            _lent4.Add(xv);
+            Pack(x, rows * q, xv);
+            var y = Rent(rows * outW);
+            int pairs = (rows + 1) / 2;
+            Parallel.For(0, pairs, Opts(), p =>
+            {
+                int r0 = 2 * p, r1 = Math.Min(r0 + 1, rows - 1);
+                int xb0 = r0 * q, xb1 = r1 * q;
+                for (int o = 0; o < outW; o++)
+                {
+                    int wb = o * q;
+                    var a0 = System.Numerics.Vector4.Zero;
+                    var a1 = System.Numerics.Vector4.Zero;
+                    for (int i = 0; i < q; i++)
+                    {
+                        var v = wv[wb + i];
+                        a0 += v * xv[xb0 + i];
+                        a1 += v * xv[xb1 + i];
+                    }
+                    y[r0 * outW + o] = a0.X + a0.Y + a0.Z + a0.W + b[o];
+                    y[r1 * outW + o] = a1.X + a1.Y + a1.Z + a1.W + b[o];
+                }
+            });
+            return y;
+        }
+
+        float[] LinearPlain(float[] x, int rows, int inW, float[] w, float[] b, int outW)
         {
             var y = Rent(rows * outW);
             Parallel.For(0, rows, Opts(), r =>
